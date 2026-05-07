@@ -25,7 +25,7 @@ Specific endpoint files may be added under `functions/` as the route surface exp
 
 ## Data Access Layer
 
-Storage contracts live in `src/storage/interfaces.ts`. D1-backed page reads, history, recent changes, search, namespace indexes, backlinks, wanted pages, orphan pages, and saves begin in `src/wiki/page-service.ts` and `src/storage/d1.ts`; future adapters should implement the same contracts for media, ACLs, users, metadata, drafts, locks, and rendered cache.
+Storage contracts live in `src/storage/interfaces.ts`. D1-backed adapters in `src/storage/d1.ts` cover page records, page revisions, media metadata rows, media revision rows, metadata, ACL rules, changelog rows, users, drafts, rendered cache rows, and search postings. Higher-level wiki services still use direct D1 queries where they need page relationship or render-specific joins.
 
 ## Storage Schema
 
