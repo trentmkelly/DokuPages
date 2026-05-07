@@ -97,7 +97,25 @@ describe("renderWikiText", () => {
       '<a href="http://www.google.com" rel="nofollow noopener noreferrer">Google</a>'
     );
     expect(rendered.html).not.toContain("http:<em>");
-    expect(rendered.html).toContain('<img src="/media/wiki/dokuwiki.svg" alt="Logo">');
+    expect(rendered.html).toContain(
+      '<a href="/media-detail/wiki/dokuwiki.svg" class="media" title="wiki:dokuwiki.svg"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+    );
+  });
+
+  it("renders DokuWiki media alignment, sizing, and link options", () => {
+    const rendered = renderWikiText(
+      "{{ wiki:dokuwiki-128.png?200x50 |Caption}} {{wiki:dokuwiki-128.png?linkonly}} [[https://example.test|{{wiki:dokuwiki.svg?nolink|Logo}}]]"
+    );
+
+    expect(rendered.html).toContain(
+      '<img src="/media/wiki/dokuwiki-128.png" class="mediacenter" loading="lazy" title="Caption" alt="Caption" width="200" height="50">'
+    );
+    expect(rendered.html).toContain(
+      '<a href="/media/wiki/dokuwiki-128.png" class="media" title="wiki:dokuwiki-128.png">dokuwiki-128.png</a>'
+    );
+    expect(rendered.html).toContain(
+      '<a href="https://example.test" rel="nofollow noopener noreferrer"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+    );
   });
 
   it("renders automatic external links", () => {

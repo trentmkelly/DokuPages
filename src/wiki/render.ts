@@ -1,6 +1,6 @@
 import { resolveInterwikiLink } from "./interwiki";
 import { cleanPageId, pageIdToRoutePath, resolvePageLinkId } from "./page-id";
-import { mediaPath } from "./media-service";
+import { cleanMediaId, mediaDetailPath, mediaName, mediaPath } from "./media-service";
 
 export interface TocItem {
   id: string;
@@ -126,6 +126,7 @@ const ACRONYM_PATTERN = new RegExp(
     .join("|")})(?=$|${ACRONYM_BOUNDARY})`,
   "g"
 );
+const IMAGE_MEDIA_EXTENSIONS = new Set(["gif", "jpg", "jpeg", "png", "svg", "webp", "avif"]);
 
 export function renderWikiText(
   source: string,
@@ -391,12 +392,17 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
 function renderInline(source: string, context: RenderContext): string {
   const nowiki: string[] = [];
   const footnotes: string[] = [];
-  const protectedHtml: string[] = [];
-  const protectHtml = (html: string): string => {
+  const protectedHtml: ProtectedHtml[] = [];
+  const protectHtml = (html: string, options: { linkLabelHtml?: string } = {}): string => {
     const token = `\uE004${protectedHtml.length}\uE005`;
-    protectedHtml.push(html);
+    protectedHtml.push({ html, linkLabelHtml: options.linkLabelHtml });
     return token;
   };
+  const renderLinkLabel = (label: string): string =>
+    escapeHtml(label).replace(/\uE004(\d+)\uE005/g, (_match, index: string) => {
+      const entry = protectedHtml[Number(index)];
+      return entry?.linkLabelHtml ?? entry?.html ?? "";
+    });
   let rendered = source.replace(/%%([\s\S]*?)%%/g, (_match, literal: string) => {
     const token = `\uE000${nowiki.length}\uE001`;
     nowiki.push(escapeHtml(literal));
@@ -412,7 +418,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = escapeHtml(rendered);
   rendered = renderTypography(rendered);
   rendered = renderMedia(rendered, protectHtml);
-  rendered = renderLinks(rendered, context, protectHtml);
+  rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = renderSmileys(rendered, protectHtml);
@@ -436,8 +442,8 @@ function renderInline(source: string, context: RenderContext): string {
     );
   }
 
-  for (const [index, html] of protectedHtml.entries()) {
-    rendered = rendered.replace(`\uE004${index}\uE005`, html);
+  for (let index = protectedHtml.length - 1; index >= 0; index -= 1) {
+    rendered = rendered.replaceAll(`\uE004${index}\uE005`, protectedHtml[index].html);
   }
 
   for (const [index, literal] of nowiki.entries()) {
@@ -485,21 +491,104 @@ function renderAcronyms(source: string, protectHtml: (html: string) => string): 
   });
 }
 
-function renderMedia(source: string, protectHtml: (html: string) => string): string {
-  return source.replace(
-    /\{\{([^}|?]+)(?:\?[^}|]+)?(?:\|([^}]*))?\}\}/g,
-    (_match, rawId, rawAlt) => {
-      const id = cleanPageId(rawId);
-      const alt = rawAlt ? rawAlt.trim() : id;
-      return protectHtml(`<img src="${mediaPath(id)}" alt="${escapeAttribute(alt)}">`);
+function renderMedia(
+  source: string,
+  protectHtml: (html: string, options?: { linkLabelHtml?: string }) => string
+): string {
+  return source.replace(/\{\{([^}]+)\}\}/g, (_match, rawMedia: string) => {
+    const parsed = parseMedia(rawMedia);
+    const title = parsed.title?.trim() || null;
+    const linkTitle = escapeAttribute(parsed.id);
+
+    if (parsed.linking === "linkonly" || !isImageMedia(parsed.id)) {
+      const label = title || mediaName(parsed.id);
+      return protectHtml(
+        `<a href="${mediaPath(parsed.id)}" class="media" title="${linkTitle}">${escapeHtml(label)}</a>`,
+        { linkLabelHtml: escapeHtml(label) }
+      );
     }
-  );
+
+    const attributes = [
+      `src="${mediaPath(parsed.id)}"`,
+      `class="media${parsed.align ?? ""}"`,
+      'loading="lazy"',
+      title ? `title="${escapeAttribute(title)}"` : "",
+      `alt="${title ? escapeAttribute(title) : ""}"`,
+      parsed.width ? `width="${escapeAttribute(parsed.width)}"` : "",
+      parsed.height ? `height="${escapeAttribute(parsed.height)}"` : ""
+    ].filter(Boolean);
+    const image = `<img ${attributes.join(" ")}>`;
+
+    if (parsed.linking === "nolink") {
+      return protectHtml(image, { linkLabelHtml: image });
+    }
+
+    const href = parsed.linking === "direct" ? mediaPath(parsed.id) : mediaDetailPath(parsed.id);
+    return protectHtml(`<a href="${href}" class="media" title="${linkTitle}">${image}</a>`, {
+      linkLabelHtml: image
+    });
+  });
+}
+
+interface ProtectedHtml {
+  html: string;
+  linkLabelHtml?: string;
+}
+
+interface ParsedMedia {
+  id: string;
+  title: string | null;
+  align: "left" | "right" | "center" | null;
+  width: string | null;
+  height: string | null;
+  linking: "details" | "direct" | "linkonly" | "nolink";
+}
+
+function parseMedia(rawMedia: string): ParsedMedia {
+  const [rawTarget, rawTitle] = rawMedia.split("|", 2);
+  const leadingSpace = rawTarget.startsWith(" ");
+  const trailingSpace = rawTarget.endsWith(" ");
+  const align =
+    leadingSpace && trailingSpace
+      ? "center"
+      : leadingSpace
+        ? "right"
+        : trailingSpace
+          ? "left"
+          : null;
+  const trimmedTarget = rawTarget.trim();
+  const queryIndex = trimmedTarget.lastIndexOf("?");
+  const rawId = queryIndex === -1 ? trimmedTarget : trimmedTarget.slice(0, queryIndex);
+  const params = queryIndex === -1 ? "" : trimmedTarget.slice(queryIndex + 1);
+  const size = params.match(/(\d+)(?:x(\d+))?/i);
+
+  return {
+    id: cleanMediaId(rawId),
+    title: rawTitle ?? null,
+    align,
+    width: size?.[1] ?? null,
+    height: size?.[2] ?? null,
+    linking: mediaLinkingMode(params)
+  };
+}
+
+function mediaLinkingMode(params: string): ParsedMedia["linking"] {
+  if (/nolink/i.test(params)) return "nolink";
+  if (/direct/i.test(params)) return "direct";
+  if (/linkonly/i.test(params)) return "linkonly";
+  return "details";
+}
+
+function isImageMedia(id: string): boolean {
+  const extension = mediaName(id).split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_MEDIA_EXTENSIONS.has(extension);
 }
 
 function renderLinks(
   source: string,
   context: RenderContext,
-  protectHtml: (html: string) => string
+  protectHtml: (html: string) => string,
+  renderLinkLabel: (label: string) => string
 ): string {
   return source.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, rawTarget, rawLabel) => {
     const target = decodeHtmlEntities(rawTarget.trim());
@@ -524,7 +613,7 @@ function renderLinks(
     const linkClass = windowsShare ? ' class="windows"' : "";
 
     return protectHtml(
-      `<a href="${escapeAttribute(href)}"${rel}${linkClass}>${escapeHtml(label)}</a>`
+      `<a href="${escapeAttribute(href)}"${rel}${linkClass}>${renderLinkLabel(label)}</a>`
     );
   });
 }

@@ -208,6 +208,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement internal links.
 - [x] Implement namespace-relative links.
 - [x] Implement media links.
+- [x] Implement media sizing, alignment, and link options.
 - [x] Implement external links.
 - [x] Implement interwiki links.
 - [x] Implement Windows share links if supported.
