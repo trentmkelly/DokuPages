@@ -1521,7 +1521,7 @@ describe("handleRequest", () => {
       title: "Preview"
     });
     expect(preview).toMatchObject({
-      html: expect.stringContaining('<a href="/wiki/wiki/guide/child">Child</a>')
+      html: expect.stringContaining('<a href="/wiki/wiki/guide/child" class="wikilink1">Child</a>')
     });
   });
 

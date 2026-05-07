@@ -43,7 +43,7 @@ Scanned 4 page files and 572 source lines.
 | Tables                           | supported       |          31 | `wiki:syntax`                                                           |                                                                                         |
 | Quote blocks                     | supported       |           5 | `wiki:syntax`                                                           |                                                                                         |
 | Footnotes                        | supported       |           3 | `wiki:dokuwiki`, `wiki:syntax`                                          |                                                                                         |
-| Horizontal rules                 | unsupported     |           1 | `wiki:syntax`                                                           | Current renderer treats this as paragraph text.                                         |
+| Horizontal rules                 | supported       |           1 | `wiki:syntax`                                                           |                                                                                         |
 | Code blocks                      | supported       |           8 | `wiki:syntax`                                                           |                                                                                         |
 | File blocks                      | supported       |           4 | `wiki:syntax`                                                           |                                                                                         |
 | Indented code blocks             | supported       |          41 | `wiki:dokuwiki`, `wiki:syntax`                                          |                                                                                         |
@@ -58,7 +58,6 @@ Scanned 4 page files and 572 source lines.
 ## Follow-Up Notes
 
 - unsupported: RSS feed aggregation syntax (1 occurrence) - Requires a Pages-native replacement; the renderer does not fetch or cache remote feeds.
-- unsupported: Horizontal rules (1 occurrence) - Current renderer treats this as paragraph text.
 - partial: Code/file language metadata (5 occurrences) - Renderer preserves code/file content but does not run GeSHi highlighting.
 - partial: Downloadable file block metadata (2 occurrences) - Renderer displays file labels but does not provide generated downloads.
 - unsupported: Syntax plugin macros (1 occurrence) - Current content uses DokuWiki's INFO syntax plugin macro.

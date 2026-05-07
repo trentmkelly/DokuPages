@@ -67,6 +67,12 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain("&ndash;");
   });
 
+  it("renders horizontal rules for the DokuWiki template", () => {
+    const rendered = renderWikiText("Before\n\n----\n\nAfter");
+
+    expect(rendered.html).toBe("<p>Before</p>\n<hr>\n<p>After</p>");
+  });
+
   it("renders default DokuWiki smileys", () => {
     const rendered = renderWikiText("Hello :-) LOL wordLOL [[wiki:syntax|LOL]]");
     const literal = renderWikiText("%%:-)%%");
@@ -78,7 +84,7 @@ describe("renderWikiText", () => {
       '<img src="/images/smileys/lol.svg" class="icon smiley" alt="LOL">'
     );
     expect(rendered.html).toContain("wordLOL");
-    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax">LOL</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">LOL</a>');
     expect(literal.html).toBe("<p>:-)</p>");
   });
 
@@ -100,12 +106,12 @@ describe("renderWikiText", () => {
       "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}"
     );
 
-    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax">Syntax</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">Syntax</a>');
     expect(rendered.html).toContain(
-      '<a href="https://example.test" rel="nofollow noopener noreferrer">Example</a>'
+      '<a href="https://example.test" class="urlextern" rel="nofollow noopener noreferrer">Example</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="http://www.google.com" rel="nofollow noopener noreferrer">Google</a>'
+      '<a href="http://www.google.com" class="urlextern" rel="nofollow noopener noreferrer">Google</a>'
     );
     expect(rendered.html).not.toContain("http:<em>");
     expect(rendered.html).toContain(
@@ -125,7 +131,7 @@ describe("renderWikiText", () => {
       '<a href="/media/wiki/dokuwiki-128.png" class="media" title="wiki:dokuwiki-128.png">dokuwiki-128.png</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="https://example.test" rel="nofollow noopener noreferrer"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+      '<a href="https://example.test" class="urlextern" rel="nofollow noopener noreferrer"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
     );
   });
 
@@ -133,10 +139,10 @@ describe("renderWikiText", () => {
     const rendered = renderWikiText("Visit http://www.google.com or www.example.org.");
 
     expect(rendered.html).toContain(
-      '<a href="http://www.google.com" rel="nofollow noopener noreferrer">http://www.google.com</a>'
+      '<a href="http://www.google.com" class="urlextern" rel="nofollow noopener noreferrer">http://www.google.com</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="http://www.example.org" rel="nofollow noopener noreferrer">www.example.org</a>.'
+      '<a href="http://www.example.org" class="urlextern" rel="nofollow noopener noreferrer">www.example.org</a>.'
     );
   });
 
@@ -146,11 +152,13 @@ describe("renderWikiText", () => {
       { pageId: "wiki:guide:page" }
     );
 
-    expect(rendered.html).toContain('<a href="/wiki/wiki/guide/child">Child</a>');
-    expect(rendered.html).toContain('<a href="/wiki/start">Start</a>');
-    expect(rendered.html).toContain('<a href="/wiki/wiki/root">Root</a>');
-    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax#head-line">Syntax</a>');
-    expect(rendered.html).toContain('<a href="#local-section">Local</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/guide/child" class="wikilink1">Child</a>');
+    expect(rendered.html).toContain('<a href="/wiki/start" class="wikilink1">Start</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/root" class="wikilink1">Root</a>');
+    expect(rendered.html).toContain(
+      '<a href="/wiki/wiki/syntax#head-line" class="wikilink1">Syntax</a>'
+    );
+    expect(rendered.html).toContain('<a href="#local-section" class="wikilink1">Local</a>');
   });
 
   it("renders interwiki links from the default DokuWiki map", () => {
@@ -159,15 +167,17 @@ describe("renderWikiText", () => {
     );
 
     expect(rendered.html).toContain(
-      '<a href="https://www.dokuwiki.org/newsletter" rel="nofollow noopener noreferrer">doku&gt;newsletter</a>'
+      '<a href="https://www.dokuwiki.org/newsletter" class="interwiki iw_doku" rel="nofollow noopener noreferrer">doku&gt;newsletter</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="https://www.dokuwiki.org/faq:sidebar" rel="nofollow noopener noreferrer">FAQ</a>'
+      '<a href="https://www.dokuwiki.org/faq:sidebar" class="interwiki iw_doku" rel="nofollow noopener noreferrer">FAQ</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="https://en.wikipedia.org/wiki/Wiki" rel="nofollow noopener noreferrer">Wiki</a>'
+      '<a href="https://en.wikipedia.org/wiki/Wiki" class="interwiki iw_wp" rel="nofollow noopener noreferrer">Wiki</a>'
     );
-    expect(rendered.html).toContain('<a href="/doku.php?do=admin&amp;page=config">config</a>');
+    expect(rendered.html).toContain(
+      '<a href="/doku.php?do=admin&amp;page=config" class="interwiki iw_this">config</a>'
+    );
   });
 
   it("renders Windows share links", () => {

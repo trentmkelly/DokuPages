@@ -38,6 +38,7 @@ fresh render.
 - media embeds
 - unordered lists
 - nested lists
+- horizontal rules
 - quote blocks
 - footnotes
 - indented code blocks
@@ -46,6 +47,8 @@ fresh render.
 - simple tables
 - acronym, entity, smiley, and typography replacement
 - section edit anchors
+- DokuWiki-template link classes for internal, external, interwiki, mail, media,
+  and Windows-share links
 
 ## Still Pending
 

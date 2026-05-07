@@ -166,9 +166,8 @@ export const FEATURE_DEFINITIONS = [
   {
     id: "horizontal_rules",
     label: "Horizontal rules",
-    status: "unsupported",
-    pattern: /^-{4,}\s*$/gm,
-    note: "Current renderer treats this as paragraph text."
+    status: "supported",
+    pattern: /^-{4,}\s*$/gm
   },
   {
     id: "code_blocks",

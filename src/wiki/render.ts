@@ -197,6 +197,12 @@ export function renderWikiText(
       continue;
     }
 
+    if (/^-{4,}\s*$/.test(line)) {
+      flushAll(blocks, state, context);
+      blocks.push("<hr>");
+      continue;
+    }
+
     const listItem = line.match(/^(\s{2,})([*-])\s+(.*)$/);
     if (listItem) {
       flushParagraph(blocks, state, context);
@@ -801,13 +807,42 @@ function renderLinks(
         : windowsShare
           ? windowsShare
           : internalLinkPath(target, context.pageId);
+    const classNames = linkClassNames({
+      external,
+      interwikiShortcut: interwiki ? interwikiShortcut(target) : null,
+      internal: !external && !interwiki && !windowsShare,
+      windowsShare: Boolean(windowsShare)
+    });
     const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
-    const linkClass = windowsShare ? ' class="windows"' : "";
+    const classAttribute = classNames.length > 0 ? ` class="${classNames.join(" ")}"` : "";
 
     return protectHtml(
-      `<a href="${escapeAttribute(href)}"${rel}${linkClass}>${renderLinkLabel(label)}</a>`
+      `<a href="${escapeAttribute(href)}"${classAttribute}${rel}>${renderLinkLabel(label)}</a>`
     );
   });
+}
+
+function linkClassNames(options: {
+  external: boolean;
+  interwikiShortcut: string | null;
+  internal: boolean;
+  windowsShare: boolean;
+}): string[] {
+  if (options.windowsShare) return ["windows"];
+  if (options.external) return ["urlextern"];
+  if (options.interwikiShortcut) return ["interwiki", `iw_${options.interwikiShortcut}`];
+  if (options.internal) return ["wikilink1"];
+  return [];
+}
+
+function interwikiShortcut(target: string): string | null {
+  const separator = target.indexOf(">");
+  if (separator <= 0) return null;
+
+  return target
+    .slice(0, separator)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_");
 }
 
 function renderEmailAutolinks(source: string, protectHtml: (html: string) => string): string {
@@ -830,7 +865,7 @@ function renderExternalAutolinks(source: string, protectHtml: (html: string) => 
           : decoded;
 
       return `${protectHtml(
-        `<a href="${escapeAttribute(href)}" rel="nofollow noopener noreferrer">${escapeHtml(decoded)}</a>`
+        `<a href="${escapeAttribute(href)}" class="urlextern" rel="nofollow noopener noreferrer">${escapeHtml(decoded)}</a>`
       )}${suffix}`;
     }
   );
