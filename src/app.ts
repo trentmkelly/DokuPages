@@ -11,8 +11,12 @@ import { cleanPageId } from "./wiki/page-id";
 import {
   getCurrentPage,
   getPageRevision,
+  listBacklinks,
+  listNamespacePages,
+  listOrphanPages,
   listPageRevisions,
   listRecentChanges,
+  listWantedPages,
   pagePath,
   savePage,
   searchPages,
@@ -40,6 +44,20 @@ export async function handleRequest(
 
   if (url.pathname === "/search") {
     return htmlResponse(await renderSearchPage(env, url));
+  }
+
+  if (url.pathname === "/index") {
+    return htmlResponse(
+      await renderNamespaceIndexPage(env, cleanPageId(url.searchParams.get("ns") ?? ""))
+    );
+  }
+
+  if (url.pathname === "/wanted") {
+    return htmlResponse(await renderWantedPage(env));
+  }
+
+  if (url.pathname === "/orphans") {
+    return htmlResponse(await renderOrphanPage(env));
   }
 
   if (url.pathname === "/api/pages" && request.method === "POST") {
@@ -78,6 +96,22 @@ export async function handleRequest(
 
     if (url.searchParams.get("do") === "search") {
       return htmlResponse(await renderSearchPage(env, url));
+    }
+
+    if (url.searchParams.get("do") === "index") {
+      return htmlResponse(await renderNamespaceIndexPage(env, namespaceForIndex(id)));
+    }
+
+    if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
+      return htmlResponse(await renderBacklinksPage(env, id));
+    }
+
+    if (url.searchParams.get("do") === "wanted") {
+      return htmlResponse(await renderWantedPage(env));
+    }
+
+    if (url.searchParams.get("do") === "orphan" || url.searchParams.get("do") === "orphans") {
+      return htmlResponse(await renderOrphanPage(env));
     }
 
     const revisionId = url.searchParams.get("rev");
@@ -225,6 +259,74 @@ async function renderSearchPage(env: Env, url: URL): Promise<string> {
     ${emptyState}
     <ol>${resultItems}</ol>`
   );
+}
+
+async function renderNamespaceIndexPage(env: Env, namespace: string): Promise<string> {
+  const pages = await listNamespacePages(env.DB, namespace);
+  const title = namespace ? `Index of ${namespace}` : "Index";
+  const items = renderPageReferenceList(
+    pages.map((page) => ({
+      id: page.id,
+      title: page.title,
+      updatedAt: page.updatedAt
+    }))
+  );
+  const emptyState = pages.length === 0 ? "<p>No pages found in this namespace.</p>" : "";
+
+  return htmlShell(env, title, `<h1>${escapeHtml(title)}</h1>${emptyState}<ul>${items}</ul>`);
+}
+
+async function renderBacklinksPage(env: Env, id: string): Promise<string> {
+  const backlinks = await listBacklinks(env.DB, id);
+  const items = renderPageReferenceList(backlinks);
+  const emptyState = backlinks.length === 0 ? "<p>No backlinks found.</p>" : "";
+
+  return htmlShell(
+    env,
+    `Backlinks for ${id}`,
+    `<h1>Backlinks for ${escapeHtml(id)}</h1>${emptyState}<ul>${items}</ul>`
+  );
+}
+
+async function renderOrphanPage(env: Env): Promise<string> {
+  const orphans = await listOrphanPages(env.DB);
+  const items = renderPageReferenceList(orphans);
+  const emptyState = orphans.length === 0 ? "<p>No orphan pages found.</p>" : "";
+
+  return htmlShell(env, "Orphan pages", `<h1>Orphan pages</h1>${emptyState}<ul>${items}</ul>`);
+}
+
+async function renderWantedPage(env: Env): Promise<string> {
+  const wanted = await listWantedPages(env.DB);
+  const items = wanted
+    .map(
+      (page) => `<li>
+        <a href="${pagePath(page.id)}">${escapeHtml(page.id)}</a>
+        <small>${page.referrers.length} referrer${page.referrers.length === 1 ? "" : "s"}</small>
+        <ul>${renderPageReferenceList(page.referrers)}</ul>
+      </li>`
+    )
+    .join("");
+  const emptyState = wanted.length === 0 ? "<p>No wanted pages found.</p>" : "";
+
+  return htmlShell(env, "Wanted pages", `<h1>Wanted pages</h1>${emptyState}<ul>${items}</ul>`);
+}
+
+function renderPageReferenceList(
+  pages: Array<{ id: string; title: string | null; updatedAt: string }>
+): string {
+  return pages
+    .map(
+      (page) => `<li>
+        <a href="${pagePath(page.id)}">${escapeHtml(page.title ?? page.id)}</a>
+        <small>${escapeHtml(page.id)} - ${escapeHtml(page.updatedAt)}</small>
+      </li>`
+    )
+    .join("");
+}
+
+function namespaceForIndex(id: string): string {
+  return id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : id;
 }
 
 function renderLineDiff(left: string, right: string): string {

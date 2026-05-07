@@ -167,6 +167,38 @@ describe("handleRequest", () => {
     await expect(response.text()).resolves.toContain("/wiki/wiki/welcome");
   });
 
+  it("renders namespace indexes", async () => {
+    const response = await handleRequest(new Request("https://example.com/index?ns=wiki"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Index of wiki");
+    expect(html).toContain("/wiki/wiki/welcome");
+    expect(html).toContain("/wiki/wiki/guide");
+  });
+
+  it("renders backlinks for a page", async () => {
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=backlink"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Backlinks for wiki:welcome");
+    expect(html).toContain("/wiki/wiki/guide");
+  });
+
+  it("renders wanted and orphan page reports", async () => {
+    const wanted = await handleRequest(new Request("https://example.com/wanted"), env);
+    const orphans = await handleRequest(new Request("https://example.com/orphans"), env);
+
+    expect(wanted.status).toBe(200);
+    expect(orphans.status).toBe(200);
+    await expect(wanted.text()).resolves.toContain("missing:page");
+    await expect(orphans.text()).resolves.toContain("/wiki/wiki/guide");
+  });
+
   it("previews submitted wiki text", async () => {
     const form = new FormData();
     form.set("content", "====== Preview ======\n\n**Text**");
@@ -329,6 +361,20 @@ function createD1Stub(state: D1StubState): D1Database {
             };
           }
 
+          if (sql.includes("from pages") && sql.includes("where namespace = ?")) {
+            return {
+              results: currentPageSourceRows(state)
+                .filter((page) => page.namespace === idOrLimit)
+                .slice(0, Number.isFinite(limit) ? limit : 200)
+            };
+          }
+
+          if (sql.includes("from pages p") && sql.includes("where p.is_deleted = 0")) {
+            return {
+              results: currentPageSourceRows(state).slice(0, Number.isFinite(limit) ? limit : 200)
+            };
+          }
+
           if (sql.includes("from page_revisions")) {
             return {
               results: state.revisions
@@ -360,13 +406,14 @@ function createD1Stub(state: D1StubState): D1Database {
       );
 
       if (pagesStatement && revisionStatement) {
-        const [id, , title, revisionId, isDeleted, , updatedAt] = pagesStatement.values;
+        const [id, namespace, title, revisionId, isDeleted, , updatedAt] = pagesStatement.values;
         const [, pageId, content, , , , summary, changeType, sizeChange, createdAt] =
           revisionStatement.values;
 
         state.deleted = isDeleted === 1;
         state.row = {
           id,
+          namespace,
           title,
           revision_id: revisionId,
           content,
@@ -446,11 +493,54 @@ function createD1Stub(state: D1StubState): D1Database {
 function currentPageRow(): Record<string, unknown> {
   return {
     id: "wiki:welcome",
+    namespace: "wiki",
     title: "Welcome",
     revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
     content: "====== Welcome ======\n\nImported page.",
     updated_at: "2026-05-07T00:00:00.000Z"
   };
+}
+
+function currentPageSourceRows(state: D1StubState): Record<string, unknown>[] {
+  const rows = [...seedPageSourceRows()];
+
+  if (!state.deleted && state.row) {
+    const id = String(state.row.id);
+    rows.unshift({
+      id,
+      namespace: state.row.namespace ?? namespaceFromId(id),
+      title: state.row.title,
+      content: state.row.content,
+      updated_at: state.row.updated_at
+    });
+  }
+
+  return rows.filter(
+    (row, index, all) => all.findIndex((candidate) => candidate.id === row.id) === index
+  );
+}
+
+function seedPageSourceRows(): Record<string, unknown>[] {
+  return [
+    {
+      id: "wiki:guide",
+      namespace: "wiki",
+      title: "Guide",
+      content: "====== Guide ======\n\nSee [[wiki:welcome]] and [[missing:page]].",
+      updated_at: "2026-05-06T00:00:00.000Z"
+    },
+    {
+      id: "playground:playground",
+      namespace: "playground",
+      title: "Playground",
+      content: "====== Playground ======\n\nScratch page.",
+      updated_at: "2026-05-05T00:00:00.000Z"
+    }
+  ];
+}
+
+function namespaceFromId(id: string): string {
+  return id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
 }
 
 function seedRevisions(): Record<string, unknown>[] {

@@ -1,3 +1,4 @@
+import { extractInternalPageLinks } from "./page-links";
 import { buildSearchTermFrequencies, makeSearchSnippet, parseSearchQuery } from "./search";
 
 export interface CurrentPage {
@@ -35,6 +36,24 @@ export interface PageSearchResult {
   snippet: string;
   score: number;
   updatedAt: string;
+}
+
+export interface NamespacePage {
+  id: string;
+  namespace: string;
+  title: string | null;
+  updatedAt: string;
+}
+
+export interface PageLinkReference {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+}
+
+export interface WantedPage {
+  id: string;
+  referrers: PageLinkReference[];
 }
 
 export interface SavePageInput {
@@ -99,6 +118,20 @@ interface PageSearchRow {
   content: string;
   updated_at: string;
   score: number;
+}
+
+interface NamespacePageRow {
+  id: string;
+  namespace: string;
+  title: string | null;
+  updated_at: string;
+}
+
+interface CurrentPageSourceRow {
+  id: string;
+  title: string | null;
+  content: string;
+  updated_at: string;
 }
 
 export async function getCurrentPage(db: D1Database, id: string): Promise<CurrentPage | null> {
@@ -213,6 +246,87 @@ export async function searchPages(
     score: row.score,
     updatedAt: row.updated_at
   }));
+}
+
+export async function listNamespacePages(
+  db: D1Database,
+  namespace: string,
+  limit = 200
+): Promise<NamespacePage[]> {
+  const result = await db
+    .prepare(
+      `select id, namespace, title, updated_at
+       from pages
+       where namespace = ? and is_deleted = 0
+       order by id
+       limit ?`
+    )
+    .bind(namespace, Math.max(1, Math.min(limit, 500)))
+    .all<NamespacePageRow>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    namespace: row.namespace,
+    title: row.title,
+    updatedAt: row.updated_at
+  }));
+}
+
+export async function listBacklinks(
+  db: D1Database,
+  targetPageId: string,
+  limit = 200
+): Promise<PageLinkReference[]> {
+  const pages = await listCurrentPageSources(db, limit);
+
+  return pages
+    .filter((page) => page.id !== targetPageId)
+    .filter((page) => extractInternalPageLinks(page.content, page.id).includes(targetPageId))
+    .map((page) => ({
+      id: page.id,
+      title: page.title,
+      updatedAt: page.updated_at
+    }));
+}
+
+export async function listOrphanPages(db: D1Database, limit = 200): Promise<PageLinkReference[]> {
+  const pages = await listCurrentPageSources(db, limit);
+  const incoming = new Set(
+    pages.flatMap((page) => extractInternalPageLinks(page.content, page.id))
+  );
+
+  return pages
+    .filter((page) => !incoming.has(page.id))
+    .map((page) => ({
+      id: page.id,
+      title: page.title,
+      updatedAt: page.updated_at
+    }));
+}
+
+export async function listWantedPages(db: D1Database, limit = 200): Promise<WantedPage[]> {
+  const pages = await listCurrentPageSources(db, limit);
+  const existing = new Set(pages.map((page) => page.id));
+  const wanted = new Map<string, PageLinkReference[]>();
+
+  for (const page of pages) {
+    for (const link of extractInternalPageLinks(page.content, page.id)) {
+      if (existing.has(link)) continue;
+
+      const referrers = wanted.get(link) ?? [];
+      referrers.push({
+        id: page.id,
+        title: page.title,
+        updatedAt: page.updated_at
+      });
+      wanted.set(link, referrers);
+    }
+  }
+
+  return [...wanted.entries()]
+    .map(([id, referrers]) => ({ id, referrers }))
+    .sort((a, b) => b.referrers.length - a.referrers.length || a.id.localeCompare(b.id))
+    .slice(0, Math.max(1, Math.min(limit, 500)));
 }
 
 export async function savePage(db: D1Database, input: SavePageInput): Promise<SavePageResult> {
@@ -340,6 +454,25 @@ async function listIndexedTerms(db: D1Database, pageId: string): Promise<string[
     .all<SearchTermRow>();
 
   return result.results.map((row) => row.term);
+}
+
+async function listCurrentPageSources(
+  db: D1Database,
+  limit: number
+): Promise<CurrentPageSourceRow[]> {
+  const result = await db
+    .prepare(
+      `select p.id, p.title, r.content, p.updated_at
+       from pages p
+       join page_revisions r on r.id = p.current_revision_id
+       where p.is_deleted = 0
+       order by p.id
+       limit ?`
+    )
+    .bind(Math.max(1, Math.min(limit, 500)))
+    .all<CurrentPageSourceRow>();
+
+  return result.results;
 }
 
 function buildSearchIndexStatements(
