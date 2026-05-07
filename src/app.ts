@@ -331,12 +331,13 @@ async function renderRevisionsPage(env: Env, id: string): Promise<string> {
   const revisions = await listPageRevisions(env.DB, id);
   const items = revisions
     .map(
-      (revision) => `<li>
-        <a href="${pagePath(id)}?rev=${encodeURIComponent(revision.id)}">${escapeHtml(revision.createdAt)}</a>
-        ${escapeHtml(revision.changeType)}
-        ${revision.summary ? ` - ${escapeHtml(revision.summary)}` : ""}
-        <a href="${pagePath(id)}?do=diff&rev=${encodeURIComponent(revision.id)}">diff</a>
+      (revision) => `<li class="${revision.changeType === "minor" ? "minor" : ""}">
+        <span class="date"><a href="${pagePath(id)}?rev=${encodeURIComponent(revision.id)}">${escapeHtml(revision.createdAt)}</a></span>
+        <a class="diff_link" href="${pagePath(id)}?do=diff&rev=${encodeURIComponent(revision.id)}">diff</a>
+        <a class="revisions_link" href="${pagePath(id)}?rev=${encodeURIComponent(revision.id)}">view</a>
         <a href="${pagePath(id)}?do=revert&rev=${encodeURIComponent(revision.id)}">revert</a>
+        <span class="changeType">${escapeHtml(revision.changeType)}</span>
+        ${revision.summary ? `<span class="sum">${escapeHtml(revision.summary)}</span>` : ""}
       </li>`
     )
     .join("");
@@ -344,7 +345,11 @@ async function renderRevisionsPage(env: Env, id: string): Promise<string> {
   return htmlShell(
     env,
     `Revisions for ${id}`,
-    `<h1>Revisions for ${escapeHtml(id)}</h1><ul>${items}</ul>`
+    `<h1>Revisions for ${escapeHtml(id)}</h1>
+    <form class="changes" method="get" action="${pagePath(id)}">
+      <ul>${items}</ul>
+    </form>`,
+    { pageId: id }
   );
 }
 
@@ -368,7 +373,17 @@ async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
   return htmlShell(
     env,
     `Diff for ${id}`,
-    `<h1>Diff for ${escapeHtml(id)}</h1><table><tbody>${rows}</tbody></table>`
+    `<h1>Diff for ${escapeHtml(id)}</h1>
+    <table class="diff diff_sidebyside">
+      <thead>
+        <tr>
+          <th colspan="2"><a href="${pagePath(id)}?rev=${encodeURIComponent(left.id)}">${escapeHtml(left.createdAt)}</a></th>
+          <th colspan="2">${"revisionId" in right ? "Current revision" : escapeHtml(right.createdAt)}</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`,
+    { pageId: id }
   );
 }
 
@@ -625,9 +640,10 @@ function renderLineDiff(left: string, right: string): string {
     const changed = oldLine !== newLine;
 
     rows.push(`<tr>
-      <td>${index + 1}</td>
-      <td>${changed ? `<del>${escapeHtml(oldLine)}</del>` : escapeHtml(oldLine)}</td>
-      <td>${changed ? `<ins>${escapeHtml(newLine)}</ins>` : escapeHtml(newLine)}</td>
+      <td class="diff-lineheader">${index + 1}</td>
+      <td class="${changed ? "diff-deletedline" : "diff-context"}">${changed ? `<del>${escapeHtml(oldLine)}</del>` : escapeHtml(oldLine)}</td>
+      <td class="diff-lineheader">${index + 1}</td>
+      <td class="${changed ? "diff-addedline" : "diff-context"}">${changed ? `<ins>${escapeHtml(newLine)}</ins>` : escapeHtml(newLine)}</td>
     </tr>`);
   }
 

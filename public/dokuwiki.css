@@ -673,6 +673,112 @@ form.search button {
   display: none;
 }
 
+.dokuwiki form.changes {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dokuwiki form.changes ul {
+  padding-left: 0;
+}
+
+.dokuwiki form.changes ul li {
+  margin: 0 0 0.45em;
+  list-style: none;
+}
+
+.dokuwiki form.changes ul li.minor {
+  opacity: 0.7;
+}
+
+.dokuwiki form.changes ul li span,
+.dokuwiki form.changes ul li a {
+  vertical-align: middle;
+}
+
+.dokuwiki form.changes li span.date {
+  display: inline-block;
+  min-width: 14em;
+  color: var(--dw-text-neutral);
+}
+
+.dokuwiki form.changes li a.diff_link,
+.dokuwiki form.changes li a.revisions_link {
+  margin-right: 0.4em;
+  vertical-align: baseline;
+}
+
+.dokuwiki form.changes li span.changeType {
+  margin: 0 0.4em;
+  color: var(--dw-text-neutral);
+}
+
+.dokuwiki form.changes li span.sum {
+  font-weight: bold;
+}
+
+.dokuwiki table.diff {
+  width: 100%;
+  border-width: 0;
+}
+
+.dokuwiki table.diff th,
+.dokuwiki table.diff td {
+  padding: 0.15em 0.35em;
+  border-width: 0;
+  background-color: #fff;
+  color: #333;
+  vertical-align: top;
+}
+
+.dokuwiki table.diff th {
+  border-bottom: 1px solid var(--dw-border);
+  font-size: 110%;
+  font-weight: normal;
+}
+
+.dokuwiki table.diff th a {
+  font-weight: bold;
+}
+
+.dokuwiki table.diff .diff-lineheader,
+.dokuwiki table.diff td {
+  font-family:
+    Consolas, "Andale Mono WT", "Andale Mono", "Bitstream Vera Sans Mono", Monaco, "Courier New",
+    monospace;
+}
+
+.dokuwiki table.diff .diff-lineheader {
+  width: 2.5em;
+  background-color: var(--dw-background-alt);
+  color: var(--dw-text-neutral);
+  text-align: right;
+}
+
+.dokuwiki table.diff .diff-addedline {
+  width: calc(50% - 2.5em);
+  background-color: #cfc;
+  color: #000;
+}
+
+.dokuwiki table.diff .diff-deletedline {
+  width: calc(50% - 2.5em);
+  background-color: #fdd;
+  color: #000;
+}
+
+.dokuwiki table.diff td.diff-context {
+  width: calc(50% - 2.5em);
+  background-color: #eee;
+  color: #000;
+}
+
+.dokuwiki table.diff td.diff-addedline ins,
+.dokuwiki table.diff td.diff-deletedline del {
+  color: #000;
+}
+
 .dokuwiki .page del {
   background: #fdd;
 }

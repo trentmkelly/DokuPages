@@ -386,8 +386,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port editor UI.
 - [x] Port preview UI.
 - [x] Port conflict UI.
-- [ ] Port revision UI.
-- [ ] Port diff UI.
+- [x] Port revision UI.
+- [x] Port diff UI.
 - [x] Port search UI.
 - [ ] Port media manager UI.
 - [ ] Port admin UI.

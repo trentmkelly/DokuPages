@@ -185,6 +185,8 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Revisions for wiki:welcome");
+    expect(html).toContain('class="changes"');
+    expect(html).toContain('class="diff_link"');
     expect(html).toContain("Initial import");
     expect(html).toContain("wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z");
   });
@@ -214,6 +216,9 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Diff for wiki:welcome");
+    expect(html).toContain('class="diff diff_sidebyside"');
+    expect(html).toContain('class="diff-deletedline"');
+    expect(html).toContain('class="diff-addedline"');
     expect(html).toContain("<del>Older page.</del>");
     expect(html).toContain("<ins>Imported page.</ins>");
   });
