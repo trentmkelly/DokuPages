@@ -228,7 +228,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement control macros.
 - [x] Implement section edit anchors.
 - [x] Implement metadata extraction.
-- [ ] Implement instruction caching or equivalent.
+- [x] Implement instruction caching or equivalent.
 - [ ] Implement renderer output compatible with current templates.
 - [x] Add parser conformance fixtures from existing pages.
 - [x] Add parser tests for each supported syntax mode.
@@ -359,7 +359,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Define rendered page cache key structure.
 - [ ] Define cache dependency tracking.
 - [x] Implement rendered HTML cache.
-- [ ] Implement parser instruction cache if needed.
+- [x] Implement parser instruction cache if needed.
 - [ ] Implement metadata cache if needed.
 - [x] Implement CSS cache or prebuilt CSS.
 - [x] Implement JavaScript cache or prebuilt JavaScript.

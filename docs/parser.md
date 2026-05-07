@@ -11,6 +11,20 @@ The current source-page syntax inventory is tracked in
 node scripts/inventory-syntax.mjs --source ../dokuwiki/data/pages --output docs/syntax-inventory.md
 ```
 
+## Instruction Cache Equivalent
+
+DokuWiki's PHP parser can cache intermediate instruction arrays. The Pages port
+does not preserve that internal representation. Instead, it caches deterministic
+render output in KV with the page ID, revision ID, renderer version, title, HTML,
+and table-of-contents payload. Current pages use `page:{id}` and immutable old
+revisions use `page:{id}:{revisionId}`; stale entries are rejected when revision
+or renderer version no longer match.
+
+This avoids a second parser-specific cache format while preserving the same
+runtime goal: repeated page views bypass parsing and rendering unless the source
+revision, renderer version, privacy rules, or `~~NOCACHE~~` directive require a
+fresh render.
+
 ## Supported
 
 - headings with title metadata and table-of-contents extraction

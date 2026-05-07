@@ -20,6 +20,8 @@ of full PHP DokuWiki runtime compatibility.
 - Native `/api/v1` JSON API with bearer-token write auth, configurable CORS,
   page/media/search/user read methods, and page/media write methods.
 - Explicit `501 Not Implemented` responses for legacy XML-RPC, JSON-RPC, and OpenAPI entrypoints.
+- DokuWiki parser instruction-cache behavior replaced by revision-aware rendered
+  HTML cache entries.
 
 ## Unsupported Or Deferred
 
@@ -30,7 +32,7 @@ of full PHP DokuWiki runtime compatibility.
 - Email delivery, subscriptions, digests, password reset emails, and registration notifications.
 - Server-side ImageMagick/GD thumbnail generation. The current media strategy serves originals and documents derivative policy headers.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
-- Thumbnail cache, parser instruction cache, metadata cache, cache warming, and stale fallback.
+- Thumbnail cache, metadata cache, cache warming, and stale fallback.
 - Scheduled production backup automation and final launch rehearsal verification.
 
 ## Plugin Compatibility

@@ -47,3 +47,11 @@ reindex/delete work does not scan the full inverted index.
 
 R2 media storage tests assert that metadata-only reads do not open R2 objects and
 that object body/head/delete operations each map to one bucket call.
+
+## Parser Cache Equivalent
+
+The port uses revision-aware rendered HTML cache entries instead of DokuWiki's
+PHP parser instruction cache. Cache entries store the renderer version, revision
+ID, page title, rendered HTML, and table of contents. Current page entries are
+invalidated on save, private ACL pages bypass the shared cache, and old revision
+entries are immutable until renderer-version invalidation.

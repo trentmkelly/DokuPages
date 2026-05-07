@@ -905,6 +905,33 @@ describe("handleRequest", () => {
     expect(cachePuts).toHaveLength(0);
   });
 
+  it("uses revision-specific rendered cache entries as the instruction cache equivalent", async () => {
+    renderCache.set(
+      "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
+      JSON.stringify({
+        rendererVersion: 16,
+        revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
+        title: "Cached Older Welcome",
+        html: "<p>Cached older body.</p>",
+        toc: []
+      })
+    );
+
+    const response = await handleRequest(
+      new Request(
+        "https://example.com/wiki/wiki/welcome?rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("<p><strong>Old revision:</strong> 2026-05-06T00:00:00.000Z</p>");
+    expect(html).toContain("Cached older body.");
+    expect(html).not.toContain("Older page.");
+    expect(cachePuts).toHaveLength(0);
+  });
+
   it("refreshes rendered page cache entries from older renderer versions", async () => {
     renderCache.set(
       "page:wiki:welcome",
