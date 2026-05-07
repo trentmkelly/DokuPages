@@ -429,7 +429,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Map MIME configuration.
 - [x] Map interwiki configuration.
 - [x] Map acronym configuration.
-- [ ] Map entity configuration.
+- [x] Map entity configuration.
 - [x] Map smiley configuration.
 - [ ] Map wordblock configuration.
 - [ ] Map license configuration.

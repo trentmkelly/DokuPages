@@ -43,7 +43,7 @@ import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/re
 
 type AssetFallback = () => Promise<Response>;
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
-const RENDER_CACHE_VERSION = 10;
+const RENDER_CACHE_VERSION = 11;
 
 interface RenderCacheEntry {
   rendererVersion: number;

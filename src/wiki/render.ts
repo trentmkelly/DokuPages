@@ -450,10 +450,13 @@ function renderInline(source: string, context: RenderContext): string {
 function renderTypography(source: string): string {
   return source
     .replace(/&lt;-&gt;/g, "&harr;")
+    .replace(/&lt;=&gt;/g, "&hArr;")
     .replace(/-&gt;/g, "&rarr;")
     .replace(/&lt;-/g, "&larr;")
     .replace(/=&gt;/g, "&rArr;")
     .replace(/&lt;=/g, "&lArr;")
+    .replace(/&gt;&gt;/g, "&raquo;")
+    .replace(/&lt;&lt;/g, "&laquo;")
     .replace(/\(c\)/gi, "&copy;")
     .replace(/\(r\)/gi, "&reg;")
     .replace(/\(tm\)/gi, "&trade;")

@@ -36,7 +36,9 @@ describe("renderWikiText", () => {
   });
 
   it("renders forced line breaks, entities, and typography replacements", () => {
-    const rendered = renderWikiText("first \\\\\nsecond (c) (tm) -> <- <-> => <= ... --- --");
+    const rendered = renderWikiText(
+      "first \\\\\nsecond (c) (tm) -> <- <-> => <= <=> >> << ... --- --"
+    );
 
     expect(rendered.html).toContain("first <br>second");
     expect(rendered.html).toContain("&copy;");
@@ -46,6 +48,9 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain("&harr;");
     expect(rendered.html).toContain("&rArr;");
     expect(rendered.html).toContain("&lArr;");
+    expect(rendered.html).toContain("&hArr;");
+    expect(rendered.html).toContain("&raquo;");
+    expect(rendered.html).toContain("&laquo;");
     expect(rendered.html).toContain("&hellip;");
     expect(rendered.html).toContain("&mdash;");
     expect(rendered.html).toContain("&ndash;");
