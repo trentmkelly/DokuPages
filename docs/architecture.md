@@ -27,6 +27,8 @@ Specific endpoint files may be added under `functions/` as the route surface exp
 
 Storage contracts live in `src/storage/interfaces.ts`. D1-backed adapters in `src/storage/d1.ts` cover page records, page revisions, media metadata rows, media revision rows, metadata, ACL rules, changelog rows, users, drafts, rendered cache rows, and search postings. Higher-level wiki services still use direct D1 queries where they need page relationship or render-specific joins.
 
+R2-backed media storage in `src/storage/r2.ts` composes a D1 metadata store with an R2 bucket. Media saves write the R2 object first, then metadata, and delete the newly written object if the metadata write fails.
+
 ## Storage Schema
 
 The first D1 schema is `migrations/0001_initial.sql`. It models pages, page revisions, media, media revisions, metadata, changelog, ACLs, users, groups, sessions, drafts, subscriptions, search postings, rendered cache, plugin settings, audit logs, import jobs, and schema versions.

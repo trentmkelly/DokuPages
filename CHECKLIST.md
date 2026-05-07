@@ -156,7 +156,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement a storage interface for rendered cache.
 - [x] Implement a storage interface for search.
 - [x] Implement D1-backed adapters.
-- [ ] Implement R2-backed adapters.
+- [x] Implement R2-backed adapters.
 - [x] Implement KV-backed adapters if used.
 - [ ] Implement Durable Object-backed locking if used.
 - [x] Implement transactional page save behavior.
