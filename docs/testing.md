@@ -26,3 +26,7 @@ and writes, page revisions, media reads and deletes, media revisions, search,
 Plugin compatibility tests cover legacy bundled plugin admin URLs that redirect
 to native replacements, plus explicit removal responses for unsupported bundled
 plugins.
+
+Storage performance tests cover D1 query plans for indexed high-cardinality
+lookups, bounded query counts for paginated storage calls, search-index batch
+sizes, and R2 media operation counts.

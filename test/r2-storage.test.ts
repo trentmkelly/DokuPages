@@ -40,6 +40,29 @@ describe("R2MediaStore", () => {
 
     expect(bucket.objects.has(media.objectKey)).toBe(false);
   });
+
+  it("keeps metadata reads out of R2 and uses one bucket operation for object reads", async () => {
+    const metadata = new MemoryMediaStore();
+    const bucket = new MemoryR2Bucket();
+    const store = new R2MediaStore(metadata, bucket as unknown as R2Bucket);
+    const media = mediaRecord();
+
+    await store.saveMedia(media, new ArrayBuffer(0));
+    bucket.resetCounts();
+
+    await expect(store.getMedia(media.id)).resolves.toEqual(media);
+    await expect(store.listMediaRevisions(media.id, 50)).resolves.toEqual([]);
+    expect(bucket.counts).toEqual({ put: 0, get: 0, head: 0, delete: 0 });
+
+    await expect(store.getMediaObject(media)).resolves.toMatchObject({ key: media.objectKey });
+    expect(bucket.counts).toEqual({ put: 0, get: 1, head: 0, delete: 0 });
+
+    await expect(store.headMediaObject(media)).resolves.toMatchObject({ key: media.objectKey });
+    expect(bucket.counts).toEqual({ put: 0, get: 1, head: 1, delete: 0 });
+
+    await store.deleteMediaObject(media);
+    expect(bucket.counts).toEqual({ put: 0, get: 1, head: 1, delete: 1 });
+  });
 });
 
 function mediaRecord(): MediaRecord {
@@ -88,25 +111,34 @@ class MemoryR2Bucket {
       options?: R2PutOptions;
     }
   >();
+  counts = { put: 0, get: 0, head: 0, delete: 0 };
+
+  resetCounts(): void {
+    this.counts = { put: 0, get: 0, head: 0, delete: 0 };
+  }
 
   async put(
     key: string,
     body: ReadableStream<Uint8Array> | ArrayBuffer,
     options?: R2PutOptions
   ): Promise<R2Object> {
+    this.counts.put += 1;
     this.objects.set(key, { body, options });
     return { key } as R2Object;
   }
 
   async get(key: string): Promise<R2ObjectBody | null> {
+    this.counts.get += 1;
     return this.objects.has(key) ? ({ key } as R2ObjectBody) : null;
   }
 
   async head(key: string): Promise<R2Object | null> {
+    this.counts.head += 1;
     return this.objects.has(key) ? ({ key } as R2Object) : null;
   }
 
   async delete(key: string): Promise<void> {
+    this.counts.delete += 1;
     this.objects.delete(key);
   }
 }

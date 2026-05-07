@@ -31,7 +31,7 @@ R2-backed media storage in `src/storage/r2.ts` composes a D1 metadata store with
 
 ## Storage Schema
 
-The first D1 schema is `migrations/0001_initial.sql`. It models pages, page revisions, media, media revisions, metadata, changelog, ACLs, users, groups, sessions, drafts, subscriptions, search postings, rendered cache, plugin settings, audit logs, import jobs, and schema versions.
+The first D1 schema is `migrations/0001_initial.sql`. It models pages, page revisions, media, media revisions, metadata, changelog, ACLs, users, groups, sessions, drafts, subscriptions, search postings, rendered cache, plugin settings, audit logs, import jobs, and schema versions. Follow-up migrations add operational indexes and compatible schema extensions.
 
 ## Cache Model
 

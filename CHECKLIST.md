@@ -164,7 +164,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement rollback behavior for partially failed writes.
 - [x] Implement pagination helpers for large namespaces, revisions, logs, and media lists.
 - [x] Implement storage error mapping.
-- [ ] Implement storage performance tests.
+- [x] Implement storage performance tests.
 
 ## Request Routing
 

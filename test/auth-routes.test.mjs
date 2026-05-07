@@ -1,16 +1,12 @@
 /* global FormData, Request */
 
-import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app.ts";
 import { hashPassword } from "../src/auth/password.ts";
+import { readMigrationSql } from "./support/migrations.mjs";
 
-const migrationSql = readFileSync(
-  fileURLToPath(new URL("../migrations/0001_initial.sql", import.meta.url)),
-  "utf8"
-);
+const migrationSql = readMigrationSql();
 const TEST_CSRF_TOKEN = "test-csrf-token";
 
 describe("auth routes", () => {

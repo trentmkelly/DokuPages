@@ -14,7 +14,7 @@ Provisioned resources for the `dokutest` Pages project.
 - Binding: `DB`
 - Database name: `dokuwiki_pages_dev`
 - Database ID: `bb1c5614-9eb2-4f06-9727-fb41cfb1786b`
-- Applied schema: `migrations/0001_initial.sql`
+- Applied schema: D1 migrations under `migrations/`
 - Imported seed pages: 4
 - Production smoke test: created and deleted `codex:smoke`, verified stale-revision conflict and changelog rows.
 

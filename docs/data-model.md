@@ -1,6 +1,6 @@
 # Data Model
 
-The D1 schema in `migrations/0001_initial.sql` is the source of truth for the initial relational model.
+The D1 migrations under `migrations/` are the source of truth for the relational model. `0001_initial.sql` creates the core tables, and later migrations add operational indexes or compatible schema extensions.
 
 ## Pages
 

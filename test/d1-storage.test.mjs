@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   D1AclStore,
@@ -14,11 +12,9 @@ import {
   D1SearchStore,
   D1UserStore
 } from "../src/storage/d1.ts";
+import { readMigrationSql } from "./support/migrations.mjs";
 
-const migrationSql = readFileSync(
-  fileURLToPath(new URL("../migrations/0001_initial.sql", import.meta.url)),
-  "utf8"
-);
+const migrationSql = readMigrationSql();
 
 describe("D1 storage adapters", () => {
   let db;
