@@ -22,6 +22,18 @@ Auth flows emit `auth_event` logs for login success, login failure, login rate
 limits, and logout. Admin ACL changes and search index rebuilds also write D1
 audit log rows that are visible in `/admin/audit`.
 
+## Metrics
+
+The runtime emits structured metric events to Cloudflare logs:
+
+- `cache_metric`: rendered page cache hit, miss, write, purge, bypass, and
+  discovery document cache hit, miss, and write events.
+- `search_metric`: search page and AJAX search result counts with query length,
+  namespace, surface, and duration.
+- `media_metric`: media fetch, media manager list/search, upload, delete, and
+  revert operations with namespace, byte counts where relevant, result counts,
+  and duration.
+
 ## Health Dashboard
 
 - `/api/health`: machine-readable health result for D1, R2, KV, Durable Objects,
@@ -34,5 +46,4 @@ audit log rows that are visible in `/admin/audit`.
 ## Remaining Work
 
 Open observability items are production alerting, quota/limit-pressure alerts,
-and deeper per-route counters for cache, search, media, and storage operation
-counts.
+and deeper per-route storage operation counts.

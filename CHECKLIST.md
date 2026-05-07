@@ -370,7 +370,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement user-sensitive cache bypass for private pages.
 - [ ] Implement cache warming for important pages.
 - [ ] Implement stale cache fallback if appropriate.
-- [ ] Add cache hit and miss metrics.
+- [x] Add cache hit and miss metrics.
 - [x] Add cache invalidation tests.
 
 ## Template And Frontend
@@ -708,9 +708,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add admin action logging.
 - [ ] Add migration logging.
 - [x] Add performance timing logs.
-- [ ] Add cache metrics.
-- [ ] Add search metrics.
-- [ ] Add media metrics.
+- [x] Add cache metrics.
+- [x] Add search metrics.
+- [x] Add media metrics.
 - [x] Add dashboard for production health.
 - [ ] Add alerting for error spikes.
 - [ ] Add alerting for storage failures.

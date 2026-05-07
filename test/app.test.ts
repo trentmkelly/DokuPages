@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app";
 import type { Env } from "../src/env";
 import { PageLockObject } from "../src/storage/page-lock-object";
@@ -713,6 +713,49 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("Imported page.");
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("emits cache, search, and media metric events", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+      await handleRequest(new Request("https://example.com/search?q=welcome"), env);
+      await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
+
+      const events = log.mock.calls.map((call) => JSON.parse(String(call[0])));
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            event: "cache_metric",
+            cache: "rendered_page",
+            action: "miss",
+            cacheKey: "page:wiki:welcome"
+          }),
+          expect.objectContaining({
+            event: "cache_metric",
+            cache: "rendered_page",
+            action: "write",
+            cacheKey: "page:wiki:welcome"
+          }),
+          expect.objectContaining({
+            event: "search_metric",
+            surface: "search_page",
+            queryLength: 7,
+            resultCount: 1
+          }),
+          expect.objectContaining({
+            event: "media_metric",
+            operation: "fetch",
+            namespace: "wiki",
+            mimeType: "image/svg+xml",
+            byteLength: 18
+          })
+        ])
+      );
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("renders table of contents for multi-heading pages", async () => {

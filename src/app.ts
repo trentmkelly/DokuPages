@@ -674,6 +674,7 @@ async function handleAjax(
 ): Promise<Response> {
   const params = await readAjaxParams(request, url);
   const call = params.get("call")?.toLowerCase() ?? "";
+  const startedAt = Date.now();
 
   if (call === "qsearch") {
     const query = params.get("q")?.trim() ?? "";
@@ -690,6 +691,13 @@ async function handleAjax(
           `<li><a href="${pagePath(page.id)}" class="wikilink1">${escapeHtml(pageLabel(page))}</a></li>`
       )
       .join("");
+
+    logMetric("search_metric", {
+      surface: "ajax_qsearch",
+      queryLength: query.length,
+      resultCount: results.length,
+      durationMs: elapsedSince(startedAt)
+    });
 
     return ajaxHtmlResponse(items ? `<strong>Quick hits</strong><ul>${items}</ul>` : "");
   }
@@ -711,6 +719,13 @@ async function handleAjax(
       a.localeCompare(b)
     );
 
+    logMetric("search_metric", {
+      surface: "ajax_suggestions",
+      queryLength: query.length,
+      resultCount: names.length,
+      durationMs: elapsedSince(startedAt)
+    });
+
     return new Response(JSON.stringify([query, names, [], []]), {
       headers: securityHeaders({ "content-type": "application/x-suggestions+json" })
     });
@@ -726,6 +741,13 @@ async function handleAjax(
         principal,
         await searchPages(env.DB, query, namespace, 50)
       );
+      logMetric("search_metric", {
+        surface: "ajax_linkwiz",
+        namespace: namespace || null,
+        queryLength: query.length,
+        resultCount: results.length,
+        durationMs: elapsedSince(startedAt)
+      });
       return ajaxHtmlResponse(renderAjaxPageList(results));
     }
 
@@ -734,6 +756,13 @@ async function handleAjax(
       principal,
       await listNamespacePages(env.DB, namespace, 50)
     );
+    logMetric("search_metric", {
+      surface: "ajax_linkwiz",
+      namespace: namespace || null,
+      queryLength: 0,
+      resultCount: pages.length,
+      durationMs: elapsedSince(startedAt)
+    });
     return ajaxHtmlResponse(renderAjaxPageList(pages));
   }
 
@@ -807,6 +836,7 @@ async function handleMediaFetch(
   url: URL,
   principal: AuthPrincipal
 ): Promise<Response> {
+  const startedAt = Date.now();
   const id = mediaIdFromPath(url, "/media/");
 
   if (!id) {
@@ -858,6 +888,15 @@ async function handleMediaFetch(
       `attachment; filename="${escapeHeaderValue(mediaName(id))}"`
     );
   }
+
+  logMetric("media_metric", {
+    operation: "fetch",
+    namespace: mediaNamespace(id) || null,
+    revision: Boolean(revisionId),
+    mimeType: media.mimeType,
+    byteLength: media.byteLength,
+    durationMs: elapsedSince(startedAt)
+  });
 
   return new Response(object.body, { headers });
 }
@@ -927,6 +966,7 @@ async function renderMediaManagerPage(
   principal: AuthPrincipal,
   csrfToken: string
 ): Promise<string | Response> {
+  const startedAt = Date.now();
   const namespace = cleanMediaId(url.searchParams.get("ns") ?? "");
   const denied = await requireAclPermission(
     request,
@@ -942,6 +982,13 @@ async function renderMediaManagerPage(
   const media = query
     ? await searchMedia(env.DB, namespace, query, pagination.limit, pagination.offset)
     : await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset);
+  logMetric("media_metric", {
+    operation: query ? "manager_search" : "manager_list",
+    namespace: namespace || null,
+    queryLength: query.length,
+    resultCount: media.length,
+    durationMs: elapsedSince(startedAt)
+  });
   const emptyState = media.length === 0 ? "<p>No media found.</p>" : "";
   const items = media
     .map(
@@ -1062,6 +1109,7 @@ async function renderPageHtml(
   revisionDate?: string,
   page?: CurrentPage
 ): Promise<string> {
+  const startedAt = Date.now();
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
   const directives = getWikiRenderDirectives(content);
   const revisionNotice = revisionDate
@@ -1069,13 +1117,38 @@ async function renderPageHtml(
     : "";
   const cached = directives.noCache ? null : await readRenderCache(env, cacheKey, revisionId);
 
+  if (directives.noCache) {
+    logMetric("cache_metric", {
+      cache: "rendered_page",
+      action: "bypass",
+      reason: "directive",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
+    });
+  }
+
   if (cached) {
+    logMetric("cache_metric", {
+      cache: "rendered_page",
+      action: "hit",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
+    });
     return htmlShell(
       env,
       cached.title,
       `${renderBreadcrumbs(id)}${renderToc(cached.toc)}${revisionNotice}${cached.html}`,
       { pageId: id, updatedAt: revisionDate ?? page?.updatedAt }
     );
+  }
+
+  if (!directives.noCache) {
+    logMetric("cache_metric", {
+      cache: "rendered_page",
+      action: "miss",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
+    });
   }
 
   const rendered = renderWikiText(content, { pageId: id });
@@ -1088,6 +1161,12 @@ async function renderPageHtml(
       title,
       html: rendered.html,
       toc: rendered.toc
+    });
+    logMetric("cache_metric", {
+      cache: "rendered_page",
+      action: "write",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
     });
   }
 
@@ -1725,11 +1804,19 @@ function renderAclPermissionOptions(selected: number): string {
 }
 
 async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+  const startedAt = Date.now();
   const query = url.searchParams.get("q")?.trim() ?? "";
   const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
   const results = query
     ? await filterReadablePageItems(env, principal, await searchPages(env.DB, query, namespace))
     : [];
+  logMetric("search_metric", {
+    surface: "search_page",
+    namespace: namespace || null,
+    queryLength: query.length,
+    resultCount: results.length,
+    durationMs: elapsedSince(startedAt)
+  });
   const resultItems = results
     .map(
       (result) => `<li>
@@ -2414,6 +2501,23 @@ function logAuthEvent(
   );
 }
 
+function logMetric(
+  event: "cache_metric" | "search_metric" | "media_metric",
+  details: Record<string, unknown>
+): void {
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event,
+      ...details
+    })
+  );
+}
+
+function elapsedSince(startedAt: number): number {
+  return Date.now() - startedAt;
+}
+
 function unsupportedAccountFeatureForPath(pathname: string): string | null {
   switch (pathname) {
     case "/register":
@@ -2879,6 +2983,7 @@ async function handleMediaUpload(
   env: Env,
   principal: AuthPrincipal
 ): Promise<Response> {
+  const startedAt = Date.now();
   if (!env.MEDIA_BUCKET) {
     return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
   }
@@ -2956,6 +3061,14 @@ async function handleMediaUpload(
     );
   }
 
+  logMetric("media_metric", {
+    operation: "upload",
+    namespace: mediaNamespace(id) || null,
+    changeType: result.changeType,
+    byteLength: result.media.byteLength,
+    durationMs: elapsedSince(startedAt)
+  });
+
   if (acceptsJson(request)) {
     return jsonResponse({ ok: true, id, revisionId: result.revision.id });
   }
@@ -2968,6 +3081,7 @@ async function handleMediaDelete(
   env: Env,
   principal: AuthPrincipal
 ): Promise<Response> {
+  const startedAt = Date.now();
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
@@ -3000,6 +3114,13 @@ async function handleMediaDelete(
     });
   }
 
+  logMetric("media_metric", {
+    operation: "delete",
+    namespace: mediaNamespace(id) || null,
+    revisionId: result.revision.id,
+    durationMs: elapsedSince(startedAt)
+  });
+
   if (acceptsJson(request)) {
     return jsonResponse({ ok: true, id, revisionId: result.revision.id });
   }
@@ -3012,6 +3133,7 @@ async function handleMediaRevert(
   env: Env,
   principal: AuthPrincipal
 ): Promise<Response> {
+  const startedAt = Date.now();
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
@@ -3051,6 +3173,14 @@ async function handleMediaRevert(
       status
     });
   }
+
+  logMetric("media_metric", {
+    operation: "revert",
+    namespace: mediaNamespace(id) || null,
+    sourceRevisionId: revisionId,
+    revisionId: result.revision.id,
+    durationMs: elapsedSince(startedAt)
+  });
 
   if (acceptsJson(request)) {
     return jsonResponse({ ok: true, id, revisionId: result.revision.id });
@@ -3805,6 +3935,7 @@ async function purgePageCache(
   revisionId: string,
   origin?: string
 ): Promise<void> {
+  const startedAt = Date.now();
   const keys = [`page:${id}`, `page:${id}:${revisionId}`];
 
   if (origin) {
@@ -3812,6 +3943,12 @@ async function purgePageCache(
   }
 
   await Promise.all(keys.map((key) => env.RENDER_CACHE.delete(key)));
+  logMetric("cache_metric", {
+    cache: "rendered_page",
+    action: "purge",
+    keyCount: keys.length,
+    durationMs: elapsedSince(startedAt)
+  });
 }
 
 async function cachedXmlResponse(
@@ -3821,16 +3958,38 @@ async function cachedXmlResponse(
   contentType: string,
   render: () => Promise<string>
 ): Promise<Response> {
+  const startedAt = Date.now();
   const cacheKey = discoveryCacheKey(kind, url.origin);
   const cached = await readTextCache(env, cacheKey);
   const cacheHeaders = { "cache-control": `public, max-age=${DISCOVERY_CACHE_TTL_SECONDS}` };
 
   if (cached) {
+    logMetric("cache_metric", {
+      cache: "discovery",
+      kind,
+      action: "hit",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
+    });
     return xmlResponse(cached, contentType, cacheHeaders);
   }
 
+  logMetric("cache_metric", {
+    cache: "discovery",
+    kind,
+    action: "miss",
+    cacheKey,
+    durationMs: elapsedSince(startedAt)
+  });
   const body = await render();
   await writeTextCache(env, cacheKey, body, DISCOVERY_CACHE_TTL_SECONDS);
+  logMetric("cache_metric", {
+    cache: "discovery",
+    kind,
+    action: "write",
+    cacheKey,
+    durationMs: elapsedSince(startedAt)
+  });
   return xmlResponse(body, contentType, cacheHeaders);
 }
 
