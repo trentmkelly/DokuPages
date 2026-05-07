@@ -310,7 +310,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement bearer token auth if remote APIs are supported.
 - [x] Implement admin and manager role checks.
 - [x] Implement default group assignment.
-- [ ] Implement user manager behavior.
+- [x] Implement user manager behavior.
 - [x] Implement account disable behavior if supported.
 - [x] Implement auth migration from `users.auth.php`.
 - [ ] Implement auth event hooks or replacement extension points.
@@ -395,7 +395,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port admin UI.
 - [x] Port login UI.
 - [ ] Port profile UI if supported.
-- [ ] Port user manager UI if supported.
+- [x] Port user manager UI if supported.
 - [ ] Port styling plugin behavior if supported.
 - [ ] Port configuration UI if supported.
 - [ ] Ensure responsive behavior.
@@ -455,7 +455,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port the revert plugin.
 - [x] Port the safefnrecode plugin or make it migration-only.
 - [x] Port the styling plugin or replace it with build-time theme configuration.
-- [ ] Port the usermanager plugin or replace it with native user management.
+- [x] Port the usermanager plugin or replace it with native user management.
 - [x] Decide support for authad.
 - [x] Decide support for authldap.
 - [x] Decide support for authpdo.
@@ -473,7 +473,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [x] Implement admin dashboard.
 - [ ] Implement configuration management.
-- [ ] Implement user management.
+- [x] Implement user management.
 - [x] Implement ACL management.
 - [x] Implement page index rebuild.
 - [x] Implement search index rebuild.

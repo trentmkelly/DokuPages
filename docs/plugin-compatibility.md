@@ -18,7 +18,7 @@ path.
 | `revert`       | Replaced by native page and media revision revert routes.                                              |
 | `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                               |
 | `styling`      | Replaced by build-time theme assets and checked-in CSS.                                                |
-| `usermanager`  | Deferred until native user management is implemented.                                                  |
+| `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.                 |
 | `authad`       | Deferred to an external identity or sync bridge.                                                       |
 | `authldap`     | Deferred to an external identity or sync bridge.                                                       |
 | `authpdo`      | Deferred to an external identity or sync bridge.                                                       |

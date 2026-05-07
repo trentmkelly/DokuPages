@@ -279,6 +279,104 @@ describe("auth routes", () => {
     expect(auditHtml).toContain("search_index_rebuild");
   });
 
+  it("allows admin users to manage native users and groups", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    await seedUser(env.DB, {
+      userId: "user-bob",
+      username: "bob",
+      password: "bob password",
+      displayName: "Bob Example",
+      email: "bob@example.test",
+      groups: ["user"]
+    });
+    const cookie = await loginAsAlice(env);
+
+    const anonymous = await handleRequest(new Request("https://example.com/admin/users"), env);
+    const dashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const page = await handleRequest(
+      new Request("https://example.com/admin/users", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(anonymous.status).toBe(403);
+    await expect(dashboard.text()).resolves.toContain("User manager");
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("Bob Example");
+    expect(html).toContain("bob@example.test");
+
+    const form = new FormData();
+    form.set("id", "user-bob");
+    form.set("displayName", "Bobby User");
+    form.set("email", "");
+    form.set("groups", "user, manager");
+    form.set("isDisabled", "1");
+
+    const saved = await handleRequest(
+      new Request("https://example.com/api/admin/users", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    expect(saved.headers.get("location")).toBe("/admin/users");
+    await expect(
+      env.DB.prepare(
+        `select username, display_name, email, is_disabled
+         from users
+         where id = ?`
+      )
+        .bind("user-bob")
+        .first()
+    ).resolves.toMatchObject({
+      username: "bob",
+      display_name: "Bobby User",
+      email: null,
+      is_disabled: 1
+    });
+    await expect(
+      env.DB.prepare(
+        `select g.name
+         from user_groups ug
+         join groups g on g.id = ug.group_id
+         where ug.user_id = ?
+         order by g.name asc`
+      )
+        .bind("user-bob")
+        .all()
+    ).resolves.toEqual({
+      results: [{ name: "manager" }, { name: "user" }]
+    });
+
+    const bobLogin = await postLogin(env, "bob", "bob password");
+    expect(bobLogin.status).toBe(401);
+    expect(bobLogin.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+    await expect(
+      env.DB.prepare("select action, target_type, target_id from audit_log where action = ?")
+        .bind("user_update")
+        .all()
+    ).resolves.toMatchObject({
+      results: [
+        {
+          action: "user_update",
+          target_type: "user",
+          target_id: "user-bob"
+        }
+      ]
+    });
+  });
+
   it("allows manager users to view the admin dashboard but not ACL management", async () => {
     env = createEnv();
     await seedUser(env.DB, {
@@ -311,6 +409,12 @@ describe("auth routes", () => {
       }),
       env
     );
+    const users = await handleRequest(
+      new Request("https://example.com/admin/users", {
+        headers: { cookie }
+      }),
+      env
+    );
 
     expect(anonymous.status).toBe(403);
     expect(legacy.status).toBe(301);
@@ -319,6 +423,7 @@ describe("auth routes", () => {
     await expect(dashboard.text()).resolves.toContain("Administration");
     expect(acl.status).toBe(403);
     expect(audit.status).toBe(403);
+    expect(users.status).toBe(403);
   });
 
   it("rejects invalid logins without setting a session cookie", async () => {

@@ -93,8 +93,7 @@ import {
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
-import type { AclRuleRecord } from "./storage/interfaces";
-import type { AuditLogRecord } from "./storage/interfaces";
+import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -277,12 +276,22 @@ export async function handleRequest(
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
+  if (url.pathname === "/admin/users" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    const page = await renderUserAdminPage(request, env, principal, url, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
   if (url.pathname === "/api/admin/acl" && request.method === "POST") {
     return handleAclRuleUpsert(request, env, principal);
   }
 
   if (url.pathname === "/api/admin/acl/delete" && request.method === "POST") {
     return handleAclRuleDelete(request, env, principal);
+  }
+
+  if (url.pathname === "/api/admin/users" && request.method === "POST") {
+    return handleUserAdminUpdate(request, env, principal);
   }
 
   if (url.pathname === "/api/admin/search/rebuild" && request.method === "POST") {
@@ -2443,6 +2452,9 @@ function renderAdminDashboardPage(
   const aclTool = isAdminPrincipal(principal)
     ? `<li><a href="/admin/acl">Access control list manager</a></li>`
     : "";
+  const userTool = isAdminPrincipal(principal)
+    ? `<li><a href="/admin/users">User manager</a></li>`
+    : "";
   const adminActions = isAdminPrincipal(principal)
     ? `<form method="post" action="/api/admin/search/rebuild">
         ${csrfInput(csrfToken)}
@@ -2458,6 +2470,7 @@ function renderAdminDashboardPage(
         <li><a href="/admin/diagnostics">Diagnostics</a></li>
         ${isAdminPrincipal(principal) ? '<li><a href="/admin/audit">Audit log</a></li>' : ""}
         ${aclTool}
+        ${userTool}
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`
@@ -2567,6 +2580,112 @@ function renderAclRuleRow(rule: AclRuleRecord, csrfToken: string): string {
         ${csrfInput(csrfToken)}
         <input type="hidden" name="id" value="${escapeAttribute(rule.id)}">
         <button type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>`;
+}
+
+interface ManagedUser extends UserRecord {
+  groups: string[];
+}
+
+interface ManagedUserUpdate {
+  id: string;
+  displayName: string;
+  email: string | null;
+  isDisabled: boolean;
+}
+
+interface UserRow {
+  id: string;
+  username: string;
+  display_name: string;
+  email: string | null;
+  password_hash: string | null;
+  is_disabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserGroupRow {
+  user_id: string;
+  group_name: string | null;
+}
+
+async function renderUserAdminPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  url: URL,
+  csrfToken: string
+): Promise<string | Response> {
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 200 });
+  const users = await listManagedUsers(env.DB, pagination.limit, pagination.offset);
+  const rows = users.map((user) => renderManagedUserRow(user, csrfToken, principal)).join("");
+
+  return htmlShell(
+    env,
+    "User Manager",
+    `<h1>User manager</h1>
+    <table class="inline user__manager">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Display name</th>
+          <th>Email</th>
+          <th>Groups</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="6">No users configured.</td></tr>'}</tbody>
+    </table>
+    ${renderPaginationControls(url, pagination, users.length)}`
+  );
+}
+
+function renderManagedUserRow(
+  user: ManagedUser,
+  csrfToken: string,
+  principal: AuthPrincipal
+): string {
+  const elementId = escapeAttribute(user.id.replace(/[^a-zA-Z0-9_-]/g, "_"));
+  const formId = `user__form_${elementId}`;
+  const disabledChecked = user.isDisabled ? " checked" : "";
+  const disableDisabled = principal.id === user.id ? " disabled" : "";
+  const selfDisableGuard =
+    principal.id === user.id ? "<small>Current account cannot disable itself.</small>" : "";
+
+  return `<tr>
+    <td><code>${escapeHtml(user.username)}</code></td>
+    <td>
+      <label class="a11y" for="user__display_${elementId}">Display name</label>
+      <input form="${formId}" id="user__display_${elementId}" name="displayName" type="text" value="${escapeAttribute(user.displayName)}" required>
+    </td>
+    <td>
+      <label class="a11y" for="user__email_${elementId}">Email</label>
+      <input form="${formId}" id="user__email_${elementId}" name="email" type="email" value="${escapeAttribute(user.email ?? "")}">
+    </td>
+    <td>
+      <label class="a11y" for="user__groups_${elementId}">Groups</label>
+      <input form="${formId}" id="user__groups_${elementId}" name="groups" type="text" value="${escapeAttribute(user.groups.join(", "))}">
+    </td>
+    <td>
+      <label>
+        <input form="${formId}" name="isDisabled" type="checkbox" value="1"${disabledChecked}${disableDisabled}>
+        Disabled
+      </label>
+      ${selfDisableGuard}
+    </td>
+    <td>
+      <form id="${formId}" method="post" action="/api/admin/users">
+        ${csrfInput(csrfToken)}
+        <input type="hidden" name="id" value="${escapeAttribute(user.id)}">
+        <button type="submit">Save</button>
       </form>
     </td>
   </tr>`;
@@ -2909,6 +3028,50 @@ async function handleAclRuleDelete(
   return redirectResponse("/admin/acl");
 }
 
+async function handleUserAdminUpdate(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const parsed = parseUserAdminForm(form, principal);
+  if (!parsed.ok) {
+    return userAdminErrorResponse(request, env, parsed.error);
+  }
+
+  const existing = await getManagedUser(env.DB, parsed.user.id);
+  if (!existing) {
+    return userAdminErrorResponse(request, env, `User '${parsed.user.id}' was not found.`, 404);
+  }
+
+  await updateManagedUser(env.DB, parsed.user, parsed.groups);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "user_update",
+    targetType: "user",
+    targetId: parsed.user.id,
+    details: {
+      username: existing.username,
+      displayName: parsed.user.displayName,
+      email: parsed.user.email,
+      isDisabled: parsed.user.isDisabled,
+      groups: parsed.groups
+    }
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, id: parsed.user.id });
+  }
+
+  return redirectResponse("/admin/users");
+}
+
 async function handleSearchIndexRebuild(
   request: Request,
   env: Env,
@@ -2969,6 +3132,169 @@ async function appendAdminAuditLog(
     details,
     createdAt
   });
+}
+
+async function listManagedUsers(
+  db: D1Database,
+  limit: number,
+  offset: number
+): Promise<ManagedUser[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 200));
+  const safeOffset = Math.max(0, offset);
+  const usersResult = await db
+    .prepare(
+      `select id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
+       from users
+       order by username asc
+       limit ? offset ?`
+    )
+    .bind(safeLimit, safeOffset)
+    .all<UserRow>();
+  const users = usersResult.results.map(mapManagedUser);
+
+  if (users.length === 0) return [];
+
+  const groupRows = await readManagedUserGroups(
+    db,
+    users.map((user) => user.id)
+  );
+  return users.map((user) => ({ ...user, groups: groupRows.get(user.id) ?? [] }));
+}
+
+async function getManagedUser(db: D1Database, id: string): Promise<ManagedUser | null> {
+  const row = await db
+    .prepare(
+      `select id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
+       from users
+       where id = ?`
+    )
+    .bind(id)
+    .first<UserRow>();
+
+  if (!row) return null;
+
+  const groups = await readManagedUserGroups(db, [row.id]);
+  return { ...mapManagedUser(row), groups: groups.get(row.id) ?? [] };
+}
+
+async function readManagedUserGroups(
+  db: D1Database,
+  userIds: string[]
+): Promise<Map<string, string[]>> {
+  if (userIds.length === 0) return new Map();
+
+  const rows = await db
+    .prepare(
+      `select ug.user_id, g.name as group_name
+       from user_groups ug
+       join groups g on g.id = ug.group_id
+       where ug.user_id in (${userIds.map(() => "?").join(", ")})
+       order by g.name asc`
+    )
+    .bind(...userIds)
+    .all<UserGroupRow>();
+  const groups = new Map<string, string[]>();
+
+  for (const row of rows.results) {
+    if (!row.group_name) continue;
+    groups.set(row.user_id, [...(groups.get(row.user_id) ?? []), row.group_name]);
+  }
+
+  return groups;
+}
+
+async function updateManagedUser(
+  db: D1Database,
+  user: ManagedUserUpdate,
+  groups: string[]
+): Promise<void> {
+  const now = new Date().toISOString();
+  const statements = [
+    db
+      .prepare(
+        `update users
+         set display_name = ?, email = ?, is_disabled = ?, updated_at = ?
+         where id = ?`
+      )
+      .bind(user.displayName, user.email, user.isDisabled ? 1 : 0, now, user.id),
+    db.prepare("delete from user_groups where user_id = ?").bind(user.id)
+  ];
+
+  for (const group of groups) {
+    const id = groupId(group);
+    statements.push(
+      db
+        .prepare(
+          "insert into groups (id, name, created_at) values (?, ?, ?) on conflict(name) do nothing"
+        )
+        .bind(id, group, now),
+      db
+        .prepare("insert into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
+        .bind(user.id, id, now)
+    );
+  }
+
+  await db.batch(statements);
+}
+
+function parseUserAdminForm(
+  form: FormData,
+  principal: AuthPrincipal
+): { ok: true; user: ManagedUserUpdate; groups: string[] } | { ok: false; error: string } {
+  const id = String(form.get("id") ?? "").trim();
+  if (!id) {
+    return { ok: false, error: "Missing user id." };
+  }
+
+  const displayName = String(form.get("displayName") ?? "").trim();
+  if (!displayName) {
+    return { ok: false, error: "Display name is required." };
+  }
+
+  const email = String(form.get("email") ?? "").trim() || null;
+  const groups = normalizeUserManagerGroups(String(form.get("groups") ?? ""));
+  const isSelf = principal.id === id;
+  const isDisabled = !isSelf && Boolean(form.get("isDisabled"));
+
+  return {
+    ok: true,
+    user: {
+      id,
+      displayName,
+      email,
+      isDisabled
+    },
+    groups
+  };
+}
+
+function normalizeUserManagerGroups(value: string): string[] {
+  return [
+    ...new Set(
+      value
+        .split(/[,\s]+/)
+        .map((group) => group.trim().replace(/^@+/, ""))
+        .filter(Boolean)
+    )
+  ].sort((a, b) => a.localeCompare(b));
+}
+
+function mapManagedUser(row: UserRow): ManagedUser {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    email: row.email,
+    passwordHash: row.password_hash,
+    isDisabled: row.is_disabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    groups: []
+  };
+}
+
+function groupId(group: string): string {
+  return `group:${group}`;
 }
 
 function parseAclRuleForm(
@@ -4427,6 +4753,21 @@ function aclAdminErrorResponse(request: Request, env: Env, message: string): Res
 
   return htmlResponse(htmlShell(env, "ACL rule rejected", `<p>${escapeHtml(message)}</p>`), {
     status: 400
+  });
+}
+
+function userAdminErrorResponse(
+  request: Request,
+  env: Env,
+  message: string,
+  status = 400
+): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: message }, { status });
+  }
+
+  return htmlResponse(htmlShell(env, "User update rejected", `<p>${escapeHtml(message)}</p>`), {
+    status
   });
 }
 
