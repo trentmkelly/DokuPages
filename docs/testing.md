@@ -18,3 +18,7 @@ CI runs `npm run audit`, which maps to `npm audit --audit-level=high`, on every 
 CI also runs `npm run scan:secrets`, which scans tracked files for high-signal private keys and service tokens.
 
 Security regression tests cover renderer XSS escaping, CSRF rejection, ACL denial before page render/cache/edit writes, and media upload denial before D1/R2 writes.
+
+Native API compatibility tests cover the `/api/v1` endpoint index, page reads
+and writes, page revisions, media reads and deletes, media revisions, search,
+`users/me`, bearer-token authentication, and configured CORS behavior.

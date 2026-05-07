@@ -661,7 +661,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add integration tests for admin actions.
 - [x] Add migration tests using fixture wiki data.
 - [x] Add URL compatibility tests.
-- [ ] Add API compatibility tests if APIs are supported.
+- [x] Add API compatibility tests if APIs are supported.
 - [ ] Add accessibility tests.
 - [ ] Add visual regression tests.
 - [ ] Add mobile viewport tests.
