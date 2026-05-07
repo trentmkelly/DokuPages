@@ -702,7 +702,7 @@ describe("auth routes", () => {
     await env.RENDER_CACHE.put(
       "page:private:start",
       JSON.stringify({
-        rendererVersion: 16,
+        rendererVersion: 17,
         revisionId: "private:start@2026-05-07T00:00:00.000Z",
         title: "Cached Private",
         html: "<p>Cached private body.</p>",
