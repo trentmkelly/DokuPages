@@ -88,7 +88,7 @@ describe("handleRequest", () => {
   });
 
   it("handles wiki routes through the Pages Function router", async () => {
-    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-security-policy")).toContain("default-src 'self'");
@@ -101,6 +101,16 @@ describe("handleRequest", () => {
     expect(html).toContain('id="mobile__tools"');
     expect(html).toContain('<h1 id="welcome">Welcome</h1>');
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("redirects non-canonical wiki paths to normalized page routes", async () => {
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=edit"),
+      env
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
   });
 
   it("redirects the site root to the configured start page", async () => {
@@ -210,7 +220,7 @@ describe("handleRequest", () => {
       })
     );
 
-    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -231,7 +241,7 @@ describe("handleRequest", () => {
       })
     );
 
-    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -245,7 +255,7 @@ describe("handleRequest", () => {
       content: "====== Welcome ======\n\n===== Details =====\n\nMore text."
     };
 
-    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -259,7 +269,7 @@ describe("handleRequest", () => {
       content: "~~NOTOC~~\n~~NOCACHE~~\n====== Welcome ======\n\n===== Details =====\n\nMore text."
     };
 
-    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -270,7 +280,7 @@ describe("handleRequest", () => {
   });
 
   it("returns 404 when a wiki page does not exist", async () => {
-    const response = await handleRequest(new Request("https://example.com/wiki/Missing/Page"), env);
+    const response = await handleRequest(new Request("https://example.com/wiki/missing/page"), env);
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
@@ -284,7 +294,7 @@ describe("handleRequest", () => {
 
   it("renders an edit form for existing pages", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=edit"),
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
       env
     );
 
@@ -300,7 +310,7 @@ describe("handleRequest", () => {
 
   it("returns source text for existing pages", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=source"),
+      new Request("https://example.com/wiki/wiki/welcome?do=source"),
       env
     );
 
@@ -310,16 +320,16 @@ describe("handleRequest", () => {
 
   it("exports pages as raw text and rendered HTML modes", async () => {
     const raw = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=export_raw"),
+      new Request("https://example.com/wiki/wiki/welcome?do=export_raw"),
       env
     );
     const xhtmlBody = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=export_xhtmlbody"),
+      new Request("https://example.com/wiki/wiki/welcome?do=export_xhtmlbody"),
       env
     );
     const xhtml = await handleRequest(
       new Request(
-        "https://example.com/wiki/Wiki/Welcome?do=export_xhtml&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+        "https://example.com/wiki/wiki/welcome?do=export_xhtml&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
       ),
       env
     );
@@ -343,7 +353,7 @@ describe("handleRequest", () => {
 
   it("renders page revision history", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=revisions"),
+      new Request("https://example.com/wiki/wiki/welcome?do=revisions"),
       env
     );
 
@@ -359,7 +369,7 @@ describe("handleRequest", () => {
   it("renders an old page revision", async () => {
     const response = await handleRequest(
       new Request(
-        "https://example.com/wiki/Wiki/Welcome?rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+        "https://example.com/wiki/wiki/welcome?rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
       ),
       env
     );
@@ -373,7 +383,7 @@ describe("handleRequest", () => {
   it("renders a page diff against the current revision", async () => {
     const response = await handleRequest(
       new Request(
-        "https://example.com/wiki/Wiki/Welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+        "https://example.com/wiki/wiki/welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
       ),
       env
     );
@@ -391,7 +401,7 @@ describe("handleRequest", () => {
   it("renders a revert form for an old page revision", async () => {
     const response = await handleRequest(
       new Request(
-        "https://example.com/wiki/Wiki/Welcome?do=revert&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+        "https://example.com/wiki/wiki/welcome?do=revert&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
       ),
       env
     );
@@ -461,7 +471,7 @@ describe("handleRequest", () => {
 
   it("handles DokuWiki-style page search actions", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=search&q=welcome"),
+      new Request("https://example.com/wiki/wiki/welcome?do=search&q=welcome"),
       env
     );
 
@@ -481,7 +491,7 @@ describe("handleRequest", () => {
 
   it("renders backlinks for a page", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=backlink"),
+      new Request("https://example.com/wiki/wiki/welcome?do=backlink"),
       env
     );
 
@@ -665,7 +675,7 @@ describe("handleRequest", () => {
 
   it("purges rendered page cache through the page action", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=purge"),
+      new Request("https://example.com/wiki/wiki/welcome?do=purge"),
       env
     );
 
@@ -734,11 +744,11 @@ describe("handleRequest", () => {
     await expect(autosaveDraft.json()).resolves.toMatchObject({ ok: true, id: "wiki:welcome" });
 
     const edit = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=edit"),
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
       env
     );
     const draftView = await handleRequest(
-      new Request("https://example.com/wiki/Wiki/Welcome?do=draft"),
+      new Request("https://example.com/wiki/wiki/welcome?do=draft"),
       env
     );
 

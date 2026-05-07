@@ -204,6 +204,11 @@ export async function handleRequest(
       return jsonResponse({ error: "Method not allowed." }, { status: 405 });
     }
 
+    const canonicalPath = pagePath(id);
+    if (url.pathname !== canonicalPath) {
+      return redirectResponse(`${canonicalPath}${url.search}`, 301);
+    }
+
     if (url.searchParams.get("do") === "revisions") {
       return htmlResponse(await renderRevisionsPage(env, id));
     }

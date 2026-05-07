@@ -194,7 +194,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement route handling for remote APIs if supported.
 - [x] Implement 404 behavior compatible with DokuWiki settings.
 - [x] Implement redirects compatible with DokuWiki actions.
-- [ ] Implement canonical URL behavior.
+- [x] Implement canonical URL behavior.
 - [x] Implement pretty URL support.
 - [x] Implement compatibility for query parameter based DokuWiki URLs.
 
