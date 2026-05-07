@@ -201,35 +201,35 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## DokuWiki Syntax Parser
 
 - [ ] Inventory DokuWiki syntax features used by current content.
-- [ ] Decide whether to port DokuWiki's parser or implement a compatible parser.
-- [ ] Implement headings.
+- [x] Decide whether to port DokuWiki's parser or implement a compatible parser.
+- [x] Implement headings.
 - [ ] Implement paragraphs and line breaks.
-- [ ] Implement bold, italic, underline, monospace, subscript, superscript, and deleted text.
-- [ ] Implement internal links.
+- [x] Implement bold, italic, underline, monospace, subscript, superscript, and deleted text.
+- [x] Implement internal links.
 - [ ] Implement namespace-relative links.
-- [ ] Implement media links.
-- [ ] Implement external links.
+- [x] Implement media links.
+- [x] Implement external links.
 - [ ] Implement interwiki links.
 - [ ] Implement Windows share links if supported.
 - [ ] Implement email links and mailguard behavior.
-- [ ] Implement lists.
-- [ ] Implement tables.
-- [ ] Implement code blocks.
+- [x] Implement lists.
+- [x] Implement tables.
+- [x] Implement code blocks.
 - [ ] Implement file blocks.
-- [ ] Implement nowiki blocks.
+- [x] Implement nowiki blocks.
 - [ ] Implement quotes.
 - [ ] Implement footnotes.
 - [ ] Implement acronym replacement.
 - [ ] Implement entity replacement.
 - [ ] Implement smileys.
 - [ ] Implement typography replacements.
-- [ ] Implement table of contents extraction.
+- [x] Implement table of contents extraction.
 - [ ] Implement section edit anchors.
-- [ ] Implement metadata extraction.
+- [x] Implement metadata extraction.
 - [ ] Implement instruction caching or equivalent.
 - [ ] Implement renderer output compatible with current templates.
 - [ ] Add parser conformance fixtures from existing pages.
-- [ ] Add parser tests for each supported syntax mode.
+- [x] Add parser tests for each supported syntax mode.
 - [ ] Add parser tests for invalid and edge-case markup.
 
 ## Page Behavior
@@ -635,10 +635,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Testing
 
-- [ ] Add unit tests for page ID handling.
+- [x] Add unit tests for page ID handling.
 - [ ] Add unit tests for namespace handling.
-- [ ] Add unit tests for parser behavior.
-- [ ] Add unit tests for renderer behavior.
+- [x] Add unit tests for parser behavior.
+- [x] Add unit tests for renderer behavior.
 - [ ] Add unit tests for ACL behavior.
 - [ ] Add unit tests for auth behavior.
 - [ ] Add unit tests for storage adapters.
