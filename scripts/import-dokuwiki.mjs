@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { gunzip } from "node:zlib";
@@ -394,9 +395,36 @@ async function readMaybeCompressed(file, compression) {
   const content = await fs.readFile(file);
   if (compression === "gz") return gunzipAsync(content);
   if (compression === "bz2") {
-    return Buffer.from("");
+    return bunzip2Async(content);
   }
   return content;
+}
+
+async function bunzip2Async(content) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bzip2", ["-dc"], { stdio: ["pipe", "pipe", "pipe"] });
+    const stdout = [];
+    const stderr = [];
+
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.on("error", (error) => {
+      reject(new Error(`Unable to run bzip2 for compressed attic import: ${error.message}`));
+    });
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(stdout));
+      } else {
+        reject(
+          new Error(
+            `Unable to decompress bzip2 attic revision: ${Buffer.concat(stderr).toString().trim()}`
+          )
+        );
+      }
+    });
+
+    child.stdin.end(content);
+  });
 }
 
 async function readTextIfExists(file) {

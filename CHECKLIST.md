@@ -562,7 +562,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [x] Write importer for `data/pages`.
 - [x] Write importer for `data/attic`.
-- [ ] Write importer for compressed old page revisions.
+- [x] Write importer for compressed old page revisions.
 - [x] Write importer for `data/media`.
 - [x] Write importer for `data/media_attic`.
 - [ ] Write importer for `data/meta`.

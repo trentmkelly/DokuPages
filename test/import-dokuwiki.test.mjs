@@ -1,18 +1,27 @@
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
+import { gzip } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { buildImportPlan, writePageImportSql } from "../scripts/import-dokuwiki.mjs";
+
+const gzipAsync = promisify(gzip);
 
 describe("DokuWiki import planner", () => {
   it("discovers pages, media, ACLs, and users from a flat-file DokuWiki tree", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-"));
 
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
 
     await writeFile(path.join(root, "data/pages/wiki/welcome.txt"), "====== Welcome ======\n");
+    await writeFile(
+      path.join(root, "data/attic/wiki/welcome.1767225600.txt.gz"),
+      await gzipAsync("====== Old Welcome ======\n")
+    );
     await writeFile(path.join(root, "data/media/wiki/logo.svg"), "<svg />\n");
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 1\nwiki:* @user 8\n");
     await writeFile(
@@ -41,6 +50,7 @@ describe("DokuWiki import planner", () => {
 
     expect(plan.counts).toMatchObject({
       pages: 1,
+      pageRevisions: 1,
       media: 1,
       aclRules: 2,
       users: 1,
@@ -50,6 +60,12 @@ describe("DokuWiki import planner", () => {
       wordblockPatterns: 2
     });
     expect(plan.pages[0]).toMatchObject({ id: "wiki:welcome" });
+    expect(plan.pageRevisions[0]).toMatchObject({
+      pageId: "wiki:welcome",
+      revision: "1767225600",
+      compression: "gz",
+      byteLength: "====== Old Welcome ======\n".length
+    });
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
