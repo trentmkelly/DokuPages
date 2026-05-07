@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app.ts";
 import { hashPassword } from "../src/auth/password.ts";
 
@@ -38,73 +38,92 @@ describe("auth routes", () => {
   it("logs in native users, resolves the session principal, and logs out", async () => {
     env = createEnv();
     await seedUser(env.DB);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const login = new FormData();
     login.set("username", "alice");
     login.set("password", "correct horse battery staple");
     login.set("returnTo", "/wiki/wiki/welcome");
 
-    const loginResponse = await handleRequest(
-      new Request("https://example.com/api/auth/login", {
-        method: "POST",
-        body: login,
-        headers: csrfHeaders()
-      }),
-      env
-    );
-    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+    try {
+      const loginResponse = await handleRequest(
+        new Request("https://example.com/api/auth/login", {
+          method: "POST",
+          body: login,
+          headers: csrfHeaders()
+        }),
+        env
+      );
+      const cookie = loginResponse.headers.get("set-cookie") ?? "";
 
-    expect(loginResponse.status).toBe(303);
-    expect(loginResponse.headers.get("location")).toBe("/wiki/wiki/welcome");
-    expect(cookie).toContain("DW_PAGES_SESSION=");
-    expect(cookie).toContain("HttpOnly");
-    expect(cookie).toContain("SameSite=Lax");
-    expect(cookie).toContain("Secure");
+      expect(loginResponse.status).toBe(303);
+      expect(loginResponse.headers.get("location")).toBe("/wiki/wiki/welcome");
+      expect(cookie).toContain("DW_PAGES_SESSION=");
+      expect(cookie).toContain("HttpOnly");
+      expect(cookie).toContain("SameSite=Lax");
+      expect(cookie).toContain("Secure");
 
-    const sessionResponse = await handleRequest(
-      new Request("https://example.com/api/auth/session", {
-        headers: { cookie }
-      }),
-      env
-    );
+      const sessionResponse = await handleRequest(
+        new Request("https://example.com/api/auth/session", {
+          headers: { cookie }
+        }),
+        env
+      );
 
-    await expect(sessionResponse.json()).resolves.toMatchObject({
-      principal: {
-        type: "user",
-        isAuthenticated: true,
-        username: "alice",
-        displayName: "Alice Example",
-        groups: ["admin", "user"],
-        aclSubjects: ["@ALL", "@admin", "@user", "alice"]
-      }
-    });
+      await expect(sessionResponse.json()).resolves.toMatchObject({
+        principal: {
+          type: "user",
+          isAuthenticated: true,
+          username: "alice",
+          displayName: "Alice Example",
+          groups: ["admin", "user"],
+          aclSubjects: ["@ALL", "@admin", "@user", "alice"]
+        }
+      });
 
-    const logout = new FormData();
-    logout.set("returnTo", "/wiki/wiki/welcome");
-    const logoutResponse = await handleRequest(
-      new Request("https://example.com/api/auth/logout", {
-        method: "POST",
-        body: logout,
-        headers: csrfHeaders({ cookie })
-      }),
-      env
-    );
+      const logout = new FormData();
+      logout.set("returnTo", "/wiki/wiki/welcome");
+      const logoutResponse = await handleRequest(
+        new Request("https://example.com/api/auth/logout", {
+          method: "POST",
+          body: logout,
+          headers: csrfHeaders({ cookie })
+        }),
+        env
+      );
 
-    expect(logoutResponse.status).toBe(303);
-    expect(logoutResponse.headers.get("set-cookie")).toContain("Max-Age=0");
+      expect(logoutResponse.status).toBe(303);
+      expect(logoutResponse.headers.get("set-cookie")).toContain("Max-Age=0");
 
-    const anonymousResponse = await handleRequest(
-      new Request("https://example.com/api/auth/session", {
-        headers: { cookie }
-      }),
-      env
-    );
+      const anonymousResponse = await handleRequest(
+        new Request("https://example.com/api/auth/session", {
+          headers: { cookie }
+        }),
+        env
+      );
 
-    await expect(anonymousResponse.json()).resolves.toMatchObject({
-      principal: {
-        type: "anonymous",
-        isAuthenticated: false
-      }
-    });
+      await expect(anonymousResponse.json()).resolves.toMatchObject({
+        principal: {
+          type: "anonymous",
+          isAuthenticated: false
+        }
+      });
+      expect(log.mock.calls.map((call) => JSON.parse(String(call[0])))).toEqual([
+        expect.objectContaining({
+          event: "auth_event",
+          authEvent: "login_success",
+          userId: "user-1",
+          username: "alice"
+        }),
+        expect.objectContaining({
+          event: "auth_event",
+          authEvent: "logout",
+          userId: "user-1",
+          username: "alice"
+        })
+      ]);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("allows admin users to manage ACL rules", async () => {
@@ -270,22 +289,32 @@ describe("auth routes", () => {
   it("rejects invalid logins without setting a session cookie", async () => {
     env = createEnv();
     await seedUser(env.DB);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const login = new FormData();
     login.set("username", "alice");
     login.set("password", "wrong");
 
-    const response = await handleRequest(
-      new Request("https://example.com/api/auth/login", {
-        method: "POST",
-        body: login,
-        headers: csrfHeaders()
-      }),
-      env
-    );
+    try {
+      const response = await handleRequest(
+        new Request("https://example.com/api/auth/login", {
+          method: "POST",
+          body: login,
+          headers: csrfHeaders()
+        }),
+        env
+      );
 
-    expect(response.status).toBe(401);
-    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
-    await expect(response.text()).resolves.toContain("Invalid username or password.");
+      expect(response.status).toBe(401);
+      expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+      await expect(response.text()).resolves.toContain("Invalid username or password.");
+      expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({
+        event: "auth_event",
+        authEvent: "login_failure",
+        username: "alice"
+      });
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("rate limits repeated invalid login attempts", async () => {

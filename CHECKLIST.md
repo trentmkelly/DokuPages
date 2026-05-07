@@ -704,7 +704,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add request IDs.
 - [x] Add error logging.
 - [x] Add storage error logging.
-- [ ] Add auth event logging.
+- [x] Add auth event logging.
 - [x] Add admin action logging.
 - [ ] Add migration logging.
 - [ ] Add performance timing logs.

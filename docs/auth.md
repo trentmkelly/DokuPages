@@ -20,6 +20,8 @@ Native login uses D1-backed users with the native password hash format. Successf
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
 
+Login success, login failure, login rate-limit, and logout events emit structured `auth_event` logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
+
 ## Password Hashing
 
 New native accounts use PBKDF2-HMAC-SHA-256 through Web Crypto. Encoded hashes use:

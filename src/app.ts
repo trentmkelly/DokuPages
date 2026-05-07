@@ -220,7 +220,7 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/api/auth/logout" && request.method === "POST") {
-    return handleLogout(request, env);
+    return handleLogout(request, env, principal);
   }
 
   if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
@@ -2098,11 +2098,15 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   }
 
   const rateLimited = await loginRateLimitResponse(request, env, username, returnTo, csrf);
-  if (rateLimited) return rateLimited;
+  if (rateLimited) {
+    logAuthEvent(request, "login_rate_limited", { username });
+    return rateLimited;
+  }
 
   const user = await authenticateUser(env.DB, username, password);
   if (!user) {
     await recordLoginFailure(request, env, username);
+    logAuthEvent(request, "login_failure", { username });
     return htmlResponseWithCsrf(
       request,
       renderLoginPage(env, url, "Invalid username or password.", returnTo, csrf.token),
@@ -2113,6 +2117,10 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
   await clearLoginFailures(request, env, username);
   const session = await createLoginSession(env.DB, user.id);
+  logAuthEvent(request, "login_success", {
+    userId: user.id,
+    username: user.username
+  });
   return new Response(null, {
     status: 303,
     headers: securityHeaders({
@@ -2300,7 +2308,11 @@ function uploadRateLimitKey(request: Request, principal: AuthPrincipal): string 
   return `media:upload:${client}:${encodeURIComponent(actor).slice(0, 160)}`;
 }
 
-async function handleLogout(request: Request, env: Env): Promise<Response> {
+async function handleLogout(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
@@ -2309,6 +2321,10 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
   const cookieName = getRuntimeConfig(env).sessionCookieName;
 
   await deleteLoginSession(env.DB, readCookie(request, cookieName));
+  logAuthEvent(request, "logout", {
+    userId: principal.id,
+    username: principal.username
+  });
 
   return new Response(null, {
     status: 303,
@@ -2317,6 +2333,27 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
       "set-cookie": clearSessionCookieHeader(cookieName, request)
     })
   });
+}
+
+function logAuthEvent(
+  request: Request,
+  authEvent: "login_success" | "login_failure" | "login_rate_limited" | "logout",
+  details: Record<string, unknown>
+): void {
+  const url = new URL(request.url);
+
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event: "auth_event",
+      authEvent,
+      requestId: request.headers.get("cf-ray") ?? request.headers.get("x-request-id") ?? null,
+      method: request.method,
+      path: url.pathname,
+      ip: getClientIp(request),
+      ...details
+    })
+  );
 }
 
 function renderLoginPage(
