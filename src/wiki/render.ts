@@ -1,4 +1,5 @@
 import { cleanPageId } from "./page-id";
+import { mediaPath } from "./media-service";
 
 export interface TocItem {
   id: string;
@@ -309,9 +310,8 @@ function renderMedia(source: string): string {
     /\{\{([^}|?]+)(?:\?[^}|]+)?(?:\|([^}]*))?\}\}/g,
     (_match, rawId, rawAlt) => {
       const id = cleanPageId(rawId);
-      const src = `/media/${encodeURIComponent(id.replaceAll(":", "/"))}`;
       const alt = rawAlt ? rawAlt.trim() : id;
-      return `<img src="${src}" alt="${escapeAttribute(alt)}">`;
+      return `<img src="${mediaPath(id)}" alt="${escapeAttribute(alt)}">`;
     }
   );
 }

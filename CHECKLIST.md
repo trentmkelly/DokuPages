@@ -178,9 +178,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for search.
 - [x] Implement route handling for namespace index.
 - [x] Implement route handling for recent changes.
-- [ ] Implement route handling for media fetches.
-- [ ] Implement route handling for media details.
-- [ ] Implement route handling for media manager.
+- [x] Implement route handling for media fetches.
+- [x] Implement route handling for media details.
+- [x] Implement route handling for media manager.
 - [ ] Implement route handling for uploads.
 - [x] Implement route handling for feeds.
 - [x] Implement route handling for sitemap.
@@ -267,9 +267,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Media Behavior
 
-- [ ] Implement media ID cleaning.
-- [ ] Implement media namespace resolution.
-- [ ] Implement media MIME detection.
+- [x] Implement media ID cleaning.
+- [x] Implement media namespace resolution.
+- [x] Implement media MIME detection.
 - [ ] Implement media ACL checks.
 - [ ] Implement media upload.
 - [ ] Implement media overwrite rules.
@@ -278,15 +278,15 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement media revert.
 - [ ] Implement media changelog.
 - [ ] Implement media metadata.
-- [ ] Implement media detail pages.
-- [ ] Implement media manager browsing.
+- [x] Implement media detail pages.
+- [x] Implement media manager browsing.
 - [ ] Implement media search.
 - [ ] Implement thumbnail generation or a replacement strategy.
 - [ ] Implement image resizing or a replacement strategy.
 - [ ] Implement EXIF/JPEG metadata behavior if supported.
-- [ ] Implement download headers.
-- [ ] Implement cache headers for immutable media revisions.
-- [ ] Implement cache headers for current media files.
+- [x] Implement download headers.
+- [x] Implement cache headers for immutable media revisions.
+- [x] Implement cache headers for current media files.
 - [ ] Implement large upload limits and validation.
 - [ ] Implement SVG safety checks.
 - [ ] Implement upload content safety checks.
@@ -598,7 +598,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Inventory existing URL patterns.
 - [x] Preserve `doku.php?id=...` routes if required.
 - [x] Preserve nice URL routes if required.
-- [ ] Preserve media fetch URLs if required.
+- [x] Preserve media fetch URLs if required.
 - [x] Preserve feed URLs if required.
 - [x] Preserve sitemap URLs if required.
 - [x] Preserve revision URLs if required.
@@ -653,7 +653,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add integration tests for diff.
 - [x] Add integration tests for search.
 - [ ] Add integration tests for media upload.
-- [ ] Add integration tests for media fetch.
+- [x] Add integration tests for media fetch.
 - [ ] Add integration tests for login.
 - [ ] Add integration tests for logout.
 - [ ] Add integration tests for admin actions.

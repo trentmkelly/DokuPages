@@ -7,6 +7,8 @@ interface D1StubState {
   revisions: Record<string, unknown>[];
   changelog: Record<string, unknown>[];
   searchPostings: Record<string, unknown>[];
+  media: Record<string, unknown>[];
+  mediaRevisions: Record<string, unknown>[];
   drafts: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
@@ -17,6 +19,8 @@ const state: D1StubState = {
   revisions: seedRevisions(),
   changelog: seedChangelog(),
   searchPostings: seedSearchPostings(),
+  media: seedMedia(),
+  mediaRevisions: seedMediaRevisions(),
   drafts: [],
   deleted: false,
   batches: []
@@ -28,7 +32,7 @@ const renderCache = new Map<string, string>();
 
 const env = {
   DB: createD1Stub(state),
-  MEDIA_BUCKET: {} as R2Bucket,
+  MEDIA_BUCKET: createR2Stub(),
   RENDER_CACHE: {
     get: async (key: string, type?: string) => {
       const value = renderCache.get(key);
@@ -54,6 +58,8 @@ describe("handleRequest", () => {
     state.revisions = seedRevisions();
     state.changelog = seedChangelog();
     state.searchPostings = seedSearchPostings();
+    state.media = seedMedia();
+    state.mediaRevisions = seedMediaRevisions();
     state.drafts = [];
     state.deleted = false;
     state.batches = [];
@@ -117,6 +123,48 @@ describe("handleRequest", () => {
     );
     expect(start.status).toBe(301);
     expect(start.headers.get("location")).toBe("/wiki/wiki/welcome");
+  });
+
+  it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
+    const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
+    const download = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?download=1"),
+      env
+    );
+    const revision = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?rev=media-rev-1"),
+      env
+    );
+    const detail = await handleRequest(
+      new Request("https://example.com/media-detail/wiki/logo.svg"),
+      env
+    );
+    const manager = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki"),
+      env
+    );
+    const legacyFetch = await handleRequest(
+      new Request("https://example.com/lib/exe/fetch.php?media=wiki:logo.svg&dl=1"),
+      env
+    );
+    const legacyDetail = await handleRequest(
+      new Request("https://example.com/lib/exe/detail.php?id=wiki:logo.svg"),
+      env
+    );
+
+    expect(fetch.status).toBe(200);
+    expect(fetch.headers.get("content-type")).toBe("image/svg+xml");
+    expect(fetch.headers.get("cache-control")).toBe("public, max-age=3600");
+    await expect(fetch.text()).resolves.toBe("<svg>current</svg>");
+    expect(download.headers.get("content-disposition")).toBe('attachment; filename="logo.svg"');
+    expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    await expect(revision.text()).resolves.toBe("<svg>old</svg>");
+    await expect(detail.text()).resolves.toContain("Media detail");
+    await expect(manager.text()).resolves.toContain("logo.svg");
+    expect(legacyFetch.status).toBe(301);
+    expect(legacyFetch.headers.get("location")).toBe("/media/wiki/logo.svg?download=1");
+    expect(legacyDetail.status).toBe(301);
+    expect(legacyDetail.headers.get("location")).toBe("/media-detail/wiki/logo.svg");
   });
 
   it("uses matching rendered page cache entries", async () => {
@@ -614,6 +662,14 @@ function createD1Stub(state: D1StubState): D1Database {
         values,
         first: async () => {
           const [id] = values;
+          if (sql.includes("from media_revisions")) {
+            return state.mediaRevisions.find((revision) => revision.id === id) ?? null;
+          }
+
+          if (sql.includes("from media")) {
+            return state.media.find((media) => media.id === id && media.is_deleted === 0) ?? null;
+          }
+
           if (sql.includes("from page_revisions") && !sql.includes("join")) {
             return state.revisions.find((revision) => revision.id === id) ?? null;
           }
@@ -660,6 +716,14 @@ function createD1Stub(state: D1StubState): D1Database {
                   updated_at: state.row?.updated_at,
                   score
                 }))
+            };
+          }
+
+          if (sql.includes("from media") && sql.includes("where namespace = ?")) {
+            return {
+              results: state.media
+                .filter((media) => media.namespace === idOrLimit && media.is_deleted === 0)
+                .slice(0, Number.isFinite(limit) ? limit : 200)
             };
           }
 
@@ -831,6 +895,24 @@ function createD1Stub(state: D1StubState): D1Database {
   } as unknown as D1Database;
 }
 
+function createR2Stub(): R2Bucket {
+  const objects = new Map([
+    ["media/current/wiki/logo.svg", "<svg>current</svg>"],
+    ["media/revisions/wiki/logo.svg/20260506000000", "<svg>old</svg>"]
+  ]);
+
+  return {
+    get: async (key: string) => {
+      const value = objects.get(key);
+      if (!value) return null;
+
+      return {
+        body: new Response(value).body
+      };
+    }
+  } as unknown as R2Bucket;
+}
+
 function currentPageRow(): Record<string, unknown> {
   return {
     id: "wiki:welcome",
@@ -936,6 +1018,39 @@ function seedSearchPostings(): Record<string, unknown>[] {
       page_id: "wiki:welcome",
       frequency: 1,
       updated_at: "2026-05-07T00:00:00.000Z"
+    }
+  ];
+}
+
+function seedMedia(): Record<string, unknown>[] {
+  return [
+    {
+      id: "wiki:logo.svg",
+      namespace: "wiki",
+      object_key: "media/current/wiki/logo.svg",
+      mime_type: "image/svg+xml",
+      byte_length: 18,
+      content_hash: "current-media-hash",
+      current_revision_id: "media-rev-current",
+      is_deleted: 0,
+      created_at: "2026-05-06T00:00:00.000Z",
+      updated_at: "2026-05-07T00:00:00.000Z"
+    }
+  ];
+}
+
+function seedMediaRevisions(): Record<string, unknown>[] {
+  return [
+    {
+      id: "media-rev-1",
+      media_id: "wiki:logo.svg",
+      object_key: "media/revisions/wiki/logo.svg/20260506000000",
+      mime_type: "image/svg+xml",
+      byte_length: 14,
+      content_hash: "old-media-hash",
+      change_type: "edit",
+      summary: "Older media",
+      created_at: "2026-05-06T00:00:00.000Z"
     }
   ];
 }

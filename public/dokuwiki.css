@@ -830,6 +830,48 @@ form.search button {
   color: #000;
 }
 
+#dokuwiki__detail {
+  padding: 0;
+}
+
+#dokuwiki__detail img {
+  display: block;
+  max-height: 32em;
+  margin-bottom: 1.4em;
+  object-fit: contain;
+}
+
+#dokuwiki__detail div.img_detail dl {
+  overflow: hidden;
+}
+
+#dokuwiki__detail div.img_detail dl dt {
+  float: left;
+  clear: left;
+  width: 9em;
+  text-align: right;
+}
+
+#dokuwiki__detail div.img_detail dl dd {
+  margin-left: 9.5em;
+  overflow-wrap: anywhere;
+}
+
+.dokuwiki ul.media__manager {
+  padding-left: 0;
+}
+
+.dokuwiki ul.media__manager li {
+  margin: 0 0 0.45em;
+  list-style: none;
+}
+
+.dokuwiki ul.media__manager span,
+.dokuwiki ul.media__manager small {
+  margin-left: 0.5em;
+  color: var(--dw-text-neutral);
+}
+
 .dokuwiki .page del {
   background: #fdd;
 }

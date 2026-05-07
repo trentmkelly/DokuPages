@@ -1,6 +1,17 @@
 import type { Env } from "./env";
 import { healthResponse } from "./http/health";
 import { htmlResponse, jsonResponse, notFoundResponse, redirectResponse } from "./http/responses";
+import {
+  cleanMediaId,
+  getCurrentMedia,
+  getMediaRevision,
+  listNamespaceMedia,
+  mediaDetailPath,
+  mediaName,
+  mediaPath,
+  type CurrentMedia,
+  type MediaRevision
+} from "./wiki/media-service";
 import { cleanPageId } from "./wiki/page-id";
 import {
   getCurrentPage,
@@ -45,8 +56,35 @@ export async function handleRequest(
     return redirectLegacyDokuPhp(url, env);
   }
 
+  if (url.pathname === "/lib/exe/fetch.php") {
+    return redirectLegacyMediaFetch(url);
+  }
+
+  if (url.pathname === "/lib/exe/detail.php") {
+    return redirectLegacyMediaDetail(url);
+  }
+
+  if (url.pathname === "/lib/exe/mediamanager.php") {
+    return redirectResponse(
+      `/media-manager?ns=${encodeURIComponent(cleanPageId(url.searchParams.get("ns") ?? ""))}`,
+      301
+    );
+  }
+
   if (url.pathname === "/wiki" || url.pathname === "/wiki/") {
     return redirectResponse(pagePath(startPageId(env)), 301);
+  }
+
+  if (url.pathname.startsWith("/media/")) {
+    return handleMediaFetch(env, url);
+  }
+
+  if (url.pathname.startsWith("/media-detail/")) {
+    return htmlResponse(await renderMediaDetailPage(env, url));
+  }
+
+  if (url.pathname === "/media-manager") {
+    return htmlResponse(await renderMediaManagerPage(env, url));
   }
 
   if (url.pathname === "/api/health") {
@@ -257,6 +295,156 @@ function redirectLegacyDokuPhp(url: URL, env: Env): Response {
   }
 
   return redirectResponse(`${target.pathname}${target.search}`, 301);
+}
+
+function redirectLegacyMediaFetch(url: URL): Response {
+  const id = cleanMediaId(url.searchParams.get("media") ?? url.searchParams.get("id") ?? "");
+
+  if (!id) {
+    return redirectResponse("/media-manager", 301);
+  }
+
+  const target = new URL(mediaPath(id), url);
+  const revisionId = url.searchParams.get("rev");
+
+  if (revisionId) {
+    target.searchParams.set("rev", revisionId);
+  }
+
+  if (url.searchParams.get("dl")) {
+    target.searchParams.set("download", "1");
+  }
+
+  return redirectResponse(`${target.pathname}${target.search}`, 301);
+}
+
+function redirectLegacyMediaDetail(url: URL): Response {
+  const id = cleanMediaId(url.searchParams.get("id") ?? url.searchParams.get("media") ?? "");
+
+  if (!id) {
+    return redirectResponse("/media-manager", 301);
+  }
+
+  return redirectResponse(mediaDetailPath(id), 301);
+}
+
+async function handleMediaFetch(env: Env, url: URL): Promise<Response> {
+  const id = mediaIdFromPath(url, "/media/");
+
+  if (!id) {
+    return notFoundResponse("Missing media id.");
+  }
+
+  const revisionId = url.searchParams.get("rev");
+  const media = revisionId
+    ? await getMediaRevision(env.DB, revisionId)
+    : await getCurrentMedia(env.DB, id);
+
+  if (!media || getComparableMediaId(media) !== id) {
+    return notFoundResponse(`Media '${id}' was not found.`);
+  }
+
+  if (!env.MEDIA_BUCKET) {
+    return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
+  }
+
+  const object = await env.MEDIA_BUCKET.get(media.objectKey);
+
+  if (!object) {
+    return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
+  }
+
+  const headers = new Headers();
+  headers.set("content-type", media.mimeType);
+  headers.set("content-length", String(media.byteLength));
+  headers.set("etag", `"${media.contentHash}"`);
+  headers.set("last-modified", new Date(getMediaTimestamp(media)).toUTCString());
+  headers.set("x-content-type-options", "nosniff");
+  headers.set(
+    "cache-control",
+    revisionId ? "public, max-age=31536000, immutable" : "public, max-age=3600"
+  );
+
+  if (url.searchParams.get("download") === "1") {
+    headers.set(
+      "content-disposition",
+      `attachment; filename="${escapeHeaderValue(mediaName(id))}"`
+    );
+  }
+
+  return new Response(object.body, { headers });
+}
+
+async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
+  const id = mediaIdFromPath(url, "/media-detail/");
+  const media = id ? await getCurrentMedia(env.DB, id) : null;
+
+  if (!id || !media) {
+    return htmlShell(env, "Media not found", "<p>Media not found.</p>");
+  }
+
+  const preview = media.mimeType.startsWith("image/")
+    ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}"></a></p>`
+    : `<p><a href="${mediaPath(id)}">Download ${escapeHtml(mediaName(id))}</a></p>`;
+
+  return htmlShell(
+    env,
+    `Media detail for ${id}`,
+    `<h1>Media detail</h1>
+    <div id="dokuwiki__detail">
+      ${preview}
+      <div class="img_detail">
+        <dl>
+          <dt>Media ID</dt><dd>${escapeHtml(id)}</dd>
+          <dt>Namespace</dt><dd>${escapeHtml(media.namespace || "(root)")}</dd>
+          <dt>MIME type</dt><dd>${escapeHtml(media.mimeType)}</dd>
+          <dt>Size</dt><dd>${media.byteLength.toLocaleString("en-US")} bytes</dd>
+          <dt>Updated</dt><dd>${escapeHtml(media.updatedAt)}</dd>
+          <dt>Hash</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
+        </dl>
+      </div>
+    </div>`
+  );
+}
+
+async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
+  const namespace = cleanMediaId(url.searchParams.get("ns") ?? "");
+  const media = await listNamespaceMedia(env.DB, namespace);
+  const emptyState = media.length === 0 ? "<p>No media found.</p>" : "";
+  const items = media
+    .map(
+      (item) => `<li>
+        <a href="${mediaDetailPath(item.id)}">${escapeHtml(mediaName(item.id))}</a>
+        <span>${escapeHtml(item.mimeType)}</span>
+        <small>${item.byteLength.toLocaleString("en-US")} bytes</small>
+      </li>`
+    )
+    .join("");
+
+  return htmlShell(
+    env,
+    `Media manager ${namespace}`,
+    `<h1>Media manager</h1>
+    <form class="search" method="get" action="/media-manager">
+      <label for="media__ns">Namespace</label>
+      <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
+      <button type="submit">Browse</button>
+    </form>
+    ${emptyState}
+    <ul class="idx media__manager">${items}</ul>`
+  );
+}
+
+function mediaIdFromPath(url: URL, prefix: string): string {
+  return cleanMediaId(decodeURIComponent(url.pathname.slice(prefix.length)));
+}
+
+function getComparableMediaId(media: CurrentMedia | MediaRevision): string {
+  return "mediaId" in media ? media.mediaId : media.id;
+}
+
+function getMediaTimestamp(media: CurrentMedia | MediaRevision): string {
+  return "updatedAt" in media ? media.updatedAt : media.createdAt;
 }
 
 function normalizeLegacyAction(action: string | null): string | null {
@@ -1095,6 +1283,14 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value: string): string {
+  return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+function escapeHeaderValue(value: string): string {
+  return value.replace(/["\r\n\\]/g, "_");
 }
 
 function escapeXml(value: string): string {

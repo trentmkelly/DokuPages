@@ -47,7 +47,7 @@ describe("renderWikiText", () => {
 
     expect(rendered.html).toContain('<a href="/wiki/wiki%2Fsyntax">Syntax</a>');
     expect(rendered.html).toContain('<a href="https://example.test">Example</a>');
-    expect(rendered.html).toContain('<img src="/media/wiki%2Fdokuwiki.svg" alt="Logo">');
+    expect(rendered.html).toContain('<img src="/media/wiki/dokuwiki.svg" alt="Logo">');
   });
 
   it("renders lists, code blocks, and nowiki spans", () => {
