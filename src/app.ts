@@ -45,6 +45,7 @@ import {
   deleteMedia,
   getCurrentMedia,
   getMediaRevision,
+  listMediaRevisions,
   listNamespaceMedia,
   mediaDetailPath,
   mediaName,
@@ -353,6 +354,11 @@ export async function handleRequest(
     );
   }
 
+  if (url.pathname === "/api/v1" || url.pathname.startsWith("/api/v1/")) {
+    const response = await handleNativeApi(request, env, url, principal);
+    return withNativeApiCors(request, env, response);
+  }
+
   if (url.pathname === "/api/pages" && request.method === "POST") {
     return handleSave(request, env, principal);
   }
@@ -654,6 +660,699 @@ function remoteApiNotImplementedResponse(apiName: string): Response {
     },
     { status: 501 }
   );
+}
+
+async function handleNativeApi(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  if (request.method === "OPTIONS") {
+    return nativeApiPreflightResponse(request, env);
+  }
+
+  const auth = resolveNativeApiPrincipal(request, env, principal, request.method !== "GET");
+  if (auth instanceof Response) return auth;
+
+  if (url.pathname === "/api/v1" && request.method === "GET") {
+    return jsonResponse({
+      ok: true,
+      endpoints: [
+        "/api/v1/pages",
+        "/api/v1/pages/revisions",
+        "/api/v1/revisions",
+        "/api/v1/media",
+        "/api/v1/media/revisions",
+        "/api/v1/search",
+        "/api/v1/users/me"
+      ]
+    });
+  }
+
+  if (url.pathname === "/api/v1/pages") {
+    if (request.method === "GET") return handleNativeApiPageRead(request, env, url, auth);
+    if (request.method === "POST") return handleNativeApiPageWrite(request, env, auth);
+    return nativeApiMethodNotAllowed("GET, POST");
+  }
+
+  if (url.pathname === "/api/v1/pages/revisions") {
+    if (request.method === "GET") return handleNativeApiPageRevisions(request, env, url, auth);
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  if (url.pathname === "/api/v1/pages/revert") {
+    if (request.method === "POST") return handleNativeApiPageRevert(request, env, auth);
+    return nativeApiMethodNotAllowed("POST");
+  }
+
+  if (url.pathname === "/api/v1/revisions") {
+    if (request.method === "GET") return handleNativeApiRevisionRead(request, env, url, auth);
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  if (url.pathname === "/api/v1/media") {
+    if (request.method === "GET") return handleNativeApiMediaRead(request, env, url, auth);
+    if (request.method === "POST") return handleNativeApiMediaUpload(request, env, auth);
+    if (request.method === "DELETE") return handleNativeApiMediaDelete(request, env, url, auth);
+    return nativeApiMethodNotAllowed("GET, POST, DELETE");
+  }
+
+  if (url.pathname === "/api/v1/media/revisions") {
+    if (request.method === "GET") return handleNativeApiMediaRevisions(request, env, url, auth);
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  if (url.pathname === "/api/v1/media/revert") {
+    if (request.method === "POST") return handleNativeApiMediaRevert(request, env, auth);
+    return nativeApiMethodNotAllowed("POST");
+  }
+
+  if (url.pathname === "/api/v1/search") {
+    if (request.method === "GET") return handleNativeApiSearch(env, url, auth);
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  if (url.pathname === "/api/v1/users/me") {
+    if (request.method === "GET") {
+      return jsonResponse({ ok: true, principal: publicPrincipal(auth) });
+    }
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  return jsonResponse({ error: "API endpoint not found." }, { status: 404 });
+}
+
+async function handleNativeApiPageRead(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanPageId(url.searchParams.get("id") ?? "");
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const page = await getCurrentPage(env.DB, id);
+  if (!page) {
+    return jsonResponse({ error: `Page '${id}' was not found.` }, { status: 404 });
+  }
+
+  return jsonResponse({ ok: true, page: nativePagePayload(page) });
+}
+
+async function handleNativeApiPageRevisions(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanPageId(url.searchParams.get("id") ?? "");
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const revisions = await listPageRevisions(
+    env.DB,
+    id,
+    numericSearchParam(url, "limit", 50),
+    numericSearchParam(url, "offset", 0)
+  );
+
+  return jsonResponse({ ok: true, revisions: revisions.map(nativePageRevisionPayload) });
+}
+
+async function handleNativeApiRevisionRead(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const revisionId = url.searchParams.get("id") ?? "";
+  const revision = revisionId ? await getPageRevision(env.DB, revisionId) : null;
+
+  if (!revision) {
+    return jsonResponse({ error: "Revision was not found." }, { status: 404 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, revision.pageId, ACL_READ);
+  if (denied) return denied;
+
+  return jsonResponse({ ok: true, revision: nativePageRevisionPayload(revision) });
+}
+
+async function handleNativeApiPageWrite(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const body = await readJsonObject(request);
+  if (!body.ok) return body.response;
+
+  const id = cleanPageId(String(body.value.id ?? ""));
+  const content = String(body.value.content ?? "");
+  const summary = String(body.value.summary ?? "");
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  const currentPage = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    currentPage ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
+
+  const rateLimited = await editRateLimitResponse(request, env, principal);
+  if (rateLimited) return rateLimited;
+
+  await recordEditAttempt(request, env, principal);
+
+  const blocked = findWordblockMatch(`${content}\n${summary}`);
+  if (blocked) {
+    return jsonResponse(
+      { error: WORD_BLOCK_MESSAGE, blockedPattern: blocked.pattern },
+      { status: 400 }
+    );
+  }
+
+  const author = principalAuthor(principal);
+  const result = await savePage(env.DB, {
+    id,
+    content,
+    summary,
+    baseRevisionId: stringOrNull(body.value.baseRevisionId),
+    changeType: body.value.minor ? "minor" : undefined,
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    return jsonResponse(
+      { error: "Page conflict.", currentRevisionId: result.currentRevisionId },
+      { status: 409 }
+    );
+  }
+
+  await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
+  await deletePageDraft(env.DB, id);
+
+  return jsonResponse(
+    { ok: true, changeType: result.changeType, page: nativePagePayload(result.page) },
+    { status: result.changeType === "create" ? 201 : 200 }
+  );
+}
+
+async function handleNativeApiPageRevert(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const body = await readJsonObject(request);
+  if (!body.ok) return body.response;
+
+  const id = cleanPageId(String(body.value.id ?? ""));
+  const revisionId = String(body.value.revisionId ?? "");
+
+  if (!id || !revisionId) {
+    return jsonResponse({ error: "Missing page id or revision id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_EDIT);
+  if (denied) return denied;
+
+  const revision = await getPageRevision(env.DB, revisionId);
+  if (!revision || revision.pageId !== id) {
+    return jsonResponse({ error: `Revision '${revisionId}' was not found.` }, { status: 404 });
+  }
+
+  const author = principalAuthor(principal);
+  const result = await savePage(env.DB, {
+    id,
+    content: revision.content,
+    summary: String(body.value.summary || "") || `Reverted to ${revision.createdAt}`,
+    baseRevisionId: stringOrNull(body.value.baseRevisionId),
+    changeType: "revert",
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    return jsonResponse(
+      { error: "Page conflict.", currentRevisionId: result.currentRevisionId },
+      { status: 409 }
+    );
+  }
+
+  await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
+
+  return jsonResponse({ ok: true, changeType: "revert", page: nativePagePayload(result.page) });
+}
+
+async function handleNativeApiMediaRead(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanMediaId(url.searchParams.get("id") ?? "");
+
+  if (!id) {
+    return jsonResponse({ error: "Missing media id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const media = await getCurrentMedia(env.DB, id);
+  if (!media) {
+    return jsonResponse({ error: `Media '${id}' was not found.` }, { status: 404 });
+  }
+
+  return jsonResponse({ ok: true, media: nativeMediaPayload(media) });
+}
+
+async function handleNativeApiMediaRevisions(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanMediaId(url.searchParams.get("id") ?? "");
+
+  if (!id) {
+    return jsonResponse({ error: "Missing media id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const revisions = await listMediaRevisions(
+    env.DB,
+    id,
+    numericSearchParam(url, "limit", 50),
+    url.searchParams.get("cursor") ?? undefined
+  );
+
+  return jsonResponse({ ok: true, revisions: revisions.map(nativeMediaRevisionPayload) });
+}
+
+async function handleNativeApiMediaUpload(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const startedAt = Date.now();
+  if (!env.MEDIA_BUCKET) {
+    return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
+  }
+
+  const form = await request.formData();
+  const file = form.get("file");
+
+  if (!isUploadFile(file)) {
+    return jsonResponse({ error: "Missing upload file." }, { status: 400 });
+  }
+
+  const namespace = cleanMediaId(String(form.get("ns") ?? ""));
+  const requestedId = cleanMediaId(String(form.get("id") ?? ""));
+  const id = requestedId || cleanMediaId([namespace, file.name].filter(Boolean).join(":"));
+
+  if (!id) {
+    return jsonResponse({ error: "Missing media id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
+  if (denied) return denied;
+
+  const rateLimited = await uploadRateLimitResponse(request, env, principal);
+  if (rateLimited) return rateLimited;
+
+  await recordUploadAttempt(request, env, principal);
+
+  const mediaBody = await file.arrayBuffer();
+  const validation = validateMediaUpload({
+    id,
+    body: mediaBody,
+    mimeType: file.type || null
+  });
+
+  if (!validation.ok) {
+    return jsonResponse({ error: validation.error }, { status: 400 });
+  }
+
+  const author = principalAuthor(principal);
+  const result = await saveMediaUpload(env.DB, env.MEDIA_BUCKET, {
+    id,
+    body: mediaBody,
+    mimeType: file.type || null,
+    summary: String(form.get("summary") ?? ""),
+    overwrite: Boolean(form.get("overwrite")),
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    return jsonResponse({ error: `Media '${id}' already exists.` }, { status: 409 });
+  }
+
+  logMetric("media_metric", {
+    operation: "upload",
+    namespace: mediaNamespace(id) || null,
+    changeType: result.changeType,
+    byteLength: result.media.byteLength,
+    durationMs: elapsedSince(startedAt)
+  });
+
+  return jsonResponse(
+    {
+      ok: true,
+      changeType: result.changeType,
+      media: nativeMediaPayload(result.media),
+      revision: nativeMediaRevisionPayload(result.revision)
+    },
+    { status: result.changeType === "create" ? 201 : 200 }
+  );
+}
+
+async function handleNativeApiMediaDelete(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const body = await readOptionalJsonObject(request);
+  if (!body.ok) return body.response;
+
+  const id = cleanMediaId(String(body.value.id ?? url.searchParams.get("id") ?? ""));
+
+  if (!id) {
+    return jsonResponse({ error: "Missing media id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_DELETE);
+  if (denied) return denied;
+
+  const author = principalAuthor(principal);
+  const result = await deleteMedia(env.DB, {
+    id,
+    summary: String(body.value.summary ?? ""),
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    return jsonResponse({ error: `Media '${id}' was not found.` }, { status: 404 });
+  }
+
+  return jsonResponse({ ok: true, id, revision: nativeMediaRevisionPayload(result.revision) });
+}
+
+async function handleNativeApiMediaRevert(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const body = await readJsonObject(request);
+  if (!body.ok) return body.response;
+
+  const id = cleanMediaId(String(body.value.id ?? ""));
+  const revisionId = String(body.value.revisionId ?? "");
+
+  if (!id || !revisionId) {
+    return jsonResponse({ error: "Missing media id or revision id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
+  if (denied) return denied;
+
+  const author = principalAuthor(principal);
+  const result = await revertMedia(env.DB, {
+    id,
+    revisionId,
+    summary: String(body.value.summary ?? ""),
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    return jsonResponse(
+      {
+        error:
+          result.reason === "delete_revision"
+            ? `Media revision '${revisionId}' is a delete revision and cannot be restored.`
+            : `Media revision '${revisionId}' was not found.`
+      },
+      { status: result.reason === "delete_revision" ? 400 : 404 }
+    );
+  }
+
+  return jsonResponse({
+    ok: true,
+    media: nativeMediaPayload(result.media),
+    revision: nativeMediaRevisionPayload(result.revision)
+  });
+}
+
+async function handleNativeApiSearch(
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const query = url.searchParams.get("q")?.trim() ?? "";
+  const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
+  const limit = numericSearchParam(url, "limit", 25);
+  const results = query
+    ? await filterReadablePageItems(
+        env,
+        principal,
+        await searchPages(env.DB, query, namespace, limit)
+      )
+    : [];
+
+  return jsonResponse({ ok: true, query, results });
+}
+
+function resolveNativeApiPrincipal(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  requireBearer: boolean
+): AuthPrincipal | Response {
+  const authorization = request.headers.get("authorization");
+
+  if (authorization) {
+    const token = bearerToken(authorization);
+    const expected = env.API_BEARER_TOKEN?.trim();
+
+    if (!token || !expected || !constantTimeEqual(token, expected)) {
+      return nativeApiUnauthorized("Invalid bearer token.");
+    }
+
+    return apiTokenPrincipal();
+  }
+
+  if (requireBearer) {
+    return nativeApiUnauthorized("Bearer token is required for write API requests.");
+  }
+
+  if (principal.isAuthenticated) {
+    return principal;
+  }
+
+  return nativeApiUnauthorized("API authentication is required.");
+}
+
+function apiTokenPrincipal(): AuthPrincipal {
+  return {
+    type: "user",
+    isAuthenticated: true,
+    id: "api-token",
+    username: "api-token",
+    displayName: "API token",
+    email: null,
+    groups: ["admin", "user"]
+  };
+}
+
+function bearerToken(authorization: string): string | null {
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : null;
+}
+
+function nativeApiUnauthorized(message: string): Response {
+  return jsonResponse(
+    { error: message },
+    {
+      status: 401,
+      headers: {
+        "www-authenticate": 'Bearer realm="DokuWiki Pages API"'
+      }
+    }
+  );
+}
+
+function nativeApiMethodNotAllowed(allow: string): Response {
+  return jsonResponse(
+    { error: "Method not allowed." },
+    {
+      status: 405,
+      headers: {
+        allow
+      }
+    }
+  );
+}
+
+function nativeApiPreflightResponse(request: Request, env: Env): Response {
+  const origin = request.headers.get("origin");
+
+  if (origin && !allowedNativeApiCorsOrigin(env, origin)) {
+    return jsonResponse({ error: "CORS origin is not allowed." }, { status: 403 });
+  }
+
+  return new Response(null, {
+    status: 204,
+    headers: securityHeaders({
+      "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type",
+      "access-control-max-age": "86400"
+    })
+  });
+}
+
+function withNativeApiCors(request: Request, env: Env, response: Response): Response {
+  const origin = request.headers.get("origin");
+  response.headers.append("vary", "Origin");
+
+  if (!origin) return response;
+
+  const allowedOrigin = allowedNativeApiCorsOrigin(env, origin);
+  if (!allowedOrigin) return response;
+
+  response.headers.set("access-control-allow-origin", allowedOrigin);
+  if (allowedOrigin !== "*") {
+    response.headers.set("access-control-allow-credentials", "true");
+  }
+
+  return response;
+}
+
+function allowedNativeApiCorsOrigin(env: Env, origin: string): string | null {
+  const origins = (env.API_CORS_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (origins.includes("*")) return "*";
+  return origins.includes(origin) ? origin : null;
+}
+
+async function readJsonObject(
+  request: Request
+): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; response: Response }> {
+  try {
+    const value = await request.json();
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {
+        ok: false,
+        response: jsonResponse({ error: "Expected a JSON object." }, { status: 400 })
+      };
+    }
+    return { ok: true, value: value as Record<string, unknown> };
+  } catch {
+    return {
+      ok: false,
+      response: jsonResponse({ error: "Invalid JSON body." }, { status: 400 })
+    };
+  }
+}
+
+async function readOptionalJsonObject(
+  request: Request
+): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; response: Response }> {
+  if (!request.body) return { ok: true, value: {} };
+  return readJsonObject(request);
+}
+
+function nativePagePayload(page: CurrentPage): Record<string, unknown> {
+  return {
+    id: page.id,
+    title: page.title,
+    revisionId: page.revisionId,
+    content: page.content,
+    updatedAt: page.updatedAt,
+    url: pagePath(page.id)
+  };
+}
+
+function nativePageRevisionPayload(revision: PageRevision): Record<string, unknown> {
+  return {
+    id: revision.id,
+    pageId: revision.pageId,
+    content: revision.content,
+    summary: revision.summary,
+    changeType: revision.changeType,
+    sizeChange: revision.sizeChange,
+    createdAt: revision.createdAt
+  };
+}
+
+function nativeMediaPayload(media: CurrentMedia): Record<string, unknown> {
+  return {
+    id: media.id,
+    namespace: media.namespace,
+    mimeType: media.mimeType,
+    byteLength: media.byteLength,
+    contentHash: media.contentHash,
+    currentRevisionId: media.currentRevisionId,
+    createdAt: media.createdAt,
+    updatedAt: media.updatedAt,
+    url: mediaPath(media.id),
+    detailUrl: mediaDetailPath(media.id)
+  };
+}
+
+function nativeMediaRevisionPayload(revision: MediaRevision): Record<string, unknown> {
+  return {
+    id: revision.id,
+    mediaId: revision.mediaId,
+    mimeType: revision.mimeType,
+    byteLength: revision.byteLength,
+    contentHash: revision.contentHash,
+    changeType: revision.changeType,
+    summary: revision.summary,
+    createdAt: revision.createdAt,
+    url: `${mediaPath(revision.mediaId)}?rev=${encodeURIComponent(revision.id)}`
+  };
+}
+
+function numericSearchParam(url: URL, name: string, fallback: number): number {
+  const value = Number(url.searchParams.get(name));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function stringOrNull(value: unknown): string | null {
+  const normalized = String(value ?? "");
+  return normalized || null;
 }
 
 function legacyEndpointNotAvailableResponse(endpointName: string, status: 410 | 501): Response {

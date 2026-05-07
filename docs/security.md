@@ -6,6 +6,11 @@ State-changing POST routes require a DokuWiki-style `sectok` value or `x-csrf-to
 
 Preview rendering is exempt because it does not write storage.
 
+The native `/api/v1` JSON API keeps automation writes separate from browser form
+CSRF protections. API reads accept either an authenticated same-origin session or
+the configured `API_BEARER_TOKEN`. API writes require `Authorization: Bearer ...`
+and do not accept cookie-only auth.
+
 ## Rendered Content
 
 The native wiki renderer escapes raw HTML in headings, paragraphs, link labels,

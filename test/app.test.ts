@@ -57,7 +57,9 @@ const env = {
     }
   } as unknown as KVNamespace,
   PAGE_LOCKS: pageLocks.namespace,
-  SITE_NAME: "Test Wiki"
+  SITE_NAME: "Test Wiki",
+  API_BEARER_TOKEN: "test-token",
+  API_CORS_ORIGINS: "https://client.example"
 } satisfies Env;
 
 describe("handleRequest", () => {
@@ -77,6 +79,8 @@ describe("handleRequest", () => {
     cachePuts.length = 0;
     renderCache.clear();
     pageLocks.reset();
+    env.API_BEARER_TOKEN = "test-token";
+    env.API_CORS_ORIGINS = "https://client.example";
   });
 
   it("returns health information for the API health route", async () => {
@@ -311,6 +315,173 @@ describe("handleRequest", () => {
     await expect(indexer.json()).resolves.toMatchObject({ status: "not_available" });
     expect(taskrunner.status).toBe(204);
     expect(taskrunner.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("serves authenticated native API read methods with configured CORS", async () => {
+    const headers = {
+      authorization: "Bearer test-token",
+      origin: "https://client.example"
+    };
+    const index = await handleRequest(new Request("https://example.com/api/v1", { headers }), env);
+    const page = await handleRequest(
+      new Request("https://example.com/api/v1/pages?id=wiki:welcome", { headers }),
+      env
+    );
+    const pageRevisions = await handleRequest(
+      new Request("https://example.com/api/v1/pages/revisions?id=wiki:welcome", { headers }),
+      env
+    );
+    const revision = await handleRequest(
+      new Request("https://example.com/api/v1/revisions?id=wiki:welcome@2026-05-06T00:00:00.000Z", {
+        headers
+      }),
+      env
+    );
+    const media = await handleRequest(
+      new Request("https://example.com/api/v1/media?id=wiki:logo.svg", { headers }),
+      env
+    );
+    const mediaRevisions = await handleRequest(
+      new Request("https://example.com/api/v1/media/revisions?id=wiki:logo.svg", { headers }),
+      env
+    );
+    const search = await handleRequest(
+      new Request("https://example.com/api/v1/search?q=welcome", { headers }),
+      env
+    );
+    const user = await handleRequest(
+      new Request("https://example.com/api/v1/users/me", { headers }),
+      env
+    );
+
+    expect(index.status).toBe(200);
+    expect(index.headers.get("access-control-allow-origin")).toBe("https://client.example");
+    await expect(page.json()).resolves.toMatchObject({
+      ok: true,
+      page: {
+        id: "wiki:welcome",
+        revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
+        url: "/wiki/wiki/welcome"
+      }
+    });
+    await expect(pageRevisions.json()).resolves.toMatchObject({
+      ok: true,
+      revisions: [expect.objectContaining({ pageId: "wiki:welcome" })]
+    });
+    await expect(revision.json()).resolves.toMatchObject({
+      ok: true,
+      revision: {
+        id: "wiki:welcome@2026-05-06T00:00:00.000Z",
+        content: "====== Welcome ======\n\nOlder page."
+      }
+    });
+    await expect(media.json()).resolves.toMatchObject({
+      ok: true,
+      media: {
+        id: "wiki:logo.svg",
+        url: "/media/wiki/logo.svg",
+        detailUrl: "/media-detail/wiki/logo.svg"
+      }
+    });
+    await expect(mediaRevisions.json()).resolves.toMatchObject({
+      ok: true,
+      revisions: [expect.objectContaining({ mediaId: "wiki:logo.svg" })]
+    });
+    await expect(search.json()).resolves.toMatchObject({
+      ok: true,
+      results: [expect.objectContaining({ id: "wiki:welcome" })]
+    });
+    await expect(user.json()).resolves.toMatchObject({
+      ok: true,
+      principal: {
+        isAuthenticated: true,
+        username: "api-token"
+      }
+    });
+  });
+
+  it("supports native API page and media writes through bearer auth", async () => {
+    const headers = {
+      authorization: "Bearer test-token",
+      "content-type": "application/json"
+    };
+
+    const page = await handleRequest(
+      new Request("https://example.com/api/v1/pages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "wiki:welcome",
+          content: "====== Welcome ======\n\nUpdated through API.",
+          summary: "API edit",
+          baseRevisionId: "wiki:welcome@2026-05-07T00:00:00.000Z"
+        })
+      }),
+      env
+    );
+    const mediaDelete = await handleRequest(
+      new Request("https://example.com/api/v1/media?id=wiki:logo.svg", {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ summary: "API delete" })
+      }),
+      env
+    );
+
+    expect(page.status).toBe(200);
+    await expect(page.json()).resolves.toMatchObject({
+      ok: true,
+      changeType: "edit",
+      page: {
+        id: "wiki:welcome",
+        content: "====== Welcome ======\n\nUpdated through API."
+      }
+    });
+    expect(purgedKeys).toContain("page:wiki:welcome");
+    expect(mediaDelete.status).toBe(200);
+    await expect(mediaDelete.json()).resolves.toMatchObject({
+      ok: true,
+      id: "wiki:logo.svg",
+      revision: {
+        mediaId: "wiki:logo.svg",
+        changeType: "delete"
+      }
+    });
+  });
+
+  it("rejects unauthenticated native API writes and unapproved CORS origins", async () => {
+    const anonymousWrite = await handleRequest(
+      new Request("https://example.com/api/v1/pages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "wiki:welcome", content: "Blocked", summary: "Blocked" })
+      }),
+      env
+    );
+    const invalidBearer = await handleRequest(
+      new Request("https://example.com/api/v1/pages?id=wiki:welcome", {
+        headers: { authorization: "Bearer wrong" }
+      }),
+      env
+    );
+    const blockedPreflight = await handleRequest(
+      new Request("https://example.com/api/v1/pages", {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://blocked.example",
+          "access-control-request-method": "GET"
+        }
+      }),
+      env
+    );
+
+    expect(anonymousWrite.status).toBe(401);
+    expect(anonymousWrite.headers.get("www-authenticate")).toBe(
+      'Bearer realm="DokuWiki Pages API"'
+    );
+    expect(invalidBearer.status).toBe(401);
+    expect(blockedPreflight.status).toBe(403);
+    expect(state.row?.content).toBe("====== Welcome ======\n\nImported page.");
   });
 
   it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
@@ -1848,6 +2019,15 @@ function createD1Stub(state: D1StubState): D1Database {
                       String(media.mime_type).toLowerCase().includes(query))
                 ),
                 200
+              )
+            };
+          }
+
+          if (sql.includes("from media_revisions")) {
+            return {
+              results: applyPagination(
+                state.mediaRevisions.filter((revision) => revision.media_id === idOrLimit),
+                50
               )
             };
           }

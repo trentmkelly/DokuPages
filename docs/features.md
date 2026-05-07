@@ -15,6 +15,8 @@ of full PHP DokuWiki runtime compatibility.
 - KV-backed rendered page cache, rate-limit counters, and discovery cache.
 - Durable Object-backed page edit locks.
 - Native admin dashboard, ACL manager, audit log view, diagnostics, and search index rebuild action.
+- Native `/api/v1` JSON API with bearer-token write auth, configurable CORS,
+  page/media/search/user read methods, and page/media write methods.
 - Explicit `501 Not Implemented` responses for legacy XML-RPC, JSON-RPC, and OpenAPI entrypoints.
 
 ## Unsupported Or Deferred
@@ -22,7 +24,7 @@ of full PHP DokuWiki runtime compatibility.
 - Running PHP, arbitrary DokuWiki PHP plugins, or the DokuWiki installer in production.
 - Production extension-manager installs and plugin code uploads.
 - LDAP, Active Directory, and PDO auth backends at runtime.
-- XML-RPC, JSON-RPC, OpenAPI methods, bearer-token API auth, and API CORS behavior.
+- XML-RPC, JSON-RPC, and OpenAPI method compatibility.
 - Email delivery, subscriptions, digests, password reset emails, and registration notifications.
 - Server-side ImageMagick/GD thumbnail generation. The current media strategy serves originals and documents derivative policy headers.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.

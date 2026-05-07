@@ -26,18 +26,21 @@ Optional Pages environment variables:
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.
 - `APP_VERSION`: display/build version override. Defaults to the package version.
+- `API_CORS_ORIGINS`: comma-separated exact origins allowed to call the native
+  `/api/v1` JSON API cross-origin. Default: no cross-origin API access.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.
 
-No secret-specific runtime variable is required for the current implementation.
-Wrangler authentication stays outside the repository and should never be checked
-in. `npm run scan:secrets` guards tracked files for high-signal tokens.
+Set `API_BEARER_TOKEN` as a Pages secret when remote API automation should be
+enabled. Wrangler authentication and API bearer tokens stay outside the
+repository and should never be checked in. `npm run scan:secrets` guards tracked
+files for high-signal tokens.
 
 ## Deployment Decisions
 
-- Secrets: no application secret is required for the validation deployment.
-  Wrangler credentials remain operator-local.
+- Secrets: `API_BEARER_TOKEN` is optional and only required for native remote
+  API automation. Wrangler credentials remain operator-local.
 - Custom domain: not configured for `dokutest`; the validation target remains
   `dokutest.pages.dev`.
 - Cache rules: no account-level Cloudflare cache rule is required. Runtime cache

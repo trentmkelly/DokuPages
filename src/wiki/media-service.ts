@@ -199,6 +199,40 @@ export async function getMediaRevision(
   return row ? mapMediaRevision(row) : null;
 }
 
+export async function listMediaRevisions(
+  db: D1Database,
+  mediaId: string,
+  limit = 50,
+  cursor?: string
+): Promise<MediaRevision[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const result = cursor
+    ? await db
+        .prepare(
+          `select id, media_id, object_key, mime_type, byte_length, content_hash,
+                  change_type, summary, created_at
+           from media_revisions
+           where media_id = ? and created_at < ?
+           order by created_at desc
+           limit ?`
+        )
+        .bind(mediaId, cursor, safeLimit)
+        .all<MediaRevisionRow>()
+    : await db
+        .prepare(
+          `select id, media_id, object_key, mime_type, byte_length, content_hash,
+                  change_type, summary, created_at
+           from media_revisions
+           where media_id = ?
+           order by created_at desc
+           limit ?`
+        )
+        .bind(mediaId, safeLimit)
+        .all<MediaRevisionRow>();
+
+  return result.results.map(mapMediaRevision);
+}
+
 export async function listNamespaceMedia(
   db: D1Database,
   namespace: string,

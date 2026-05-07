@@ -307,7 +307,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement remember-me behavior or a secure replacement.
 - [x] Implement session cookie behavior.
 - [x] Implement CSRF tokens.
-- [ ] Implement bearer token auth if remote APIs are supported.
+- [x] Implement bearer token auth if remote APIs are supported.
 - [x] Implement admin and manager role checks.
 - [x] Implement default group assignment.
 - [ ] Implement user manager behavior.
@@ -509,17 +509,17 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Decide whether XML-RPC compatibility is required.
 - [x] Decide whether JSON-RPC compatibility is required.
 - [x] Decide whether OpenAPI output is required.
-- [ ] Implement API auth.
-- [ ] Implement API CORS behavior.
-- [ ] Implement page read API methods.
-- [ ] Implement page write API methods.
-- [ ] Implement revision API methods.
-- [ ] Implement media read API methods.
-- [ ] Implement media write API methods.
-- [ ] Implement search API methods.
-- [ ] Implement user API methods if supported.
-- [ ] Add API compatibility tests.
-- [ ] Add API security tests.
+- [x] Implement API auth.
+- [x] Implement API CORS behavior.
+- [x] Implement page read API methods.
+- [x] Implement page write API methods.
+- [x] Implement revision API methods.
+- [x] Implement media read API methods.
+- [x] Implement media write API methods.
+- [x] Implement search API methods.
+- [x] Implement user API methods if supported.
+- [x] Add API compatibility tests.
+- [x] Add API security tests.
 
 ## Email And Notifications
 
