@@ -271,6 +271,9 @@ export async function handleRequest(
     return authFeatureNotSupportedResponse(request, env, unsupportedAccountPath);
   }
 
+  const maintenanceResponse = maintenanceWriteResponse(request, env, url);
+  if (maintenanceResponse) return maintenanceResponse;
+
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     return handleLogin(request, env);
   }
@@ -4516,6 +4519,10 @@ async function handleEditPage(
   id: string,
   page: CurrentPage | null
 ): Promise<Response> {
+  if (getRuntimeConfig(env).maintenanceMode) {
+    return maintenanceModeResponse(request, env);
+  }
+
   const denied = await requireAclPermission(
     request,
     env,
@@ -5153,6 +5160,42 @@ function acceptsJson(request: Request): boolean {
   const accept = request.headers.get("accept") ?? "";
   const requestedWith = request.headers.get("x-requested-with") ?? "";
   return accept.includes("application/json") || requestedWith.toLowerCase() === "xmlhttprequest";
+}
+
+function maintenanceWriteResponse(request: Request, env: Env, url: URL): Response | null {
+  if (!getRuntimeConfig(env).maintenanceMode) return null;
+  if (!isMaintenanceWriteRoute(url.pathname, request.method)) return null;
+
+  return maintenanceModeResponse(request, env);
+}
+
+function isMaintenanceWriteRoute(pathname: string, method: string): boolean {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return false;
+  if (pathname === "/api/pages/preview") return false;
+  if (pathname.startsWith("/api/pages")) return true;
+  if (pathname.startsWith("/api/media")) return true;
+  if (pathname === "/api/v1/pages" && method === "POST") return true;
+  if (pathname === "/api/v1/pages/revert" && method === "POST") return true;
+  if (pathname === "/api/v1/media" && method !== "GET") return true;
+  if (pathname === "/api/v1/media/revert" && method === "POST") return true;
+  return false;
+}
+
+function maintenanceModeResponse(request: Request, env: Env): Response {
+  const message = "Wiki is in maintenance mode; content writes are temporarily disabled.";
+  const headers = { "retry-after": "300" };
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: message }, { status: 503, headers });
+  }
+
+  return htmlResponse(
+    htmlShell(env, "Maintenance mode", `<h1>Maintenance mode</h1><p>${escapeHtml(message)}</p>`),
+    {
+      status: 503,
+      headers
+    }
+  );
 }
 
 async function requireAclPermission(

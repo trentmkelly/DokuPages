@@ -14,6 +14,8 @@ Native admin routes use D1-backed session principals and group membership.
 - `/api/admin/search/rebuild` rebuilds D1 search terms/postings from current pages and requires `admin`.
 - `/api/admin/cache/purge` purges rendered page and discovery caches from KV,
   clears D1 rendered-cache rows, and requires `admin`.
+- `MAINTENANCE_MODE=1` keeps read routes available while blocking page/media
+  writes, drafts, locks, and native API content writes with HTTP 503.
 - `/doku.php?do=admin` redirects to `/admin`.
 - `/doku.php?do=admin&page=acl` redirects to `/admin/acl`.
 

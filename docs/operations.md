@@ -78,6 +78,9 @@ rollback plan explicitly defines a final sync window.
 - Apply pending D1 migrations to the target database.
 - Upload imported media to the target R2 bucket.
 - Deploy the companion Page Lock Durable Object Worker when its code or config changed.
+- For a final sync or incident response read-only window, set
+  `MAINTENANCE_MODE=1` in Pages configuration and redeploy. Public reads remain
+  available while content writes return HTTP 503.
 - Deploy the Pages project from the approved commit.
 - Verify Pages bindings for D1, R2, KV, and `PAGE_LOCKS`.
 - Verify runtime environment variables.

@@ -40,7 +40,7 @@ const renderCache = new Map<string, string>();
 const pageLocks = createPageLockNamespaceStub();
 const TEST_CSRF_TOKEN = "test-csrf-token";
 
-const env = {
+const env: Env = {
   DB: createD1Stub(state),
   MEDIA_BUCKET: createR2Stub(),
   RENDER_CACHE: {
@@ -61,8 +61,9 @@ const env = {
   PAGE_LOCKS: pageLocks.namespace,
   SITE_NAME: "Test Wiki",
   API_BEARER_TOKEN: "test-token",
-  API_CORS_ORIGINS: "https://client.example"
-} satisfies Env;
+  API_CORS_ORIGINS: "https://client.example",
+  MAINTENANCE_MODE: undefined
+};
 
 describe("handleRequest", () => {
   beforeEach(() => {
@@ -84,6 +85,7 @@ describe("handleRequest", () => {
     pageLocks.reset();
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
+    env.MAINTENANCE_MODE = undefined;
   });
 
   it("returns health information for the API health route", async () => {
@@ -1654,6 +1656,48 @@ describe("handleRequest", () => {
       "Too many page edit attempts. Try again later."
     );
     expect(state.row?.id).not.toBe("wiki:rate-limited");
+  });
+
+  it("serves reads but blocks content writes in maintenance mode", async () => {
+    env.MAINTENANCE_MODE = "1";
+
+    const read = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+    expect(read.status).toBe(200);
+    state.batches = [];
+
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "Changed.");
+    const blocked = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+    const editPage = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+    const nativeWrite = await handleRequest(
+      new Request("https://example.com/api/v1/pages", {
+        method: "POST",
+        headers: { accept: "application/json" },
+        body: JSON.stringify({ id: "wiki:welcome", content: "Changed." })
+      }),
+      env
+    );
+
+    expect(blocked.status).toBe(503);
+    expect(blocked.headers.get("retry-after")).toBe("300");
+    await expect(blocked.json()).resolves.toMatchObject({
+      error: "Wiki is in maintenance mode; content writes are temporarily disabled."
+    });
+    expect(editPage.status).toBe(503);
+    expect(nativeWrite.status).toBe(503);
+    expect(state.batches).toHaveLength(0);
   });
 
   it("rejects state-changing page and media posts without CSRF tokens", async () => {

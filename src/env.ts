@@ -9,6 +9,7 @@ export interface Env {
   SESSION_COOKIE_NAME?: string;
   HIDE_PAGES?: string;
   SNEAKY_INDEX?: string;
+  MAINTENANCE_MODE?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

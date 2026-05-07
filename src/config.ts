@@ -20,6 +20,7 @@ export interface RuntimeConfig {
   sessionCookieName: string;
   hidePages: string | null;
   sneakyIndex: boolean;
+  maintenanceMode: boolean;
   appVersion: string;
 }
 
@@ -64,6 +65,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
     hidePages: nonEmpty(env.HIDE_PAGES) ?? null,
     sneakyIndex: truthy(env.SNEAKY_INDEX),
+    maintenanceMode: truthy(env.MAINTENANCE_MODE),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -100,6 +102,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     ),
     configEntry("HIDE_PAGES", env.HIDE_PAGES, config.hidePages, null),
     configEntry("SNEAKY_INDEX", env.SNEAKY_INDEX, String(config.sneakyIndex), "false"),
+    configEntry("MAINTENANCE_MODE", env.MAINTENANCE_MODE, String(config.maintenanceMode), "false"),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",

@@ -17,6 +17,7 @@ describe("runtime config", () => {
       sessionCookieName: "DW_PAGES_SESSION",
       hidePages: null,
       sneakyIndex: false,
+      maintenanceMode: false,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -30,13 +31,15 @@ describe("runtime config", () => {
       START_PAGE: "Wiki/Welcome",
       WIKI_LANG: "pt_BR",
       HIDE_PAGES: ":hidden:",
-      SNEAKY_INDEX: "1"
+      SNEAKY_INDEX: "1",
+      MAINTENANCE_MODE: "true"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
     expect(getRuntimeConfig(env).language).toBe("pt-br");
     expect(getRuntimeConfig(env).hidePages).toBe(":hidden:");
     expect(getRuntimeConfig(env).sneakyIndex).toBe(true);
+    expect(getRuntimeConfig(env).maintenanceMode).toBe(true);
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -72,6 +75,10 @@ describe("runtime config", () => {
           key: "API_CORS_ORIGINS",
           value: "https://client.example",
           effectiveValue: "https://client.example"
+        }),
+        expect.objectContaining({
+          key: "MAINTENANCE_MODE",
+          effectiveValue: "false"
         })
       ])
     );
