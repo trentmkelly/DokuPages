@@ -248,7 +248,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement conflict detection.
 - [ ] Implement edit locks.
 - [ ] Implement draft autosave.
-- [ ] Implement draft recovery.
+- [x] Implement draft recovery.
 - [ ] Implement page templates.
 - [ ] Implement breadcrumbs.
 - [ ] Implement "you are here" navigation if supported.

@@ -7,6 +7,7 @@ interface D1StubState {
   revisions: Record<string, unknown>[];
   changelog: Record<string, unknown>[];
   searchPostings: Record<string, unknown>[];
+  drafts: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
 }
@@ -16,6 +17,7 @@ const state: D1StubState = {
   revisions: seedRevisions(),
   changelog: seedChangelog(),
   searchPostings: seedSearchPostings(),
+  drafts: [],
   deleted: false,
   batches: []
 };
@@ -52,6 +54,7 @@ describe("handleRequest", () => {
     state.revisions = seedRevisions();
     state.changelog = seedChangelog();
     state.searchPostings = seedSearchPostings();
+    state.drafts = [];
     state.deleted = false;
     state.batches = [];
     purgedKeys.length = 0;
@@ -385,6 +388,77 @@ describe("handleRequest", () => {
     });
   });
 
+  it("saves, recovers, and deletes page drafts", async () => {
+    const draft = new FormData();
+    draft.set("id", "wiki:welcome");
+    draft.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    draft.set("content", "====== Draft ======\n\nUnsaved text.");
+
+    const saveDraft = await handleRequest(
+      new Request("https://example.com/api/pages/draft", {
+        method: "POST",
+        body: draft
+      }),
+      env
+    );
+
+    expect(saveDraft.status).toBe(303);
+    expect(saveDraft.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
+    expect(state.drafts).toHaveLength(1);
+
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=edit"),
+      env
+    );
+    const draftView = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=draft"),
+      env
+    );
+
+    expect(edit.status).toBe(200);
+    expect(draftView.status).toBe(200);
+    await expect(edit.text()).resolves.toContain("Draft recovered:");
+    await expect(draftView.text()).resolves.toContain("Unsaved text.");
+
+    const deleteDraft = await handleRequest(
+      new Request("https://example.com/api/pages/draft/delete", {
+        method: "POST",
+        body: draft
+      }),
+      env
+    );
+
+    expect(deleteDraft.status).toBe(303);
+    expect(state.drafts).toHaveLength(0);
+  });
+
+  it("deletes page drafts after successful saves", async () => {
+    state.drafts = [
+      {
+        id: "draft:wiki:welcome:anonymous",
+        page_id: "wiki:welcome",
+        content: "Draft text",
+        base_revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
+        updated_at: "2026-05-07T00:00:00.000Z"
+      }
+    ];
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Updated ======\n\nChanged.");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(state.drafts).toHaveLength(0);
+  });
+
   it("returns conflicts when the base revision is stale", async () => {
     const form = new FormData();
     form.set("id", "wiki:welcome");
@@ -464,6 +538,10 @@ function createD1Stub(state: D1StubState): D1Database {
           const [id] = values;
           if (sql.includes("from page_revisions") && !sql.includes("join")) {
             return state.revisions.find((revision) => revision.id === id) ?? null;
+          }
+
+          if (sql.includes("from drafts")) {
+            return state.drafts.find((draft) => draft.id === id) ?? null;
           }
 
           return !state.deleted && state.row?.id === id ? state.row : null;
@@ -548,6 +626,33 @@ function createD1Stub(state: D1StubState): D1Database {
           }
 
           return { results: [] };
+        },
+        run: async () => {
+          if (sql.includes("insert into drafts")) {
+            const [id, pageId, content, baseRevisionId, updatedAt] = values;
+            const existing = state.drafts.find((draft) => draft.id === id);
+
+            if (existing) {
+              existing.content = content;
+              existing.base_revision_id = baseRevisionId;
+              existing.updated_at = updatedAt;
+            } else {
+              state.drafts.push({
+                id,
+                page_id: pageId,
+                content,
+                base_revision_id: baseRevisionId,
+                updated_at: updatedAt
+              });
+            }
+          }
+
+          if (sql.includes("delete from drafts")) {
+            const [id] = values;
+            state.drafts = state.drafts.filter((draft) => draft.id !== id);
+          }
+
+          return { success: true };
         }
       })
     }),

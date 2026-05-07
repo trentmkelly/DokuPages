@@ -5,9 +5,12 @@ The first page editing implementation is intentionally small but exercises the r
 ## Routes
 
 - `GET /wiki/:id?do=edit` renders an HTML edit form.
+- `GET /wiki/:id?do=draft` shows an anonymous draft when one exists.
 - `GET /wiki/:id?do=source` returns raw wiki text.
 - `GET /wiki/:id?do=revert&rev=:revisionId` renders a revert confirmation form.
 - `POST /api/pages` saves page content.
+- `POST /api/pages/draft` stores the current edit form as an anonymous draft.
+- `POST /api/pages/draft/delete` deletes the anonymous draft.
 - `POST /api/pages/revert` restores an old revision through the save path.
 - `POST /api/pages/preview` returns rendered preview JSON.
 
@@ -31,6 +34,8 @@ The save path:
 - edits a page when content is non-empty
 - deletes a page when content is empty
 - reverts a page by copying an old revision into a new `revert` revision
+- recovers existing anonymous drafts into the edit form
+- deletes anonymous drafts after successful saves
 - records immutable page revisions
 - appends changelog rows
 - updates search postings

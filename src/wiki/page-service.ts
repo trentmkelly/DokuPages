@@ -56,6 +56,14 @@ export interface WantedPage {
   referrers: PageLinkReference[];
 }
 
+export interface PageDraft {
+  id: string;
+  pageId: string;
+  content: string;
+  baseRevisionId: string | null;
+  updatedAt: string;
+}
+
 export interface SavePageInput {
   id: string;
   content: string;
@@ -132,6 +140,14 @@ interface CurrentPageSourceRow {
   id: string;
   title: string | null;
   content: string;
+  updated_at: string;
+}
+
+interface PageDraftRow {
+  id: string;
+  page_id: string;
+  content: string;
+  base_revision_id: string | null;
   updated_at: string;
 }
 
@@ -349,6 +365,54 @@ export async function listWantedPages(db: D1Database, limit = 200): Promise<Want
     .slice(0, Math.max(1, Math.min(limit, 500)));
 }
 
+export async function getPageDraft(db: D1Database, pageId: string): Promise<PageDraft | null> {
+  const row = await db
+    .prepare(
+      `select id, page_id, content, base_revision_id, updated_at
+       from drafts
+       where id = ?`
+    )
+    .bind(draftId(pageId))
+    .first<PageDraftRow>();
+
+  return row ? mapDraft(row) : null;
+}
+
+export async function savePageDraft(
+  db: D1Database,
+  pageId: string,
+  content: string,
+  baseRevisionId: string | null,
+  now = new Date()
+): Promise<PageDraft> {
+  const updatedAt = now.toISOString();
+  const id = draftId(pageId);
+
+  await db
+    .prepare(
+      `insert into drafts (id, page_id, user_id, content, base_revision_id, updated_at)
+       values (?, ?, null, ?, ?, ?)
+       on conflict(id) do update set
+         content = excluded.content,
+         base_revision_id = excluded.base_revision_id,
+         updated_at = excluded.updated_at`
+    )
+    .bind(id, pageId, content, baseRevisionId, updatedAt)
+    .run();
+
+  return {
+    id,
+    pageId,
+    content,
+    baseRevisionId,
+    updatedAt
+  };
+}
+
+export async function deletePageDraft(db: D1Database, pageId: string): Promise<void> {
+  await db.prepare("delete from drafts where id = ?").bind(draftId(pageId)).run();
+}
+
 export async function savePage(db: D1Database, input: SavePageInput): Promise<SavePageResult> {
   const current = await getCurrentPage(db, input.id);
   const currentRevisionId = current?.revisionId ?? null;
@@ -465,6 +529,20 @@ function mapRevision(row: PageRevisionRow): PageRevision {
     sizeChange: row.size_change,
     createdAt: row.created_at
   };
+}
+
+function mapDraft(row: PageDraftRow): PageDraft {
+  return {
+    id: row.id,
+    pageId: row.page_id,
+    content: row.content,
+    baseRevisionId: row.base_revision_id,
+    updatedAt: row.updated_at
+  };
+}
+
+function draftId(pageId: string): string {
+  return `draft:${pageId}:anonymous`;
 }
 
 async function listIndexedTerms(db: D1Database, pageId: string): Promise<string[]> {

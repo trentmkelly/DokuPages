@@ -10,6 +10,7 @@ import {
 import { cleanPageId } from "./wiki/page-id";
 import {
   getCurrentPage,
+  getPageDraft,
   getPageRevision,
   listAllPages,
   listBacklinks,
@@ -20,8 +21,11 @@ import {
   listWantedPages,
   pagePath,
   savePage,
+  savePageDraft,
   searchPages,
+  deletePageDraft,
   type CurrentPage,
+  type PageDraft,
   type PageRevision
 } from "./wiki/page-service";
 import { renderWikiText } from "./wiki/render";
@@ -108,6 +112,14 @@ export async function handleRequest(
     return handleRevert(request, env);
   }
 
+  if (url.pathname === "/api/pages/draft" && request.method === "POST") {
+    return handleSaveDraft(request, env);
+  }
+
+  if (url.pathname === "/api/pages/draft/delete" && request.method === "POST") {
+    return handleDeleteDraft(request, env);
+  }
+
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
     const form = await request.formData();
     const content = String(form.get("content") ?? "");
@@ -182,7 +194,16 @@ export async function handleRequest(
     const page = await getCurrentPage(env.DB, id);
 
     if (url.searchParams.get("do") === "edit") {
-      return htmlResponse(renderEditPage(id, page, env));
+      const draft = await getPageDraft(env.DB, id);
+      return htmlResponse(renderEditPage(id, page, draft, env));
+    }
+
+    if (url.searchParams.get("do") === "draft") {
+      const draft = await getPageDraft(env.DB, id);
+      if (!draft) {
+        return notFoundResponse(`Draft for '${id}' was not found.`);
+      }
+      return htmlResponse(renderDraftPage(id, draft, env));
     }
 
     if (url.searchParams.get("do") === "source") {
@@ -607,6 +628,7 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
   }
 
   await purgePageCache(env, id, result.page.revisionId);
+  await deletePageDraft(env.DB, id);
 
   return redirectResponse(pagePath(id));
 }
@@ -643,12 +665,49 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
   return redirectResponse(pagePath(id));
 }
 
+async function handleSaveDraft(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanPageId(String(form.get("id") ?? ""));
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  await savePageDraft(
+    env.DB,
+    id,
+    String(form.get("content") ?? ""),
+    String(form.get("baseRevisionId") || "") || null
+  );
+
+  return redirectResponse(`${pagePath(id)}?do=edit`);
+}
+
+async function handleDeleteDraft(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanPageId(String(form.get("id") ?? ""));
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  await deletePageDraft(env.DB, id);
+
+  return redirectResponse(`${pagePath(id)}?do=edit`);
+}
+
 function renderEditPage(
   id: string,
   page: Awaited<ReturnType<typeof getCurrentPage>>,
+  draft: PageDraft | null,
   env: Env
 ): string {
   const title = page?.title ?? id;
+  const content = draft?.content ?? page?.content ?? "";
+  const baseRevisionId = draft?.baseRevisionId ?? page?.revisionId ?? "";
+  const draftNotice = draft
+    ? `<p><strong>Draft recovered:</strong> ${escapeHtml(draft.updatedAt)}</p>`
+    : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -660,12 +719,13 @@ function renderEditPage(
 <body>
   <main>
     <h1>Edit ${escapeHtml(title)}</h1>
+    ${draftNotice}
     <form method="post" action="/api/pages">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
-      <input type="hidden" name="baseRevisionId" value="${escapeHtml(page?.revisionId ?? "")}">
+      <input type="hidden" name="baseRevisionId" value="${escapeHtml(baseRevisionId)}">
       <p>
         <label for="content">Wiki text</label><br>
-        <textarea id="content" name="content" rows="24" cols="100">${escapeHtml(page?.content ?? "")}</textarea>
+        <textarea id="content" name="content" rows="24" cols="100">${escapeHtml(content)}</textarea>
       </p>
       <p>
         <label for="summary">Summary</label><br>
@@ -675,10 +735,23 @@ function renderEditPage(
         <label><input name="minor" type="checkbox" value="1"> Minor edit</label>
       </p>
       <button type="submit">Save</button>
+      <button type="submit" formaction="/api/pages/draft">Save draft</button>
+      <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>
     </form>
   </main>
 </body>
 </html>`;
+}
+
+function renderDraftPage(id: string, draft: PageDraft, env: Env): string {
+  return htmlShell(
+    env,
+    `Draft for ${id}`,
+    `<h1>Draft for ${escapeHtml(id)}</h1>
+    <p>${escapeHtml(draft.updatedAt)}</p>
+    <pre><code>${escapeHtml(draft.content)}</code></pre>
+    <p><a href="${pagePath(id)}?do=edit">Recover draft</a></p>`
+  );
 }
 
 async function purgePageCache(env: Env, id: string, revisionId: string): Promise<void> {
