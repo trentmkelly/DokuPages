@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { getClientIp } from "./http/client-ip";
 import { healthResponse } from "./http/health";
 import {
   htmlResponse,
@@ -1207,7 +1208,7 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
     summary,
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
     changeType: form.get("minor") ? "minor" : undefined,
-    ip: request.headers.get("cf-connecting-ip") ?? null
+    ip: getClientIp(request)
   });
 
   if (!result.ok) {
@@ -1246,7 +1247,7 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
     summary: String(form.get("summary") || "") || `Reverted to ${revision.createdAt}`,
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
     changeType: "revert",
-    ip: request.headers.get("cf-connecting-ip") ?? null
+    ip: getClientIp(request)
   });
 
   if (!result.ok) {

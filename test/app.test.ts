@@ -562,7 +562,8 @@ describe("handleRequest", () => {
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
         method: "POST",
-        body: form
+        body: form,
+        headers: { "cf-connecting-ip": "203.0.113.10" }
       }),
       env
     );
@@ -571,6 +572,7 @@ describe("handleRequest", () => {
     expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(state.row?.title).toBe("Updated");
     expect(state.batches).toHaveLength(1);
+    expect(state.changelog[0]).toMatchObject({ ip: "203.0.113.10" });
     expect(state.metadata).toContainEqual(
       expect.objectContaining({
         subject_type: "page",
@@ -1002,7 +1004,7 @@ function createD1Stub(state: D1StubState): D1Database {
           revisionId,
           ,
           userName,
-          ,
+          ip,
           changeType,
           summary,
           sizeChange,
@@ -1015,6 +1017,7 @@ function createD1Stub(state: D1StubState): D1Database {
           subject_id: subjectId,
           revision_id: revisionId,
           user_name: userName,
+          ip,
           change_type: changeType,
           summary,
           size_change: sizeChange,
