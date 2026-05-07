@@ -461,6 +461,40 @@ describe("handleRequest", () => {
     expect(state.mediaRevisions).toHaveLength(1);
   });
 
+  it("rate limits repeated media upload attempts before writing R2 objects", async () => {
+    async function upload(name: string): Promise<Response> {
+      const form = new FormData();
+      form.set("ns", "wiki");
+      form.set("file", new File(["uploaded media"], name, { type: "text/plain" }));
+
+      return handleRequest(
+        new Request("https://example.com/api/media/upload", {
+          method: "POST",
+          body: form,
+          headers: csrfHeaders({
+            accept: "application/json",
+            "cf-connecting-ip": "203.0.113.60"
+          })
+        }),
+        env
+      );
+    }
+
+    for (let index = 0; index < 20; index += 1) {
+      const response = await upload(`upload-${index}.txt`);
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await upload("upload-limited.txt");
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("900");
+    await expect(limited.json()).resolves.toMatchObject({
+      error: "Too many media upload attempts. Try again later."
+    });
+    expect(state.media.some((media) => media.id === "wiki:upload-limited.txt")).toBe(false);
+  });
+
   it("deletes current media while preserving immutable media revisions", async () => {
     const form = new FormData();
     form.set("id", "wiki:logo.svg");

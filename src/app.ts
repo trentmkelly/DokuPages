@@ -106,6 +106,8 @@ const CSRF_TOKEN_BYTES = 32;
 const CSRF_TTL_SECONDS = 60 * 60 * 24;
 const LOGIN_RATE_LIMIT_ATTEMPTS = 5;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+const UPLOAD_RATE_LIMIT_ATTEMPTS = 20;
+const UPLOAD_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 
@@ -2074,6 +2076,62 @@ function loginRateLimitKey(request: Request, username: string): string {
   return `auth:login:${client}:${encodeURIComponent(username.toLowerCase()).slice(0, 128)}`;
 }
 
+async function uploadRateLimitResponse(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response | null> {
+  const attempts = await readUploadAttemptCount(request, env, principal);
+  if (attempts < UPLOAD_RATE_LIMIT_ATTEMPTS) return null;
+
+  const message = "Too many media upload attempts. Try again later.";
+
+  if (acceptsJson(request)) {
+    return jsonResponse(
+      { error: message },
+      {
+        status: 429,
+        headers: { "retry-after": String(UPLOAD_RATE_LIMIT_WINDOW_SECONDS) }
+      }
+    );
+  }
+
+  return htmlResponse(htmlShell(env, "Media upload limited", `<p>${escapeHtml(message)}</p>`), {
+    status: 429,
+    headers: { "retry-after": String(UPLOAD_RATE_LIMIT_WINDOW_SECONDS) }
+  });
+}
+
+async function readUploadAttemptCount(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<number> {
+  const raw = await env.RENDER_CACHE.get(uploadRateLimitKey(request, principal));
+  if (!raw) return 0;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function recordUploadAttempt(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<void> {
+  const key = uploadRateLimitKey(request, principal);
+  const attempts = (await readUploadAttemptCount(request, env, principal)) + 1;
+  await env.RENDER_CACHE.put(key, String(attempts), {
+    expirationTtl: UPLOAD_RATE_LIMIT_WINDOW_SECONDS
+  });
+}
+
+function uploadRateLimitKey(request: Request, principal: AuthPrincipal): string {
+  const client = getClientIp(request) ?? "unknown";
+  const actor = principal.type === "user" ? `user:${principal.id}` : "anonymous";
+  return `media:upload:${client}:${encodeURIComponent(actor).slice(0, 160)}`;
+}
+
 async function handleLogout(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
@@ -2529,6 +2587,11 @@ async function handleMediaUpload(
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
   if (denied) return denied;
+
+  const rateLimited = await uploadRateLimitResponse(request, env, principal);
+  if (rateLimited) return rateLimited;
+
+  await recordUploadAttempt(request, env, principal);
 
   const body = await file.arrayBuffer();
   const validation = validateMediaUpload({

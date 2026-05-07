@@ -27,6 +27,8 @@ The upload path writes the R2 object first, then stores current media metadata, 
 
 Uploads are validated before R2 writes. The native validator enforces a 25 MiB body limit, allows only a conservative extension set, checks non-generic MIME types against the file extension, and rejects SVG content containing scripts, event handlers, doctypes, entities, foreign objects, or `javascript:` links.
 
+Authorized upload submissions are rate limited in KV by client IP and actor. Twenty attempts in a 15 minute window block additional attempts for that pair and return `429` with `Retry-After: 900`.
+
 ## Rollback Semantics
 
 Page saves, page deletes, media deletes, media reverts, search index updates, and metadata updates use D1 batches so partial SQL writes roll back together. Media uploads are the only request path that writes outside D1: the R2 object is written first, and the upload service deletes that new object if the following D1 batch fails. Existing media revision objects are immutable and are not removed during delete or revert operations.

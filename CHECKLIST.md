@@ -547,9 +547,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement wordblock checks.
 - [x] Implement IP extraction through Cloudflare headers.
 - [x] Implement trusted proxy behavior appropriate for Cloudflare.
-- [ ] Implement rate limits for login.
+- [x] Implement rate limits for login.
 - [ ] Implement rate limits for edits.
-- [ ] Implement rate limits for uploads.
+- [x] Implement rate limits for uploads.
 - [ ] Implement audit logging for admin actions.
 - [x] Implement security headers.
 - [x] Implement cookie security flags.

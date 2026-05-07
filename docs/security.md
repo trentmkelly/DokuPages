@@ -6,6 +6,12 @@ State-changing POST routes require a DokuWiki-style `sectok` value or `x-csrf-to
 
 Preview rendering is exempt because it does not write storage.
 
+## Rate Limits
+
+Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
+
+Authorized media upload submissions are rate limited by client IP and actor in KV. Twenty attempts in a 15 minute window block additional upload attempts for that pair and return `429` with `Retry-After: 900` before the request writes to R2.
+
 ## ACL
 
 ACL records use DokuWiki permission levels: none `0`, read `1`, edit `2`, create `4`,
