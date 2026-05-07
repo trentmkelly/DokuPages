@@ -48,6 +48,28 @@ reindex/delete work does not scan the full inverted index.
 R2 media storage tests assert that metadata-only reads do not open R2 objects and
 that object body/head/delete operations each map to one bucket call.
 
+## Search
+
+Search time is measured in two places:
+
+- `search_metric.durationMs` records server-side route time for search pages,
+  API search, and AJAX quick search.
+- External `curl` checks against `https://dokutest.pages.dev/search` record
+  end-to-end time through Cloudflare.
+
+Initial remote search baseline on May 7, 2026:
+
+| Route                                   | Status | Bytes | External time |
+| --------------------------------------- | -----: | ----: | ------------: |
+| `/search?q=DokuWiki`                    |    200 |  4961 |        0.992s |
+| `/search?q=syntax&ns=wiki`              |    200 |  4992 |        0.973s |
+| `/lib/exe/ajax.php?call=qsearch&q=wiki` |    200 |   269 |        0.948s |
+
+Search performance tests assert that page search uses the page namespace or
+deleted-page indexes, page revision primary-key lookups, and search posting
+primary-key lookups. They also assert one D1 read per search call and clamp raw
+posting searches to 100 results.
+
 ## Parser Cache Equivalent
 
 The port uses revision-aware rendered HTML cache entries instead of DokuWiki's

@@ -31,5 +31,9 @@ Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
 sizes, and R2 media operation counts.
 
+Search performance tests cover indexed page search query plans, raw posting
+search result clamps, term deduplication, and one-read D1 behavior across large
+fixture corpora.
+
 Syntax inventory tests cover the scanner used to generate
 `docs/syntax-inventory.md` from the current DokuWiki `data/pages` tree.

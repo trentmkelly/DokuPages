@@ -351,7 +351,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement index rebuild job.
 - [x] Implement incremental index updates on save.
 - [ ] Implement index migration from existing `data/index` if needed.
-- [ ] Add search performance tests.
+- [x] Add search performance tests.
 - [x] Add search correctness tests.
 
 ## Cache And Rendering Performance
@@ -682,7 +682,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Measure page render time.
 - [ ] Measure edit save time.
 - [x] Measure media fetch time.
-- [ ] Measure search time.
+- [x] Measure search time.
 - [ ] Measure migration time.
 - [ ] Measure D1 query counts per route.
 - [x] Measure R2 operation counts per route.
