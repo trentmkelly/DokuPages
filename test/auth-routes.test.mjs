@@ -504,6 +504,15 @@ describe("auth routes", () => {
       }),
       env
     );
+    const cachePurgeForm = new FormData();
+    const cachePurge = await handleRequest(
+      new Request("https://example.com/api/admin/cache/purge", {
+        method: "POST",
+        body: cachePurgeForm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
 
     expect(anonymous.status).toBe(403);
     expect(legacy.status).toBe(301);
@@ -513,6 +522,54 @@ describe("auth routes", () => {
     expect(acl.status).toBe(403);
     expect(audit.status).toBe(403);
     expect(users.status).toBe(403);
+    expect(cachePurge.status).toBe(403);
+  });
+
+  it("allows admin users to purge global render and discovery caches", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    await env.RENDER_CACHE.put("page:wiki:welcome", "rendered page");
+    await env.RENDER_CACHE.put("page:wiki:welcome:rev-1", "rendered revision");
+    await env.RENDER_CACHE.put("discovery:sitemap:https://example.com", "sitemap");
+    await env.RENDER_CACHE.put("auth:login:203.0.113.10:alice", "4");
+    const cookie = await loginAsAlice(env);
+
+    const dashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const form = new FormData();
+    const purged = await handleRequest(
+      new Request("https://example.com/api/admin/cache/purge", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    await expect(dashboard.text()).resolves.toContain("Purge render cache");
+    expect(purged.status).toBe(303);
+    expect(purged.headers.get("location")).toBe("/admin");
+    await expect(env.RENDER_CACHE.get("page:wiki:welcome")).resolves.toBeNull();
+    await expect(env.RENDER_CACHE.get("page:wiki:welcome:rev-1")).resolves.toBeNull();
+    await expect(env.RENDER_CACHE.get("discovery:sitemap:https://example.com")).resolves.toBeNull();
+    await expect(env.RENDER_CACHE.get("auth:login:203.0.113.10:alice")).resolves.toBe("4");
+    await expect(
+      env.DB.prepare("select action, target_type, target_id from audit_log where action = ?")
+        .bind("cache_purge")
+        .all()
+    ).resolves.toMatchObject({
+      results: [
+        {
+          action: "cache_purge",
+          target_type: "cache",
+          target_id: "global"
+        }
+      ]
+    });
   });
 
   it("rejects invalid logins without setting a session cookie", async () => {
@@ -791,5 +848,18 @@ class MemoryKv {
 
   async delete(key) {
     this.values.delete(key);
+  }
+
+  async list({ prefix = "", cursor } = {}) {
+    const keys = [...this.values.keys()]
+      .filter((key) => key.startsWith(prefix))
+      .sort()
+      .slice(cursor ? Number(cursor) : 0)
+      .map((name) => ({ name }));
+
+    return {
+      keys,
+      list_complete: true
+    };
   }
 }

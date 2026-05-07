@@ -16,7 +16,7 @@ of full PHP DokuWiki runtime compatibility.
 - KV-backed rendered page cache, rate-limit counters, and discovery cache.
 - Durable Object-backed page edit locks.
 - Native admin dashboard, ACL manager, user manager, audit log view,
-  diagnostics, and search index rebuild action.
+  diagnostics, cache purge, and search index rebuild action.
 - Native `/api/v1` JSON API with bearer-token write auth, configurable CORS,
   page/media/search/user read methods, and page/media write methods.
 - Explicit `501 Not Implemented` responses for legacy XML-RPC, JSON-RPC, and OpenAPI entrypoints.

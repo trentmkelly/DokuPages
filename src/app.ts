@@ -305,6 +305,10 @@ export async function handleRequest(
     return handleUserAdminUpdate(request, env, principal);
   }
 
+  if (url.pathname === "/api/admin/cache/purge" && request.method === "POST") {
+    return handleGlobalCachePurge(request, env, principal);
+  }
+
   if (url.pathname === "/api/admin/search/rebuild" && request.method === "POST") {
     return handleSearchIndexRebuild(request, env, principal);
   }
@@ -2478,6 +2482,10 @@ function renderAdminDashboardPage(
     ? `<form method="post" action="/api/admin/search/rebuild">
         ${csrfInput(csrfToken)}
         <button type="submit">Rebuild search index</button>
+      </form>
+      <form method="post" action="/api/admin/cache/purge">
+        ${csrfInput(csrfToken)}
+        <button type="submit">Purge render cache</button>
       </form>`
     : "";
 
@@ -3089,6 +3097,34 @@ async function handleUserAdminUpdate(
   }
 
   return redirectResponse("/admin/users");
+}
+
+async function handleGlobalCachePurge(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const result = await purgeGlobalCache(env);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "cache_purge",
+    targetType: "cache",
+    targetId: "global",
+    details: { ...result }
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, ...result });
+  }
+
+  return redirectResponse("/admin");
 }
 
 async function handleSearchIndexRebuild(
@@ -5373,6 +5409,48 @@ async function purgePageCache(
     keyCount: keys.length,
     durationMs: elapsedSince(startedAt)
   });
+}
+
+interface GlobalCachePurgeResult {
+  kvKeysPurged: number;
+  d1RowsPurged: boolean;
+}
+
+async function purgeGlobalCache(env: Env): Promise<GlobalCachePurgeResult> {
+  const startedAt = Date.now();
+  const kvKeysPurged = await purgeKvCachePrefixes(env, ["page:", "discovery:"]);
+
+  await env.DB.prepare("delete from rendered_cache").run();
+
+  logMetric("cache_metric", {
+    cache: "global",
+    action: "purge",
+    kvKeysPurged,
+    d1RowsPurged: true,
+    durationMs: elapsedSince(startedAt)
+  });
+
+  return {
+    kvKeysPurged,
+    d1RowsPurged: true
+  };
+}
+
+async function purgeKvCachePrefixes(env: Env, prefixes: string[]): Promise<number> {
+  let purged = 0;
+
+  for (const prefix of prefixes) {
+    let cursor: string | undefined;
+
+    do {
+      const listed = await env.RENDER_CACHE.list({ prefix, cursor });
+      await Promise.all(listed.keys.map((key) => env.RENDER_CACHE.delete(key.name)));
+      purged += listed.keys.length;
+      cursor = listed.list_complete ? undefined : listed.cursor;
+    } while (cursor);
+  }
+
+  return purged;
 }
 
 async function cachedXmlResponse(
