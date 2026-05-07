@@ -1,3 +1,5 @@
+import { principalAuthor, publicPrincipal, type AuthPrincipal } from "./auth/principal";
+import { resolveRequestPrincipal } from "./auth/request";
 import { getRuntimeConfig, type ConfigValidation } from "./config";
 import type { Env } from "./env";
 import {
@@ -75,6 +77,7 @@ export async function handleRequest(
   assetFallback?: AssetFallback
 ): Promise<Response> {
   const url = new URL(request.url);
+  const principal = await resolveRequestPrincipal(request, env);
 
   if (url.pathname === "/") {
     return redirectResponse(pagePath(startPageId(env)), 302);
@@ -121,6 +124,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/diagnostics") {
     return jsonResponse(await collectDiagnostics(env));
+  }
+
+  if (url.pathname === "/api/auth/session") {
+    return jsonResponse({ principal: publicPrincipal(principal) });
   }
 
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
@@ -188,15 +195,15 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/api/pages" && request.method === "POST") {
-    return handleSave(request, env);
+    return handleSave(request, env, principal);
   }
 
   if (url.pathname === "/api/pages/revert" && request.method === "POST") {
-    return handleRevert(request, env);
+    return handleRevert(request, env, principal);
   }
 
   if (url.pathname === "/api/pages/draft" && request.method === "POST") {
-    return handleSaveDraft(request, env);
+    return handleSaveDraft(request, env, principal);
   }
 
   if (url.pathname === "/api/pages/draft/delete" && request.method === "POST") {
@@ -1471,11 +1478,12 @@ function manifestResponse(body: Record<string, unknown>): Response {
   });
 }
 
-async function handleSave(request: Request, env: Env): Promise<Response> {
+async function handleSave(request: Request, env: Env, principal: AuthPrincipal): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
   const content = String(form.get("content") ?? "");
   const summary = String(form.get("summary") ?? "");
+  const author = principalAuthor(principal);
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
@@ -1492,6 +1500,8 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
     summary,
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
     changeType: form.get("minor") ? "minor" : undefined,
+    authorId: author.authorId,
+    authorName: author.authorName,
     ip: getClientIp(request)
   });
 
@@ -1506,10 +1516,15 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
   return redirectResponse(pagePath(id));
 }
 
-async function handleRevert(request: Request, env: Env): Promise<Response> {
+async function handleRevert(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
   const revisionId = String(form.get("revisionId") ?? "");
+  const author = principalAuthor(principal);
 
   if (!id || !revisionId) {
     return jsonResponse({ error: "Missing page id or revision id." }, { status: 400 });
@@ -1531,6 +1546,8 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
     summary: String(form.get("summary") || "") || `Reverted to ${revision.createdAt}`,
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
     changeType: "revert",
+    authorId: author.authorId,
+    authorName: author.authorName,
     ip: getClientIp(request)
   });
 
@@ -1585,9 +1602,14 @@ function renderWordblockPage(
   );
 }
 
-async function handleSaveDraft(request: Request, env: Env): Promise<Response> {
+async function handleSaveDraft(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
+  const author = principalAuthor(principal);
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
@@ -1597,7 +1619,8 @@ async function handleSaveDraft(request: Request, env: Env): Promise<Response> {
     env.DB,
     id,
     String(form.get("content") ?? ""),
-    String(form.get("baseRevisionId") || "") || null
+    String(form.get("baseRevisionId") || "") || null,
+    author.authorId
   );
 
   if (acceptsJson(request)) {

@@ -127,6 +127,22 @@ describe("handleRequest", () => {
     expect(diagnosticsHtml).toContain("<h2>Migration status</h2>");
   });
 
+  it("resolves requests as anonymous until session auth is implemented", async () => {
+    const response = await handleRequest(new Request("https://example.com/api/auth/session"), env);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      principal: {
+        type: "anonymous",
+        isAuthenticated: false,
+        username: null,
+        displayName: "Anonymous",
+        groups: [],
+        aclSubjects: ["@ALL"]
+      }
+    });
+  });
+
   it("handles wiki routes through the Pages Function router", async () => {
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
@@ -722,7 +738,10 @@ describe("handleRequest", () => {
     expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(state.row?.title).toBe("Updated");
     expect(state.batches).toHaveLength(1);
-    expect(state.changelog[0]).toMatchObject({ ip: "203.0.113.10" });
+    expect(state.changelog[0]).toMatchObject({
+      user_name: null,
+      ip: "203.0.113.10"
+    });
     expect(state.metadata).toContainEqual(
       expect.objectContaining({
         subject_type: "page",
@@ -1126,10 +1145,11 @@ function createD1Stub(state: D1StubState): D1Database {
         },
         run: async () => {
           if (sql.includes("insert into drafts")) {
-            const [id, pageId, content, baseRevisionId, updatedAt] = values;
+            const [id, pageId, userId, content, baseRevisionId, updatedAt] = values;
             const existing = state.drafts.find((draft) => draft.id === id);
 
             if (existing) {
+              existing.user_id = userId;
               existing.content = content;
               existing.base_revision_id = baseRevisionId;
               existing.updated_at = updatedAt;
@@ -1137,6 +1157,7 @@ function createD1Stub(state: D1StubState): D1Database {
               state.drafts.push({
                 id,
                 page_id: pageId,
+                user_id: userId,
                 content,
                 base_revision_id: baseRevisionId,
                 updated_at: updatedAt

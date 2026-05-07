@@ -398,6 +398,7 @@ export async function savePageDraft(
   pageId: string,
   content: string,
   baseRevisionId: string | null,
+  userId: string | null = null,
   now = new Date()
 ): Promise<PageDraft> {
   const updatedAt = now.toISOString();
@@ -406,13 +407,14 @@ export async function savePageDraft(
   await db
     .prepare(
       `insert into drafts (id, page_id, user_id, content, base_revision_id, updated_at)
-       values (?, ?, null, ?, ?, ?)
+       values (?, ?, ?, ?, ?, ?)
        on conflict(id) do update set
+         user_id = excluded.user_id,
          content = excluded.content,
          base_revision_id = excluded.base_revision_id,
          updated_at = excluded.updated_at`
     )
-    .bind(id, pageId, content, baseRevisionId, updatedAt)
+    .bind(id, pageId, userId, content, baseRevisionId, updatedAt)
     .run();
 
   return {

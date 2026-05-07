@@ -295,8 +295,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Authentication
 
-- [ ] Decide which DokuWiki auth backends will be supported.
-- [ ] Implement anonymous user behavior.
+- [x] Decide which DokuWiki auth backends will be supported.
+- [x] Implement anonymous user behavior.
 - [ ] Implement login.
 - [ ] Implement logout.
 - [x] Implement password hashing.
