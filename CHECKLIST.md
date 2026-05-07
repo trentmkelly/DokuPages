@@ -432,7 +432,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Map acronym configuration.
 - [x] Map entity configuration.
 - [x] Map smiley configuration.
-- [ ] Map wordblock configuration.
+- [x] Map wordblock configuration.
 - [ ] Map license configuration.
 - [x] Map manifest configuration.
 - [ ] Map language configuration.
@@ -544,7 +544,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement SVG safety policy.
 - [ ] Implement HTML embedding policy.
 - [x] Implement external link rel policy.
-- [ ] Implement wordblock checks.
+- [x] Implement wordblock checks.
 - [ ] Implement IP extraction through Cloudflare headers.
 - [ ] Implement trusted proxy behavior appropriate for Cloudflare.
 - [ ] Implement rate limits for login.

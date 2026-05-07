@@ -40,6 +40,7 @@ import {
   type PageRevision
 } from "./wiki/page-service";
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
+import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -1189,15 +1190,21 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
   const content = String(form.get("content") ?? "");
+  const summary = String(form.get("summary") ?? "");
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
   }
 
+  const blocked = findWordblockMatch(`${content}\n${summary}`);
+  if (blocked) {
+    return wordblockResponse(request, env, id, content, blocked);
+  }
+
   const result = await savePage(env.DB, {
     id,
     content,
-    summary: String(form.get("summary") ?? ""),
+    summary,
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
     changeType: form.get("minor") ? "minor" : undefined,
     ip: request.headers.get("cf-connecting-ip") ?? null
@@ -1228,6 +1235,11 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
     return notFoundResponse(`Revision '${revisionId}' was not found.`);
   }
 
+  const blocked = findWordblockMatch(`${revision.content}\n${String(form.get("summary") ?? "")}`);
+  if (blocked) {
+    return wordblockResponse(request, env, id, revision.content, blocked);
+  }
+
   const result = await savePage(env.DB, {
     id,
     content: revision.content,
@@ -1245,6 +1257,47 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
   await purgePageCache(env, id, result.page.revisionId);
 
   return redirectResponse(pagePath(id));
+}
+
+function wordblockResponse(
+  request: Request,
+  env: Env,
+  id: string,
+  content: string,
+  blocked: WordblockMatch
+): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse(
+      { error: WORD_BLOCK_MESSAGE, blockedText: blocked.match, pattern: blocked.pattern },
+      { status: 400 }
+    );
+  }
+
+  return htmlResponse(renderWordblockPage(env, id, content, blocked), { status: 400 });
+}
+
+function renderWordblockPage(
+  env: Env,
+  id: string,
+  content: string,
+  blocked: WordblockMatch
+): string {
+  return htmlShell(
+    env,
+    `Blocked edit for ${id}`,
+    `<h1>Blocked edit</h1>
+    <p>${escapeHtml(WORD_BLOCK_MESSAGE)}</p>
+    <p><strong>Blocked text:</strong> <code>${escapeHtml(blocked.match)}</code></p>
+    <form method="post" action="/api/pages">
+      <input type="hidden" name="id" value="${escapeHtml(id)}">
+      <textarea class="edit" name="content" rows="20" cols="100">${escapeHtml(content)}</textarea>
+      <div class="editBar">
+        <button type="submit">Try saving again</button>
+        <a href="${pagePath(id)}?do=edit">Back to editor</a>
+      </div>
+    </form>`,
+    { pageId: id }
+  );
 }
 
 async function handleSaveDraft(request: Request, env: Env): Promise<Response> {

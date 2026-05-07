@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { handleRequest } from "../src/app";
 import type { Env } from "../src/env";
+import { WORD_BLOCK_MESSAGE } from "../src/wiki/wordblock";
 
 interface D1StubState {
   row: Record<string, unknown> | null;
@@ -586,6 +587,32 @@ describe("handleRequest", () => {
       })
     );
     expect(purgedKeys).toContain("page:wiki:welcome");
+  });
+
+  it("blocks page edits that match the wordblock list", async () => {
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Updated ======\n\nzoosex");
+    form.set("summary", "Updated page");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: WORD_BLOCK_MESSAGE,
+      blockedText: "zoosex"
+    });
+    expect(state.row?.content).toBe("====== Welcome ======\n\nImported page.");
+    expect(state.batches).toHaveLength(0);
+    expect(purgedKeys).toHaveLength(0);
   });
 
   it("purges rendered page cache through the page action", async () => {
