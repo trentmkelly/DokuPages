@@ -4,8 +4,8 @@ Native admin routes use D1-backed session principals and group membership.
 
 - `/admin` is the admin dashboard and requires `manager` or `admin`.
 - `/admin/acl` manages ACL rules and requires `admin`.
-- `/admin/config` shows validated runtime configuration, secret status, and
-  export links and requires `admin`.
+- `/admin/config` shows validated read-only runtime configuration, secret
+  status, and export links and requires `admin`.
 - `/admin/users` manages native D1 users, group membership, and disabled status
   and requires `admin`.
 - `/admin/audit` shows recent admin audit log entries and requires `admin`.

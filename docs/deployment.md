@@ -42,6 +42,10 @@ download a JSON configuration backup from `/api/admin/config/export`. Secret
 values are never included in the page or export; the backup records only whether
 each supported secret is configured.
 
+Configuration editing remains a deployment operation. Pages Functions cannot
+mutate their own environment variables or secrets safely at runtime; update
+Cloudflare Pages variables/secrets or Wrangler configuration and redeploy.
+
 ## Deployment Decisions
 
 - Secrets: `API_BEARER_TOKEN` is optional and only required for native remote

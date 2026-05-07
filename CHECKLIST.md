@@ -439,7 +439,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement environment-specific config.
 - [x] Implement secret-specific config.
 - [x] Implement config validation.
-- [ ] Implement admin config editing if supported.
+- [x] Implement admin config editing if supported.
 - [x] Implement config export and backup.
 
 ## Plugins And Extension Compatibility

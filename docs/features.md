@@ -43,7 +43,7 @@ PHP modules to execute. Current decisions:
 - `acl`: replaced by the native ACL manager.
 - `authplain`: replaced by D1-backed native users, groups, and sessions.
 - `config`: replaced by runtime env validation, `/admin/config`, and redacted
-  configuration export.
+  read-only configuration export.
 - `extension`: unsupported for production installs on Pages.
 - `info`: partially replaced by diagnostics and health endpoints.
 - `logviewer`: replaced by Cloudflare logs plus native admin audit log.

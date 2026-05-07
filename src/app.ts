@@ -2606,6 +2606,7 @@ function renderConfigAdminPage(
     env,
     "Configuration Manager",
     `<h1>Configuration manager</h1>
+    <p class="info">Runtime configuration is read-only inside Pages Functions. Edit variables and secrets through Cloudflare Pages or Wrangler, then redeploy.</p>
     <p><a href="/api/admin/config/export">Download configuration backup</a></p>
     <h2>Validation</h2>
     ${renderConfigValidation(validation)}
