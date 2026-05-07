@@ -97,7 +97,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add linting.
 - [x] Add formatting.
 - [x] Add unit test framework.
-- [ ] Add integration test framework.
+- [x] Add integration test framework.
 - [ ] Add end-to-end test framework.
 - [x] Add CI workflow.
 - [x] Add environment configuration templates.
@@ -272,7 +272,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement media ID cleaning.
 - [x] Implement media namespace resolution.
 - [x] Implement media MIME detection.
-- [ ] Implement media ACL checks.
+- [x] Implement media ACL checks.
 - [x] Implement media upload.
 - [x] Implement media overwrite rules.
 - [x] Implement media deletion.
@@ -445,7 +445,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Plugins And Extension Compatibility
 
 - [ ] Decide support level for bundled plugins.
-- [ ] Port the ACL plugin or replace it with native admin UI.
+- [x] Port the ACL plugin or replace it with native admin UI.
 - [ ] Port the authplain plugin or replace it with native auth.
 - [ ] Port the config plugin or replace it with native admin UI.
 - [ ] Port the extension manager plugin or remove it for Pages.
@@ -474,7 +474,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement admin dashboard.
 - [ ] Implement configuration management.
 - [ ] Implement user management.
-- [ ] Implement ACL management.
+- [x] Implement ACL management.
 - [ ] Implement page index rebuild.
 - [ ] Implement search index rebuild.
 - [x] Implement cache purge.
@@ -641,24 +641,24 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add unit tests for namespace handling.
 - [x] Add unit tests for parser behavior.
 - [x] Add unit tests for renderer behavior.
-- [ ] Add unit tests for ACL behavior.
-- [ ] Add unit tests for auth behavior.
-- [ ] Add unit tests for storage adapters.
+- [x] Add unit tests for ACL behavior.
+- [x] Add unit tests for auth behavior.
+- [x] Add unit tests for storage adapters.
 - [x] Add unit tests for cache behavior.
 - [x] Add unit tests for search behavior.
-- [ ] Add unit tests for media behavior.
-- [ ] Add integration tests for page view.
-- [ ] Add integration tests for page edit.
-- [ ] Add integration tests for page delete.
+- [x] Add unit tests for media behavior.
+- [x] Add integration tests for page view.
+- [x] Add integration tests for page edit.
+- [x] Add integration tests for page delete.
 - [x] Add integration tests for page revert.
 - [x] Add integration tests for revisions.
 - [x] Add integration tests for diff.
 - [x] Add integration tests for search.
-- [ ] Add integration tests for media upload.
+- [x] Add integration tests for media upload.
 - [x] Add integration tests for media fetch.
-- [ ] Add integration tests for login.
-- [ ] Add integration tests for logout.
-- [ ] Add integration tests for admin actions.
+- [x] Add integration tests for login.
+- [x] Add integration tests for logout.
+- [x] Add integration tests for admin actions.
 - [x] Add migration tests using fixture wiki data.
 - [x] Add URL compatibility tests.
 - [ ] Add API compatibility tests if APIs are supported.
