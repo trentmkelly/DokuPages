@@ -250,8 +250,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement draft autosave.
 - [x] Implement draft recovery.
 - [ ] Implement page templates.
-- [ ] Implement breadcrumbs.
-- [ ] Implement "you are here" navigation if supported.
+- [x] Implement breadcrumbs.
+- [x] Implement "you are here" navigation if supported.
 - [x] Implement backlinks.
 - [x] Implement orphan pages if supported.
 - [x] Implement wanted pages if supported.

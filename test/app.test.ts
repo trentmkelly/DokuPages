@@ -81,7 +81,10 @@ describe("handleRequest", () => {
     const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
 
     expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toContain('<h1 id="welcome">Welcome</h1>');
+    const html = await response.text();
+    expect(html).toContain('<nav aria-label="Breadcrumb">');
+    expect(html).toContain('<a href="/index?ns=wiki">wiki</a> / <span>welcome</span>');
+    expect(html).toContain('<h1 id="welcome">Welcome</h1>');
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
@@ -99,6 +102,7 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
+    expect(html).toContain('<nav aria-label="Breadcrumb">');
     expect(html).toContain("Cached body.");
     expect(html).not.toContain("Imported page.");
     expect(cachePuts).toHaveLength(0);

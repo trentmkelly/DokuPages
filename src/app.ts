@@ -249,7 +249,7 @@ async function renderPageHtml(
   const cached = await readRenderCache(env, cacheKey, revisionId);
 
   if (cached) {
-    return htmlShell(env, cached.title, `${revisionNotice}${cached.html}`);
+    return htmlShell(env, cached.title, `${renderBreadcrumbs(id)}${revisionNotice}${cached.html}`);
   }
 
   const rendered = renderWikiText(content);
@@ -260,7 +260,27 @@ async function renderPageHtml(
     html: rendered.html
   });
 
-  return htmlShell(env, title, `${revisionNotice}${rendered.html}`);
+  return htmlShell(env, title, `${renderBreadcrumbs(id)}${revisionNotice}${rendered.html}`);
+}
+
+function renderBreadcrumbs(id: string): string {
+  const segments = id.split(":").filter(Boolean);
+  if (segments.length === 0) return "";
+
+  const crumbs = segments
+    .map((segment, index) => {
+      const currentId = segments.slice(0, index + 1).join(":");
+      const label = escapeHtml(segment);
+
+      if (index === segments.length - 1) {
+        return `<span>${label}</span>`;
+      }
+
+      return `<a href="/index?ns=${encodeURIComponent(currentId)}">${label}</a>`;
+    })
+    .join(" / ");
+
+  return `<nav aria-label="Breadcrumb">${crumbs}</nav>`;
 }
 
 async function renderRevisionsPage(env: Env, id: string): Promise<string> {
