@@ -10,6 +10,15 @@ import { fileURLToPath } from "node:url";
 
 const gunzipAsync = promisify(gunzip);
 const DEFAULT_AUTH_GROUP = "user";
+const DEFAULT_MIME_TYPES = new Map([
+  ["gif", "image/gif"],
+  ["jpg", "image/jpeg"],
+  ["jpeg", "image/jpeg"],
+  ["png", "image/png"],
+  ["svg", "image/svg+xml"],
+  ["txt", "text/plain"],
+  ["webp", "image/webp"]
+]);
 
 export async function buildImportPlan(sourceRoot) {
   const root = path.resolve(sourceRoot);
@@ -157,6 +166,63 @@ set document_count = (
   );
   statements.push("delete from search_terms where document_count = 0;");
 
+  for (const media of plan.media) {
+    const revisionId = mediaRevisionId(media.id, media.modifiedAt);
+    const namespace = mediaNamespace(media.id);
+    const mimeType = mediaMimeType(media.id, plan.mimeTypes);
+
+    statements.push(
+      `insert into media (
+  id, namespace, object_key, mime_type, byte_length, content_hash,
+  current_revision_id, is_deleted, created_at, updated_at
+) values (
+  ${sql(media.id)}, ${sql(namespace)}, ${sql(media.objectKey)}, ${sql(mimeType)}, ${media.byteLength}, ${sql(
+    media.contentHash
+  )},
+  ${sql(revisionId)}, 0, ${sql(media.modifiedAt)}, ${sql(media.modifiedAt)}
+)
+on conflict(id) do update set
+  namespace = excluded.namespace,
+  object_key = excluded.object_key,
+  mime_type = excluded.mime_type,
+  byte_length = excluded.byte_length,
+  content_hash = excluded.content_hash,
+  current_revision_id = excluded.current_revision_id,
+  is_deleted = excluded.is_deleted,
+  updated_at = excluded.updated_at;`
+    );
+
+    statements.push(
+      `insert or replace into media_revisions (
+  id, media_id, object_key, mime_type, byte_length, content_hash,
+  author_id, summary, change_type, created_at
+) values (
+  ${sql(revisionId)}, ${sql(media.id)}, ${sql(media.objectKey)}, ${sql(mimeType)}, ${media.byteLength}, ${sql(
+    media.contentHash
+  )},
+  null, 'Imported from DokuWiki media files', 'create', ${sql(media.modifiedAt)}
+);`
+    );
+  }
+
+  for (const revision of plan.mediaRevisions) {
+    const createdAt = mediaRevisionCreatedAt(revision);
+    const revisionId = mediaRevisionId(revision.mediaId, createdAt);
+    const mimeType = mediaMimeType(revision.mediaId, plan.mimeTypes);
+
+    statements.push(
+      `insert or replace into media_revisions (
+  id, media_id, object_key, mime_type, byte_length, content_hash,
+  author_id, summary, change_type, created_at
+) values (
+  ${sql(revisionId)}, ${sql(revision.mediaId)}, ${sql(revision.objectKey)}, ${sql(mimeType)}, ${revision.byteLength}, ${sql(
+    revision.contentHash
+  )},
+  null, 'Imported from DokuWiki media attic', 'edit', ${sql(createdAt)}
+);`
+    );
+  }
+
   for (const rule of plan.aclRules) {
     statements.push(
       `insert into acl_rules (id, scope, principal_type, principal, permission, created_at)
@@ -217,6 +283,17 @@ on conflict(user_id, group_id) do nothing;`
 
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
   await fs.writeFile(outputFile, `${statements.join("\n\n")}\n`);
+}
+
+export async function writeMediaManifest(plan, outputFile) {
+  const manifest = {
+    generatedAt: plan.generatedAt,
+    sourceRoot: plan.sourceRoot,
+    objects: mediaImportObjects(plan)
+  };
+
+  await fs.mkdir(path.dirname(outputFile), { recursive: true });
+  await fs.writeFile(outputFile, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 export async function discoverPages(pagesRoot) {
@@ -324,6 +401,59 @@ export async function discoverMediaRevisions(mediaAtticRoot) {
   return revisions.sort((a, b) =>
     `${a.mediaId}:${a.revision}`.localeCompare(`${b.mediaId}:${b.revision}`)
   );
+}
+
+function mediaImportObjects(plan) {
+  return [
+    ...plan.media.map((media) => ({
+      role: "current",
+      mediaId: media.id,
+      revisionId: mediaRevisionId(media.id, media.modifiedAt),
+      sourcePath: media.sourcePath,
+      objectKey: media.objectKey,
+      mimeType: mediaMimeType(media.id, plan.mimeTypes),
+      byteLength: media.byteLength,
+      contentHash: media.contentHash,
+      modifiedAt: media.modifiedAt
+    })),
+    ...plan.mediaRevisions.map((revision) => {
+      const createdAt = mediaRevisionCreatedAt(revision);
+
+      return {
+        role: "revision",
+        mediaId: revision.mediaId,
+        revisionId: mediaRevisionId(revision.mediaId, createdAt),
+        sourcePath: revision.sourcePath,
+        objectKey: revision.objectKey,
+        mimeType: mediaMimeType(revision.mediaId, plan.mimeTypes),
+        byteLength: revision.byteLength,
+        contentHash: revision.contentHash,
+        modifiedAt: revision.modifiedAt
+      };
+    })
+  ];
+}
+
+function mediaNamespace(id) {
+  return id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
+}
+
+function mediaMimeType(id, mimeTypes) {
+  const extension = id.includes(".") ? id.slice(id.lastIndexOf(".") + 1).toLowerCase() : "";
+  const configured = mimeTypes.find((entry) => entry.extension === extension);
+  return configured?.mimeType ?? DEFAULT_MIME_TYPES.get(extension) ?? "application/octet-stream";
+}
+
+function mediaRevisionCreatedAt(revision) {
+  if (/^\d{10,}$/.test(revision.revision)) {
+    return new Date(Number.parseInt(revision.revision, 10) * 1000).toISOString();
+  }
+
+  return revision.modifiedAt;
+}
+
+function mediaRevisionId(id, createdAt) {
+  return `${id}@${createdAt}`;
 }
 
 export async function discoverChangelogEntries(file, subjectType) {
@@ -1013,6 +1143,7 @@ function addTerms(target, terms, weight) {
 }
 
 function sql(value) {
+  if (value === null || value === undefined) return "null";
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
@@ -1020,7 +1151,8 @@ function parseArgs(argv) {
   const args = {
     source: "../dokuwiki",
     dryRun: false,
-    sqlOut: ""
+    sqlOut: "",
+    mediaManifestOut: ""
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -1031,6 +1163,8 @@ function parseArgs(argv) {
       args.dryRun = true;
     } else if (arg === "--sql-out") {
       args.sqlOut = argv[++index];
+    } else if (arg === "--media-manifest-out") {
+      args.mediaManifestOut = argv[++index];
     }
   }
 
@@ -1043,6 +1177,10 @@ async function main() {
 
   if (args.sqlOut) {
     await writePageImportSql(plan, args.sqlOut);
+  }
+
+  if (args.mediaManifestOut) {
+    await writeMediaManifest(plan, args.mediaManifestOut);
   }
 
   console.log(JSON.stringify(plan, null, 2));

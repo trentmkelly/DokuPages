@@ -4,7 +4,11 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { buildImportPlan, writePageImportSql } from "../scripts/import-dokuwiki.mjs";
+import {
+  buildImportPlan,
+  writeMediaManifest,
+  writePageImportSql
+} from "../scripts/import-dokuwiki.mjs";
 
 const gzipAsync = promisify(gzip);
 
@@ -15,6 +19,7 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/media_attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media_meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
@@ -25,6 +30,10 @@ describe("DokuWiki import planner", () => {
       await gzipAsync("====== Old Welcome ======\n")
     );
     await writeFile(path.join(root, "data/media/wiki/logo.svg"), "<svg />\n");
+    await writeFile(
+      path.join(root, "data/media_attic/wiki/logo.1767225600.svg"),
+      "<svg>old</svg>\n"
+    );
     await writeFile(
       path.join(root, "data/meta/_dokuwiki.changes"),
       "1767225600\t203.0.113.7\tC\twiki:welcome\talice\tCreated page\t\t24\n"
@@ -91,6 +100,7 @@ describe("DokuWiki import planner", () => {
       pageChangelogEntries: 1,
       pageMetadata: 1,
       media: 1,
+      mediaRevisions: 1,
       mediaChangelogEntries: 1,
       mediaMetadata: 1,
       aclRules: 4,
@@ -129,7 +139,15 @@ describe("DokuWiki import planner", () => {
         persistent: { date: { created: 1767225600 } }
       }
     });
-    expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
+    expect(plan.media[0]).toMatchObject({
+      id: "wiki:logo.svg",
+      objectKey: "media/current/wiki/logo.svg"
+    });
+    expect(plan.mediaRevisions[0]).toMatchObject({
+      mediaId: "wiki:logo.svg",
+      revision: "1767225600",
+      objectKey: "media/revisions/wiki/logo.svg/1767225600"
+    });
     expect(plan.mediaChangelogEntries[0]).toMatchObject({
       subjectType: "media",
       subjectId: "wiki:logo.svg",
@@ -270,15 +288,42 @@ describe("DokuWiki import planner", () => {
       { id: "wordblock:1", pattern: "zoosex" },
       { id: "wordblock:2", pattern: "wow gold" }
     ]);
+
+    const manifestOutput = path.join(root, "media-manifest.json");
+    await writeMediaManifest(plan, manifestOutput);
+    const manifest = JSON.parse(await readFile(manifestOutput, "utf8"));
+    expect(manifest.objects).toContainEqual(
+      expect.objectContaining({
+        role: "current",
+        mediaId: "wiki:logo.svg",
+        objectKey: "media/current/wiki/logo.svg",
+        mimeType: "image/svg+xml"
+      })
+    );
+    expect(manifest.objects).toContainEqual(
+      expect.objectContaining({
+        role: "revision",
+        mediaId: "wiki:logo.svg",
+        revisionId: "wiki:logo.svg@2026-01-01T00:00:00.000Z",
+        objectKey: "media/revisions/wiki/logo.svg/1767225600"
+      })
+    );
   });
 
   it("generates idempotent SQL for D1 page imports", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-sql-"));
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/media_attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
     await writeFile(
       path.join(root, "data/pages/wiki/welcome.txt"),
       "====== Welcome ======\n\nText\n"
+    );
+    await writeFile(path.join(root, "data/media/wiki/logo.svg"), "<svg />\n");
+    await writeFile(
+      path.join(root, "data/media_attic/wiki/logo.1767225600.svg"),
+      "<svg>old</svg>\n"
     );
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 8\n");
     await writeFile(
@@ -297,6 +342,10 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert or replace into page_revisions");
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("insert into search_postings");
+    expect(sql).toContain("insert into media (");
+    expect(sql).toContain("insert or replace into media_revisions");
+    expect(sql).toContain("'media/current/wiki/logo.svg'");
+    expect(sql).toContain("'wiki:logo.svg@2026-01-01T00:00:00.000Z'");
     expect(sql).toContain("insert into acl_rules");
     expect(sql).toContain("insert into users");
     expect(sql).toContain("insert into groups");

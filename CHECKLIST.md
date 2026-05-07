@@ -582,10 +582,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Preserve author information.
 - [ ] Preserve edit summaries.
 - [ ] Preserve delete events.
-- [ ] Preserve media revision history.
+- [x] Preserve media revision history.
 - [x] Validate imported page counts.
-- [ ] Validate imported media counts.
-- [ ] Validate imported revision counts.
+- [x] Validate imported media counts.
+- [x] Validate imported revision counts.
 - [x] Validate imported user counts.
 - [ ] Validate imported ACL counts.
 - [ ] Validate content hashes before and after import.
@@ -727,7 +727,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Document deployment setup.
 - [ ] Document environment variables.
 - [ ] Document D1 migration workflow.
-- [ ] Document R2 bucket workflow.
+- [x] Document R2 bucket workflow.
 - [ ] Document data import workflow.
 - [ ] Document backup workflow.
 - [ ] Document restore workflow.

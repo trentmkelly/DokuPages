@@ -27,6 +27,18 @@ The upload path writes the R2 object first, then stores current media metadata, 
 
 Uploads are validated before R2 writes. The native validator enforces a 25 MiB body limit, allows only a conservative extension set, checks non-generic MIME types against the file extension, and rejects SVG content containing scripts, event handlers, doctypes, entities, foreign objects, or `javascript:` links.
 
+## R2 Import Workflow
+
+The DokuWiki importer now emits both D1 SQL and an R2 object manifest. The SQL includes current media rows and immutable `media_revisions` rows for files found under `data/media` and `data/media_attic`.
+
+```sh
+npm run import:sql
+npm run import:media-manifest
+npm run import:media-upload
+```
+
+`import:media-upload` reads `.wrangler/dokuwiki-media-manifest.json` and uploads each listed file to `dokuwiki-pages-dev-media` with the detected content type. Use `node scripts/upload-r2-media.mjs --manifest <path> --bucket <bucket> --remote --dry-run` to review the generated Wrangler commands before running a live import.
+
 ## Delete Semantics
 
 `POST /api/media/delete` expects `id` and optional `summary`. Deletion marks the current `media` row deleted, creates a `delete` media revision, appends a media changelog row, and records deletion metadata. R2 objects are kept so immutable old revisions remain fetchable.
