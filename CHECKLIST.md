@@ -232,7 +232,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement renderer output compatible with current templates.
 - [x] Add parser conformance fixtures from existing pages.
 - [x] Add parser tests for each supported syntax mode.
-- [ ] Add parser tests for invalid and edge-case markup.
+- [x] Add parser tests for invalid and edge-case markup.
 
 ## Page Behavior
 

@@ -217,6 +217,29 @@ describe("renderWikiText", () => {
     );
   });
 
+  it("keeps invalid or unclosed inline markup as escaped text", () => {
+    const rendered = renderWikiText(
+      "[[wiki:syntax|Syntax {{wiki:logo.png|Logo %%literal **bold <script>alert(1)</script>"
+    );
+
+    expect(rendered.html).toContain("[[wiki:syntax|Syntax");
+    expect(rendered.html).toContain("{{wiki:logo.png|Logo");
+    expect(rendered.html).toContain("%%literal");
+    expect(rendered.html).toContain("**bold");
+    expect(rendered.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(rendered.html).not.toContain("<script>");
+  });
+
+  it("flushes unterminated code and file blocks safely at end of input", () => {
+    const code = renderWikiText("<code>\n<unsafe>\n**literal**");
+    const file = renderWikiText("<file txt example.txt>\n<unsafe>");
+
+    expect(code.html).toContain('<pre class="code"><code>&lt;unsafe&gt;\n**literal**</code></pre>');
+    expect(file.html).toContain(
+      '<dl class="file"><dt>example.txt</dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
+    );
+  });
+
   it("renders simple DokuWiki tables", () => {
     const rendered = renderWikiText("^ Head ^\n| Cell |");
 
