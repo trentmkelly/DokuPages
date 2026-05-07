@@ -7,6 +7,8 @@ export interface Env {
   START_PAGE?: string;
   WIKI_LANG?: string;
   SESSION_COOKIE_NAME?: string;
+  HIDE_PAGES?: string;
+  SNEAKY_INDEX?: string;
   APP_VERSION?: string;
   CF_PAGES_BRANCH?: string;
   CF_PAGES_COMMIT_SHA?: string;

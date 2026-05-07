@@ -18,6 +18,8 @@ export interface RuntimeConfig {
   startPage: string;
   language: SupportedLanguage;
   sessionCookieName: string;
+  hidePages: string | null;
+  sneakyIndex: boolean;
   appVersion: string;
 }
 
@@ -38,6 +40,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     startPage: normalizedStartPage(env.START_PAGE),
     language: resolveLanguage(env.WIKI_LANG),
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
+    hidePages: nonEmpty(env.HIDE_PAGES) ?? null,
+    sneakyIndex: truthy(env.SNEAKY_INDEX),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -49,6 +53,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateStartPage(env.START_PAGE, issues);
   validateLanguage(env.WIKI_LANG, issues);
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
+  validateHidePages(env.HIDE_PAGES, issues);
   validateAppVersion(env.APP_VERSION, issues);
 
   return {
@@ -156,6 +161,21 @@ function validateAppVersion(value: string | undefined, issues: ConfigValidationI
   }
 }
 
+function validateHidePages(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const pattern = nonEmpty(value);
+  if (!pattern) return;
+
+  try {
+    new RegExp(pattern, "iu");
+  } catch {
+    issues.push({
+      key: "HIDE_PAGES",
+      severity: "error",
+      message: "HIDE_PAGES must be a valid JavaScript-compatible regular expression."
+    });
+  }
+}
+
 function normalizedStartPage(value: string | undefined): string {
   const normalized = cleanPageId(value ?? DEFAULT_START_PAGE);
   return normalized || DEFAULT_START_PAGE;
@@ -172,4 +192,8 @@ function validCookieName(value: string): boolean {
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed || undefined;
+}
+
+function truthy(value: string | undefined): boolean {
+  return value === "1" || value?.toLowerCase() === "true";
 }

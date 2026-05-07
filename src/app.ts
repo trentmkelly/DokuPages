@@ -1,4 +1,9 @@
-import { principalAuthor, publicPrincipal, type AuthPrincipal } from "./auth/principal";
+import {
+  anonymousPrincipal,
+  principalAuthor,
+  publicPrincipal,
+  type AuthPrincipal
+} from "./auth/principal";
 import { resolveRequestPrincipal } from "./auth/request";
 import {
   authenticateUser,
@@ -197,42 +202,47 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/recent") {
-    return htmlResponse(await renderRecentPage(env, url));
+    return htmlResponse(await renderRecentPage(env, url, principal));
   }
 
   if (url.pathname === "/search") {
-    return htmlResponse(await renderSearchPage(env, url));
+    return htmlResponse(await renderSearchPage(env, url, principal));
   }
 
   if (url.pathname === "/index") {
     return htmlResponse(
-      await renderNamespaceIndexPage(env, cleanPageId(url.searchParams.get("ns") ?? ""), url)
+      await renderNamespaceIndexPage(
+        env,
+        cleanPageId(url.searchParams.get("ns") ?? ""),
+        url,
+        principal
+      )
     );
   }
 
   if (url.pathname === "/wanted") {
-    return htmlResponse(await renderWantedPage(env));
+    return htmlResponse(await renderWantedPage(env, principal));
   }
 
   if (url.pathname === "/orphans") {
-    return htmlResponse(await renderOrphanPage(env));
+    return htmlResponse(await renderOrphanPage(env, principal));
   }
 
   if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap") {
     return cachedXmlResponse(env, "sitemap", url, "application/xml; charset=utf-8", () =>
-      renderSitemap(env, url)
+      renderSitemap(env, url, anonymousPrincipal())
     );
   }
 
   if (url.pathname === "/feed.php" || url.pathname === "/feed" || url.pathname === "/feed.xml") {
     return cachedXmlResponse(env, "rss", url, "application/rss+xml; charset=utf-8", () =>
-      renderRssFeed(env, url)
+      renderRssFeed(env, url, anonymousPrincipal())
     );
   }
 
   if (url.pathname === "/atom.xml") {
     return cachedXmlResponse(env, "atom", url, "application/atom+xml; charset=utf-8", () =>
-      renderAtomFeed(env, url)
+      renderAtomFeed(env, url, anonymousPrincipal())
     );
   }
 
@@ -329,15 +339,17 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "recent") {
-      return htmlResponse(await renderRecentPage(env, url));
+      return htmlResponse(await renderRecentPage(env, url, principal));
     }
 
     if (url.searchParams.get("do") === "search") {
-      return htmlResponse(await renderSearchPage(env, url));
+      return htmlResponse(await renderSearchPage(env, url, principal));
     }
 
     if (url.searchParams.get("do") === "index") {
-      return htmlResponse(await renderNamespaceIndexPage(env, namespaceForIndex(id), url));
+      return htmlResponse(
+        await renderNamespaceIndexPage(env, namespaceForIndex(id), url, principal)
+      );
     }
 
     if (url.searchParams.get("do") === "login") {
@@ -351,15 +363,15 @@ export async function handleRequest(
     if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
-      return htmlResponse(await renderBacklinksPage(env, id));
+      return htmlResponse(await renderBacklinksPage(env, id, principal));
     }
 
     if (url.searchParams.get("do") === "wanted") {
-      return htmlResponse(await renderWantedPage(env));
+      return htmlResponse(await renderWantedPage(env, principal));
     }
 
     if (url.searchParams.get("do") === "orphan" || url.searchParams.get("do") === "orphans") {
-      return htmlResponse(await renderOrphanPage(env));
+      return htmlResponse(await renderOrphanPage(env, principal));
     }
 
     if (url.searchParams.get("do") === "revert") {
@@ -1112,9 +1124,13 @@ async function renderRevertPage(
   );
 }
 
-async function renderRecentPage(env: Env, url: URL): Promise<string> {
+async function renderRecentPage(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
   const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
-  const changes = await listRecentChanges(env.DB, pagination.limit, pagination.offset);
+  const changes = await filterReadableChanges(
+    env,
+    principal,
+    await listRecentChanges(env.DB, pagination.limit, pagination.offset)
+  );
   const items = changes
     .map(
       (change) => `<li>
@@ -1284,10 +1300,12 @@ function renderImportJobTable(jobs: ImportJobStatus[]): string {
   </table>`;
 }
 
-async function renderSearchPage(env: Env, url: URL): Promise<string> {
+async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
   const query = url.searchParams.get("q")?.trim() ?? "";
   const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
-  const results = query ? await searchPages(env.DB, query, namespace) : [];
+  const results = query
+    ? await filterReadablePageItems(env, principal, await searchPages(env.DB, query, namespace))
+    : [];
   const resultItems = results
     .map(
       (result) => `<li>
@@ -1316,9 +1334,22 @@ async function renderSearchPage(env: Env, url: URL): Promise<string> {
   );
 }
 
-async function renderNamespaceIndexPage(env: Env, namespace: string, url: URL): Promise<string> {
+async function renderNamespaceIndexPage(
+  env: Env,
+  namespace: string,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<string> {
   const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
-  const pages = await listNamespacePages(env.DB, namespace, pagination.limit, pagination.offset);
+  const rules = await listAclRules(env);
+  const pages = canListNamespace(env, rules, principal, namespace)
+    ? filterReadablePageItemsWithRules(
+        env,
+        rules,
+        principal,
+        await listNamespacePages(env.DB, namespace, pagination.limit, pagination.offset)
+      )
+    : [];
   const title = namespace ? `Index of ${namespace}` : "Index";
   const items = renderPageReferenceList(
     pages.map((page) => ({
@@ -1336,8 +1367,12 @@ async function renderNamespaceIndexPage(env: Env, namespace: string, url: URL): 
   );
 }
 
-async function renderBacklinksPage(env: Env, id: string): Promise<string> {
-  const backlinks = await listBacklinks(env.DB, id);
+async function renderBacklinksPage(
+  env: Env,
+  id: string,
+  principal: AuthPrincipal
+): Promise<string> {
+  const backlinks = await filterReadablePageItems(env, principal, await listBacklinks(env.DB, id));
   const items = renderPageReferenceList(backlinks);
   const emptyState = backlinks.length === 0 ? "<p>No backlinks found.</p>" : "";
 
@@ -1348,16 +1383,23 @@ async function renderBacklinksPage(env: Env, id: string): Promise<string> {
   );
 }
 
-async function renderOrphanPage(env: Env): Promise<string> {
-  const orphans = await listOrphanPages(env.DB);
+async function renderOrphanPage(env: Env, principal: AuthPrincipal): Promise<string> {
+  const orphans = await filterReadablePageItems(env, principal, await listOrphanPages(env.DB));
   const items = renderPageReferenceList(orphans);
   const emptyState = orphans.length === 0 ? "<p>No orphan pages found.</p>" : "";
 
   return htmlShell(env, "Orphan pages", `<h1>Orphan pages</h1>${emptyState}<ul>${items}</ul>`);
 }
 
-async function renderWantedPage(env: Env): Promise<string> {
-  const wanted = await listWantedPages(env.DB);
+async function renderWantedPage(env: Env, principal: AuthPrincipal): Promise<string> {
+  const rules = await listAclRules(env);
+  const wanted = (await listWantedPages(env.DB))
+    .filter((page) => !isHiddenPageId(env, page.id))
+    .map((page) => ({
+      ...page,
+      referrers: filterReadablePageItemsWithRules(env, rules, principal, page.referrers)
+    }))
+    .filter((page) => page.referrers.length > 0);
   const items = wanted
     .map(
       (page) => `<li>
@@ -1408,8 +1450,8 @@ function paginationHref(url: URL, offset: number, limit: number): string {
   return `${next.pathname}${next.search}`;
 }
 
-async function renderSitemap(env: Env, url: URL): Promise<string> {
-  const pages = await listAllPages(env.DB);
+async function renderSitemap(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+  const pages = await filterReadablePageItems(env, principal, await listAllPages(env.DB));
   const urls = pages
     .map(
       (page) => `<url>
@@ -1425,8 +1467,8 @@ ${urls}
 </urlset>`;
 }
 
-async function renderRssFeed(env: Env, url: URL): Promise<string> {
-  const changes = await listRecentChanges(env.DB);
+async function renderRssFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+  const changes = await filterReadableChanges(env, principal, await listRecentChanges(env.DB));
   const title = getRuntimeConfig(env).siteName;
   const items = changes
     .map(
@@ -1451,8 +1493,8 @@ ${items}
 </rss>`;
 }
 
-async function renderAtomFeed(env: Env, url: URL): Promise<string> {
-  const changes = await listRecentChanges(env.DB);
+async function renderAtomFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+  const changes = await filterReadableChanges(env, principal, await listRecentChanges(env.DB));
   const title = getRuntimeConfig(env).siteName;
   const updated = changes[0]?.createdAt ?? new Date(0).toISOString();
   const entries = changes
@@ -2487,8 +2529,12 @@ async function resolveRequestAclPermission(
   subjectId: string,
   principal: AuthPrincipal
 ): Promise<number> {
-  const rules = await new D1AclStore(env.DB).listAllRules();
+  const rules = await listAclRules(env);
   return resolveAclPermission(rules, subjectId, principal);
+}
+
+async function listAclRules(env: Env) {
+  return new D1AclStore(env.DB).listAllRules();
 }
 
 function aclDeniedResponse(
@@ -2521,6 +2567,68 @@ function aclDeniedResponse(
     ),
     { status: 403 }
   );
+}
+
+async function filterReadablePageItems<T extends { id: string }>(
+  env: Env,
+  principal: AuthPrincipal,
+  items: T[]
+): Promise<T[]> {
+  return filterReadablePageItemsWithRules(env, await listAclRules(env), principal, items);
+}
+
+async function filterReadableChanges<T extends { subjectId: string }>(
+  env: Env,
+  principal: AuthPrincipal,
+  changes: T[]
+): Promise<T[]> {
+  const rules = await listAclRules(env);
+  return changes.filter((change) => isReadablePageId(env, rules, principal, change.subjectId));
+}
+
+function filterReadablePageItemsWithRules<T extends { id: string }>(
+  env: Env,
+  rules: Awaited<ReturnType<typeof listAclRules>>,
+  principal: AuthPrincipal,
+  items: T[]
+): T[] {
+  return items.filter((item) => isReadablePageId(env, rules, principal, item.id));
+}
+
+function isReadablePageId(
+  env: Env,
+  rules: Awaited<ReturnType<typeof listAclRules>>,
+  principal: AuthPrincipal,
+  id: string
+): boolean {
+  return (
+    !isHiddenPageId(env, id) &&
+    hasAclPermission(resolveAclPermission(rules, id, principal), ACL_READ)
+  );
+}
+
+function canListNamespace(
+  env: Env,
+  rules: Awaited<ReturnType<typeof listAclRules>>,
+  principal: AuthPrincipal,
+  namespace: string
+): boolean {
+  if (!getRuntimeConfig(env).sneakyIndex) return true;
+  return hasAclPermission(
+    resolveAclPermission(rules, namespace ? `${namespace}:*` : "*", principal),
+    ACL_READ
+  );
+}
+
+function isHiddenPageId(env: Env, id: string): boolean {
+  const pattern = getRuntimeConfig(env).hidePages;
+  if (!pattern) return false;
+
+  try {
+    return new RegExp(pattern, "iu").test(`:${id}`);
+  } catch {
+    return false;
+  }
 }
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {

@@ -973,6 +973,47 @@ describe("handleRequest", () => {
     expect(pagedHtml).toContain("offset=1");
   });
 
+  it("filters aggregate page outputs by ACL read access", async () => {
+    state.aclRules = [aclRule("*", "all", "@ALL", 16), aclRule("wiki:welcome", "all", "@ALL", 0)];
+
+    const search = await handleRequest(new Request("https://example.com/search?q=welcome"), env);
+    const recent = await handleRequest(new Request("https://example.com/recent"), env);
+    const index = await handleRequest(new Request("https://example.com/index?ns=wiki"), env);
+    const sitemap = await handleRequest(new Request("https://example.com/sitemap.xml"), env);
+
+    expect(await search.text()).toContain("No matching pages found.");
+    expect(await recent.text()).not.toContain("Initial import");
+    const indexHtml = await index.text();
+    expect(indexHtml).not.toContain("<small>wiki:welcome");
+    expect(indexHtml).toContain("/wiki/wiki/guide");
+    expect(await sitemap.text()).not.toContain("https://example.com/wiki/wiki/welcome");
+  });
+
+  it("honors hidden page and sneaky index settings in aggregate views", async () => {
+    const hiddenEnv = { ...env, HIDE_PAGES: "guide|missing" } satisfies Env;
+
+    const hiddenIndex = await handleRequest(
+      new Request("https://example.com/index?ns=wiki"),
+      hiddenEnv
+    );
+    const hiddenWanted = await handleRequest(new Request("https://example.com/wanted"), hiddenEnv);
+
+    expect(await hiddenIndex.text()).not.toContain("/wiki/wiki/guide");
+    expect(await hiddenWanted.text()).not.toContain("missing:page");
+
+    state.aclRules = [aclRule("*", "all", "@ALL", 16), aclRule("wiki:*", "all", "@ALL", 0)];
+    const sneakyEnv = { ...env, SNEAKY_INDEX: "1" } satisfies Env;
+    const sneakyIndex = await handleRequest(
+      new Request("https://example.com/index?ns=wiki"),
+      sneakyEnv
+    );
+
+    const sneakyHtml = await sneakyIndex.text();
+    expect(sneakyHtml).toContain("No pages found in this namespace.");
+    expect(sneakyHtml).not.toContain("<small>wiki:welcome");
+    expect(sneakyHtml).not.toContain("<small>wiki:guide");
+  });
+
   it("renders backlinks for a page", async () => {
     const response = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=backlink"),

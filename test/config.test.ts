@@ -9,6 +9,8 @@ describe("runtime config", () => {
       startPage: "wiki:welcome",
       language: "en",
       sessionCookieName: "DW_PAGES_SESSION",
+      hidePages: null,
+      sneakyIndex: false,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -18,10 +20,17 @@ describe("runtime config", () => {
   });
 
   it("normalizes configured page ids and reports warnings", () => {
-    const env = { START_PAGE: "Wiki/Welcome", WIKI_LANG: "pt_BR" } as Env;
+    const env = {
+      START_PAGE: "Wiki/Welcome",
+      WIKI_LANG: "pt_BR",
+      HIDE_PAGES: ":hidden:",
+      SNEAKY_INDEX: "1"
+    } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
     expect(getRuntimeConfig(env).language).toBe("pt-br");
+    expect(getRuntimeConfig(env).hidePages).toBe(":hidden:");
+    expect(getRuntimeConfig(env).sneakyIndex).toBe(true);
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -41,7 +50,8 @@ describe("runtime config", () => {
     const validation = validateRuntimeConfig({
       START_PAGE: "::",
       WIKI_LANG: "zz",
-      SESSION_COOKIE_NAME: "bad cookie"
+      SESSION_COOKIE_NAME: "bad cookie",
+      HIDE_PAGES: "["
     } as Env);
 
     expect(validation.ok).toBe(false);
@@ -49,7 +59,8 @@ describe("runtime config", () => {
       expect.arrayContaining([
         expect.objectContaining({ key: "START_PAGE", severity: "error" }),
         expect.objectContaining({ key: "WIKI_LANG", severity: "error" }),
-        expect.objectContaining({ key: "SESSION_COOKIE_NAME", severity: "error" })
+        expect.objectContaining({ key: "SESSION_COOKIE_NAME", severity: "error" }),
+        expect.objectContaining({ key: "HIDE_PAGES", severity: "error" })
       ])
     );
   });

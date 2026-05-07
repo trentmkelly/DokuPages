@@ -328,8 +328,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement special `%USER%` rules.
 - [x] Implement special `%GROUP%` rules.
 - [x] Implement minimum permission checks for every action.
-- [ ] Implement hidden page behavior.
-- [ ] Implement sneaky index behavior if supported.
+- [x] Implement hidden page behavior.
+- [x] Implement sneaky index behavior if supported.
 - [ ] Implement ACL admin UI.
 - [x] Add ACL test fixtures.
 - [x] Add ACL regression tests for page, namespace, and media access.
@@ -347,7 +347,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement search query parsing.
 - [x] Implement search result ranking.
 - [x] Implement namespace-limited search.
-- [ ] Implement ACL filtering for search results.
+- [x] Implement ACL filtering for search results.
 - [ ] Implement index rebuild job.
 - [x] Implement incremental index updates on save.
 - [ ] Implement index migration from existing `data/index` if needed.
@@ -493,7 +493,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [x] Implement RSS feed.
 - [x] Implement Atom feed if supported.
-- [ ] Implement feed ACL filtering.
+- [x] Implement feed ACL filtering.
 - [x] Implement feed cache.
 - [x] Implement sitemap generation.
 - [x] Implement sitemap cache.

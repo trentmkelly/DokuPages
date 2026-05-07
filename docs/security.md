@@ -20,6 +20,8 @@ active principal before matching.
 
 Route enforcement applies the matcher to page reads, page edit/create saves, page
 revision/diff/source/revert actions, drafts, edit locks, media reads, media
-manager access, media uploads, media deletes, and media reverts. Hidden page
-behavior, sneaky index behavior, and ACL-filtered aggregate search/list results
-are tracked separately.
+manager access, media uploads, media deletes, and media reverts. Search, recent
+changes, namespace indexes, backlinks, wanted/orphan reports, sitemap, RSS, and
+Atom responses filter out pages that are hidden by `HIDE_PAGES` or unreadable by
+the active principal. `SNEAKY_INDEX=1` prevents namespace indexes from listing a
+namespace that lacks namespace-level read permission.
