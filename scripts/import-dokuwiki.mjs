@@ -20,6 +20,7 @@ export async function buildImportPlan(sourceRoot) {
   const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
+  const wordblockPatterns = await discoverWordblockPatterns(path.join(confRoot, "wordblock.conf"));
 
   return {
     sourceRoot: root,
@@ -30,14 +31,16 @@ export async function buildImportPlan(sourceRoot) {
       media: media.length,
       mediaRevisions: mediaRevisions.length,
       aclRules: aclRules.length,
-      users: users.length
+      users: users.length,
+      wordblockPatterns: wordblockPatterns.length
     },
     pages,
     pageRevisions,
     media,
     mediaRevisions,
     aclRules,
-    users
+    users,
+    wordblockPatterns
   };
 }
 
@@ -251,6 +254,20 @@ export async function discoverUsers(file) {
         groups: groups.split(",").filter(Boolean)
       };
     });
+}
+
+export async function discoverWordblockPatterns(file) {
+  const text = await readTextIfExists(file);
+  if (!text) return [];
+
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((pattern, index) => ({
+      id: `wordblock:${index + 1}`,
+      pattern
+    }));
 }
 
 async function walkFiles(root) {

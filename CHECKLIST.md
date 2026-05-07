@@ -574,7 +574,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Write importer for plugin settings.
 - [ ] Write importer for interwiki configuration.
 - [ ] Write importer for MIME configuration.
-- [ ] Write importer for wordblock configuration.
+- [x] Write importer for wordblock configuration.
 - [ ] Write importer for custom language files if present.
 - [ ] Write importer for custom template files if present.
 - [ ] Write importer for custom media metadata if present.

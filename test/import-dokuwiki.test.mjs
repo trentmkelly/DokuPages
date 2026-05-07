@@ -19,6 +19,7 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
+    await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
 
     const plan = await buildImportPlan(root);
 
@@ -26,12 +27,17 @@ describe("DokuWiki import planner", () => {
       pages: 1,
       media: 1,
       aclRules: 2,
-      users: 1
+      users: 1,
+      wordblockPatterns: 2
     });
     expect(plan.pages[0]).toMatchObject({ id: "wiki:welcome" });
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
+    expect(plan.wordblockPatterns).toEqual([
+      { id: "wordblock:1", pattern: "zoosex" },
+      { id: "wordblock:2", pattern: "wow gold" }
+    ]);
   });
 
   it("generates idempotent SQL for D1 page imports", async () => {
