@@ -21,10 +21,15 @@ export async function buildImportPlan(sourceRoot) {
     path.join(dataRoot, "meta", "_dokuwiki.changes"),
     "page"
   );
+  const pageMetadata = await discoverSerializedMetadata(path.join(dataRoot, "meta"), "page");
   const media = await discoverMedia(path.join(dataRoot, "media"));
   const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
   const mediaChangelogEntries = await discoverChangelogEntries(
     path.join(dataRoot, "meta", "_media.changes"),
+    "media"
+  );
+  const mediaMetadata = await discoverSerializedMetadata(
+    path.join(dataRoot, "media_meta"),
     "media"
   );
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
@@ -51,9 +56,11 @@ export async function buildImportPlan(sourceRoot) {
       pages: pages.length,
       pageRevisions: pageRevisions.length,
       pageChangelogEntries: pageChangelogEntries.length,
+      pageMetadata: pageMetadata.length,
       media: media.length,
       mediaRevisions: mediaRevisions.length,
       mediaChangelogEntries: mediaChangelogEntries.length,
+      mediaMetadata: mediaMetadata.length,
       aclRules: aclRules.length,
       users: users.length,
       pluginSettings: pluginSettings.length,
@@ -64,9 +71,11 @@ export async function buildImportPlan(sourceRoot) {
     pages,
     pageRevisions,
     pageChangelogEntries,
+    pageMetadata,
     media,
     mediaRevisions,
     mediaChangelogEntries,
+    mediaMetadata,
     aclRules,
     users,
     pluginSettings,
@@ -301,6 +310,29 @@ function dokuChangeType(type) {
   }
 }
 
+export async function discoverSerializedMetadata(root, subjectType) {
+  const files = await walkFiles(root);
+  const entries = [];
+
+  for (const file of files) {
+    if (!file.endsWith(".meta")) continue;
+
+    const relative = path.relative(root, file).slice(0, -".meta".length);
+    const stat = await fs.stat(file);
+    const content = await fs.readFile(file);
+
+    entries.push({
+      subjectType,
+      subjectId: pathWithoutExtensionToId(relative),
+      sourcePath: file,
+      value: parsePhpSerialized(content),
+      modifiedAt: stat.mtime.toISOString()
+    });
+  }
+
+  return entries.sort((a, b) => a.subjectId.localeCompare(b.subjectId));
+}
+
 export async function discoverAclRules(file) {
   const text = await readTextIfExists(file);
   if (!text) return [];
@@ -418,6 +450,129 @@ export async function discoverMimeTypes(files) {
 
 function decodeConfigEntities(value) {
   return value.replaceAll("&amp;", "&");
+}
+
+function parsePhpSerialized(content) {
+  const parser = new PhpSerializedParser(Buffer.isBuffer(content) ? content : Buffer.from(content));
+  return parser.parse();
+}
+
+class PhpSerializedParser {
+  constructor(buffer) {
+    this.buffer = buffer;
+    this.offset = 0;
+  }
+
+  parse() {
+    const value = this.parseValue();
+    this.skipWhitespace();
+
+    if (this.offset !== this.buffer.length) {
+      throw new Error(`Unexpected trailing PHP serialized data at byte ${this.offset}`);
+    }
+
+    return value;
+  }
+
+  parseValue() {
+    const type = this.readAscii(1);
+
+    if (type === "N") {
+      this.expect(";");
+      return null;
+    }
+
+    this.expect(":");
+
+    if (type === "b") {
+      const value = this.readUntil(";");
+      return value === "1";
+    }
+
+    if (type === "i") {
+      return Number.parseInt(this.readUntil(";"), 10);
+    }
+
+    if (type === "d") {
+      return Number.parseFloat(this.readUntil(";"));
+    }
+
+    if (type === "s") {
+      const length = Number.parseInt(this.readUntil(":"), 10);
+      this.expect('"');
+      const value = this.buffer.subarray(this.offset, this.offset + length).toString("utf8");
+      this.offset += length;
+      this.expect('"');
+      this.expect(";");
+      return value;
+    }
+
+    if (type === "a") {
+      const count = Number.parseInt(this.readUntil(":"), 10);
+      this.expect("{");
+      const entries = [];
+
+      for (let index = 0; index < count; index += 1) {
+        entries.push([this.parseValue(), this.parseValue()]);
+      }
+
+      this.expect("}");
+      return phpArrayToJs(entries);
+    }
+
+    throw new Error(`Unsupported PHP serialized type '${type}' at byte ${this.offset - 2}`);
+  }
+
+  readUntil(delimiter) {
+    const start = this.offset;
+    const delimiterCode = delimiter.charCodeAt(0);
+
+    while (this.offset < this.buffer.length && this.buffer[this.offset] !== delimiterCode) {
+      this.offset += 1;
+    }
+
+    if (this.offset >= this.buffer.length) {
+      throw new Error(`Missing '${delimiter}' in PHP serialized data`);
+    }
+
+    const value = this.buffer.subarray(start, this.offset).toString("ascii");
+    this.offset += 1;
+    return value;
+  }
+
+  readAscii(length) {
+    const value = this.buffer.subarray(this.offset, this.offset + length).toString("ascii");
+    this.offset += length;
+    return value;
+  }
+
+  expect(value) {
+    const actual = this.readAscii(value.length);
+    if (actual !== value) {
+      throw new Error(
+        `Expected '${value}' at byte ${this.offset - value.length}, received '${actual}'`
+      );
+    }
+  }
+
+  skipWhitespace() {
+    while (
+      this.offset < this.buffer.length &&
+      /\s/.test(String.fromCharCode(this.buffer[this.offset]))
+    ) {
+      this.offset += 1;
+    }
+  }
+}
+
+function phpArrayToJs(entries) {
+  const isList = entries.every(([key], index) => key === index);
+
+  if (isList) {
+    return entries.map(([, value]) => value);
+  }
+
+  return Object.fromEntries(entries.map(([key, value]) => [String(key), value]));
 }
 
 export async function discoverWordblockPatterns(file) {

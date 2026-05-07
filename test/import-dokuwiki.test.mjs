@@ -15,7 +15,8 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
-    await mkdir(path.join(root, "data/meta"), { recursive: true });
+    await mkdir(path.join(root, "data/meta/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/media_meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
 
     await writeFile(path.join(root, "data/pages/wiki/welcome.txt"), "====== Welcome ======\n");
@@ -31,6 +32,14 @@ describe("DokuWiki import planner", () => {
     await writeFile(
       path.join(root, "data/meta/_media.changes"),
       "1767225601\t203.0.113.8\tE\twiki:logo.svg\tbob\tUpdated logo\t\t3\n"
+    );
+    await writeFile(
+      path.join(root, "data/meta/wiki/welcome.meta"),
+      'a:2:{s:7:"current";a:2:{s:5:"title";s:7:"Welcome";s:8:"relation";a:1:{s:10:"references";a:1:{s:10:"wiki:guide";b:1;}}}s:10:"persistent";a:1:{s:4:"date";a:1:{s:7:"created";i:1767225600;}}}'
+    );
+    await writeFile(
+      path.join(root, "data/media_meta/wiki/logo.svg.meta"),
+      'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
     );
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 1\nwiki:* @user 8\n");
     await writeFile(
@@ -61,8 +70,10 @@ describe("DokuWiki import planner", () => {
       pages: 1,
       pageRevisions: 1,
       pageChangelogEntries: 1,
+      pageMetadata: 1,
       media: 1,
       mediaChangelogEntries: 1,
+      mediaMetadata: 1,
       aclRules: 2,
       users: 1,
       pluginSettings: 3,
@@ -86,6 +97,17 @@ describe("DokuWiki import planner", () => {
       sizeChange: 24,
       createdAt: "2026-01-01T00:00:00.000Z"
     });
+    expect(plan.pageMetadata[0]).toMatchObject({
+      subjectType: "page",
+      subjectId: "wiki:welcome",
+      value: {
+        current: {
+          title: "Welcome",
+          relation: { references: { "wiki:guide": true } }
+        },
+        persistent: { date: { created: 1767225600 } }
+      }
+    });
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
     expect(plan.mediaChangelogEntries[0]).toMatchObject({
       subjectType: "media",
@@ -94,6 +116,11 @@ describe("DokuWiki import planner", () => {
       changeType: "edit",
       sizeChange: 3,
       createdAt: "2026-01-01T00:00:01.000Z"
+    });
+    expect(plan.mediaMetadata[0]).toMatchObject({
+      subjectType: "media",
+      subjectId: "wiki:logo.svg",
+      value: { Exif: { Title: "Logo" } }
     });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
