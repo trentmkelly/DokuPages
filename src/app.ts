@@ -2,6 +2,9 @@ import type { Env } from "./env";
 import {
   collectDiagnostics,
   type DiagnosticsSnapshot,
+  type ImportJobStatus,
+  type MigrationStatus,
+  type SchemaVersionStatus,
   type StorageCheck
 } from "./http/diagnostics";
 import { getClientIp } from "./http/client-ip";
@@ -891,7 +894,9 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
         <tr><th>Binding</th><th>Status</th><th>Latency</th><th>Message</th></tr>
       </thead>
       <tbody>${renderStorageHealthRows(diagnostics)}</tbody>
-    </table>`
+    </table>
+    <h2>Migration status</h2>
+    ${renderMigrationStatus(diagnostics.migration)}`
   );
 }
 
@@ -926,6 +931,64 @@ function renderStorageHealthRows(diagnostics: DiagnosticsSnapshot): string {
 
 function renderStorageStatus(check: StorageCheck): string {
   return `<span class="diagnostics__status diagnostics__status--${escapeAttribute(check.status)}">${escapeHtml(check.status)}</span>`;
+}
+
+function renderMigrationStatus(migration: MigrationStatus): string {
+  return `<p class="${migration.status === "error" ? "error" : "success"}">
+      ${escapeHtml(migration.message)}
+    </p>
+    <p>Latest schema version: ${migration.latestSchemaVersion ?? "none"}</p>
+    <h3>Schema versions</h3>
+    ${renderSchemaVersionTable(migration.schemaVersions)}
+    <h3>Recent import jobs</h3>
+    ${renderImportJobTable(migration.recentImportJobs)}`;
+}
+
+function renderSchemaVersionTable(versions: SchemaVersionStatus[]): string {
+  if (versions.length === 0) {
+    return "<p>No schema versions recorded.</p>";
+  }
+
+  const rows = versions
+    .map(
+      (version) => `<tr>
+        <td>${version.version}</td>
+        <td>${escapeHtml(version.appliedAt)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<table class="diagnostics">
+    <thead><tr><th>Version</th><th>Applied</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderImportJobTable(jobs: ImportJobStatus[]): string {
+  if (jobs.length === 0) {
+    return "<p>No import jobs recorded.</p>";
+  }
+
+  const rows = jobs
+    .map(
+      (job) => `<tr>
+        <td><code>${escapeHtml(job.id)}</code></td>
+        <td>${escapeHtml(job.status)}</td>
+        <td>${escapeHtml(job.sourcePath)}</td>
+        <td>${escapeHtml(JSON.stringify(job.counts) ?? "null")}</td>
+        <td>${job.errorCount ?? "unknown"}</td>
+        <td>${escapeHtml(job.startedAt)}</td>
+        <td>${job.finishedAt ? escapeHtml(job.finishedAt) : "-"}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<table class="diagnostics">
+    <thead>
+      <tr><th>ID</th><th>Status</th><th>Source</th><th>Counts</th><th>Errors</th><th>Started</th><th>Finished</th></tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 async function renderSearchPage(env: Env, url: URL): Promise<string> {

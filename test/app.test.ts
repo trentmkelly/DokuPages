@@ -109,10 +109,13 @@ describe("handleRequest", () => {
         d1: { status: "ok" },
         kv: { status: "ok" },
         r2: { status: "ok" }
+      },
+      migration: {
+        latestSchemaVersion: 1
       }
     });
     expect(html.status).toBe(200);
-    await expect(html.text()).resolves.toContain("<h1>Diagnostics</h1>");
+    await expect(html.text()).resolves.toContain("<h2>Migration status</h2>");
   });
 
   it("handles wiki routes through the Pages Function router", async () => {
@@ -976,6 +979,28 @@ function createD1Stub(state: D1StubState): D1Database {
               results: state.searchPostings
                 .filter((posting) => posting.page_id === idOrLimit)
                 .map((posting) => ({ term: posting.term }))
+            };
+          }
+
+          if (sql.includes("from schema_versions")) {
+            return {
+              results: [{ version: 1, applied_at: "2026-05-07T00:00:00.000Z" }]
+            };
+          }
+
+          if (sql.includes("from import_jobs")) {
+            return {
+              results: [
+                {
+                  id: "fixture-import",
+                  source_path: "../dokuwiki",
+                  status: "finished",
+                  counts_json: '{"pages":3}',
+                  errors_json: "[]",
+                  started_at: "2026-05-07T00:00:00.000Z",
+                  finished_at: "2026-05-07T00:01:00.000Z"
+                }
+              ]
             };
           }
 
