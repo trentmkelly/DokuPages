@@ -42,13 +42,17 @@ describe("renderWikiText", () => {
 
   it("renders internal links, external links, and media embeds", () => {
     const rendered = renderWikiText(
-      "[[wiki:syntax|Syntax]] [[https://example.test|Example]] {{wiki:dokuwiki.svg|Logo}}"
+      "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}"
     );
 
     expect(rendered.html).toContain('<a href="/wiki/wiki/syntax">Syntax</a>');
     expect(rendered.html).toContain(
       '<a href="https://example.test" rel="nofollow noopener noreferrer">Example</a>'
     );
+    expect(rendered.html).toContain(
+      '<a href="http://www.google.com" rel="nofollow noopener noreferrer">Google</a>'
+    );
+    expect(rendered.html).not.toContain("http:<em>");
     expect(rendered.html).toContain('<img src="/media/wiki/dokuwiki.svg" alt="Logo">');
   });
 
@@ -86,6 +90,23 @@ describe("renderWikiText", () => {
     const rendered = renderWikiText(String.raw`[[\\server\share|this]]`);
 
     expect(rendered.html).toContain('<a href="file://///server/share" class="windows">this</a>');
+  });
+
+  it("renders email links with default hex mailguard obfuscation", () => {
+    const autoEmail =
+      "&#97;&#110;&#100;&#105;&#64;&#115;&#112;&#108;&#105;&#116;&#98;&#114;&#97;&#105;&#110;&#46;&#111;&#114;&#103;";
+    const linkedEmail =
+      "&#116;&#101;&#97;&#109;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#111;&#114;&#103;";
+    const rendered = renderWikiText("<andi@splitbrain.org> [[team@example.org|Team]]");
+
+    expect(rendered.html).toContain(
+      `<a href="mailto:${autoEmail}" class="mail" title="${autoEmail}">${autoEmail}</a>`
+    );
+    expect(rendered.html).toContain(
+      `<a href="mailto:${linkedEmail}" class="mail" title="${linkedEmail}">Team</a>`
+    );
+    expect(rendered.html).not.toContain("andi@splitbrain.org");
+    expect(rendered.html).not.toContain("team@example.org");
   });
 
   it("renders lists, code blocks, and nowiki spans", () => {

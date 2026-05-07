@@ -258,6 +258,12 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
 function renderInline(source: string, context: RenderContext): string {
   const nowiki: string[] = [];
   const footnotes: string[] = [];
+  const protectedHtml: string[] = [];
+  const protectHtml = (html: string): string => {
+    const token = `\uE004${protectedHtml.length}\uE005`;
+    protectedHtml.push(html);
+    return token;
+  };
   let rendered = source.replace(/%%([\s\S]*?)%%/g, (_match, literal: string) => {
     const token = `\uE000${nowiki.length}\uE001`;
     nowiki.push(escapeHtml(literal));
@@ -272,8 +278,9 @@ function renderInline(source: string, context: RenderContext): string {
 
   rendered = escapeHtml(rendered);
   rendered = renderTypography(rendered);
-  rendered = renderMedia(rendered);
-  rendered = renderLinks(rendered, context);
+  rendered = renderMedia(rendered, protectHtml);
+  rendered = renderLinks(rendered, context, protectHtml);
+  rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\/\/([^/]+)\/\//g, "<em>$1</em>")
@@ -291,6 +298,10 @@ function renderInline(source: string, context: RenderContext): string {
       `\uE002${index}\uE003`,
       `<sup><a href="#fn__${number}" id="fnt__${number}">${number})</a></sup>`
     );
+  }
+
+  for (const [index, html] of protectedHtml.entries()) {
+    rendered = rendered.replace(`\uE004${index}\uE005`, html);
   }
 
   for (const [index, literal] of nowiki.entries()) {
@@ -315,21 +326,31 @@ function renderTypography(source: string): string {
     .replace(/--/g, "&ndash;");
 }
 
-function renderMedia(source: string): string {
+function renderMedia(source: string, protectHtml: (html: string) => string): string {
   return source.replace(
     /\{\{([^}|?]+)(?:\?[^}|]+)?(?:\|([^}]*))?\}\}/g,
     (_match, rawId, rawAlt) => {
       const id = cleanPageId(rawId);
       const alt = rawAlt ? rawAlt.trim() : id;
-      return `<img src="${mediaPath(id)}" alt="${escapeAttribute(alt)}">`;
+      return protectHtml(`<img src="${mediaPath(id)}" alt="${escapeAttribute(alt)}">`);
     }
   );
 }
 
-function renderLinks(source: string, context: RenderContext): string {
+function renderLinks(
+  source: string,
+  context: RenderContext,
+  protectHtml: (html: string) => string
+): string {
   return source.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, rawTarget, rawLabel) => {
     const target = decodeHtmlEntities(rawTarget.trim());
-    const label = decodeHtmlEntities(rawLabel?.trim() || target);
+    const explicitLabel = rawLabel?.trim();
+    const label = decodeHtmlEntities(explicitLabel || target);
+
+    if (isEmailAddress(target)) {
+      return protectHtml(renderEmailLink(target, explicitLabel ? label : undefined));
+    }
+
     const external = /^https?:\/\//i.test(target);
     const interwiki = external ? null : resolveInterwikiLink(target);
     const windowsShare = external || interwiki ? null : windowsSharePath(target);
@@ -343,8 +364,34 @@ function renderLinks(source: string, context: RenderContext): string {
     const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
     const linkClass = windowsShare ? ' class="windows"' : "";
 
-    return `<a href="${escapeAttribute(href)}"${rel}${linkClass}>${escapeHtml(label)}</a>`;
+    return protectHtml(
+      `<a href="${escapeAttribute(href)}"${rel}${linkClass}>${escapeHtml(label)}</a>`
+    );
   });
+}
+
+function renderEmailAutolinks(source: string, protectHtml: (html: string) => string): string {
+  return source.replace(
+    /&lt;([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})&gt;/gi,
+    (_match, email: string) => protectHtml(renderEmailLink(email))
+  );
+}
+
+function renderEmailLink(email: string, label?: string): string {
+  const obfuscated = obfuscateEmail(email);
+  const name = label ? escapeHtml(label) : obfuscated;
+
+  return `<a href="mailto:${obfuscated}" class="mail" title="${obfuscated}">${name}</a>`;
+}
+
+function obfuscateEmail(email: string): string {
+  return Array.from(email)
+    .map((char) => `&#${char.codePointAt(0) ?? 0};`)
+    .join("");
+}
+
+function isEmailAddress(value: string): boolean {
+  return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value);
 }
 
 function windowsSharePath(target: string): string | null {
