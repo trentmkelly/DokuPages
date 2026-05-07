@@ -11,6 +11,7 @@ const migrationSql = readFileSync(
   fileURLToPath(new URL("../migrations/0001_initial.sql", import.meta.url)),
   "utf8"
 );
+const TEST_CSRF_TOKEN = "test-csrf-token";
 
 describe("auth routes", () => {
   let db;
@@ -28,7 +29,10 @@ describe("auth routes", () => {
     const response = await handleRequest(new Request("https://example.com/login"), env);
 
     expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toContain('id="dw__login"');
+    expect(response.headers.get("set-cookie") ?? "").toContain("DW_CSRF_TOKEN=");
+    const html = await response.text();
+    expect(html).toContain('id="dw__login"');
+    expect(html).toContain('name="sectok"');
   });
 
   it("logs in native users, resolves the session principal, and logs out", async () => {
@@ -42,7 +46,8 @@ describe("auth routes", () => {
     const loginResponse = await handleRequest(
       new Request("https://example.com/api/auth/login", {
         method: "POST",
-        body: login
+        body: login,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -79,7 +84,7 @@ describe("auth routes", () => {
       new Request("https://example.com/api/auth/logout", {
         method: "POST",
         body: logout,
-        headers: { cookie }
+        headers: csrfHeaders({ cookie })
       }),
       env
     );
@@ -112,14 +117,35 @@ describe("auth routes", () => {
     const response = await handleRequest(
       new Request("https://example.com/api/auth/login", {
         method: "POST",
-        body: login
+        body: login,
+        headers: csrfHeaders()
       }),
       env
     );
 
     expect(response.status).toBe(401);
-    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
     await expect(response.text()).resolves.toContain("Invalid username or password.");
+  });
+
+  it("rejects login posts without CSRF tokens", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const login = new FormData();
+    login.set("username", "alice");
+    login.set("password", "correct horse battery staple");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: login,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
   });
 
   function createEnv() {
@@ -137,6 +163,16 @@ describe("auth routes", () => {
     };
   }
 });
+
+function csrfHeaders(headers = {}) {
+  return {
+    ...headers,
+    cookie: headers.cookie
+      ? `${headers.cookie}; DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`
+      : `DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`,
+    "x-csrf-token": TEST_CSRF_TOKEN
+  };
+}
 
 async function seedUser(d1) {
   const now = "2026-05-07T00:00:00.000Z";

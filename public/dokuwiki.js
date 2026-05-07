@@ -176,6 +176,7 @@
     var id = form.querySelector('input[name="id"]');
     var baseRevisionId = form.querySelector('input[name="baseRevisionId"]');
     var lockToken = form.querySelector('input[name="lockToken"]');
+    var sectok = form.querySelector('input[name="sectok"]');
     var formData = new FormData();
 
     formData.set("id", id ? id.value : "");
@@ -184,6 +185,10 @@
 
     if (lockToken) {
       formData.set("lockToken", lockToken.value);
+    }
+
+    if (sectok) {
+      formData.set("sectok", sectok.value);
     }
 
     setStatus(status, "Saving draft...");
@@ -232,10 +237,12 @@
   function pageLockFormData(form) {
     var id = form.querySelector('input[name="id"]');
     var lockToken = form.querySelector('input[name="lockToken"]');
+    var sectok = form.querySelector('input[name="sectok"]');
     var formData = new FormData();
 
     formData.set("id", id ? id.value : "");
     formData.set("lockToken", lockToken ? lockToken.value : "");
+    formData.set("sectok", sectok ? sectok.value : "");
 
     return formData;
   }

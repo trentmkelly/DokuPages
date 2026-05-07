@@ -306,7 +306,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement profile update if supported.
 - [ ] Implement remember-me behavior or a secure replacement.
 - [x] Implement session cookie behavior.
-- [ ] Implement CSRF tokens.
+- [x] Implement CSRF tokens.
 - [ ] Implement bearer token auth if remote APIs are supported.
 - [ ] Implement admin and manager role checks.
 - [ ] Implement default group assignment.
@@ -537,7 +537,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Anti-Abuse And Security
 
-- [ ] Implement CSRF protection for all state-changing actions.
+- [x] Implement CSRF protection for all state-changing actions.
 - [x] Implement upload validation.
 - [x] Implement MIME validation.
 - [ ] Implement XSS protections for rendered wiki syntax.
@@ -668,7 +668,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add performance tests.
 - [ ] Add load tests within Workers limits.
 - [ ] Add security tests for XSS.
-- [ ] Add security tests for CSRF.
+- [x] Add security tests for CSRF.
 - [ ] Add security tests for ACL bypass.
 - [ ] Add security tests for upload bypass.
 - [ ] Add dependency scanning.

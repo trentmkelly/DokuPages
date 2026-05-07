@@ -83,6 +83,9 @@ const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 16;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
 const PAGE_LOCK_TOKEN_BYTES = 24;
+const CSRF_COOKIE_NAME = "DW_CSRF_TOKEN";
+const CSRF_TOKEN_BYTES = 32;
+const CSRF_TTL_SECONDS = 60 * 60 * 24;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 
@@ -134,11 +137,13 @@ export async function handleRequest(
   }
 
   if (url.pathname.startsWith("/media-detail/")) {
-    return htmlResponse(await renderMediaDetailPage(env, url));
+    const csrf = csrfContext(request);
+    return htmlResponseWithCsrf(request, await renderMediaDetailPage(env, url, csrf.token), csrf);
   }
 
   if (url.pathname === "/media-manager") {
-    return htmlResponse(await renderMediaManagerPage(env, url));
+    const csrf = csrfContext(request);
+    return htmlResponseWithCsrf(request, await renderMediaManagerPage(env, url, csrf.token), csrf);
   }
 
   if (url.pathname === "/api/health") {
@@ -154,11 +159,17 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/login" && request.method === "GET") {
-    return htmlResponse(renderLoginPage(env, url));
+    const csrf = csrfContext(request);
+    return htmlResponseWithCsrf(
+      request,
+      renderLoginPage(env, url, undefined, undefined, csrf.token),
+      csrf
+    );
   }
 
   if (url.pathname === "/logout" && request.method === "GET") {
-    return htmlResponse(renderLogoutPage(env, url));
+    const csrf = csrfContext(request);
+    return htmlResponseWithCsrf(request, renderLogoutPage(env, url, undefined, csrf.token), csrf);
   }
 
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
@@ -334,7 +345,8 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "revert") {
-      return htmlResponse(await renderRevertPage(env, id, url));
+      const csrf = csrfContext(request);
+      return htmlResponseWithCsrf(request, await renderRevertPage(env, id, url, csrf.token), csrf);
     }
 
     if (url.searchParams.get("do") === "purge") {
@@ -529,7 +541,7 @@ async function handleMediaFetch(env: Env, url: URL): Promise<Response> {
   return new Response(object.body, { headers });
 }
 
-async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
+async function renderMediaDetailPage(env: Env, url: URL, csrfToken: string): Promise<string> {
   const id = mediaIdFromPath(url, "/media-detail/");
   const media = id ? await getCurrentMedia(env.DB, id) : null;
 
@@ -559,6 +571,7 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
         </dl>
       </div>
       <form class="media__revert" method="post" action="/api/media/revert">
+        ${csrfInput(csrfToken)}
         <input type="hidden" name="id" value="${escapeAttribute(id)}">
         <label for="media__revert_revision">Revision ID</label>
         <input id="media__revert_revision" name="revisionId" type="text" required>
@@ -567,6 +580,7 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
         <button type="submit">Revert media</button>
       </form>
       <form class="media__delete" method="post" action="/api/media/delete">
+        ${csrfInput(csrfToken)}
         <input type="hidden" name="id" value="${escapeAttribute(id)}">
         <label for="media__delete_summary">Delete summary</label>
         <input id="media__delete_summary" name="summary" type="text">
@@ -576,7 +590,7 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
   );
 }
 
-async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
+async function renderMediaManagerPage(env: Env, url: URL, csrfToken: string): Promise<string> {
   const namespace = cleanMediaId(url.searchParams.get("ns") ?? "");
   const query = (url.searchParams.get("q") ?? "").trim();
   const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
@@ -606,6 +620,7 @@ async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
       <button type="submit">Search</button>
     </form>
     <form class="upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
+      ${csrfInput(csrfToken)}
       <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
       <fieldset>
         <legend>Upload</legend>
@@ -984,7 +999,12 @@ async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
   );
 }
 
-async function renderRevertPage(env: Env, id: string, url: URL): Promise<string> {
+async function renderRevertPage(
+  env: Env,
+  id: string,
+  url: URL,
+  csrfToken: string
+): Promise<string> {
   const revisionId = url.searchParams.get("rev");
 
   if (!revisionId) {
@@ -1006,6 +1026,7 @@ async function renderRevertPage(env: Env, id: string, url: URL): Promise<string>
     `<h1>Revert ${escapeHtml(id)}</h1>
     <p>Restore revision ${escapeHtml(revision.createdAt)}.</p>
     <form method="post" action="/api/pages/revert">
+      ${csrfInput(csrfToken)}
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <input type="hidden" name="revisionId" value="${escapeHtml(revision.id)}">
       <input type="hidden" name="baseRevisionId" value="${escapeHtml(current.revisionId)}">
@@ -1411,22 +1432,32 @@ function renderWebManifest(env: Env): Record<string, unknown> {
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const username = String(form.get("username") ?? form.get("u") ?? "").trim();
   const password = String(form.get("password") ?? form.get("p") ?? "");
   const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
   const url = new URL(request.url);
+  const csrf = csrfContext(request);
 
   if (!username || !password) {
-    return htmlResponse(renderLoginPage(env, url, "Missing username or password.", returnTo), {
-      status: 400
-    });
+    return htmlResponseWithCsrf(
+      request,
+      renderLoginPage(env, url, "Missing username or password.", returnTo, csrf.token),
+      csrf,
+      { status: 400 }
+    );
   }
 
   const user = await authenticateUser(env.DB, username, password);
   if (!user) {
-    return htmlResponse(renderLoginPage(env, url, "Invalid username or password.", returnTo), {
-      status: 401
-    });
+    return htmlResponseWithCsrf(
+      request,
+      renderLoginPage(env, url, "Invalid username or password.", returnTo, csrf.token),
+      csrf,
+      { status: 401 }
+    );
   }
 
   const session = await createLoginSession(env.DB, user.id);
@@ -1441,6 +1472,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
   const cookieName = getRuntimeConfig(env).sessionCookieName;
 
@@ -1459,7 +1493,8 @@ function renderLoginPage(
   env: Env,
   url: URL,
   error: string | null = null,
-  returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env)
+  returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env),
+  csrfToken = ""
 ): string {
   const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
 
@@ -1469,6 +1504,7 @@ function renderLoginPage(
     `<h1>Login</h1>
     ${message}
     <form id="dw__login" method="post" action="/api/auth/login">
+      ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <fieldset>
         <legend>Login</legend>
@@ -1485,13 +1521,15 @@ function renderLoginPage(
 function renderLogoutPage(
   env: Env,
   url: URL,
-  returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env)
+  returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env),
+  csrfToken = ""
 ): string {
   return htmlShell(
     env,
     "Logout",
     `<h1>Logout</h1>
     <form method="post" action="/api/auth/logout">
+      ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <button type="submit">Logout</button>
     </form>`
@@ -1690,6 +1728,72 @@ function manifestResponse(body: Record<string, unknown>): Response {
   });
 }
 
+interface CsrfContext {
+  token: string;
+}
+
+function csrfContext(request: Request): CsrfContext {
+  return {
+    token: readCookie(request, CSRF_COOKIE_NAME) || randomCsrfToken()
+  };
+}
+
+function htmlResponseWithCsrf(
+  request: Request,
+  body: string,
+  csrf: CsrfContext,
+  init: ResponseInit = {}
+): Response {
+  const response = htmlResponse(body, init);
+  response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
+  return response;
+}
+
+function csrfInput(token: string): string {
+  return `<input type="hidden" name="sectok" value="${escapeAttribute(token)}">`;
+}
+
+function validateCsrf(request: Request, form: FormData): Response | null {
+  const cookie = readCookie(request, CSRF_COOKIE_NAME);
+  const token = String(
+    request.headers.get("x-csrf-token") ?? form.get("sectok") ?? form.get("csrfToken") ?? ""
+  );
+
+  if (cookie && token && constantTimeEqual(cookie, token)) {
+    return null;
+  }
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: "Invalid CSRF token." }, { status: 403 });
+  }
+
+  return htmlResponse("<h1>Invalid CSRF token</h1><p>Invalid CSRF token.</p>", {
+    status: 403
+  });
+}
+
+function csrfCookieHeader(token: string, request: Request): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${CSRF_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${CSRF_TTL_SECONDS}${secure}`;
+}
+
+function randomCsrfToken(): string {
+  const bytes = new Uint8Array(CSRF_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  let diff = left.length ^ right.length;
+  const maxLength = Math.max(left.length, right.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    diff |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+
+  return diff === 0;
+}
+
 async function handleEditPage(
   request: Request,
   env: Env,
@@ -1702,19 +1806,26 @@ async function handleEditPage(
   const cookieName = pageLockCookieName(id);
   const lockToken = readCookie(request, cookieName) || randomPageLockToken();
   const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+  const csrf = csrfContext(request);
 
   if (!lock.ok) {
     return lockedResponse(request, env, id, lock.lock);
   }
 
-  const response = htmlResponse(renderEditPage(id, page, draft, env, templateContent, lockToken));
+  const response = htmlResponse(
+    renderEditPage(id, page, draft, env, templateContent, lockToken, csrf.token)
+  );
   response.headers.append("set-cookie", pageLockCookieHeader(cookieName, lockToken, request));
+  response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
 
   return response;
 }
 
 async function handleSave(request: Request, env: Env, principal: AuthPrincipal): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanPageId(String(form.get("id") ?? ""));
   const content = String(form.get("content") ?? "");
   const summary = String(form.get("summary") ?? "");
@@ -1776,6 +1887,9 @@ async function handleMediaUpload(
   }
 
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const file = form.get("file");
 
   if (!isUploadFile(file)) {
@@ -1850,6 +1964,9 @@ async function handleMediaDelete(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanMediaId(String(form.get("id") ?? ""));
 
   if (!id) {
@@ -1888,6 +2005,9 @@ async function handleMediaRevert(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanMediaId(String(form.get("id") ?? ""));
   const revisionId = String(form.get("revisionId") ?? "");
 
@@ -1934,6 +2054,9 @@ async function handleRevert(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanPageId(String(form.get("id") ?? ""));
   const revisionId = String(form.get("revisionId") ?? "");
   const submittedLockToken = String(form.get("lockToken") ?? "");
@@ -1994,6 +2117,9 @@ async function handleRefreshPageLock(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanPageId(String(form.get("id") ?? ""));
   const lockToken = String(form.get("lockToken") ?? "");
 
@@ -2021,6 +2147,9 @@ async function handleReleasePageLock(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanPageId(String(form.get("id") ?? ""));
   const lockToken = String(form.get("lockToken") ?? "");
 
@@ -2104,14 +2233,21 @@ function wordblockResponse(
     );
   }
 
-  return htmlResponse(renderWordblockPage(env, id, content, blocked), { status: 400 });
+  const csrf = csrfContext(request);
+  return htmlResponseWithCsrf(
+    request,
+    renderWordblockPage(env, id, content, blocked, csrf.token),
+    csrf,
+    { status: 400 }
+  );
 }
 
 function renderWordblockPage(
   env: Env,
   id: string,
   content: string,
-  blocked: WordblockMatch
+  blocked: WordblockMatch,
+  csrfToken: string
 ): string {
   return htmlShell(
     env,
@@ -2120,6 +2256,7 @@ function renderWordblockPage(
     <p>${escapeHtml(WORD_BLOCK_MESSAGE)}</p>
     <p><strong>Blocked text:</strong> <code>${escapeHtml(blocked.match)}</code></p>
     <form method="post" action="/api/pages">
+      ${csrfInput(csrfToken)}
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <textarea class="edit" name="content" rows="20" cols="100">${escapeHtml(content)}</textarea>
       <div class="editBar">
@@ -2137,6 +2274,9 @@ async function handleSaveDraft(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanPageId(String(form.get("id") ?? ""));
   const lockToken = String(form.get("lockToken") ?? "");
   const author = principalAuthor(principal);
@@ -2202,6 +2342,9 @@ async function handleDeleteDraft(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
   const id = cleanPageId(String(form.get("id") ?? ""));
   const lockToken = String(form.get("lockToken") ?? "");
 
@@ -2300,7 +2443,8 @@ function renderEditPage(
   draft: PageDraft | null,
   env: Env,
   templateContent: string | null = null,
-  lockToken = ""
+  lockToken = "",
+  csrfToken = ""
 ): string {
   const title = page?.title ?? id;
   const content = draft?.content ?? page?.content ?? templateContent ?? "";
@@ -2316,6 +2460,7 @@ function renderEditPage(
     ${draftNotice}
     <div class="editBox">
     <form id="dw__editform" class="edit" method="post" action="/api/pages" data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release">
+      ${csrfInput(csrfToken)}
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <input type="hidden" name="baseRevisionId" value="${escapeHtml(baseRevisionId)}">
       <input type="hidden" name="lockToken" value="${escapeHtml(lockToken)}">

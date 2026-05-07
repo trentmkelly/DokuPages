@@ -34,6 +34,7 @@ const purgedKeys: string[] = [];
 const cachePuts: string[] = [];
 const renderCache = new Map<string, string>();
 const pageLocks = createPageLockNamespaceStub();
+const TEST_CSRF_TOKEN = "test-csrf-token";
 
 const env = {
   DB: createD1Stub(state),
@@ -302,7 +303,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/media/upload", {
         method: "POST",
         body: form,
-        headers: { "cf-connecting-ip": "203.0.113.20" }
+        headers: csrfHeaders({ "cf-connecting-ip": "203.0.113.20" })
       }),
       env
     );
@@ -354,7 +355,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/media/upload", {
         method: "POST",
         body: form,
-        headers: { accept: "application/json" }
+        headers: csrfHeaders({ accept: "application/json" })
       }),
       env
     );
@@ -368,7 +369,8 @@ describe("handleRequest", () => {
     const overwrite = await handleRequest(
       new Request("https://example.com/api/media/upload", {
         method: "POST",
-        body: form
+        body: form,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -393,7 +395,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/media/upload", {
         method: "POST",
         body: form,
-        headers: { accept: "application/json" }
+        headers: csrfHeaders({ accept: "application/json" })
       }),
       env
     );
@@ -415,7 +417,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/media/delete", {
         method: "POST",
         body: form,
-        headers: { "cf-connecting-ip": "203.0.113.30" }
+        headers: csrfHeaders({ "cf-connecting-ip": "203.0.113.30" })
       }),
       env
     );
@@ -472,7 +474,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/media/revert", {
         method: "POST",
         body: form,
-        headers: { "cf-connecting-ip": "203.0.113.40" }
+        headers: csrfHeaders({ "cf-connecting-ip": "203.0.113.40" })
       }),
       env
     );
@@ -607,6 +609,7 @@ describe("handleRequest", () => {
     expect(lockCookie).toContain("Secure");
     const html = await response.text();
     expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
+    expect(html).toContain('name="sectok" value="');
     expect(html).toContain('name="lockToken" value="');
     expect(html).toContain('id="dw__editform"');
     expect(html).toContain('id="tool__bar"');
@@ -640,7 +643,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/pages/lock/release", {
         method: "POST",
         body: release,
-        headers: { accept: "application/json" }
+        headers: csrfHeaders({ accept: "application/json" })
       }),
       env
     );
@@ -801,7 +804,8 @@ describe("handleRequest", () => {
     const response = await handleRequest(
       new Request("https://example.com/api/pages/revert", {
         method: "POST",
-        body: form
+        body: form,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1009,7 +1013,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/pages", {
         method: "POST",
         body: form,
-        headers: { "cf-connecting-ip": "203.0.113.10" }
+        headers: csrfHeaders({ "cf-connecting-ip": "203.0.113.10" })
       }),
       env
     );
@@ -1043,6 +1047,42 @@ describe("handleRequest", () => {
     expect(purgedKeys).toContain("discovery:atom:https://example.com");
   });
 
+  it("rejects state-changing page and media posts without CSRF tokens", async () => {
+    const pageForm = new FormData();
+    pageForm.set("id", "wiki:welcome");
+    pageForm.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    pageForm.set("content", "Changed.");
+
+    const pageResponse = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: pageForm,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    const mediaForm = new FormData();
+    mediaForm.set("ns", "wiki");
+    mediaForm.set("file", new File(["blocked"], "blocked.txt", { type: "text/plain" }));
+
+    const mediaResponse = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: mediaForm,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    expect(pageResponse.status).toBe(403);
+    await expect(pageResponse.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
+    expect(mediaResponse.status).toBe(403);
+    await expect(mediaResponse.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
+    expect(state.batches).toHaveLength(0);
+    expect(state.media).toHaveLength(1);
+  });
+
   it("blocks page edits that match the wordblock list", async () => {
     const form = new FormData();
     form.set("id", "wiki:welcome");
@@ -1054,7 +1094,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/pages", {
         method: "POST",
         body: form,
-        headers: { accept: "application/json" }
+        headers: csrfHeaders({ accept: "application/json" })
       }),
       env
     );
@@ -1092,7 +1132,8 @@ describe("handleRequest", () => {
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
         method: "POST",
-        body: form
+        body: form,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1114,7 +1155,8 @@ describe("handleRequest", () => {
     const saveDraft = await handleRequest(
       new Request("https://example.com/api/pages/draft", {
         method: "POST",
-        body: draft
+        body: draft,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1128,10 +1170,10 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/pages/draft", {
         method: "POST",
         body: draft,
-        headers: {
+        headers: csrfHeaders({
           accept: "application/json",
           "x-requested-with": "XMLHttpRequest"
-        }
+        })
       }),
       env
     );
@@ -1156,7 +1198,8 @@ describe("handleRequest", () => {
     const deleteDraft = await handleRequest(
       new Request("https://example.com/api/pages/draft/delete", {
         method: "POST",
-        body: draft
+        body: draft,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1183,7 +1226,8 @@ describe("handleRequest", () => {
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
         method: "POST",
-        body: form
+        body: form,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1201,7 +1245,8 @@ describe("handleRequest", () => {
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
         method: "POST",
-        body: form
+        body: form,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1222,7 +1267,8 @@ describe("handleRequest", () => {
     const createResponse = await handleRequest(
       new Request("https://example.com/api/pages", {
         method: "POST",
-        body: create
+        body: create,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1242,7 +1288,8 @@ describe("handleRequest", () => {
     const deleteResponse = await handleRequest(
       new Request("https://example.com/api/pages", {
         method: "POST",
-        body: remove
+        body: remove,
+        headers: csrfHeaders()
       }),
       env
     );
@@ -1289,6 +1336,16 @@ function createPageLockNamespaceStub(): {
       }
     } as unknown as DurableObjectNamespace,
     reset: () => states.clear()
+  };
+}
+
+function csrfHeaders(headers: Record<string, string> = {}): Record<string, string> {
+  return {
+    ...headers,
+    cookie: headers.cookie
+      ? `${headers.cookie}; DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`
+      : `DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`,
+    "x-csrf-token": TEST_CSRF_TOKEN
   };
 }
 

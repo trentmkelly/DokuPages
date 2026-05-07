@@ -9,6 +9,7 @@ The current deployment is a Cloudflare Pages scaffold with:
 - shared TypeScript modules in `src/`
 - D1 schema migrations in `migrations/`
 - migration planning and architecture notes in `docs/`
+- security notes in `docs/security.md`
 - a tracked migration checklist in `CHECKLIST.md`
 - GPL attribution and licensing notes in `NOTICE.md` and `COPYING`
 

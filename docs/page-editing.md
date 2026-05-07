@@ -47,7 +47,7 @@ The save path:
 
 ## Edit Locks
 
-`GET /wiki/:id?do=edit` acquires a 15-minute Durable Object-backed page lock and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`, and successful saves or draft deletion release it.
+`GET /wiki/:id?do=edit` acquires a 15-minute Durable Object-backed page lock and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`, and successful saves or draft deletion release it. The edit form also carries the CSRF `sectok` used for saves, drafts, and lock refresh/release calls.
 
 ## Section Edit Anchors
 

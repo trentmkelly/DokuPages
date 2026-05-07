@@ -21,6 +21,7 @@ Media storage uses D1 for metadata and R2 for object bodies.
 - `id` when the media ID should differ from the uploaded filename
 - `summary`
 - `overwrite=1` to replace an existing current media object
+- `sectok` matching the CSRF cookie
 
 The upload path writes the R2 object first, then stores current media metadata, an immutable `media_revisions` row, changelog row, and technical metadata rows in D1. If the D1 write fails after the object write, the newly written R2 object is deleted.
 

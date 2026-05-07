@@ -34,4 +34,4 @@ Primary references:
 
 ## Security And Anti-Abuse
 
-Cloudflare Access and Turnstile are candidates for production hardening, but the application still needs native CSRF, ACL, upload validation, and rate limiting. Those features are not implemented by the initial scaffold.
+Cloudflare Access and Turnstile are candidates for production hardening. Native CSRF and upload validation are implemented; ACL enforcement and rate limiting remain pending.
