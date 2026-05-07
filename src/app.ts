@@ -14,7 +14,16 @@ import {
   sessionCookieHeader
 } from "./auth/session";
 import { hashPassword } from "./auth/password";
-import { getRuntimeConfig, type ConfigValidation } from "./config";
+import {
+  createConfigExport,
+  getRuntimeConfig,
+  getRuntimeConfigEntries,
+  getSecretConfigStatus,
+  validateRuntimeConfig,
+  type ConfigValidation,
+  type RuntimeConfigEntry,
+  type SecretConfigStatus
+} from "./config";
 import type { Env } from "./env";
 import {
   collectDiagnostics,
@@ -280,6 +289,15 @@ export async function handleRequest(
   if (url.pathname === "/admin/audit" && request.method === "GET") {
     const page = await renderAuditLogPage(request, env, principal, url);
     return page instanceof Response ? page : htmlResponse(page);
+  }
+
+  if (url.pathname === "/admin/config" && request.method === "GET") {
+    const page = renderConfigAdminPage(request, env, principal);
+    return page instanceof Response ? page : htmlResponse(page);
+  }
+
+  if (url.pathname === "/api/admin/config/export" && request.method === "GET") {
+    return handleConfigExport(request, env, principal);
   }
 
   if (url.pathname === "/admin/acl" && request.method === "GET") {
@@ -2496,6 +2514,9 @@ function renderAdminDashboardPage(
   const userTool = isAdminPrincipal(principal)
     ? `<li><a href="/admin/users">User manager</a></li>`
     : "";
+  const configTool = isAdminPrincipal(principal)
+    ? `<li><a href="/admin/config">Configuration manager</a></li>`
+    : "";
   const adminActions = isAdminPrincipal(principal)
     ? `<form method="post" action="/api/admin/search/rebuild">
         ${csrfInput(csrfToken)}
@@ -2516,10 +2537,89 @@ function renderAdminDashboardPage(
         ${isAdminPrincipal(principal) ? '<li><a href="/admin/audit">Audit log</a></li>' : ""}
         ${aclTool}
         ${userTool}
+        ${configTool}
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`
   );
+}
+
+function renderConfigAdminPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): string | Response {
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const validation = validateRuntimeConfig(env);
+  const variables = getRuntimeConfigEntries(env);
+  const secrets = getSecretConfigStatus(env);
+
+  return htmlShell(
+    env,
+    "Configuration Manager",
+    `<h1>Configuration manager</h1>
+    <p><a href="/api/admin/config/export">Download configuration backup</a></p>
+    <h2>Validation</h2>
+    ${renderConfigValidation(validation)}
+    <h2>Runtime variables</h2>
+    ${renderConfigEntryTable(variables)}
+    <h2>Secrets</h2>
+    ${renderSecretConfigTable(secrets)}`
+  );
+}
+
+function handleConfigExport(request: Request, env: Env, principal: AuthPrincipal): Response {
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const exported = createConfigExport(env);
+  const date = exported.exportedAt.slice(0, 10);
+  return jsonResponse(exported, {
+    headers: {
+      "cache-control": "no-store",
+      "content-disposition": `attachment; filename="dokuwiki-pages-config-${date}.json"`
+    }
+  });
+}
+
+function renderConfigEntryTable(entries: RuntimeConfigEntry[]): string {
+  const rows = entries
+    .map(
+      (entry) => `<tr>
+        <td><code>${escapeHtml(entry.key)}</code></td>
+        <td>${entry.effectiveValue === null ? "-" : `<code>${escapeHtml(entry.effectiveValue)}</code>`}</td>
+        <td>${entry.value === null ? "-" : `<code>${escapeHtml(entry.value)}</code>`}</td>
+        <td>${escapeHtml(entry.source)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<table class="diagnostics config__entries">
+    <thead><tr><th>Key</th><th>Effective value</th><th>Configured value</th><th>Source</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderSecretConfigTable(secrets: SecretConfigStatus[]): string {
+  const rows = secrets
+    .map(
+      (secret) => `<tr>
+        <td><code>${escapeHtml(secret.key)}</code></td>
+        <td>${secret.configured ? "configured" : "not configured"}</td>
+        <td>${secret.redactedValue ? `<code>${escapeHtml(secret.redactedValue)}</code>` : "-"}</td>
+        <td>${escapeHtml(secret.purpose)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<table class="diagnostics config__secrets">
+    <thead><tr><th>Key</th><th>Status</th><th>Value</th><th>Purpose</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 async function renderAuditLogPage(

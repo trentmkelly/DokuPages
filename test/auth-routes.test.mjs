@@ -504,6 +504,18 @@ describe("auth routes", () => {
       }),
       env
     );
+    const config = await handleRequest(
+      new Request("https://example.com/admin/config", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const configExport = await handleRequest(
+      new Request("https://example.com/api/admin/config/export", {
+        headers: { cookie }
+      }),
+      env
+    );
     const cachePurgeForm = new FormData();
     const cachePurge = await handleRequest(
       new Request("https://example.com/api/admin/cache/purge", {
@@ -522,6 +534,8 @@ describe("auth routes", () => {
     expect(acl.status).toBe(403);
     expect(audit.status).toBe(403);
     expect(users.status).toBe(403);
+    expect(config.status).toBe(403);
+    expect(configExport.status).toBe(403);
     expect(cachePurge.status).toBe(403);
   });
 
@@ -577,6 +591,49 @@ describe("auth routes", () => {
         }
       ]
     });
+  });
+
+  it("allows admin users to inspect and export redacted runtime configuration", async () => {
+    env = createEnv();
+    env.API_BEARER_TOKEN = "super-secret-token";
+    env.API_CORS_ORIGINS = "https://client.example";
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const anonymous = await handleRequest(new Request("https://example.com/admin/config"), env);
+    const dashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const page = await handleRequest(
+      new Request("https://example.com/admin/config", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const exported = await handleRequest(
+      new Request("https://example.com/api/admin/config/export", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(anonymous.status).toBe(403);
+    await expect(dashboard.text()).resolves.toContain("Configuration manager");
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("Configuration manager");
+    expect(html).toContain("API_BEARER_TOKEN");
+    expect(html).toContain("[redacted]");
+    expect(html).not.toContain("super-secret-token");
+    expect(exported.status).toBe(200);
+    expect(exported.headers.get("content-disposition")).toContain("dokuwiki-pages-config-");
+    const backupText = await exported.text();
+    expect(backupText).toContain("API_CORS_ORIGINS");
+    expect(backupText).toContain("[redacted]");
+    expect(backupText).not.toContain("super-secret-token");
   });
 
   it("bypasses shared rendered cache for pages not readable by anonymous users", async () => {

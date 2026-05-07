@@ -6,22 +6,22 @@ path.
 
 ## Bundled Plugins
 
-| Plugin         | Pages decision                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------ |
-| `acl`          | Replaced by native ACL matching and `/admin/acl`.                                                      |
-| `authplain`    | Replaced by D1-backed users, groups, sessions, and importer support.                                   |
-| `config`       | Replaced by validated runtime environment variables for launch; native admin editing remains deferred. |
-| `extension`    | Removed for production Pages runtime; plugin code upload/install is unsupported.                       |
-| `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, and `/api/health`.                                     |
-| `logviewer`    | Replaced by Cloudflare logs plus native admin audit log records.                                       |
-| `popularity`   | Removed. The port does not phone home usage statistics.                                                |
-| `revert`       | Replaced by native page and media revision revert routes.                                              |
-| `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                               |
-| `styling`      | Replaced by build-time theme assets and checked-in CSS.                                                |
-| `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.                 |
-| `authad`       | Deferred to an external identity or sync bridge.                                                       |
-| `authldap`     | Deferred to an external identity or sync bridge.                                                       |
-| `authpdo`      | Deferred to an external identity or sync bridge.                                                       |
+| Plugin         | Pages decision                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------- |
+| `acl`          | Replaced by native ACL matching and `/admin/acl`.                                                 |
+| `authplain`    | Replaced by D1-backed users, groups, sessions, and importer support.                              |
+| `config`       | Replaced by validated runtime environment variables, `/admin/config`, and redacted config export. |
+| `extension`    | Removed for production Pages runtime; plugin code upload/install is unsupported.                  |
+| `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, and `/api/health`.                                |
+| `logviewer`    | Replaced by Cloudflare logs plus native admin audit log records.                                  |
+| `popularity`   | Removed. The port does not phone home usage statistics.                                           |
+| `revert`       | Replaced by native page and media revision revert routes.                                         |
+| `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                          |
+| `styling`      | Replaced by build-time theme assets and checked-in CSS.                                           |
+| `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.            |
+| `authad`       | Deferred to an external identity or sync bridge.                                                  |
+| `authldap`     | Deferred to an external identity or sync bridge.                                                  |
+| `authpdo`      | Deferred to an external identity or sync bridge.                                                  |
 
 ## Extension API Boundary
 

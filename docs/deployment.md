@@ -37,6 +37,11 @@ enabled. Wrangler authentication and API bearer tokens stay outside the
 repository and should never be checked in. `npm run scan:secrets` guards tracked
 files for high-signal tokens.
 
+Admins can inspect the effective runtime configuration at `/admin/config` and
+download a JSON configuration backup from `/api/admin/config/export`. Secret
+values are never included in the page or export; the backup records only whether
+each supported secret is configured.
+
 ## Deployment Decisions
 
 - Secrets: `API_BEARER_TOKEN` is optional and only required for native remote

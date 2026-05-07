@@ -397,7 +397,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port profile UI if supported.
 - [x] Port user manager UI if supported.
 - [ ] Port styling plugin behavior if supported.
-- [ ] Port configuration UI if supported.
+- [x] Port configuration UI if supported.
 - [ ] Ensure responsive behavior.
 - [ ] Ensure keyboard accessibility.
 - [ ] Ensure screen reader accessibility.
@@ -437,17 +437,17 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Map manifest configuration.
 - [x] Map language configuration.
 - [x] Implement environment-specific config.
-- [ ] Implement secret-specific config.
+- [x] Implement secret-specific config.
 - [x] Implement config validation.
 - [ ] Implement admin config editing if supported.
-- [ ] Implement config export and backup.
+- [x] Implement config export and backup.
 
 ## Plugins And Extension Compatibility
 
 - [x] Decide support level for bundled plugins.
 - [x] Port the ACL plugin or replace it with native admin UI.
 - [x] Port the authplain plugin or replace it with native auth.
-- [ ] Port the config plugin or replace it with native admin UI.
+- [x] Port the config plugin or replace it with native admin UI.
 - [x] Port the extension manager plugin or remove it for Pages.
 - [x] Port the info plugin or replace it with native diagnostics.
 - [x] Port the logviewer plugin or replace it with Cloudflare logs.
@@ -472,7 +472,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Admin And Maintenance
 
 - [x] Implement admin dashboard.
-- [ ] Implement configuration management.
+- [x] Implement configuration management.
 - [x] Implement user management.
 - [x] Implement ACL management.
 - [x] Implement page index rebuild.

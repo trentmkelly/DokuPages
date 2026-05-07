@@ -23,6 +23,28 @@ export interface RuntimeConfig {
   appVersion: string;
 }
 
+export interface RuntimeConfigEntry {
+  key: string;
+  value: string | null;
+  effectiveValue: string | null;
+  source: "environment" | "default" | "cloudflare";
+}
+
+export interface SecretConfigStatus {
+  key: string;
+  configured: boolean;
+  redactedValue: string | null;
+  purpose: string;
+}
+
+export interface ConfigExport {
+  exportedAt: string;
+  runtime: RuntimeConfig;
+  variables: RuntimeConfigEntry[];
+  secrets: SecretConfigStatus[];
+  validation: ConfigValidation;
+}
+
 export interface ConfigValidation {
   ok: boolean;
   issues: ConfigValidationIssue[];
@@ -55,10 +77,62 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
   validateHidePages(env.HIDE_PAGES, issues);
   validateAppVersion(env.APP_VERSION, issues);
+  validateApiBearerToken(env.API_BEARER_TOKEN, issues);
 
   return {
     ok: issues.every((issue) => issue.severity !== "error"),
     issues
+  };
+}
+
+export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
+  const config = getRuntimeConfig(env);
+
+  return [
+    configEntry("SITE_NAME", env.SITE_NAME, config.siteName, DEFAULT_SITE_NAME),
+    configEntry("START_PAGE", env.START_PAGE, config.startPage, DEFAULT_START_PAGE),
+    configEntry("WIKI_LANG", env.WIKI_LANG, config.language, "en"),
+    configEntry(
+      "SESSION_COOKIE_NAME",
+      env.SESSION_COOKIE_NAME,
+      config.sessionCookieName,
+      DEFAULT_SESSION_COOKIE_NAME
+    ),
+    configEntry("HIDE_PAGES", env.HIDE_PAGES, config.hidePages, null),
+    configEntry("SNEAKY_INDEX", env.SNEAKY_INDEX, String(config.sneakyIndex), "false"),
+    configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
+    configEntry(
+      "API_CORS_ORIGINS",
+      env.API_CORS_ORIGINS,
+      nonEmpty(env.API_CORS_ORIGINS) ?? null,
+      null
+    ),
+    cloudflareEntry("CF_PAGES_BRANCH", env.CF_PAGES_BRANCH),
+    cloudflareEntry("CF_PAGES_COMMIT_SHA", env.CF_PAGES_COMMIT_SHA),
+    cloudflareEntry("CF_PAGES_URL", env.CF_PAGES_URL)
+  ];
+}
+
+export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
+  const apiToken = nonEmpty(env.API_BEARER_TOKEN) ?? null;
+
+  return [
+    {
+      key: "API_BEARER_TOKEN",
+      configured: Boolean(apiToken),
+      redactedValue: apiToken ? "[redacted]" : null,
+      purpose: "Native API bearer-token authentication for automation writes."
+    }
+  ];
+}
+
+export function createConfigExport(env: Env, now = new Date()): ConfigExport {
+  return {
+    exportedAt: now.toISOString(),
+    runtime: getRuntimeConfig(env),
+    variables: getRuntimeConfigEntries(env),
+    secrets: getSecretConfigStatus(env),
+    validation: validateRuntimeConfig(env)
   };
 }
 
@@ -174,6 +248,42 @@ function validateHidePages(value: string | undefined, issues: ConfigValidationIs
       message: "HIDE_PAGES must be a valid JavaScript-compatible regular expression."
     });
   }
+}
+
+function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  if (value !== undefined && !nonEmpty(value)) {
+    issues.push({
+      key: "API_BEARER_TOKEN",
+      severity: "warning",
+      message: "API_BEARER_TOKEN is blank; bearer-token API writes will remain disabled."
+    });
+  }
+}
+
+function configEntry(
+  key: string,
+  rawValue: string | undefined,
+  effectiveValue: string | null,
+  defaultValue: string | null
+): RuntimeConfigEntry {
+  return {
+    key,
+    value: nonEmpty(rawValue) ?? null,
+    effectiveValue,
+    source:
+      nonEmpty(rawValue) === undefined && effectiveValue === defaultValue
+        ? "default"
+        : "environment"
+  };
+}
+
+function cloudflareEntry(key: string, value: string | undefined): RuntimeConfigEntry {
+  return {
+    key,
+    value: nonEmpty(value) ?? null,
+    effectiveValue: nonEmpty(value) ?? null,
+    source: "cloudflare"
+  };
 }
 
 function normalizedStartPage(value: string | undefined): string {

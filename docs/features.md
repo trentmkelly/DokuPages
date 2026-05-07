@@ -15,8 +15,8 @@ of full PHP DokuWiki runtime compatibility.
 - D1-backed page/media changelogs, metadata, search postings, rendered cache records, sessions, drafts, ACLs, users, plugin settings, import jobs, schema versions, and audit logs.
 - KV-backed rendered page cache, rate-limit counters, and discovery cache.
 - Durable Object-backed page edit locks.
-- Native admin dashboard, ACL manager, user manager, audit log view,
-  diagnostics, cache purge, and search index rebuild action.
+- Native admin dashboard, ACL manager, configuration manager, user manager,
+  audit log view, diagnostics, cache purge, and search index rebuild action.
 - Native `/api/v1` JSON API with bearer-token write auth, configurable CORS,
   page/media/search/user read methods, and page/media write methods.
 - Explicit `501 Not Implemented` responses for legacy XML-RPC, JSON-RPC, and OpenAPI entrypoints.
@@ -40,7 +40,8 @@ PHP modules to execute. Current decisions:
 
 - `acl`: replaced by the native ACL manager.
 - `authplain`: replaced by D1-backed native users, groups, and sessions.
-- `config`: replaced by runtime env validation and future native config UI.
+- `config`: replaced by runtime env validation, `/admin/config`, and redacted
+  configuration export.
 - `extension`: unsupported for production installs on Pages.
 - `info`: partially replaced by diagnostics and health endpoints.
 - `logviewer`: replaced by Cloudflare logs plus native admin audit log.
