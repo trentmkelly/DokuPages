@@ -230,7 +230,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement metadata extraction.
 - [ ] Implement instruction caching or equivalent.
 - [ ] Implement renderer output compatible with current templates.
-- [ ] Add parser conformance fixtures from existing pages.
+- [x] Add parser conformance fixtures from existing pages.
 - [x] Add parser tests for each supported syntax mode.
 - [ ] Add parser tests for invalid and edge-case markup.
 
