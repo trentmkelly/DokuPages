@@ -12,7 +12,7 @@ Requests without a valid session resolve to an anonymous principal. Anonymous pr
 
 `/api/auth/session` exposes the current public principal shape for runtime checks.
 
-Native admin-only routes currently require membership in the `admin` group.
+Native admin-only routes require membership in the `admin` group. Manager-level routes such as the admin dashboard accept either the `manager` or `admin` group; ACL editing remains admin-only.
 
 ## Login Sessions
 

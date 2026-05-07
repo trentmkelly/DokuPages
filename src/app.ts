@@ -199,6 +199,10 @@ export async function handleRequest(
     return handleLogout(request, env);
   }
 
+  if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
+    return renderAdminDashboardPage(request, env, principal);
+  }
+
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
     return htmlResponse(await renderDiagnosticsPage(env));
   }
@@ -505,6 +509,10 @@ export async function handleRequest(
 }
 
 function redirectLegacyDokuPhp(url: URL, env: Env): Response {
+  if (url.searchParams.get("do") === "admin" && !url.searchParams.get("page")) {
+    return redirectResponse("/admin", 301);
+  }
+
   if (url.searchParams.get("do") === "admin" && url.searchParams.get("page") === "acl") {
     return redirectResponse("/admin/acl", 301);
   }
@@ -1318,6 +1326,29 @@ function renderImportJobTable(jobs: ImportJobStatus[]): string {
     </thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+function renderAdminDashboardPage(request: Request, env: Env, principal: AuthPrincipal): Response {
+  if (!isManagerPrincipal(principal)) {
+    return managerDeniedResponse(request, env);
+  }
+
+  const aclTool = isAdminPrincipal(principal)
+    ? `<li><a href="/admin/acl">Access control list manager</a></li>`
+    : "";
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Administration",
+      `<h1>Administration</h1>
+      <ul class="admin__tools">
+        <li><a href="/admin/diagnostics">Diagnostics</a></li>
+        ${aclTool}
+        <li><a href="/media-manager">Media manager</a></li>
+      </ul>`
+    )
+  );
 }
 
 async function renderAclAdminPage(
@@ -2769,6 +2800,21 @@ function adminDeniedResponse(request: Request, env: Env): Response {
   );
 }
 
+function managerDeniedResponse(request: Request, env: Env): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: "Manager privileges are required." }, { status: 403 });
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Manager access required",
+      "<h1>Manager access required</h1><p>Manager privileges are required.</p>"
+    ),
+    { status: 403 }
+  );
+}
+
 function aclAdminErrorResponse(request: Request, env: Env, message: string): Response {
   if (acceptsJson(request)) {
     return jsonResponse({ error: message }, { status: 400 });
@@ -2781,6 +2827,13 @@ function aclAdminErrorResponse(request: Request, env: Env, message: string): Res
 
 function isAdminPrincipal(principal: AuthPrincipal): boolean {
   return principal.type === "user" && principal.groups.includes("admin");
+}
+
+function isManagerPrincipal(principal: AuthPrincipal): boolean {
+  return (
+    principal.type === "user" &&
+    (principal.groups.includes("admin") || principal.groups.includes("manager"))
+  );
 }
 
 function normalizeAclAdminScope(value: string): string {

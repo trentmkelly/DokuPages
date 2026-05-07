@@ -177,6 +177,41 @@ describe("auth routes", () => {
     });
   });
 
+  it("allows manager users to view the admin dashboard but not ACL management", async () => {
+    env = createEnv();
+    await seedUser(env.DB, {
+      userId: "user-2",
+      username: "mona",
+      password: "manager password",
+      displayName: "Mona Manager",
+      email: "mona@example.test",
+      groups: ["manager", "user"]
+    });
+    const cookie = await loginAs(env, "mona", "manager password");
+
+    const anonymous = await handleRequest(new Request("https://example.com/admin"), env);
+    const legacy = await handleRequest(new Request("https://example.com/doku.php?do=admin"), env);
+    const dashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const acl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(anonymous.status).toBe(403);
+    expect(legacy.status).toBe(301);
+    expect(legacy.headers.get("location")).toBe("/admin");
+    expect(dashboard.status).toBe(200);
+    await expect(dashboard.text()).resolves.toContain("Administration");
+    expect(acl.status).toBe(403);
+  });
+
   it("rejects invalid logins without setting a session cookie", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -281,9 +316,23 @@ function csrfHeaders(headers = {}) {
   };
 }
 
-async function seedUser(d1) {
+async function seedUser(d1, options) {
+  return seedAuthUser(d1, options);
+}
+
+async function seedAuthUser(
+  d1,
+  {
+    userId = "user-1",
+    username = "alice",
+    password = "correct horse battery staple",
+    displayName = "Alice Example",
+    email = "alice@example.test",
+    groups = ["user", "admin"]
+  } = {}
+) {
   const now = "2026-05-07T00:00:00.000Z";
-  const passwordHash = await hashPassword("correct horse battery staple", {
+  const passwordHash = await hashPassword(password, {
     iterations: 1_000,
     salt: new Uint8Array(16).fill(9)
   });
@@ -294,30 +343,30 @@ async function seedUser(d1) {
          id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
        ) values (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind("user-1", "alice", "Alice Example", "alice@example.test", passwordHash, 0, now, now)
+    .bind(userId, username, displayName, email, passwordHash, 0, now, now)
     .run();
-  await d1
-    .prepare("insert into groups (id, name, created_at) values (?, ?, ?)")
-    .bind("g1", "user", now)
-    .run();
-  await d1
-    .prepare("insert into groups (id, name, created_at) values (?, ?, ?)")
-    .bind("g2", "admin", now)
-    .run();
-  await d1
-    .prepare("insert into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
-    .bind("user-1", "g1", now)
-    .run();
-  await d1
-    .prepare("insert into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
-    .bind("user-1", "g2", now)
-    .run();
+
+  for (const group of groups) {
+    const groupId = `group:${group}`;
+    await d1
+      .prepare("insert or ignore into groups (id, name, created_at) values (?, ?, ?)")
+      .bind(groupId, group, now)
+      .run();
+    await d1
+      .prepare("insert or ignore into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
+      .bind(userId, groupId, now)
+      .run();
+  }
 }
 
 async function loginAsAlice(env) {
+  return loginAs(env, "alice", "correct horse battery staple");
+}
+
+async function loginAs(env, username, password) {
   const login = new FormData();
-  login.set("username", "alice");
-  login.set("password", "correct horse battery staple");
+  login.set("username", username);
+  login.set("password", password);
 
   const response = await handleRequest(
     new Request("https://example.com/api/auth/login", {

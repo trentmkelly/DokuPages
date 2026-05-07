@@ -190,7 +190,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for login and logout.
 - [ ] Implement route handling for registration if supported.
 - [ ] Implement route handling for profile updates if supported.
-- [ ] Implement route handling for admin pages.
+- [x] Implement route handling for admin pages.
 - [ ] Implement route handling for remote APIs if supported.
 - [x] Implement 404 behavior compatible with DokuWiki settings.
 - [x] Implement redirects compatible with DokuWiki actions.
@@ -308,7 +308,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement session cookie behavior.
 - [x] Implement CSRF tokens.
 - [ ] Implement bearer token auth if remote APIs are supported.
-- [ ] Implement admin and manager role checks.
+- [x] Implement admin and manager role checks.
 - [x] Implement default group assignment.
 - [ ] Implement user manager behavior.
 - [x] Implement account disable behavior if supported.
@@ -471,7 +471,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Admin And Maintenance
 
-- [ ] Implement admin dashboard.
+- [x] Implement admin dashboard.
 - [ ] Implement configuration management.
 - [ ] Implement user management.
 - [x] Implement ACL management.
@@ -605,7 +605,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Preserve sitemap URLs if required.
 - [x] Preserve revision URLs if required.
 - [x] Preserve diff URLs if required.
-- [ ] Preserve admin URLs where possible.
+- [x] Preserve admin URLs where possible.
 - [ ] Implement redirect rules for unsupported legacy endpoints.
 - [x] Implement canonical URL generation.
 - [x] Add URL compatibility tests.
@@ -733,7 +733,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Document restore workflow.
 - [ ] Document rollback workflow.
 - [ ] Document plugin compatibility.
-- [ ] Document admin operations.
+- [x] Document admin operations.
 - [ ] Document security model.
 - [ ] Document known limitations.
 - [ ] Document launch checklist.
