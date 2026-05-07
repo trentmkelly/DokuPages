@@ -30,7 +30,7 @@ of full PHP DokuWiki runtime compatibility.
 - Email delivery, subscriptions, digests, password reset emails, and registration notifications.
 - Server-side ImageMagick/GD thumbnail generation. The current media strategy serves originals and documents derivative policy headers.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
-- Thumbnail cache, parser instruction cache, metadata cache, cache warming, stale fallback, and user-sensitive cache bypass beyond current ACL-filtered route behavior.
+- Thumbnail cache, parser instruction cache, metadata cache, cache warming, and stale fallback.
 - Scheduled production backup automation and final launch rehearsal verification.
 
 ## Plugin Compatibility

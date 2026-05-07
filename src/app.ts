@@ -98,6 +98,7 @@ import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interf
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
+type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 16;
@@ -546,13 +547,16 @@ export async function handleRequest(
       if (!revision || revision.pageId !== id) {
         return notFoundResponse(`Revision '${revisionId}' was not found.`);
       }
+      const cacheMode = await renderCacheModeForPage(env, id);
       return htmlResponse(
         await renderPageHtml(
           env,
           revision.pageId,
           revision.content,
           revision.id,
-          revision.createdAt
+          revision.createdAt,
+          undefined,
+          { cacheMode }
         )
       );
     }
@@ -602,8 +606,9 @@ export async function handleRequest(
     const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
     if (denied) return denied;
 
+    const cacheMode = await renderCacheModeForPage(env, id);
     return htmlResponse(
-      await renderPageHtml(env, id, page.content, page.revisionId, undefined, page)
+      await renderPageHtml(env, id, page.content, page.revisionId, undefined, page, { cacheMode })
     );
   }
 
@@ -1924,21 +1929,34 @@ async function renderPageHtml(
   content: string,
   revisionId: string,
   revisionDate?: string,
-  page?: CurrentPage
+  page?: CurrentPage,
+  options: { cacheMode?: RenderCacheMode } = {}
 ): Promise<string> {
   const startedAt = Date.now();
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
+  const privateCache = options.cacheMode === "private";
   const directives = getWikiRenderDirectives(content);
   const revisionNotice = revisionDate
     ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
     : "";
-  const cached = directives.noCache ? null : await readRenderCache(env, cacheKey, revisionId);
+  const cached =
+    directives.noCache || privateCache ? null : await readRenderCache(env, cacheKey, revisionId);
 
   if (directives.noCache) {
     logMetric("cache_metric", {
       cache: "rendered_page",
       action: "bypass",
       reason: "directive",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
+    });
+  }
+
+  if (privateCache) {
+    logMetric("cache_metric", {
+      cache: "rendered_page",
+      action: "bypass",
+      reason: "private_acl",
       cacheKey,
       durationMs: elapsedSince(startedAt)
     });
@@ -1959,7 +1977,7 @@ async function renderPageHtml(
     );
   }
 
-  if (!directives.noCache) {
+  if (!directives.noCache && !privateCache) {
     logMetric("cache_metric", {
       cache: "rendered_page",
       action: "miss",
@@ -1971,7 +1989,7 @@ async function renderPageHtml(
   const rendered = renderWikiText(content, { pageId: id });
   const title = rendered.title ?? page?.title ?? id;
 
-  if (!rendered.noCache) {
+  if (!rendered.noCache && !privateCache) {
     await writeRenderCache(env, cacheKey, {
       rendererVersion: RENDER_CACHE_VERSION,
       revisionId,
@@ -4979,6 +4997,12 @@ async function resolveRequestAclPermission(
 ): Promise<number> {
   const rules = await listAclRules(env);
   return resolveAclPermission(rules, subjectId, principal);
+}
+
+async function renderCacheModeForPage(env: Env, subjectId: string): Promise<RenderCacheMode> {
+  const rules = await listAclRules(env);
+  const anonymousPermission = resolveAclPermission(rules, subjectId, anonymousPrincipal());
+  return hasAclPermission(anonymousPermission, ACL_READ) ? "shared" : "private";
 }
 
 async function listAclRules(env: Env) {

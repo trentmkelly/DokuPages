@@ -367,7 +367,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement sitemap cache.
 - [x] Implement page purge behavior.
 - [x] Implement global purge behavior.
-- [ ] Implement user-sensitive cache bypass for private pages.
+- [x] Implement user-sensitive cache bypass for private pages.
 - [ ] Implement cache warming for important pages.
 - [ ] Implement stale cache fallback if appropriate.
 - [x] Add cache hit and miss metrics.

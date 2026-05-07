@@ -579,6 +579,56 @@ describe("auth routes", () => {
     });
   });
 
+  it("bypasses shared rendered cache for pages not readable by anonymous users", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    await seedPage(env.DB, {
+      id: "private:start",
+      title: "Private",
+      content: "====== Private ======\n\nSecret body."
+    });
+    await seedAclRule(env.DB, {
+      scope: "*",
+      principalType: "all",
+      principal: "@ALL",
+      permission: 0
+    });
+    await seedAclRule(env.DB, {
+      scope: "private:*",
+      principalType: "group",
+      principal: "user",
+      permission: 1
+    });
+    await env.RENDER_CACHE.put(
+      "page:private:start",
+      JSON.stringify({
+        rendererVersion: 16,
+        revisionId: "private:start@2026-05-07T00:00:00.000Z",
+        title: "Cached Private",
+        html: "<p>Cached private body.</p>",
+        toc: []
+      })
+    );
+    const cookie = await loginAsAlice(env);
+
+    const anonymous = await handleRequest(
+      new Request("https://example.com/wiki/private/start"),
+      env
+    );
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/private/start", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(anonymous.status).toBe(403);
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Secret body.");
+    expect(html).not.toContain("Cached private body.");
+  });
+
   it("rejects invalid logins without setting a session cookie", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -711,6 +761,62 @@ function csrfHeaders(headers = {}) {
 
 async function seedUser(d1, options) {
   return seedAuthUser(d1, options);
+}
+
+async function seedPage(
+  d1,
+  {
+    id,
+    title,
+    content,
+    revisionId = `${id}@2026-05-07T00:00:00.000Z`,
+    createdAt = "2026-05-07T00:00:00.000Z"
+  }
+) {
+  const namespace = id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
+  await d1
+    .prepare(
+      `insert into pages (
+         id, namespace, title, current_revision_id, is_deleted, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, namespace, title, revisionId, 0, createdAt, createdAt)
+    .run();
+  await d1
+    .prepare(
+      `insert into page_revisions (
+         id, page_id, content, content_hash, author_id, author_name, summary,
+         change_type, size_change, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      revisionId,
+      id,
+      content,
+      `hash:${id}`,
+      null,
+      null,
+      "Seed page",
+      "create",
+      content.length,
+      createdAt
+    )
+    .run();
+}
+
+async function seedAclRule(
+  d1,
+  { id, scope, principalType, principal, permission, createdAt = "2026-05-07T00:00:00.000Z" }
+) {
+  const ruleId = id ?? `acl:${scope}:${principalType}:${principal}`;
+  await d1
+    .prepare(
+      `insert into acl_rules (
+         id, scope, principal_type, principal, permission, created_at
+       ) values (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(ruleId, scope, principalType, principal, permission, createdAt)
+    .run();
 }
 
 async function seedAuthUser(
