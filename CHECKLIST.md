@@ -49,22 +49,22 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Inventory writable data directories under `data/`.
 - [x] Inventory configuration files under `conf/`.
 - [x] Inventory command line scripts under `bin/`.
-- [ ] Identify all PHP filesystem read paths.
-- [ ] Identify all PHP filesystem write paths.
-- [ ] Identify all PHP functions that cannot run directly in Workers.
-- [ ] Identify all code paths that depend on PHP sessions.
-- [ ] Identify all code paths that depend on headers, cookies, and output buffering.
-- [ ] Identify all code paths that depend on file modification times.
-- [ ] Identify all code paths that depend on file permissions or chmod.
-- [ ] Identify all code paths that depend on local locks.
-- [ ] Identify all code paths that shell out to external commands.
-- [ ] Identify all code paths that download remote content.
-- [ ] Identify all code paths that send email.
-- [ ] Identify all image processing paths.
-- [ ] Identify all gzip and bzip revision storage paths.
+- [x] Identify all PHP filesystem read paths.
+- [x] Identify all PHP filesystem write paths.
+- [x] Identify all PHP functions that cannot run directly in Workers.
+- [x] Identify all code paths that depend on PHP sessions.
+- [x] Identify all code paths that depend on headers, cookies, and output buffering.
+- [x] Identify all code paths that depend on file modification times.
+- [x] Identify all code paths that depend on file permissions or chmod.
+- [x] Identify all code paths that depend on local locks.
+- [x] Identify all code paths that shell out to external commands.
+- [x] Identify all code paths that download remote content.
+- [x] Identify all code paths that send email.
+- [x] Identify all image processing paths.
+- [x] Identify all gzip and bzip revision storage paths.
 - [x] Identify all search index paths.
 - [x] Identify all cache invalidation paths.
-- [ ] Identify all extension and plugin hook points.
+- [x] Identify all extension and plugin hook points.
 
 ## Architecture Decision
 
