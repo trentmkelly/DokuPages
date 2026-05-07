@@ -375,13 +375,13 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Template And Frontend
 
-- [ ] Port the default DokuWiki template.
+- [x] Port the default DokuWiki template.
 - [x] Preserve current HTML structure where compatibility matters.
 - [x] Preserve current CSS behavior where compatibility matters.
 - [x] Port template navigation.
 - [x] Port page tools.
 - [x] Port site tools.
-- [ ] Port user tools.
+- [x] Port user tools.
 - [x] Port mobile navigation.
 - [x] Port breadcrumbs.
 - [x] Port table of contents rendering.
@@ -391,8 +391,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port revision UI.
 - [x] Port diff UI.
 - [x] Port search UI.
-- [ ] Port media manager UI.
-- [ ] Port admin UI.
+- [x] Port media manager UI.
+- [x] Port admin UI.
 - [x] Port login UI.
 - [ ] Port profile UI if supported.
 - [ ] Port user manager UI if supported.
