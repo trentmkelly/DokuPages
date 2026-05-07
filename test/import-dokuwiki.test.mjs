@@ -15,6 +15,7 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/meta"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
 
     await writeFile(path.join(root, "data/pages/wiki/welcome.txt"), "====== Welcome ======\n");
@@ -23,6 +24,14 @@ describe("DokuWiki import planner", () => {
       await gzipAsync("====== Old Welcome ======\n")
     );
     await writeFile(path.join(root, "data/media/wiki/logo.svg"), "<svg />\n");
+    await writeFile(
+      path.join(root, "data/meta/_dokuwiki.changes"),
+      "1767225600\t203.0.113.7\tC\twiki:welcome\talice\tCreated page\t\t24\n"
+    );
+    await writeFile(
+      path.join(root, "data/meta/_media.changes"),
+      "1767225601\t203.0.113.8\tE\twiki:logo.svg\tbob\tUpdated logo\t\t3\n"
+    );
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 1\nwiki:* @user 8\n");
     await writeFile(
       path.join(root, "conf/users.auth.php"),
@@ -51,7 +60,9 @@ describe("DokuWiki import planner", () => {
     expect(plan.counts).toMatchObject({
       pages: 1,
       pageRevisions: 1,
+      pageChangelogEntries: 1,
       media: 1,
+      mediaChangelogEntries: 1,
       aclRules: 2,
       users: 1,
       pluginSettings: 3,
@@ -66,7 +77,24 @@ describe("DokuWiki import planner", () => {
       compression: "gz",
       byteLength: "====== Old Welcome ======\n".length
     });
+    expect(plan.pageChangelogEntries[0]).toMatchObject({
+      subjectType: "page",
+      subjectId: "wiki:welcome",
+      userName: "alice",
+      ip: "203.0.113.7",
+      changeType: "create",
+      sizeChange: 24,
+      createdAt: "2026-01-01T00:00:00.000Z"
+    });
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
+    expect(plan.mediaChangelogEntries[0]).toMatchObject({
+      subjectType: "media",
+      subjectId: "wiki:logo.svg",
+      userName: "bob",
+      changeType: "edit",
+      sizeChange: 3,
+      createdAt: "2026-01-01T00:00:01.000Z"
+    });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
     expect(plan.pluginSettings).toContainEqual({

@@ -567,8 +567,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Write importer for `data/media_attic`.
 - [ ] Write importer for `data/meta`.
 - [ ] Write importer for `data/media_meta`.
-- [ ] Write importer for page changelogs.
-- [ ] Write importer for media changelogs.
+- [x] Write importer for page changelogs.
+- [x] Write importer for media changelogs.
 - [x] Write importer for `conf/acl.auth.php`.
 - [x] Write importer for `conf/users.auth.php`.
 - [x] Write importer for plugin settings.

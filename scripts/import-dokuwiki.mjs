@@ -17,8 +17,16 @@ export async function buildImportPlan(sourceRoot) {
 
   const pages = await discoverPages(path.join(dataRoot, "pages"));
   const pageRevisions = await discoverPageRevisions(path.join(dataRoot, "attic"));
+  const pageChangelogEntries = await discoverChangelogEntries(
+    path.join(dataRoot, "meta", "_dokuwiki.changes"),
+    "page"
+  );
   const media = await discoverMedia(path.join(dataRoot, "media"));
   const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
+  const mediaChangelogEntries = await discoverChangelogEntries(
+    path.join(dataRoot, "meta", "_media.changes"),
+    "media"
+  );
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
   const pluginSettings = await discoverPluginSettings([
@@ -42,8 +50,10 @@ export async function buildImportPlan(sourceRoot) {
     counts: {
       pages: pages.length,
       pageRevisions: pageRevisions.length,
+      pageChangelogEntries: pageChangelogEntries.length,
       media: media.length,
       mediaRevisions: mediaRevisions.length,
+      mediaChangelogEntries: mediaChangelogEntries.length,
       aclRules: aclRules.length,
       users: users.length,
       pluginSettings: pluginSettings.length,
@@ -53,8 +63,10 @@ export async function buildImportPlan(sourceRoot) {
     },
     pages,
     pageRevisions,
+    pageChangelogEntries,
     media,
     mediaRevisions,
+    mediaChangelogEntries,
     aclRules,
     users,
     pluginSettings,
@@ -235,6 +247,58 @@ export async function discoverMediaRevisions(mediaAtticRoot) {
   return revisions.sort((a, b) =>
     `${a.mediaId}:${a.revision}`.localeCompare(`${b.mediaId}:${b.revision}`)
   );
+}
+
+export async function discoverChangelogEntries(file, subjectType) {
+  const text = await readTextIfExists(file);
+  if (!text) return [];
+
+  return text
+    .split(/\r?\n/)
+    .map((line, index) => parseChangelogLine(line, subjectType, index))
+    .filter(Boolean);
+}
+
+function parseChangelogLine(line, subjectType, index) {
+  if (!line.trim()) return null;
+
+  const fields = line.replace(/\r?\n$/, "").split("\t");
+  while (fields.length < 8) fields.push("");
+
+  const [timestamp, ip, rawType, subjectId, userName, summary, extra, rawSizeChange] = fields;
+  if (!timestamp || !subjectId) return null;
+
+  const createdAt = new Date(Number.parseInt(timestamp, 10) * 1000).toISOString();
+
+  return {
+    id: `changelog:${subjectType}:${subjectId}:${timestamp}:${index + 1}`,
+    subjectType,
+    subjectId,
+    revisionId: `${subjectId}@${createdAt}`,
+    userName: userName || null,
+    ip: ip || null,
+    changeType: dokuChangeType(rawType),
+    summary,
+    extra,
+    sizeChange: rawSizeChange === "" ? null : Number.parseInt(rawSizeChange, 10),
+    createdAt
+  };
+}
+
+function dokuChangeType(type) {
+  switch (type) {
+    case "C":
+      return "create";
+    case "e":
+      return "minor";
+    case "D":
+      return "delete";
+    case "R":
+      return "revert";
+    case "E":
+    default:
+      return "edit";
+  }
 }
 
 export async function discoverAclRules(file) {
