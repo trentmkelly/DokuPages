@@ -161,7 +161,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement Durable Object-backed locking if used.
 - [x] Implement transactional page save behavior.
 - [x] Implement optimistic concurrency checks.
-- [ ] Implement rollback behavior for partially failed writes.
+- [x] Implement rollback behavior for partially failed writes.
 - [x] Implement pagination helpers for large namespaces, revisions, logs, and media lists.
 - [x] Implement storage error mapping.
 - [ ] Implement storage performance tests.

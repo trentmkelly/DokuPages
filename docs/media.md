@@ -27,6 +27,10 @@ The upload path writes the R2 object first, then stores current media metadata, 
 
 Uploads are validated before R2 writes. The native validator enforces a 25 MiB body limit, allows only a conservative extension set, checks non-generic MIME types against the file extension, and rejects SVG content containing scripts, event handlers, doctypes, entities, foreign objects, or `javascript:` links.
 
+## Rollback Semantics
+
+Page saves, page deletes, media deletes, media reverts, search index updates, and metadata updates use D1 batches so partial SQL writes roll back together. Media uploads are the only request path that writes outside D1: the R2 object is written first, and the upload service deletes that new object if the following D1 batch fails. Existing media revision objects are immutable and are not removed during delete or revert operations.
+
 ## R2 Import Workflow
 
 The DokuWiki importer now emits both D1 SQL and an R2 object manifest. The SQL includes current media rows and immutable `media_revisions` rows for files found under `data/media` and `data/media_attic`.
