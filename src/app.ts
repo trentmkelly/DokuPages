@@ -58,6 +58,10 @@ export async function handleRequest(
 ): Promise<Response> {
   const url = new URL(request.url);
 
+  if (url.pathname === "/") {
+    return redirectResponse(pagePath(startPageId(env)), 302);
+  }
+
   if (url.pathname === "/doku.php") {
     return redirectLegacyDokuPhp(url, env);
   }

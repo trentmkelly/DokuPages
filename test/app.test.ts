@@ -101,6 +101,13 @@ describe("handleRequest", () => {
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
+  it("redirects the site root to the configured start page", async () => {
+    const response = await handleRequest(new Request("https://example.com/"), env);
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
+  });
+
   it("redirects legacy DokuWiki query URLs to canonical page routes", async () => {
     const page = await handleRequest(
       new Request("https://example.com/doku.php?id=Wiki:Welcome"),
@@ -687,7 +694,7 @@ describe("handleRequest", () => {
 
   it("falls back to static assets for non-dynamic routes", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/"),
+      new Request("https://example.com/static.txt"),
       env,
       async () => new Response("static asset")
     );
