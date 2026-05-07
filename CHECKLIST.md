@@ -638,7 +638,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Testing
 
 - [x] Add unit tests for page ID handling.
-- [ ] Add unit tests for namespace handling.
+- [x] Add unit tests for namespace handling.
 - [x] Add unit tests for parser behavior.
 - [x] Add unit tests for renderer behavior.
 - [ ] Add unit tests for ACL behavior.
