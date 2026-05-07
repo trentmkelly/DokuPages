@@ -418,7 +418,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port template assets.
 - [ ] Port plugin assets for supported plugins.
 - [ ] Add asset fingerprinting.
-- [ ] Add asset cache headers.
+- [x] Add asset cache headers.
 - [ ] Add asset integrity checks if needed.
 - [x] Verify all asset references resolve under pages.dev.
 
