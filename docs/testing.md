@@ -16,3 +16,5 @@ npm run test:e2e -- --base-url https://dokutest.pages.dev
 
 CI runs `npm run audit`, which maps to `npm audit --audit-level=high`, on every push and pull request.
 CI also runs `npm run scan:secrets`, which scans tracked files for high-signal private keys and service tokens.
+
+Security regression tests cover CSRF rejection, ACL denial before page render/cache/edit writes, and media upload denial before D1/R2 writes.

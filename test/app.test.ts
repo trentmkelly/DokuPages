@@ -551,7 +551,7 @@ describe("handleRequest", () => {
     await expect(oldRevision.text()).resolves.toBe("<svg>old</svg>");
   });
 
-  it("enforces media upload and delete ACLs", async () => {
+  it("prevents media upload and delete ACL bypasses", async () => {
     state.aclRules = [aclRule("*", "all", "@ALL", 1)];
 
     const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
@@ -592,6 +592,7 @@ describe("handleRequest", () => {
     });
     expect(state.media).toHaveLength(1);
     expect(state.mediaRevisions).toHaveLength(1);
+    expect(state.media.some((media) => media.id === "wiki:upload.txt")).toBe(false);
   });
 
   it("reverts current media to an immutable media revision", async () => {
@@ -749,7 +750,7 @@ describe("handleRequest", () => {
     expect(html).toContain('name="minor" type="checkbox"');
   });
 
-  it("enforces page read ACLs before rendering content", async () => {
+  it("prevents page read ACL bypasses before rendering or caching content", async () => {
     state.aclRules = [aclRule("*", "all", "@ALL", 16), aclRule("wiki:welcome", "all", "@ALL", 0)];
 
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
@@ -759,7 +760,7 @@ describe("handleRequest", () => {
     expect(cachePuts).toHaveLength(0);
   });
 
-  it("enforces page edit ACLs before locking or saving", async () => {
+  it("prevents page edit ACL bypasses before locking or saving", async () => {
     state.aclRules = [aclRule("*", "all", "@ALL", 1)];
 
     const edit = await handleRequest(
