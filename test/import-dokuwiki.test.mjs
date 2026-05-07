@@ -19,6 +19,12 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
+    await writeFile(path.join(root, "conf/plugins.php"), "$plugins['testing'] = 0;\n");
+    await writeFile(path.join(root, "conf/plugins.local.php"), "$plugins['testing'] = 1;\n");
+    await writeFile(
+      path.join(root, "conf/plugins.required.php"),
+      "$plugins['acl'] = 1;\n$plugins['template:dokuwiki'] = true;\n"
+    );
     await writeFile(
       path.join(root, "conf/interwiki.conf"),
       "wp https://en.wikipedia.org/wiki/{NAME}\ngo https://www.google.com/search?q={URL}&amp;btnI=lucky\n"
@@ -38,6 +44,7 @@ describe("DokuWiki import planner", () => {
       media: 1,
       aclRules: 2,
       users: 1,
+      pluginSettings: 3,
       interwikiTemplates: 2,
       mimeTypes: 2,
       wordblockPatterns: 2
@@ -46,6 +53,16 @@ describe("DokuWiki import planner", () => {
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
+    expect(plan.pluginSettings).toContainEqual({
+      plugin: "acl",
+      enabled: true,
+      locked: true
+    });
+    expect(plan.pluginSettings).toContainEqual({
+      plugin: "testing",
+      enabled: true,
+      locked: false
+    });
     expect(plan.interwikiTemplates).toContainEqual({
       shortcut: "go",
       template: "https://www.google.com/search?q={URL}&btnI=lucky"

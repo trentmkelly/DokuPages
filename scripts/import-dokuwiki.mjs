@@ -20,6 +20,11 @@ export async function buildImportPlan(sourceRoot) {
   const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
+  const pluginSettings = await discoverPluginSettings([
+    { file: path.join(confRoot, "plugins.php"), locked: false },
+    { file: path.join(confRoot, "plugins.local.php"), locked: false },
+    { file: path.join(confRoot, "plugins.required.php"), locked: true }
+  ]);
   const interwikiTemplates = await discoverInterwikiTemplates([
     path.join(confRoot, "interwiki.conf"),
     path.join(confRoot, "interwiki.local.conf")
@@ -40,6 +45,7 @@ export async function buildImportPlan(sourceRoot) {
       mediaRevisions: mediaRevisions.length,
       aclRules: aclRules.length,
       users: users.length,
+      pluginSettings: pluginSettings.length,
       interwikiTemplates: interwikiTemplates.length,
       mimeTypes: mimeTypes.length,
       wordblockPatterns: wordblockPatterns.length
@@ -50,6 +56,7 @@ export async function buildImportPlan(sourceRoot) {
     mediaRevisions,
     aclRules,
     users,
+    pluginSettings,
     interwikiTemplates,
     mimeTypes,
     wordblockPatterns
@@ -266,6 +273,30 @@ export async function discoverUsers(file) {
         groups: groups.split(",").filter(Boolean)
       };
     });
+}
+
+export async function discoverPluginSettings(sources) {
+  const settings = new Map();
+
+  for (const source of sources) {
+    const text = await readTextIfExists(source.file);
+    if (!text) continue;
+
+    for (const line of text.split(/\r?\n/)) {
+      const match = line.match(/\$plugins\[['"](.+?)['"]\]\s*=\s*(0|1|true|false)\s*;/i);
+      if (!match) continue;
+
+      const plugin = match[1];
+      const enabled = match[2] === "1" || match[2].toLowerCase() === "true";
+      settings.set(plugin, {
+        plugin,
+        enabled,
+        locked: source.locked
+      });
+    }
+  }
+
+  return [...settings.values()].sort((a, b) => a.plugin.localeCompare(b.plugin));
 }
 
 export async function discoverInterwikiTemplates(files) {
