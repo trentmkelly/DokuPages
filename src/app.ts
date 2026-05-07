@@ -62,6 +62,7 @@ import {
   ACL_CREATE,
   ACL_DELETE,
   ACL_EDIT,
+  ACL_NONE,
   ACL_READ,
   ACL_UPLOAD,
   hasAclPermission,
@@ -90,6 +91,7 @@ import {
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
+import type { AclRuleRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -199,6 +201,20 @@ export async function handleRequest(
 
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
     return htmlResponse(await renderDiagnosticsPage(env));
+  }
+
+  if (url.pathname === "/admin/acl" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    const page = await renderAclAdminPage(request, env, principal, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
+  if (url.pathname === "/api/admin/acl" && request.method === "POST") {
+    return handleAclRuleUpsert(request, env, principal);
+  }
+
+  if (url.pathname === "/api/admin/acl/delete" && request.method === "POST") {
+    return handleAclRuleDelete(request, env, principal);
   }
 
   if (url.pathname === "/recent") {
@@ -489,6 +505,10 @@ export async function handleRequest(
 }
 
 function redirectLegacyDokuPhp(url: URL, env: Env): Response {
+  if (url.searchParams.get("do") === "admin" && url.searchParams.get("page") === "acl") {
+    return redirectResponse("/admin/acl", 301);
+  }
+
   const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
   const target = new URL(pagePath(id || startPageId(env)), url);
   const action = normalizeLegacyAction(url.searchParams.get("do"));
@@ -1300,6 +1320,84 @@ function renderImportJobTable(jobs: ImportJobStatus[]): string {
   </table>`;
 }
 
+async function renderAclAdminPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  csrfToken: string
+): Promise<string | Response> {
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const rules = await listAclRules(env);
+  const rows = rules.map((rule) => renderAclRuleRow(rule, csrfToken)).join("");
+
+  return htmlShell(
+    env,
+    "ACL Manager",
+    `<h1>Access control list manager</h1>
+    <table class="inline acl__rules">
+      <thead>
+        <tr><th>Scope</th><th>Principal</th><th>Permission</th><th>Action</th></tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="4">No ACL rules configured.</td></tr>'}</tbody>
+    </table>
+    <form class="acl__editor" method="post" action="/api/admin/acl">
+      ${csrfInput(csrfToken)}
+      <fieldset>
+        <legend>Add or update ACL rule</legend>
+        <label for="acl__scope">Scope</label>
+        <input id="acl__scope" name="scope" type="text" value="*" required>
+        <label for="acl__principal_type">Principal type</label>
+        <select id="acl__principal_type" name="principalType">
+          <option value="all">All users</option>
+          <option value="group">Group</option>
+          <option value="user">User</option>
+        </select>
+        <label for="acl__principal">Principal</label>
+        <input id="acl__principal" name="principal" type="text" value="@ALL" required>
+        <label for="acl__permission">Permission</label>
+        <select id="acl__permission" name="permission">
+          ${renderAclPermissionOptions(ACL_READ)}
+        </select>
+        <button type="submit">Save ACL rule</button>
+      </fieldset>
+    </form>`
+  );
+}
+
+function renderAclRuleRow(rule: AclRuleRecord, csrfToken: string): string {
+  return `<tr>
+    <td><code>${escapeHtml(rule.scope)}</code></td>
+    <td>${escapeHtml(rule.principalType)} <code>${escapeHtml(rule.principal)}</code></td>
+    <td>${rule.permission}</td>
+    <td>
+      <form method="post" action="/api/admin/acl/delete">
+        ${csrfInput(csrfToken)}
+        <input type="hidden" name="id" value="${escapeAttribute(rule.id)}">
+        <button type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>`;
+}
+
+function renderAclPermissionOptions(selected: number): string {
+  return [
+    [ACL_NONE, "None"],
+    [ACL_READ, "Read"],
+    [ACL_EDIT, "Edit"],
+    [ACL_CREATE, "Create"],
+    [ACL_UPLOAD, "Upload"],
+    [ACL_DELETE, "Delete"]
+  ]
+    .map(
+      ([value, label]) =>
+        `<option value="${value}"${value === selected ? " selected" : ""}>${label} (${value})</option>`
+    )
+    .join("");
+}
+
 async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
   const query = url.searchParams.get("q")?.trim() ?? "";
   const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
@@ -1542,6 +1640,93 @@ function renderWebManifest(env: Env): Record<string, unknown> {
     display: "minimal-ui",
     background_color: "#ffffff",
     theme_color: "#0f172a"
+  };
+}
+
+async function handleAclRuleUpsert(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const parsed = parseAclRuleForm(form);
+  if (!parsed.ok) {
+    return aclAdminErrorResponse(request, env, parsed.error);
+  }
+
+  const store = new D1AclStore(env.DB);
+  await store.deleteMatchingRules(
+    parsed.rule.scope,
+    parsed.rule.principalType,
+    parsed.rule.principal
+  );
+  await store.putRule(parsed.rule);
+
+  return redirectResponse("/admin/acl");
+}
+
+async function handleAclRuleDelete(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const id = String(form.get("id") ?? "").trim();
+  if (!id) {
+    return aclAdminErrorResponse(request, env, "Missing ACL rule id.");
+  }
+
+  await new D1AclStore(env.DB).deleteRule(id);
+  return redirectResponse("/admin/acl");
+}
+
+function parseAclRuleForm(
+  form: FormData
+): { ok: true; rule: AclRuleRecord } | { ok: false; error: string } {
+  const scope = normalizeAclAdminScope(String(form.get("scope") ?? ""));
+  if (!scope) {
+    return { ok: false, error: "Missing ACL scope." };
+  }
+
+  const principalType = parseAclPrincipalType(String(form.get("principalType") ?? ""));
+  if (!principalType) {
+    return { ok: false, error: "Invalid ACL principal type." };
+  }
+
+  const principal = normalizeAclAdminPrincipal(principalType, String(form.get("principal") ?? ""));
+  if (!principal) {
+    return { ok: false, error: "Missing ACL principal." };
+  }
+
+  const permission = Number.parseInt(String(form.get("permission") ?? ""), 10);
+  if (![ACL_NONE, ACL_READ, ACL_EDIT, ACL_CREATE, ACL_UPLOAD, ACL_DELETE].includes(permission)) {
+    return { ok: false, error: "Invalid ACL permission." };
+  }
+
+  return {
+    ok: true,
+    rule: {
+      id: stableAclRuleId(scope, principalType, principal),
+      scope,
+      principalType,
+      principal,
+      permission,
+      createdAt: new Date().toISOString()
+    }
   };
 }
 
@@ -2567,6 +2752,67 @@ function aclDeniedResponse(
     ),
     { status: 403 }
   );
+}
+
+function adminDeniedResponse(request: Request, env: Env): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: "Admin privileges are required." }, { status: 403 });
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Admin access required",
+      "<h1>Admin access required</h1><p>Admin privileges are required.</p>"
+    ),
+    { status: 403 }
+  );
+}
+
+function aclAdminErrorResponse(request: Request, env: Env, message: string): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: message }, { status: 400 });
+  }
+
+  return htmlResponse(htmlShell(env, "ACL rule rejected", `<p>${escapeHtml(message)}</p>`), {
+    status: 400
+  });
+}
+
+function isAdminPrincipal(principal: AuthPrincipal): boolean {
+  return principal.type === "user" && principal.groups.includes("admin");
+}
+
+function normalizeAclAdminScope(value: string): string {
+  return value.trim().replace(/\s+/g, "");
+}
+
+function parseAclPrincipalType(value: string): AclRuleRecord["principalType"] | null {
+  return value === "all" || value === "group" || value === "user" ? value : null;
+}
+
+function normalizeAclAdminPrincipal(
+  principalType: AclRuleRecord["principalType"],
+  value: string
+): string {
+  const principal = value.trim();
+
+  if (principalType === "all") return "@ALL";
+  if (principalType === "group") {
+    if (principal === "%GROUP%") return principal;
+    return principal ? (principal.startsWith("@") ? principal : `@${principal}`) : "";
+  }
+
+  if (principal === "%USER%") return principal;
+  return principal.replace(/^@+/, "");
+}
+
+function stableAclRuleId(
+  scope: string,
+  principalType: AclRuleRecord["principalType"],
+  principal: string
+): string {
+  return `acl:${encodeURIComponent(scope)}:${principalType}:${encodeURIComponent(principal)}`;
 }
 
 async function filterReadablePageItems<T extends { id: string }>(

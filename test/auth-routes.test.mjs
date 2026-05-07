@@ -107,6 +107,76 @@ describe("auth routes", () => {
     });
   });
 
+  it("allows admin users to manage ACL rules", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const denied = await handleRequest(new Request("https://example.com/admin/acl"), env);
+    const legacy = await handleRequest(
+      new Request("https://example.com/doku.php?do=admin&page=acl"),
+      env
+    );
+    const page = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(denied.status).toBe(403);
+    expect(legacy.status).toBe(301);
+    expect(legacy.headers.get("location")).toBe("/admin/acl");
+    expect(page.status).toBe(200);
+    await expect(page.text()).resolves.toContain("Access control list manager");
+
+    const form = new FormData();
+    form.set("scope", "private:*");
+    form.set("principalType", "group");
+    form.set("principal", "admin");
+    form.set("permission", "16");
+
+    const saved = await handleRequest(
+      new Request("https://example.com/api/admin/acl", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    expect(saved.headers.get("location")).toBe("/admin/acl");
+    await expect(env.DB.prepare("select * from acl_rules").bind().all()).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({
+          scope: "private:*",
+          principal_type: "group",
+          principal: "@admin",
+          permission: 16
+        })
+      ]
+    });
+
+    const rules = await env.DB.prepare("select id from acl_rules").bind().all();
+    const remove = new FormData();
+    remove.set("id", rules.results[0].id);
+
+    const deleted = await handleRequest(
+      new Request("https://example.com/api/admin/acl/delete", {
+        method: "POST",
+        body: remove,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(deleted.status).toBe(303);
+    await expect(env.DB.prepare("select * from acl_rules").bind().all()).resolves.toEqual({
+      results: []
+    });
+  });
+
   it("rejects invalid logins without setting a session cookie", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -205,6 +275,23 @@ async function seedUser(d1) {
     .prepare("insert into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
     .bind("user-1", "g2", now)
     .run();
+}
+
+async function loginAsAlice(env) {
+  const login = new FormData();
+  login.set("username", "alice");
+  login.set("password", "correct horse battery staple");
+
+  const response = await handleRequest(
+    new Request("https://example.com/api/auth/login", {
+      method: "POST",
+      body: login,
+      headers: csrfHeaders()
+    }),
+    env
+  );
+
+  return response.headers.get("set-cookie") ?? "";
 }
 
 class SqliteD1 {

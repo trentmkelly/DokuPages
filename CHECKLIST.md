@@ -330,7 +330,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement minimum permission checks for every action.
 - [x] Implement hidden page behavior.
 - [x] Implement sneaky index behavior if supported.
-- [ ] Implement ACL admin UI.
+- [x] Implement ACL admin UI.
 - [x] Add ACL test fixtures.
 - [x] Add ACL regression tests for page, namespace, and media access.
 

@@ -189,6 +189,18 @@ describe("D1 storage adapters", () => {
     await expect(acl.listAllRules()).resolves.toEqual([
       expect.objectContaining({ scope: "wiki:*", principalType: "group", principal: "user" })
     ]);
+    await acl.deleteMatchingRules("wiki:*", "group", "user");
+    await expect(acl.listAllRules()).resolves.toEqual([]);
+    await acl.putRule({
+      id: "acl-2",
+      scope: "*",
+      principalType: "all",
+      principal: "@ALL",
+      permission: 1,
+      createdAt: "2026-05-07T00:00:00.000Z"
+    });
+    await acl.deleteRule("acl-2");
+    await expect(acl.listAllRules()).resolves.toEqual([]);
     await expect(users.getUserByUsername("alice")).resolves.toMatchObject({
       id: "user-1",
       isDisabled: false

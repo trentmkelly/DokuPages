@@ -418,6 +418,21 @@ export class D1AclStore implements AclStore {
       )
       .run();
   }
+
+  async deleteRule(id: string): Promise<void> {
+    await this.db.prepare("delete from acl_rules where id = ?").bind(id).run();
+  }
+
+  async deleteMatchingRules(
+    scope: string,
+    principalType: AclRuleRecord["principalType"],
+    principal: string
+  ): Promise<void> {
+    await this.db
+      .prepare("delete from acl_rules where scope = ? and principal_type = ? and principal = ?")
+      .bind(scope, principalType, principal)
+      .run();
+  }
 }
 
 export class D1ChangelogStore implements ChangelogStore {

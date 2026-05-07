@@ -155,6 +155,12 @@ export interface AclStore {
   listAllRules(): Promise<AclRuleRecord[]>;
   listRules(scope: string): Promise<AclRuleRecord[]>;
   putRule(rule: AclRuleRecord): Promise<void>;
+  deleteRule(id: string): Promise<void>;
+  deleteMatchingRules(
+    scope: string,
+    principalType: AclRuleRecord["principalType"],
+    principal: string
+  ): Promise<void>;
 }
 
 export interface ChangelogStore {
