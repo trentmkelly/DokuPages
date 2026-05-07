@@ -1036,6 +1036,9 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const startPath = pagePath(startId);
   const pageId = options.pageId;
   const pageIdHtml = pageId ? `<div class="pageId"><span>${escapeHtml(pageId)}</span></div>` : "";
+  const canonicalLink = pageId
+    ? `<link rel="canonical" href="${escapeAttribute(pagePath(pageId))}">`
+    : "";
   const docInfo = options.updatedAt
     ? `<div class="docInfo">Last modified: ${escapeHtml(options.updatedAt)}</div>`
     : "";
@@ -1049,6 +1052,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   <title>${escapeHtml(title)} - ${escapeHtml(siteName)}</title>
   <link rel="icon" href="/images/favicon.ico">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+  ${canonicalLink}
   <link rel="stylesheet" href="/dokuwiki.css">
   <script src="/dokuwiki.js" defer></script>
 </head>

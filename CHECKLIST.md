@@ -607,7 +607,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Preserve diff URLs if required.
 - [ ] Preserve admin URLs where possible.
 - [ ] Implement redirect rules for unsupported legacy endpoints.
-- [ ] Implement canonical URL generation.
+- [x] Implement canonical URL generation.
 - [x] Add URL compatibility tests.
 - [ ] Generate redirect audit report.
 

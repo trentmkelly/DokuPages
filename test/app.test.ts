@@ -95,6 +95,7 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain('<nav aria-label="Breadcrumb">');
     expect(html).toContain('<a href="/index?ns=wiki">wiki</a> / <span>welcome</span>');
+    expect(html).toContain('<link rel="canonical" href="/wiki/wiki/welcome">');
     expect(html).toContain('<script src="/dokuwiki.js" defer></script>');
     expect(html).toContain('id="mobile__tools"');
     expect(html).toContain('<h1 id="welcome">Welcome</h1>');
