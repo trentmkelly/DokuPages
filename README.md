@@ -20,6 +20,7 @@ The current deployment is a Cloudflare Pages scaffold with:
 - security notes in `docs/security.md`
 - static asset decisions in `docs/static-assets.md`
 - testing workflow in `docs/testing.md`
+- threat model and permissions review in `docs/threat-model.md`
 - URL compatibility and redirect audit in `docs/url-compatibility.md`
 - a tracked migration checklist in `CHECKLIST.md`
 - GPL attribution and licensing notes in `NOTICE.md` and `COPYING`

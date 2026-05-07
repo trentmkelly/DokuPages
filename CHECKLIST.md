@@ -555,8 +555,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement cookie security flags.
 - [x] Implement dependency vulnerability scanning.
 - [x] Implement secret scanning.
-- [ ] Perform threat model review.
-- [ ] Perform permissions review.
+- [x] Perform threat model review.
+- [x] Perform permissions review.
 
 ## Data Migration
 
