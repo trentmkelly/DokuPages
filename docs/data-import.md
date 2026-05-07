@@ -40,6 +40,14 @@ revisions, current media, and media attic objects. Use it after import to compar
 D1 `page_revisions.content_hash`, D1 media hash columns, and downloaded R2 object
 hashes against the source flat-file hashes.
 
+Verify a completed import:
+
+```sh
+npm run import:verify-hashes
+```
+
+Use `-- --skip-r2` when only D1 hashes need to be checked.
+
 ## Validation
 
 After importing, run:

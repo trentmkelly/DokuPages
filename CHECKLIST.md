@@ -588,7 +588,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Validate imported revision counts.
 - [x] Validate imported user counts.
 - [x] Validate imported ACL counts.
-- [ ] Validate content hashes before and after import.
+- [x] Validate content hashes before and after import.
 - [x] Produce migration report.
 - [x] Make migration idempotent.
 - [ ] Make migration resumable.
@@ -706,7 +706,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add storage error logging.
 - [x] Add auth event logging.
 - [x] Add admin action logging.
-- [ ] Add migration logging.
+- [x] Add migration logging.
 - [x] Add performance timing logs.
 - [x] Add cache metrics.
 - [x] Add search metrics.

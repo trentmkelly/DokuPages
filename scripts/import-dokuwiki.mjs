@@ -1269,17 +1269,24 @@ function parseArgs(argv) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const plan = await buildImportPlan(args.source);
+  logMigrationEvent("plan_built", {
+    source: path.resolve(args.source),
+    counts: plan.counts
+  });
 
   if (args.sqlOut) {
     await writePageImportSql(plan, args.sqlOut);
+    logMigrationEvent("sql_written", { output: args.sqlOut });
   }
 
   if (args.mediaManifestOut) {
     await writeMediaManifest(plan, args.mediaManifestOut);
+    logMigrationEvent("media_manifest_written", { output: args.mediaManifestOut });
   }
 
   if (args.hashManifestOut) {
     await writeHashManifest(plan, args.hashManifestOut);
+    logMigrationEvent("hash_manifest_written", { output: args.hashManifestOut });
   }
 
   console.log(JSON.stringify(plan, null, 2));
@@ -1288,6 +1295,17 @@ async function main() {
     process.exitCode = 2;
     console.error("Only --dry-run mode is implemented in the import planner so far.");
   }
+}
+
+function logMigrationEvent(migrationEvent, details) {
+  console.error(
+    JSON.stringify({
+      level: "info",
+      event: "migration_event",
+      migrationEvent,
+      ...details
+    })
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
