@@ -191,7 +191,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement route handling for registration if supported.
 - [ ] Implement route handling for profile updates if supported.
 - [x] Implement route handling for admin pages.
-- [ ] Implement route handling for remote APIs if supported.
+- [x] Implement route handling for remote APIs if supported.
 - [x] Implement 404 behavior compatible with DokuWiki settings.
 - [x] Implement redirects compatible with DokuWiki actions.
 - [x] Implement canonical URL behavior.
@@ -506,9 +506,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Remote APIs
 
-- [ ] Decide whether XML-RPC compatibility is required.
-- [ ] Decide whether JSON-RPC compatibility is required.
-- [ ] Decide whether OpenAPI output is required.
+- [x] Decide whether XML-RPC compatibility is required.
+- [x] Decide whether JSON-RPC compatibility is required.
+- [x] Decide whether OpenAPI output is required.
 - [ ] Implement API auth.
 - [ ] Implement API CORS behavior.
 - [ ] Implement page read API methods.

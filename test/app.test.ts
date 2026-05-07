@@ -262,6 +262,25 @@ describe("handleRequest", () => {
     expect(unknown.status).toBe(400);
   });
 
+  it("returns explicit not-implemented responses for legacy remote API entrypoints", async () => {
+    const xmlrpc = await handleRequest(new Request("https://example.com/lib/exe/xmlrpc.php"), env);
+    const jsonrpc = await handleRequest(
+      new Request("https://example.com/lib/exe/jsonrpc.php"),
+      env
+    );
+    const openapi = await handleRequest(
+      new Request("https://example.com/lib/exe/openapi.php"),
+      env
+    );
+
+    expect(xmlrpc.status).toBe(501);
+    expect(jsonrpc.status).toBe(501);
+    expect(openapi.status).toBe(501);
+    await expect(jsonrpc.json()).resolves.toMatchObject({
+      status: "not_implemented"
+    });
+  });
+
   it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
     const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
     const download = await handleRequest(

@@ -148,6 +148,18 @@ export async function handleRequest(
     );
   }
 
+  if (url.pathname === "/lib/exe/xmlrpc.php") {
+    return remoteApiNotImplementedResponse("XML-RPC");
+  }
+
+  if (url.pathname === "/lib/exe/jsonrpc.php") {
+    return remoteApiNotImplementedResponse("JSON-RPC");
+  }
+
+  if (url.pathname === "/lib/exe/openapi.php") {
+    return remoteApiNotImplementedResponse("OpenAPI");
+  }
+
   if (url.pathname === "/lib/exe/ajax.php") {
     return handleAjax(request, env, url, principal);
   }
@@ -580,6 +592,16 @@ function redirectLegacyMediaDetail(url: URL): Response {
   }
 
   return redirectResponse(mediaDetailPath(id), 301);
+}
+
+function remoteApiNotImplementedResponse(apiName: string): Response {
+  return jsonResponse(
+    {
+      error: `${apiName} compatibility is not supported by this Pages port yet.`,
+      status: "not_implemented"
+    },
+    { status: 501 }
+  );
 }
 
 async function handleAjax(
