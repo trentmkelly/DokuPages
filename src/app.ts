@@ -43,8 +43,10 @@ import { renderWikiText, type TocItem } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
+const RENDER_CACHE_VERSION = 2;
 
 interface RenderCacheEntry {
+  rendererVersion: number;
   revisionId: string;
   title: string;
   html: string;
@@ -174,7 +176,8 @@ export async function handleRequest(
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
     const form = await request.formData();
     const content = String(form.get("content") ?? "");
-    return jsonResponse(renderWikiText(content));
+    const pageId = cleanPageId(String(form.get("id") ?? ""));
+    return jsonResponse(renderWikiText(content, { pageId: pageId || undefined }));
   }
 
   if (url.pathname.startsWith("/wiki/")) {
@@ -519,9 +522,10 @@ async function renderPageHtml(
     );
   }
 
-  const rendered = renderWikiText(content);
+  const rendered = renderWikiText(content, { pageId: id });
   const title = rendered.title ?? page?.title ?? id;
   await writeRenderCache(env, cacheKey, {
+    rendererVersion: RENDER_CACHE_VERSION,
     revisionId,
     title,
     html: rendered.html,
@@ -1273,6 +1277,7 @@ async function readRenderCache(
 
     if (
       cached?.revisionId === revisionId &&
+      cached.rendererVersion === RENDER_CACHE_VERSION &&
       typeof cached.title === "string" &&
       typeof cached.html === "string" &&
       Array.isArray(cached.toc)

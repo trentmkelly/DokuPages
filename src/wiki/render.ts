@@ -1,4 +1,4 @@
-import { cleanPageId } from "./page-id";
+import { cleanPageId, pageIdToRoutePath, resolvePageLinkId } from "./page-id";
 import { mediaPath } from "./media-service";
 
 export interface TocItem {
@@ -13,11 +13,19 @@ export interface RenderedWikiText {
   toc: TocItem[];
 }
 
-export function renderWikiText(source: string): RenderedWikiText {
+export interface RenderWikiTextOptions {
+  pageId?: string;
+}
+
+export function renderWikiText(
+  source: string,
+  options: RenderWikiTextOptions = {}
+): RenderedWikiText {
   const blocks: string[] = [];
   const toc: TocItem[] = [];
   const context: RenderContext = {
-    footnotes: []
+    footnotes: [],
+    pageId: options.pageId ? cleanPageId(options.pageId) : undefined
   };
   const title: { value: string | null } = { value: null };
   const state: ParserState = {
@@ -145,6 +153,7 @@ interface SpecialBlock {
 
 interface RenderContext {
   footnotes: string[];
+  pageId?: string;
 }
 
 function parseHeading(line: string): { level: number; title: string } | null {
@@ -238,7 +247,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
   const notes = context.footnotes
     .map(
       (note, index) =>
-        `<div class="fn" id="fn__${index + 1}"><sup><a href="#fnt__${index + 1}">${index + 1})</a></sup> ${renderInline(note, { footnotes: [] })}</div>`
+        `<div class="fn" id="fn__${index + 1}"><sup><a href="#fnt__${index + 1}">${index + 1})</a></sup> ${renderInline(note, { footnotes: [], pageId: context.pageId })}</div>`
     )
     .join("");
 
@@ -263,7 +272,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = escapeHtml(rendered);
   rendered = renderTypography(rendered);
   rendered = renderMedia(rendered);
-  rendered = renderLinks(rendered);
+  rendered = renderLinks(rendered, context);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\/\/([^/]+)\/\//g, "<em>$1</em>")
@@ -316,18 +325,27 @@ function renderMedia(source: string): string {
   );
 }
 
-function renderLinks(source: string): string {
+function renderLinks(source: string, context: RenderContext): string {
   return source.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, rawTarget, rawLabel) => {
     const target = rawTarget.trim();
     const label = rawLabel?.trim() || target;
     const external = /^https?:\/\//i.test(target);
-    const href = external
-      ? target
-      : `/wiki/${encodeURIComponent(cleanPageId(target).replaceAll(":", "/"))}`;
+    const href = external ? target : internalLinkPath(target, context.pageId);
     const rel = external ? ' rel="nofollow noopener noreferrer"' : "";
 
     return `<a href="${escapeAttribute(href)}"${rel}>${escapeHtml(label)}</a>`;
   });
+}
+
+function internalLinkPath(target: string, currentPageId: string | undefined): string {
+  const [rawPageId = "", rawFragment] = target.split("#", 2);
+  const fragment = rawFragment ? `#${slugify(rawFragment)}` : "";
+
+  if (!rawPageId) {
+    return fragment || "#";
+  }
+
+  return `${pageIdToRoutePath(resolvePageLinkId(rawPageId, currentPageId))}${fragment}`;
 }
 
 function uniqueAnchor(base: string, toc: TocItem[]): string {

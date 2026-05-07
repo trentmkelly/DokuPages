@@ -1,3 +1,4 @@
+import { pageIdToRoutePath } from "./page-id";
 import { extractInternalPageLinks } from "./page-links";
 import { buildSearchTermFrequencies, makeSearchSnippet, parseSearchQuery } from "./search";
 
@@ -559,11 +560,7 @@ function countWords(content: string): number {
 }
 
 export function pagePath(id: string): string {
-  return `/wiki/${id
-    .split(":")
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join("/")}`;
+  return pageIdToRoutePath(id);
 }
 
 function mapRevision(row: PageRevisionRow): PageRevision {

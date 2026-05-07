@@ -184,6 +184,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
+        rendererVersion: 2,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -201,11 +202,11 @@ describe("handleRequest", () => {
     expect(cachePuts).toHaveLength(0);
   });
 
-  it("refreshes stale rendered page cache entries", async () => {
+  it("refreshes rendered page cache entries from older renderer versions", async () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        revisionId: "stale",
+        revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Stale",
         html: "<p>Stale body.</p>",
         toc: []
@@ -456,7 +457,8 @@ describe("handleRequest", () => {
 
   it("previews submitted wiki text", async () => {
     const form = new FormData();
-    form.set("content", "====== Preview ======\n\n**Text**");
+    form.set("id", "wiki:guide:start");
+    form.set("content", "====== Preview ======\n\n**Text** [[child|Child]]");
 
     const response = await handleRequest(
       new Request("https://example.com/api/pages/preview", {
@@ -467,8 +469,12 @@ describe("handleRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const preview = await response.json();
+    expect(preview).toMatchObject({
       title: "Preview"
+    });
+    expect(preview).toMatchObject({
+      html: expect.stringContaining('<a href="/wiki/wiki/guide/child">Child</a>')
     });
   });
 

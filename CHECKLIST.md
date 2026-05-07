@@ -206,7 +206,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement paragraphs and line breaks.
 - [x] Implement bold, italic, underline, monospace, subscript, superscript, and deleted text.
 - [x] Implement internal links.
-- [ ] Implement namespace-relative links.
+- [x] Implement namespace-relative links.
 - [x] Implement media links.
 - [x] Implement external links.
 - [ ] Implement interwiki links.

@@ -45,11 +45,24 @@ describe("renderWikiText", () => {
       "[[wiki:syntax|Syntax]] [[https://example.test|Example]] {{wiki:dokuwiki.svg|Logo}}"
     );
 
-    expect(rendered.html).toContain('<a href="/wiki/wiki%2Fsyntax">Syntax</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax">Syntax</a>');
     expect(rendered.html).toContain(
       '<a href="https://example.test" rel="nofollow noopener noreferrer">Example</a>'
     );
     expect(rendered.html).toContain('<img src="/media/wiki/dokuwiki.svg" alt="Logo">');
+  });
+
+  it("renders namespace-relative internal links from page context", () => {
+    const rendered = renderWikiText(
+      "[[child|Child]] [[:start|Start]] [[..:root|Root]] [[wiki:syntax#head line|Syntax]] [[#local section|Local]]",
+      { pageId: "wiki:guide:page" }
+    );
+
+    expect(rendered.html).toContain('<a href="/wiki/wiki/guide/child">Child</a>');
+    expect(rendered.html).toContain('<a href="/wiki/start">Start</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/root">Root</a>');
+    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax#head-line">Syntax</a>');
+    expect(rendered.html).toContain('<a href="#local-section">Local</a>');
   });
 
   it("renders lists, code blocks, and nowiki spans", () => {

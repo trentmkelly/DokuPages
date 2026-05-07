@@ -11,10 +11,9 @@ describe("page link extraction", () => {
   });
 
   it("resolves relative links in the source namespace", () => {
-    expect(extractInternalPageLinks("[[syntax]] [[:start]]", "wiki:welcome")).toEqual([
-      "start",
-      "wiki:syntax"
-    ]);
+    expect(
+      extractInternalPageLinks("[[syntax]] [[:start]] [[..:root]]", "wiki:guide:page")
+    ).toEqual(["start", "wiki:guide:syntax", "wiki:root"]);
   });
 
   it("skips DokuWiki interwiki links", () => {

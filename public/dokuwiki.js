@@ -119,7 +119,14 @@
 
   async function renderPreview(textarea, preview, status) {
     var url = textarea.dataset.previewUrl;
+    var form = textarea.form;
+    var id = form ? form.querySelector('input[name="id"]') : null;
     var formData = new FormData();
+
+    if (id) {
+      formData.set("id", id.value);
+    }
+
     formData.set("content", textarea.value);
 
     setStatus(status, "Rendering preview...");
