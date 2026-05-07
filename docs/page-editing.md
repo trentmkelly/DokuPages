@@ -19,6 +19,7 @@ The first page editing implementation is intentionally small but exercises the r
 - `content`
 - `summary`
 - `baseRevisionId`
+- `minor` for existing-page edits that should be recorded as minor changes
 
 The save path:
 

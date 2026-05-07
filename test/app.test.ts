@@ -132,9 +132,9 @@ describe("handleRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toContain(
-      'name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"'
-    );
+    const html = await response.text();
+    expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
+    expect(html).toContain('name="minor" type="checkbox"');
   });
 
   it("returns source text for existing pages", async () => {
@@ -359,6 +359,30 @@ describe("handleRequest", () => {
     expect(state.row?.title).toBe("Updated");
     expect(state.batches).toHaveLength(1);
     expect(purgedKeys).toContain("page:wiki:welcome");
+  });
+
+  it("records minor edits for existing pages", async () => {
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Welcome ======\n\nSmall correction.");
+    form.set("summary", "Small correction");
+    form.set("minor", "1");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(state.revisions[0]).toMatchObject({
+      page_id: "wiki:welcome",
+      change_type: "minor",
+      summary: "Small correction"
+    });
   });
 
   it("returns conflicts when the base revision is stale", async () => {

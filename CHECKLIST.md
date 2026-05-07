@@ -244,7 +244,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement page deletion through empty content.
 - [x] Implement page revert.
 - [x] Implement edit summaries.
-- [ ] Implement minor edits.
+- [x] Implement minor edits.
 - [x] Implement conflict detection.
 - [ ] Implement edit locks.
 - [ ] Implement draft autosave.

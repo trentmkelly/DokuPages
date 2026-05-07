@@ -61,7 +61,7 @@ export interface SavePageInput {
   content: string;
   summary: string;
   baseRevisionId: string | null;
-  changeType?: "create" | "edit" | "delete" | "revert";
+  changeType?: "create" | "edit" | "minor" | "delete" | "revert";
   authorId?: string | null;
   authorName?: string | null;
   ip?: string | null;
@@ -72,7 +72,7 @@ export type SavePageResult =
   | {
       ok: true;
       page: CurrentPage;
-      changeType: "create" | "edit" | "delete" | "revert";
+      changeType: "create" | "edit" | "minor" | "delete" | "revert";
     }
   | {
       ok: false;
@@ -368,7 +368,11 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
     extractTitle(input.content) ??
     (input.id.includes(":") ? input.id.slice(input.id.lastIndexOf(":") + 1) : input.id);
   const isDelete = input.content.trim() === "";
-  const changeType = input.changeType ?? (isDelete ? "delete" : current ? "edit" : "create");
+  const defaultChangeType = isDelete ? "delete" : current ? "edit" : "create";
+  const changeType =
+    input.changeType === "minor" && defaultChangeType !== "edit"
+      ? defaultChangeType
+      : (input.changeType ?? defaultChangeType);
   const sizeChange = input.content.length - (current?.content.length ?? 0);
   const contentHash = await sha256(input.content);
   const indexedTerms = await listIndexedTerms(db, input.id);

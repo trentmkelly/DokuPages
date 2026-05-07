@@ -598,6 +598,7 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
     content: String(form.get("content") ?? ""),
     summary: String(form.get("summary") ?? ""),
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
+    changeType: form.get("minor") ? "minor" : undefined,
     ip: request.headers.get("cf-connecting-ip") ?? null
   });
 
@@ -669,6 +670,9 @@ function renderEditPage(
       <p>
         <label for="summary">Summary</label><br>
         <input id="summary" name="summary" type="text" value="">
+      </p>
+      <p>
+        <label><input name="minor" type="checkbox" value="1"> Minor edit</label>
       </p>
       <button type="submit">Save</button>
     </form>
