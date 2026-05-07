@@ -4,6 +4,13 @@ The native TypeScript renderer lives in `src/wiki/render.ts`. It targets the
 DokuWiki syntax surface needed by the port and migration tests, but it is not a
 drop-in implementation of DokuWiki's PHP parser mode system.
 
+The current source-page syntax inventory is tracked in
+`docs/syntax-inventory.md` and can be regenerated with:
+
+```sh
+node scripts/inventory-syntax.mjs --source ../dokuwiki/data/pages --output docs/syntax-inventory.md
+```
+
 ## Supported
 
 - headings with title metadata and table-of-contents extraction

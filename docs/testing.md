@@ -30,3 +30,6 @@ plugins.
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
 sizes, and R2 media operation counts.
+
+Syntax inventory tests cover the scanner used to generate
+`docs/syntax-inventory.md` from the current DokuWiki `data/pages` tree.

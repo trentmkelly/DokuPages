@@ -200,7 +200,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## DokuWiki Syntax Parser
 
-- [ ] Inventory DokuWiki syntax features used by current content.
+- [x] Inventory DokuWiki syntax features used by current content.
 - [x] Decide whether to port DokuWiki's parser or implement a compatible parser.
 - [x] Implement headings.
 - [x] Implement paragraphs and line breaks.
