@@ -301,7 +301,7 @@ export async function handleRequest(
     }
 
     if (!page) {
-      return notFoundResponse(`Wiki page '${id}' was not found.`);
+      return htmlResponse(renderMissingPage(env, id), { status: 404 });
     }
 
     return htmlResponse(
@@ -634,6 +634,26 @@ ${rendered.html}
 function exportFileName(id: string): string {
   const name = id.split(":").filter(Boolean).at(-1) || "page";
   return name.replace(/[^a-z0-9._-]+/gi, "_");
+}
+
+function renderMissingPage(env: Env, id: string): string {
+  return htmlShell(
+    env,
+    id,
+    `${renderBreadcrumbs(id)}
+    <h1 id="${escapeAttribute(slugForPageHeading(id))}">${escapeHtml(id)}</h1>
+    <p>This topic does not exist yet.</p>
+    <p>
+      <a class="wikilink1" href="${pagePath(id)}?do=edit">Create this page</a>
+      <span class="sep"> · </span>
+      <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
+    </p>`,
+    { pageId: id }
+  );
+}
+
+function slugForPageHeading(id: string): string {
+  return id.replaceAll(":", "-").replaceAll("_", "-") || "page";
 }
 
 function renderBreadcrumbs(id: string): string {

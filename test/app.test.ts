@@ -272,6 +272,13 @@ describe("handleRequest", () => {
     const response = await handleRequest(new Request("https://example.com/wiki/Missing/Page"), env);
 
     expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    const html = await response.text();
+    expect(html).toContain("This topic does not exist yet.");
+    expect(html).toContain(
+      '<a class="wikilink1" href="/wiki/missing/page?do=edit">Create this page</a>'
+    );
+    expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');
   });
 
   it("renders an edit form for existing pages", async () => {
