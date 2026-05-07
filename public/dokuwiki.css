@@ -296,6 +296,11 @@ kbd {
   text-align: right;
 }
 
+#dokuwiki__usertools {
+  margin-bottom: 0.4em;
+  text-align: right;
+}
+
 #dokuwiki__header .mobileTools {
   display: none;
 }
@@ -1126,6 +1131,10 @@ form.search button {
   }
 
   #dokuwiki__sitetools {
+    text-align: left;
+  }
+
+  #dokuwiki__usertools {
     text-align: left;
   }
 

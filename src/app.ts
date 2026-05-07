@@ -574,7 +574,7 @@ export async function handleRequest(
           revision.id,
           revision.createdAt,
           undefined,
-          { cacheMode }
+          { cacheMode, principal }
         )
       );
     }
@@ -618,7 +618,7 @@ export async function handleRequest(
     if (!page) {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
-      return htmlResponse(renderMissingPage(env, id), { status: 404 });
+      return htmlResponse(renderMissingPage(env, id, principal), { status: 404 });
     }
 
     const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
@@ -626,7 +626,10 @@ export async function handleRequest(
 
     const cacheMode = await renderCacheModeForPage(env, id);
     return htmlResponse(
-      await renderPageHtml(env, id, page.content, page.revisionId, undefined, page, { cacheMode })
+      await renderPageHtml(env, id, page.content, page.revisionId, undefined, page, {
+        cacheMode,
+        principal
+      })
     );
   }
 
@@ -638,12 +641,8 @@ export async function handleRequest(
 }
 
 function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
-  if (url.searchParams.get("do") === "admin" && !url.searchParams.get("page")) {
-    return redirectResponse("/admin", 301);
-  }
-
-  if (url.searchParams.get("do") === "admin" && url.searchParams.get("page") === "acl") {
-    return redirectResponse("/admin/acl", 301);
+  if (url.searchParams.get("do") === "admin") {
+    return redirectLegacyAdminPage(url.searchParams.get("page"));
   }
 
   if (url.searchParams.get("do") === "profile") {
@@ -674,6 +673,34 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
   }
 
   return redirectResponse(`${target.pathname}${target.search}`, 301);
+}
+
+function redirectLegacyAdminPage(page: string | null): Response {
+  switch (page) {
+    case null:
+    case "":
+      return redirectResponse("/admin", 301);
+    case "acl":
+      return redirectResponse("/admin/acl", 301);
+    case "config":
+      return redirectResponse("/admin/config", 301);
+    case "info":
+      return redirectResponse("/diagnostics", 301);
+    case "logviewer":
+      return redirectResponse("/admin/audit", 301);
+    case "usermanager":
+      return redirectResponse("/admin/users", 301);
+    case "extension":
+      return legacyEndpointNotAvailableResponse("DokuWiki extension manager", 501);
+    case "popularity":
+      return legacyEndpointNotAvailableResponse("DokuWiki popularity plugin", 501);
+    case "safefnrecode":
+      return legacyEndpointNotAvailableResponse("DokuWiki safefnrecode plugin", 501);
+    case "styling":
+      return legacyEndpointNotAvailableResponse("DokuWiki styling plugin runtime editor", 501);
+    default:
+      return redirectResponse("/admin", 301);
+  }
 }
 
 function redirectLegacyMediaFetch(url: URL): Response {
@@ -1752,7 +1779,7 @@ async function renderMediaDetailPage(
   const media = id ? await getCurrentMedia(env.DB, id) : null;
 
   if (!id || !media) {
-    return htmlShell(env, "Media not found", "<p>Media not found.</p>");
+    return htmlShell(env, "Media not found", "<p>Media not found.</p>", { principal });
   }
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
@@ -1795,7 +1822,8 @@ async function renderMediaDetailPage(
         <input id="media__delete_summary" name="summary" type="text">
         <button type="submit">Delete media</button>
       </form>
-    </div>`
+    </div>`,
+    { principal }
   );
 }
 
@@ -1871,7 +1899,8 @@ async function renderMediaManagerPage(
     </form>
     ${emptyState}
     <ul class="idx media__manager">${items}</ul>
-    ${renderPaginationControls(url, pagination, media.length)}`
+    ${renderPaginationControls(url, pagination, media.length)}`,
+    { principal }
   );
 }
 
@@ -1948,7 +1977,7 @@ async function renderPageHtml(
   revisionId: string,
   revisionDate?: string,
   page?: CurrentPage,
-  options: { cacheMode?: RenderCacheMode } = {}
+  options: { cacheMode?: RenderCacheMode; principal?: AuthPrincipal } = {}
 ): Promise<string> {
   const startedAt = Date.now();
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
@@ -1991,7 +2020,7 @@ async function renderPageHtml(
       env,
       cached.title,
       `${renderBreadcrumbs(id)}${renderToc(cached.toc)}${revisionNotice}${cached.html}`,
-      { pageId: id, updatedAt: revisionDate ?? page?.updatedAt }
+      { pageId: id, principal: options.principal, updatedAt: revisionDate ?? page?.updatedAt }
     );
   }
 
@@ -2027,7 +2056,7 @@ async function renderPageHtml(
     env,
     title,
     `${renderBreadcrumbs(id)}${renderToc(rendered.toc)}${revisionNotice}${rendered.html}`,
-    { pageId: id, updatedAt: revisionDate ?? page?.updatedAt }
+    { pageId: id, principal: options.principal, updatedAt: revisionDate ?? page?.updatedAt }
   );
 }
 
@@ -2089,7 +2118,7 @@ function versionedAssetPath(assetPath: string, env: Env): string {
   return `${assetPath}?v=${encodeURIComponent(getRuntimeConfig(env).appVersion)}`;
 }
 
-function renderMissingPage(env: Env, id: string): string {
+function renderMissingPage(env: Env, id: string, principal?: AuthPrincipal): string {
   return htmlShell(
     env,
     id,
@@ -2101,7 +2130,7 @@ function renderMissingPage(env: Env, id: string): string {
       <span class="sep"> · </span>
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
     </p>`,
-    { pageId: id }
+    { pageId: id, principal }
   );
 }
 
@@ -2343,7 +2372,8 @@ async function renderRecentPage(env: Env, url: URL, principal: AuthPrincipal): P
   return htmlShell(
     env,
     "Recent changes",
-    `<h1>Recent changes</h1><ul>${items}</ul>${renderPaginationControls(url, pagination, changes.length)}`
+    `<h1>Recent changes</h1><ul>${items}</ul>${renderPaginationControls(url, pagination, changes.length)}`,
+    { principal }
   );
 }
 
@@ -2540,7 +2570,8 @@ function renderAdminDashboardPage(
         ${configTool}
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
-      ${adminActions}`
+      ${adminActions}`,
+    { principal }
   );
 }
 
@@ -2567,7 +2598,8 @@ function renderConfigAdminPage(
     <h2>Runtime variables</h2>
     ${renderConfigEntryTable(variables)}
     <h2>Secrets</h2>
-    ${renderSecretConfigTable(secrets)}`
+    ${renderSecretConfigTable(secrets)}`,
+    { principal }
   );
 }
 
@@ -2649,7 +2681,8 @@ async function renderAuditLogPage(
       </thead>
       <tbody>${rows || '<tr><td colspan="5">No audit entries recorded.</td></tr>'}</tbody>
     </table>
-    ${renderPaginationControls(url, pagination, entries.length)}`
+    ${renderPaginationControls(url, pagination, entries.length)}`,
+    { principal }
   );
 }
 
@@ -2711,7 +2744,8 @@ async function renderAclAdminPage(
         </select>
         <button type="submit">Save ACL rule</button>
       </fieldset>
-    </form>`
+    </form>`,
+    { principal }
   );
 }
 
@@ -2789,7 +2823,8 @@ async function renderUserAdminPage(
       </thead>
       <tbody>${rows || '<tr><td colspan="6">No users configured.</td></tr>'}</tbody>
     </table>
-    ${renderPaginationControls(url, pagination, users.length)}`
+    ${renderPaginationControls(url, pagination, users.length)}`,
+    { principal }
   );
 }
 
@@ -2890,7 +2925,8 @@ async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): P
     </form>
     ${namespace ? `<p>Search scope: ${escapeHtml(namespace)}</p>` : ""}
     ${emptyState}
-    <ol>${resultItems}</ol>`
+    <ol>${resultItems}</ol>`,
+    { principal }
   );
 }
 
@@ -2923,7 +2959,8 @@ async function renderNamespaceIndexPage(
   return htmlShell(
     env,
     title,
-    `<h1>${escapeHtml(title)}</h1>${emptyState}<ul>${items}</ul>${renderPaginationControls(url, pagination, pages.length)}`
+    `<h1>${escapeHtml(title)}</h1>${emptyState}<ul>${items}</ul>${renderPaginationControls(url, pagination, pages.length)}`,
+    { principal }
   );
 }
 
@@ -2939,7 +2976,8 @@ async function renderBacklinksPage(
   return htmlShell(
     env,
     `Backlinks for ${id}`,
-    `<h1>Backlinks for ${escapeHtml(id)}</h1>${emptyState}<ul>${items}</ul>`
+    `<h1>Backlinks for ${escapeHtml(id)}</h1>${emptyState}<ul>${items}</ul>`,
+    { principal }
   );
 }
 
@@ -2948,7 +2986,9 @@ async function renderOrphanPage(env: Env, principal: AuthPrincipal): Promise<str
   const items = renderPageReferenceList(orphans);
   const emptyState = orphans.length === 0 ? "<p>No orphan pages found.</p>" : "";
 
-  return htmlShell(env, "Orphan pages", `<h1>Orphan pages</h1>${emptyState}<ul>${items}</ul>`);
+  return htmlShell(env, "Orphan pages", `<h1>Orphan pages</h1>${emptyState}<ul>${items}</ul>`, {
+    principal
+  });
 }
 
 async function renderWantedPage(env: Env, principal: AuthPrincipal): Promise<string> {
@@ -2971,7 +3011,9 @@ async function renderWantedPage(env: Env, principal: AuthPrincipal): Promise<str
     .join("");
   const emptyState = wanted.length === 0 ? "<p>No wanted pages found.</p>" : "";
 
-  return htmlShell(env, "Wanted pages", `<h1>Wanted pages</h1>${emptyState}<ul>${items}</ul>`);
+  return htmlShell(env, "Wanted pages", `<h1>Wanted pages</h1>${emptyState}<ul>${items}</ul>`, {
+    principal
+  });
 }
 
 function renderPageReferenceList(
@@ -3903,7 +3945,8 @@ function renderProfilePage(
         <input id="profile__new_password_confirm" name="newPasswordConfirm" class="edit" type="password" autocomplete="new-password">
       </fieldset>
       <button type="submit">Update Profile</button>
-    </form>`
+    </form>`,
+    { principal }
   );
 }
 
@@ -4210,6 +4253,7 @@ function getComparablePageId(page: CurrentPage | PageRevision): string {
 
 interface HtmlShellOptions {
   pageId?: string;
+  principal?: AuthPrincipal;
   updatedAt?: string;
 }
 
@@ -4256,20 +4300,18 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">
+          ${renderUserTools(options.principal)}
           <nav id="dokuwiki__sitetools" aria-label="Site tools">
             <h3 class="a11y">Site tools</h3>
             <form class="search" method="get" action="/search">
               <input name="q" type="search" placeholder="Search">
               <button type="submit">Search</button>
             </form>
-            ${renderMobileTools(pageId)}
+            ${renderMobileTools(pageId, options.principal)}
             <ul>
               <li><a href="/recent">Recent changes</a></li>
               <li><a href="/index?ns=wiki">Index</a></li>
               <li><a href="/diagnostics">Diagnostics</a></li>
-              <li><a href="/login">Login</a></li>
-              <li><a href="/register">Register</a></li>
-              <li><a href="/profile">Update Profile</a></li>
             </ul>
           </nav>
         </div>
@@ -4305,13 +4347,35 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
 </html>`;
 }
 
-function renderMobileTools(pageId?: string): string {
+function renderUserTools(principal?: AuthPrincipal): string {
+  const accountItems =
+    principal?.type === "user"
+      ? `${isManagerPrincipal(principal) ? '<li class="admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
+        <li class="profile"><a href="/profile" rel="nofollow">Update Profile</a></li>
+        <li class="logout"><a href="/logout" rel="nofollow">Logout</a></li>`
+      : `<li class="login"><a href="/login" rel="nofollow">Login</a></li>
+        <li class="register"><a href="/register" rel="nofollow">Register</a></li>`;
+
+  return `<nav id="dokuwiki__usertools" aria-label="User tools">
+            <h3 class="a11y">User tools</h3>
+            <ul>${accountItems}</ul>
+          </nav>`;
+}
+
+function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
   const pageOptions = pageId
     ? `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>
       <option value="${pagePath(pageId)}?do=source">Show source</option>
       <option value="${pagePath(pageId)}?do=revisions">Old revisions</option>
       <option value="${pagePath(pageId)}?do=backlink">Backlinks</option>`
     : "";
+  const accountOptions =
+    principal?.type === "user"
+      ? `${isManagerPrincipal(principal) ? '<option value="/admin">Admin</option>' : ""}
+        <option value="/profile">Update Profile</option>
+        <option value="/logout">Logout</option>`
+      : `<option value="/login">Login</option>
+        <option value="/register">Register</option>`;
 
   return `<div class="mobileTools">
       <label class="a11y" for="mobile__tools">Tools</label>
@@ -4322,9 +4386,7 @@ function renderMobileTools(pageId?: string): string {
         <option value="/index?ns=wiki">Index</option>
         <option value="/search">Search</option>
         <option value="/diagnostics">Diagnostics</option>
-        <option value="/login">Login</option>
-        <option value="/register">Register</option>
-        <option value="/profile">Update Profile</option>
+        ${accountOptions}
       </select>
     </div>`;
 }

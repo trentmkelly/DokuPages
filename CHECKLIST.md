@@ -467,7 +467,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Define supported admin hooks.
 - [x] Define plugin packaging rules for Pages.
 - [x] Define plugin security boundaries.
-- [ ] Add plugin compatibility tests for supported plugins.
+- [x] Add plugin compatibility tests for supported plugins.
 
 ## Admin And Maintenance
 

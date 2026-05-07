@@ -16,6 +16,14 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?id=<page>&do=export_xhtml`               | Redirects to the XHTML export route.                                |
 | `/doku.php?do=admin`                                | Redirects to `/admin`.                                              |
 | `/doku.php?do=admin&page=acl`                       | Redirects to `/admin/acl`.                                          |
+| `/doku.php?do=admin&page=config`                    | Redirects to `/admin/config`.                                       |
+| `/doku.php?do=admin&page=info`                      | Redirects to `/diagnostics`.                                        |
+| `/doku.php?do=admin&page=logviewer`                 | Redirects to `/admin/audit`.                                        |
+| `/doku.php?do=admin&page=usermanager`               | Redirects to `/admin/users`.                                        |
+| `/doku.php?do=admin&page=extension`                 | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=admin&page=popularity`                | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=admin&page=safefnrecode`              | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=admin&page=styling`                   | Returns explicit `501` JSON.                                        |
 | `/doku.php?do=register`                             | Returns explicit `501` JSON.                                        |
 | `/doku.php?do=profile`                              | Redirects to `/profile`.                                            |
 | `/doku.php?do=resendpwd`                            | Returns explicit `501` JSON.                                        |

@@ -22,3 +22,7 @@ Security regression tests cover renderer XSS escaping, CSRF rejection, ACL denia
 Native API compatibility tests cover the `/api/v1` endpoint index, page reads
 and writes, page revisions, media reads and deletes, media revisions, search,
 `users/me`, bearer-token authentication, and configured CORS behavior.
+
+Plugin compatibility tests cover legacy bundled plugin admin URLs that redirect
+to native replacements, plus explicit removal responses for unsupported bundled
+plugins.

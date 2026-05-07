@@ -89,6 +89,10 @@ describe("auth routes", () => {
     const html = await profile.text();
     expect(html).toContain('id="dw__profile"');
     expect(html).toContain("Alice Example");
+    expect(html).toContain('id="dokuwiki__usertools"');
+    expect(html).toContain('<a href="/profile" rel="nofollow">Update Profile</a>');
+    expect(html).toContain('<a href="/logout" rel="nofollow">Logout</a>');
+    expect(html).not.toContain('<a href="/login" rel="nofollow">Login</a>');
 
     const invalid = new FormData();
     invalid.set("displayName", "Alice Updated");
@@ -634,6 +638,49 @@ describe("auth routes", () => {
     expect(backupText).toContain("API_CORS_ORIGINS");
     expect(backupText).toContain("[redacted]");
     expect(backupText).not.toContain("super-secret-token");
+  });
+
+  it("maps bundled plugin admin pages to native replacements or explicit removal", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+    const replacements = [
+      ["acl", "/admin/acl", "Access control list manager"],
+      ["config", "/admin/config", "Configuration manager"],
+      ["info", "/diagnostics", "Diagnostics"],
+      ["logviewer", "/admin/audit", "Audit log"],
+      ["usermanager", "/admin/users", "User manager"]
+    ];
+
+    for (const [plugin, location, pageText] of replacements) {
+      const legacy = await handleRequest(
+        new Request(`https://example.com/doku.php?do=admin&page=${plugin}`),
+        env
+      );
+      const native = await handleRequest(
+        new Request(`https://example.com${location}`, {
+          headers: { cookie }
+        }),
+        env
+      );
+
+      expect(legacy.status, plugin).toBe(301);
+      expect(legacy.headers.get("location"), plugin).toBe(location);
+      expect(native.status, plugin).toBe(200);
+      await expect(native.text(), plugin).resolves.toContain(pageText);
+    }
+
+    for (const plugin of ["extension", "popularity", "safefnrecode", "styling"]) {
+      const removed = await handleRequest(
+        new Request(`https://example.com/doku.php?do=admin&page=${plugin}`),
+        env
+      );
+
+      expect(removed.status, plugin).toBe(501);
+      await expect(removed.json(), plugin).resolves.toMatchObject({
+        status: "not_available"
+      });
+    }
   });
 
   it("bypasses shared rendered cache for pages not readable by anonymous users", async () => {
