@@ -56,6 +56,17 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<img src="/media/wiki/dokuwiki.svg" alt="Logo">');
   });
 
+  it("renders automatic external links", () => {
+    const rendered = renderWikiText("Visit http://www.google.com or www.example.org.");
+
+    expect(rendered.html).toContain(
+      '<a href="http://www.google.com" rel="nofollow noopener noreferrer">http://www.google.com</a>'
+    );
+    expect(rendered.html).toContain(
+      '<a href="http://www.example.org" rel="nofollow noopener noreferrer">www.example.org</a>.'
+    );
+  });
+
   it("renders namespace-relative internal links from page context", () => {
     const rendered = renderWikiText(
       "[[child|Child]] [[:start|Start]] [[..:root|Root]] [[wiki:syntax#head line|Syntax]] [[#local section|Local]]",

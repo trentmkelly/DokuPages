@@ -280,6 +280,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderTypography(rendered);
   rendered = renderMedia(rendered, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml);
+  rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
@@ -375,6 +376,33 @@ function renderEmailAutolinks(source: string, protectHtml: (html: string) => str
     /&lt;([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})&gt;/gi,
     (_match, email: string) => protectHtml(renderEmailLink(email))
   );
+}
+
+function renderExternalAutolinks(source: string, protectHtml: (html: string) => string): string {
+  return source.replace(
+    /\b((?:https?|ftp):\/\/[A-Z0-9/#~:.?+=&%@!_()[\],;-]+|(?:www|ftp)\.[A-Z0-9.?\-;,#~=+&%@!_()[\]/]+)(?=\s|$|[<])/gi,
+    (match) => {
+      const { linkText, suffix } = splitTrailingLinkPunctuation(match);
+      const decoded = decodeHtmlEntities(linkText);
+      const href = decoded.startsWith("www.")
+        ? `http://${decoded}`
+        : decoded.startsWith("ftp.")
+          ? `ftp://${decoded}`
+          : decoded;
+
+      return `${protectHtml(
+        `<a href="${escapeAttribute(href)}" rel="nofollow noopener noreferrer">${escapeHtml(decoded)}</a>`
+      )}${suffix}`;
+    }
+  );
+}
+
+function splitTrailingLinkPunctuation(value: string): { linkText: string; suffix: string } {
+  const match = value.match(/^(.*?)([.,;:!?)]*)$/);
+  return {
+    linkText: match?.[1] || value,
+    suffix: match?.[2] || ""
+  };
 }
 
 function renderEmailLink(email: string, label?: string): string {
