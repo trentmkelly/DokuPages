@@ -1,6 +1,8 @@
 import type {
   AclRuleRecord,
   AclStore,
+  AuditLogRecord,
+  AuditLogStore,
   ChangelogRecord,
   ChangelogStore,
   DraftRecord,
@@ -98,6 +100,16 @@ type ChangelogRow = {
   change_type: string;
   summary: string;
   size_change: number;
+  created_at: string;
+};
+
+type AuditLogRow = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  details_json: string;
   created_at: string;
 };
 
@@ -483,6 +495,43 @@ export class D1ChangelogStore implements ChangelogStore {
   }
 }
 
+export class D1AuditLogStore implements AuditLogStore {
+  constructor(private readonly db: D1Database) {}
+
+  async listEntries(limit: number, offset = 0): Promise<AuditLogRecord[]> {
+    const result = await this.db
+      .prepare(
+        `select id, actor_id, action, target_type, target_id, details_json, created_at
+         from audit_log
+         order by created_at desc, id desc
+         limit ? offset ?`
+      )
+      .bind(clampLimit(limit, 200), Math.max(0, offset))
+      .all<AuditLogRow>();
+
+    return result.results.map(mapAuditLog);
+  }
+
+  async appendEntry(entry: AuditLogRecord): Promise<void> {
+    await this.db
+      .prepare(
+        `insert into audit_log (
+           id, actor_id, action, target_type, target_id, details_json, created_at
+         ) values (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        entry.id,
+        entry.actorId,
+        entry.action,
+        entry.targetType,
+        entry.targetId,
+        JSON.stringify(entry.details),
+        entry.createdAt
+      )
+      .run();
+  }
+}
+
 export class D1UserStore implements UserStore {
   constructor(private readonly db: D1Database) {}
 
@@ -810,6 +859,18 @@ function mapChangelog(row: ChangelogRow): ChangelogRecord {
     changeType: row.change_type,
     summary: row.summary,
     sizeChange: row.size_change,
+    createdAt: row.created_at
+  };
+}
+
+function mapAuditLog(row: AuditLogRow): AuditLogRecord {
+  return {
+    id: row.id,
+    actorId: row.actor_id,
+    action: row.action,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    details: JSON.parse(row.details_json) as Record<string, unknown>,
     createdAt: row.created_at
   };
 }

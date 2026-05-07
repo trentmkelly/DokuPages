@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   D1AclStore,
+  D1AuditLogStore,
   D1ChangelogStore,
   D1DraftStore,
   D1MediaStore,
@@ -118,6 +119,7 @@ describe("D1 storage adapters", () => {
     d1 = createD1();
     const metadata = new D1MetadataStore(d1);
     const acl = new D1AclStore(d1);
+    const audit = new D1AuditLogStore(d1);
     const users = new D1UserStore(d1);
     const drafts = new D1DraftStore(d1);
     const changelog = new D1ChangelogStore(d1);
@@ -169,6 +171,15 @@ describe("D1 storage adapters", () => {
       sizeChange: 5,
       createdAt: "2026-05-07T00:00:00.000Z"
     });
+    await audit.appendEntry({
+      id: "audit-1",
+      actorId: "user-1",
+      action: "acl_rule_upsert",
+      targetType: "acl_rule",
+      targetId: "acl-1",
+      details: { scope: "wiki:*", permission: 8 },
+      createdAt: "2026-05-07T00:00:00.000Z"
+    });
     await rendered.putRendered({
       cacheKey: "page:wiki:start",
       subjectType: "page",
@@ -210,6 +221,14 @@ describe("D1 storage adapters", () => {
     });
     await expect(changelog.listChanges("page", "wiki:start", 10)).resolves.toEqual([
       expect.objectContaining({ userName: "Alice", ip: "203.0.113.10" })
+    ]);
+    await expect(audit.listEntries(10)).resolves.toEqual([
+      expect.objectContaining({
+        actorId: "user-1",
+        action: "acl_rule_upsert",
+        targetId: "acl-1",
+        details: { scope: "wiki:*", permission: 8 }
+      })
     ]);
     await expect(rendered.getRendered("page:wiki:start")).resolves.toMatchObject({
       renderedHtml: "<h1>Start</h1>"

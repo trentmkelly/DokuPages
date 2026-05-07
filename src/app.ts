@@ -33,7 +33,7 @@ import {
   redirectResponse,
   securityHeaders
 } from "./http/responses";
-import { D1AclStore } from "./storage/d1";
+import { D1AclStore, D1AuditLogStore } from "./storage/d1";
 import {
   refreshPageLock,
   releasePageLock,
@@ -93,6 +93,7 @@ import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/re
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
 import type { AclRuleRecord } from "./storage/interfaces";
+import type { AuditLogRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -230,6 +231,11 @@ export async function handleRequest(
 
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
     return htmlResponse(await renderDiagnosticsPage(env));
+  }
+
+  if (url.pathname === "/admin/audit" && request.method === "GET") {
+    const page = await renderAuditLogPage(request, env, principal, url);
+    return page instanceof Response ? page : htmlResponse(page);
   }
 
   if (url.pathname === "/admin/acl" && request.method === "GET") {
@@ -1528,11 +1534,58 @@ function renderAdminDashboardPage(
     `<h1>Administration</h1>
       <ul class="admin__tools">
         <li><a href="/admin/diagnostics">Diagnostics</a></li>
+        ${isAdminPrincipal(principal) ? '<li><a href="/admin/audit">Audit log</a></li>' : ""}
         ${aclTool}
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`
   );
+}
+
+async function renderAuditLogPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  url: URL
+): Promise<string | Response> {
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const pagination = paginationFromUrl(url, { defaultLimit: 100, maxLimit: 200 });
+  const entries = await new D1AuditLogStore(env.DB).listEntries(
+    pagination.limit,
+    pagination.offset
+  );
+  const rows = entries.map(renderAuditLogRow).join("");
+
+  return htmlShell(
+    env,
+    "Audit Log",
+    `<h1>Audit log</h1>
+    <table class="inline audit__log">
+      <thead>
+        <tr><th>Created</th><th>Actor</th><th>Action</th><th>Target</th><th>Details</th></tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="5">No audit entries recorded.</td></tr>'}</tbody>
+    </table>
+    ${renderPaginationControls(url, pagination, entries.length)}`
+  );
+}
+
+function renderAuditLogRow(entry: AuditLogRecord): string {
+  const actor = entry.details.actorUsername
+    ? `${String(entry.details.actorUsername)} (${entry.actorId ?? "unknown"})`
+    : (entry.actorId ?? "unknown");
+  const target = entry.targetId ? `${entry.targetType}: ${entry.targetId}` : entry.targetType;
+
+  return `<tr>
+    <td>${escapeHtml(entry.createdAt)}</td>
+    <td>${escapeHtml(actor)}</td>
+    <td><code>${escapeHtml(entry.action)}</code></td>
+    <td>${escapeHtml(target)}</td>
+    <td><code>${escapeHtml(JSON.stringify(entry.details))}</code></td>
+  </tr>`;
 }
 
 async function renderAclAdminPage(
@@ -1883,6 +1936,17 @@ async function handleAclRuleUpsert(
     parsed.rule.principal
   );
   await store.putRule(parsed.rule);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "acl_rule_upsert",
+    targetType: "acl_rule",
+    targetId: parsed.rule.id,
+    details: {
+      scope: parsed.rule.scope,
+      principalType: parsed.rule.principalType,
+      principal: parsed.rule.principal,
+      permission: parsed.rule.permission
+    }
+  });
 
   return redirectResponse("/admin/acl");
 }
@@ -1906,6 +1970,12 @@ async function handleAclRuleDelete(
   }
 
   await new D1AclStore(env.DB).deleteRule(id);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "acl_rule_delete",
+    targetType: "acl_rule",
+    targetId: id,
+    details: {}
+  });
   return redirectResponse("/admin/acl");
 }
 
@@ -1923,12 +1993,52 @@ async function handleSearchIndexRebuild(
   }
 
   const result = await rebuildSearchIndex(env.DB);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "search_index_rebuild",
+    targetType: "search_index",
+    targetId: null,
+    details: {
+      pageCount: result.pageCount,
+      termCount: result.termCount,
+      postingCount: result.postingCount
+    }
+  });
 
   if (acceptsJson(request)) {
     return jsonResponse(result);
   }
 
   return redirectResponse("/admin?searchRebuild=ok");
+}
+
+async function appendAdminAuditLog(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  entry: {
+    action: string;
+    targetType: string;
+    targetId: string | null;
+    details: Record<string, unknown>;
+  }
+): Promise<void> {
+  const createdAt = new Date().toISOString();
+  const details = {
+    ...entry.details,
+    actorUsername: principal.username,
+    actorDisplayName: principal.displayName,
+    ip: getClientIp(request)
+  };
+
+  await new D1AuditLogStore(env.DB).appendEntry({
+    id: `audit:${createdAt}:${crypto.randomUUID()}`,
+    actorId: principal.id,
+    action: entry.action,
+    targetType: entry.targetType,
+    targetId: entry.targetId,
+    details,
+    createdAt
+  });
 }
 
 function parseAclRuleForm(

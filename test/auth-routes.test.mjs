@@ -187,6 +187,42 @@ describe("auth routes", () => {
     await expect(env.DB.prepare("select * from acl_rules").bind().all()).resolves.toEqual({
       results: []
     });
+    await expect(
+      env.DB.prepare(
+        "select action, target_type, target_id, details_json from audit_log order by action"
+      )
+        .bind()
+        .all()
+    ).resolves.toMatchObject({
+      results: expect.arrayContaining([
+        expect.objectContaining({
+          action: "acl_rule_delete",
+          target_type: "acl_rule"
+        }),
+        expect.objectContaining({
+          action: "acl_rule_upsert",
+          target_type: "acl_rule",
+          target_id: expect.stringContaining("private")
+        }),
+        expect.objectContaining({
+          action: "search_index_rebuild",
+          target_type: "search_index"
+        })
+      ])
+    });
+
+    const auditPage = await handleRequest(
+      new Request("https://example.com/admin/audit", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(auditPage.status).toBe(200);
+    const auditHtml = await auditPage.text();
+    expect(auditHtml).toContain("Audit log");
+    expect(auditHtml).toContain("acl_rule_upsert");
+    expect(auditHtml).toContain("search_index_rebuild");
   });
 
   it("allows manager users to view the admin dashboard but not ACL management", async () => {
@@ -215,6 +251,12 @@ describe("auth routes", () => {
       }),
       env
     );
+    const audit = await handleRequest(
+      new Request("https://example.com/admin/audit", {
+        headers: { cookie }
+      }),
+      env
+    );
 
     expect(anonymous.status).toBe(403);
     expect(legacy.status).toBe(301);
@@ -222,6 +264,7 @@ describe("auth routes", () => {
     expect(dashboard.status).toBe(200);
     await expect(dashboard.text()).resolves.toContain("Administration");
     expect(acl.status).toBe(403);
+    expect(audit.status).toBe(403);
   });
 
   it("rejects invalid logins without setting a session cookie", async () => {

@@ -71,6 +71,16 @@ export interface ChangelogRecord {
   createdAt: WikiTimestamp;
 }
 
+export interface AuditLogRecord {
+  id: string;
+  actorId: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: WikiTimestamp;
+}
+
 export interface AclRuleRecord {
   id: string;
   scope: string;
@@ -170,6 +180,11 @@ export interface ChangelogStore {
     limit: number
   ): Promise<ChangelogRecord[]>;
   appendChange(change: ChangelogRecord): Promise<void>;
+}
+
+export interface AuditLogStore {
+  listEntries(limit: number, offset?: number): Promise<AuditLogRecord[]>;
+  appendEntry(entry: AuditLogRecord): Promise<void>;
 }
 
 export interface UserStore {

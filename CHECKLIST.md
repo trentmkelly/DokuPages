@@ -484,7 +484,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement version display.
 - [x] Implement storage health checks.
 - [x] Implement migration status display.
-- [ ] Implement audit log view.
+- [x] Implement audit log view.
 - [ ] Implement maintenance mode if needed.
 - [ ] Implement backup export.
 - [ ] Implement restore import.
@@ -550,7 +550,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement rate limits for login.
 - [x] Implement rate limits for edits.
 - [x] Implement rate limits for uploads.
-- [ ] Implement audit logging for admin actions.
+- [x] Implement audit logging for admin actions.
 - [x] Implement security headers.
 - [x] Implement cookie security flags.
 - [x] Implement dependency vulnerability scanning.
@@ -705,7 +705,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add error logging.
 - [ ] Add storage error logging.
 - [ ] Add auth event logging.
-- [ ] Add admin action logging.
+- [x] Add admin action logging.
 - [ ] Add migration logging.
 - [ ] Add performance timing logs.
 - [ ] Add cache metrics.
