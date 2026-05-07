@@ -41,7 +41,10 @@ describe("DokuWiki import planner", () => {
       path.join(root, "data/media_meta/wiki/logo.svg.meta"),
       'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
     );
-    await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 1\nwiki:* @user 8\n");
+    await writeFile(
+      path.join(root, "conf/acl.auth.php"),
+      "* @ALL 1\nwiki:* @user 8\nusers:%USER%:* %USER% 16\nteams:%GROUP%:* %GROUP% 8 # group home\n"
+    );
     await writeFile(
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
@@ -86,7 +89,7 @@ describe("DokuWiki import planner", () => {
       media: 1,
       mediaChangelogEntries: 1,
       mediaMetadata: 1,
-      aclRules: 2,
+      aclRules: 4,
       users: 1,
       configSettings: 3,
       pluginConfigSettings: 2,
@@ -136,7 +139,30 @@ describe("DokuWiki import planner", () => {
       subjectId: "wiki:logo.svg",
       value: { Exif: { Title: "Logo" } }
     });
-    expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
+    expect(plan.aclRules[0]).toMatchObject({
+      scope: "*",
+      principalType: "all",
+      principal: "@ALL",
+      permission: 1
+    });
+    expect(plan.aclRules[1]).toMatchObject({
+      scope: "wiki:*",
+      principalType: "group",
+      principal: "@user",
+      permission: 8
+    });
+    expect(plan.aclRules[2]).toMatchObject({
+      scope: "users:%USER%:*",
+      principalType: "user",
+      principal: "%USER%",
+      permission: 16
+    });
+    expect(plan.aclRules[3]).toMatchObject({
+      scope: "teams:%GROUP%:*",
+      principalType: "group",
+      principal: "%GROUP%",
+      permission: 8
+    });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
     expect(plan.configSettings).toContainEqual({
       key: "title",
@@ -222,10 +248,12 @@ describe("DokuWiki import planner", () => {
   it("generates idempotent SQL for D1 page imports", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-sql-"));
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
+    await mkdir(path.join(root, "conf"), { recursive: true });
     await writeFile(
       path.join(root, "data/pages/wiki/welcome.txt"),
       "====== Welcome ======\n\nText\n"
     );
+    await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 8\n");
 
     const plan = await buildImportPlan(root);
     const output = path.join(root, "import.sql");
@@ -238,6 +266,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert or replace into page_revisions");
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("insert into search_postings");
+    expect(sql).toContain("insert into acl_rules");
+    expect(sql).toContain("'all'");
     expect(sql).toContain("'wiki:welcome'");
   });
 });

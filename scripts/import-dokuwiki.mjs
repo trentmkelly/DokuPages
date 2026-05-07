@@ -156,6 +156,21 @@ set document_count = (
   );
   statements.push("delete from search_terms where document_count = 0;");
 
+  for (const rule of plan.aclRules) {
+    statements.push(
+      `insert into acl_rules (id, scope, principal_type, principal, permission, created_at)
+values (${sql(rule.id)}, ${sql(rule.scope)}, ${sql(rule.principalType)}, ${sql(rule.principal)}, ${rule.permission}, ${sql(
+        rule.createdAt ?? plan.generatedAt
+      )})
+on conflict(id) do update set
+  scope = excluded.scope,
+  principal_type = excluded.principal_type,
+  principal = excluded.principal,
+  permission = excluded.permission,
+  created_at = excluded.created_at;`
+    );
+  }
+
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
   await fs.writeFile(outputFile, `${statements.join("\n\n")}\n`);
 }
@@ -345,20 +360,36 @@ export async function discoverSerializedMetadata(root, subjectType) {
 export async function discoverAclRules(file) {
   const text = await readTextIfExists(file);
   if (!text) return [];
+  const stat = await fs.stat(file);
+  const createdAt = stat.mtime.toISOString();
 
   return text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.replace(/\s+#.*$/, "").trim())
+    .filter(Boolean)
     .map((line, index) => {
       const [scope, principal, permission] = line.split(/\s+/);
+      const parsedPermission = Number.parseInt(permission, 10);
+      if (!scope || !principal || !Number.isFinite(parsedPermission)) return null;
+
       return {
         id: `acl:${index + 1}`,
         scope,
+        principalType: aclPrincipalType(principal),
         principal,
-        permission: Number.parseInt(permission, 10)
+        permission: parsedPermission,
+        createdAt
       };
-    });
+    })
+    .filter(Boolean);
+}
+
+function aclPrincipalType(principal) {
+  if (principal === "@ALL") return "all";
+  if (principal === "%GROUP%" || principal.startsWith("@")) return "group";
+  return "user";
 }
 
 export async function discoverUsers(file) {

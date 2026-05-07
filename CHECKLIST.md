@@ -319,19 +319,19 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## ACL
 
-- [ ] Implement ACL config import from `acl.auth.php`.
-- [ ] Implement ACL matching rules.
-- [ ] Implement namespace ACL inheritance.
-- [ ] Implement user ACL checks.
-- [ ] Implement group ACL checks.
-- [ ] Implement wildcard ACL rules.
-- [ ] Implement special `%USER%` rules.
-- [ ] Implement special `%GROUP%` rules.
+- [x] Implement ACL config import from `acl.auth.php`.
+- [x] Implement ACL matching rules.
+- [x] Implement namespace ACL inheritance.
+- [x] Implement user ACL checks.
+- [x] Implement group ACL checks.
+- [x] Implement wildcard ACL rules.
+- [x] Implement special `%USER%` rules.
+- [x] Implement special `%GROUP%` rules.
 - [ ] Implement minimum permission checks for every action.
 - [ ] Implement hidden page behavior.
 - [ ] Implement sneaky index behavior if supported.
 - [ ] Implement ACL admin UI.
-- [ ] Add ACL test fixtures.
+- [x] Add ACL test fixtures.
 - [ ] Add ACL regression tests for page, namespace, and media access.
 
 ## Search And Indexing

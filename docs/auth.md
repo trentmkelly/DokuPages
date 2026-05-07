@@ -8,7 +8,7 @@ Launch auth will be a native D1-backed replacement for DokuWiki's `authplain` us
 
 ## Anonymous Requests
 
-Requests without a valid session resolve to an anonymous principal. Anonymous principals have no username, no user groups, and no revision author identity. ACL evaluation should still include DokuWiki's special `@ALL` subject for anonymous visitors.
+Requests without a valid session resolve to an anonymous principal. Anonymous principals have no username, no user groups, and no revision author identity. ACL evaluation includes DokuWiki's special `@ALL` subject for anonymous visitors.
 
 `/api/auth/session` exposes the current public principal shape for runtime checks.
 

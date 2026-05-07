@@ -39,7 +39,7 @@ Current rendered page HTML is cached in KV under `page:{id}` with revision IDs s
 
 ## Auth And Sessions
 
-The schema supports native users, groups, sessions, password hashes, and ACLs. Native login and logout routes issue and clear D1-backed session cookies; ACL enforcement is still tracked separately.
+The schema supports native users, groups, sessions, password hashes, and ACLs. Native login and logout routes issue and clear D1-backed session cookies. The ACL matcher implements DokuWiki page, namespace, wildcard, user, group, `%USER%`, and `%GROUP%` rule precedence; route enforcement is still tracked separately.
 
 ## Lock And Conflict Model
 
