@@ -27,6 +27,13 @@ import {
 import { renderWikiText } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
+const RENDER_CACHE_TTL_SECONDS = 60 * 60;
+
+interface RenderCacheEntry {
+  revisionId: string;
+  title: string;
+  html: string;
+}
 
 export async function handleRequest(
   request: Request,
@@ -154,7 +161,13 @@ export async function handleRequest(
         return notFoundResponse(`Revision '${revisionId}' was not found.`);
       }
       return htmlResponse(
-        renderPageHtml(env, revision.pageId, revision.content, revision.createdAt)
+        await renderPageHtml(
+          env,
+          revision.pageId,
+          revision.content,
+          revision.id,
+          revision.createdAt
+        )
       );
     }
 
@@ -180,7 +193,9 @@ export async function handleRequest(
       return notFoundResponse(`Wiki page '${id}' was not found.`);
     }
 
-    return htmlResponse(renderPageHtml(env, id, page.content, undefined, page));
+    return htmlResponse(
+      await renderPageHtml(env, id, page.content, page.revisionId, undefined, page)
+    );
   }
 
   if (assetFallback) {
@@ -190,18 +205,31 @@ export async function handleRequest(
   return notFoundResponse("Not found.");
 }
 
-function renderPageHtml(
+async function renderPageHtml(
   env: Env,
   id: string,
   content: string,
+  revisionId: string,
   revisionDate?: string,
   page?: CurrentPage
-): string {
-  const rendered = renderWikiText(content);
-  const title = rendered.title ?? page?.title ?? id;
+): Promise<string> {
+  const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
   const revisionNotice = revisionDate
     ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
     : "";
+  const cached = await readRenderCache(env, cacheKey, revisionId);
+
+  if (cached) {
+    return htmlShell(env, cached.title, `${revisionNotice}${cached.html}`);
+  }
+
+  const rendered = renderWikiText(content);
+  const title = rendered.title ?? page?.title ?? id;
+  await writeRenderCache(env, cacheKey, {
+    revisionId,
+    title,
+    html: rendered.html
+  });
 
   return htmlShell(env, title, `${revisionNotice}${rendered.html}`);
 }
@@ -579,6 +607,42 @@ async function purgePageCache(env: Env, id: string, revisionId: string): Promise
     env.RENDER_CACHE.delete(`page:${id}`),
     env.RENDER_CACHE.delete(`page:${id}:${revisionId}`)
   ]);
+}
+
+async function readRenderCache(
+  env: Env,
+  cacheKey: string,
+  revisionId: string
+): Promise<RenderCacheEntry | null> {
+  try {
+    const cached = (await env.RENDER_CACHE.get(cacheKey, "json")) as RenderCacheEntry | null;
+
+    if (
+      cached?.revisionId === revisionId &&
+      typeof cached.title === "string" &&
+      typeof cached.html === "string"
+    ) {
+      return cached;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function writeRenderCache(
+  env: Env,
+  cacheKey: string,
+  entry: RenderCacheEntry
+): Promise<void> {
+  try {
+    await env.RENDER_CACHE.put(cacheKey, JSON.stringify(entry), {
+      expirationTtl: RENDER_CACHE_TTL_SECONDS
+    });
+  } catch {
+    // Rendering should remain available when KV is degraded.
+  }
 }
 
 function escapeHtml(value: string): string {

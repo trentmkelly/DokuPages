@@ -33,7 +33,7 @@ The first D1 schema is `migrations/0001_initial.sql`. It models pages, page revi
 
 ## Cache Model
 
-Rendered page cache entries are modeled in D1 for metadata and can be mirrored into KV or the Cache API. Cache invalidation must be keyed by subject type, subject ID, revision ID, and content hash.
+Current rendered page HTML is cached in KV under `page:{id}` with revision IDs stored in the payload to reject stale entries. Old revision render output is cached under `page:{id}:{revisionId}`. The page save path purges the current page key and the new immutable revision key; later dependency tracking can broaden invalidation for backlinks, feeds, and ACL-sensitive views.
 
 ## Auth And Sessions
 

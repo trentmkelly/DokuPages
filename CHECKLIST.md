@@ -63,7 +63,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Identify all image processing paths.
 - [ ] Identify all gzip and bzip revision storage paths.
 - [x] Identify all search index paths.
-- [ ] Identify all cache invalidation paths.
+- [x] Identify all cache invalidation paths.
 - [ ] Identify all extension and plugin hook points.
 
 ## Architecture Decision
@@ -157,7 +157,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement a storage interface for search.
 - [ ] Implement D1-backed adapters.
 - [ ] Implement R2-backed adapters.
-- [ ] Implement KV-backed adapters if used.
+- [x] Implement KV-backed adapters if used.
 - [ ] Implement Durable Object-backed locking if used.
 - [x] Implement transactional page save behavior.
 - [x] Implement optimistic concurrency checks.
@@ -354,9 +354,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Cache And Rendering Performance
 
-- [ ] Define rendered page cache key structure.
+- [x] Define rendered page cache key structure.
 - [ ] Define cache dependency tracking.
-- [ ] Implement rendered HTML cache.
+- [x] Implement rendered HTML cache.
 - [ ] Implement parser instruction cache if needed.
 - [ ] Implement metadata cache if needed.
 - [ ] Implement CSS cache or prebuilt CSS.
@@ -369,7 +369,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement cache warming for important pages.
 - [ ] Implement stale cache fallback if appropriate.
 - [ ] Add cache hit and miss metrics.
-- [ ] Add cache invalidation tests.
+- [x] Add cache invalidation tests.
 
 ## Template And Frontend
 
@@ -475,7 +475,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement ACL management.
 - [ ] Implement page index rebuild.
 - [ ] Implement search index rebuild.
-- [ ] Implement cache purge.
+- [x] Implement cache purge.
 - [ ] Implement media cleanup.
 - [ ] Implement orphaned revision cleanup if needed.
 - [ ] Implement diagnostics.
@@ -642,7 +642,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add unit tests for ACL behavior.
 - [ ] Add unit tests for auth behavior.
 - [ ] Add unit tests for storage adapters.
-- [ ] Add unit tests for cache behavior.
+- [x] Add unit tests for cache behavior.
 - [x] Add unit tests for search behavior.
 - [ ] Add unit tests for media behavior.
 - [ ] Add integration tests for page view.

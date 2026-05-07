@@ -21,13 +21,25 @@ const state: D1StubState = {
 };
 
 const purgedKeys: string[] = [];
+const cachePuts: string[] = [];
+const renderCache = new Map<string, string>();
 
 const env = {
   DB: createD1Stub(state),
   MEDIA_BUCKET: {} as R2Bucket,
   RENDER_CACHE: {
+    get: async (key: string, type?: string) => {
+      const value = renderCache.get(key);
+      if (!value) return null;
+      return type === "json" ? JSON.parse(value) : value;
+    },
+    put: async (key: string, value: string) => {
+      cachePuts.push(key);
+      renderCache.set(key, value);
+    },
     delete: async (key: string) => {
       purgedKeys.push(key);
+      renderCache.delete(key);
     }
   } as unknown as KVNamespace,
   PAGE_LOCKS: {} as DurableObjectNamespace,
@@ -43,6 +55,8 @@ describe("handleRequest", () => {
     state.deleted = false;
     state.batches = [];
     purgedKeys.length = 0;
+    cachePuts.length = 0;
+    renderCache.clear();
   });
 
   it("returns health information for the API health route", async () => {
@@ -65,6 +79,44 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain('<h1 id="welcome">Welcome</h1>');
+    expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("uses matching rendered page cache entries", async () => {
+    renderCache.set(
+      "page:wiki:welcome",
+      JSON.stringify({
+        revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
+        title: "Cached Welcome",
+        html: "<p>Cached body.</p>"
+      })
+    );
+
+    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Cached body.");
+    expect(html).not.toContain("Imported page.");
+    expect(cachePuts).toHaveLength(0);
+  });
+
+  it("refreshes stale rendered page cache entries", async () => {
+    renderCache.set(
+      "page:wiki:welcome",
+      JSON.stringify({
+        revisionId: "stale",
+        title: "Stale",
+        html: "<p>Stale body.</p>"
+      })
+    );
+
+    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Imported page.");
+    expect(cachePuts).toContain("page:wiki:welcome");
   });
 
   it("returns 404 when a wiki page does not exist", async () => {
