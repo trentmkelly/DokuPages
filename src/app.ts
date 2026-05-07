@@ -311,7 +311,8 @@ export async function handleRequest(
 
     if (url.searchParams.get("do") === "edit") {
       const draft = await getPageDraft(env.DB, id);
-      return htmlResponse(renderEditPage(id, page, draft, env));
+      const templateContent = !page && !draft ? await resolvePageTemplate(env.DB, id) : null;
+      return htmlResponse(renderEditPage(id, page, draft, env, templateContent));
     }
 
     if (url.searchParams.get("do") === "draft") {
@@ -691,6 +692,59 @@ function renderMissingPage(env: Env, id: string): string {
 
 function slugForPageHeading(id: string): string {
   return id.replaceAll(":", "-").replaceAll("_", "-") || "page";
+}
+
+async function resolvePageTemplate(db: D1Database, id: string): Promise<string | null> {
+  for (const templateId of pageTemplateCandidates(id)) {
+    const template = await getCurrentPage(db, templateId);
+    if (template) {
+      return applyPageTemplate(template.content, id);
+    }
+  }
+
+  return null;
+}
+
+function pageTemplateCandidates(id: string): string[] {
+  const segments = cleanPageId(id).split(":").filter(Boolean);
+  const namespaceSegments = segments.slice(0, -1);
+  const candidates: string[] = [];
+
+  if (namespaceSegments.length > 0) {
+    candidates.push([...namespaceSegments, "_template"].join(":"));
+  }
+
+  for (let length = namespaceSegments.length; length >= 0; length -= 1) {
+    const namespace = namespaceSegments.slice(0, length);
+    candidates.push([...namespace, "__template"].filter(Boolean).join(":"));
+  }
+
+  return [...new Set(candidates)];
+}
+
+function applyPageTemplate(template: string, id: string): string {
+  const pageId = cleanPageId(id);
+  const segments = pageId.split(":").filter(Boolean);
+  const page = segments.at(-1) ?? pageId;
+  const namespace = segments.slice(0, -1).join(":");
+  const pageLabel = page.replace(/[_-]+/g, " ");
+  const title = titleCase(pageLabel);
+
+  return template
+    .replaceAll("@ID@", pageId)
+    .replaceAll("@NS@", namespace)
+    .replaceAll("@PAGE@", page)
+    .replaceAll("@!PAGE@", capitalize(pageLabel))
+    .replaceAll("@!!PAGE@", pageLabel.toUpperCase())
+    .replaceAll("@!PAGE!@", title);
+}
+
+function titleCase(value: string): string {
+  return value.split(/\s+/).filter(Boolean).map(capitalize).join(" ");
+}
+
+function capitalize(value: string): string {
+  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 }
 
 function renderBreadcrumbs(id: string): string {
@@ -1576,10 +1630,11 @@ function renderEditPage(
   id: string,
   page: Awaited<ReturnType<typeof getCurrentPage>>,
   draft: PageDraft | null,
-  env: Env
+  env: Env,
+  templateContent: string | null = null
 ): string {
   const title = page?.title ?? id;
-  const content = draft?.content ?? page?.content ?? "";
+  const content = draft?.content ?? page?.content ?? templateContent ?? "";
   const baseRevisionId = draft?.baseRevisionId ?? page?.revisionId ?? "";
   const draftNotice = draft
     ? `<p><strong>Draft recovered:</strong> ${escapeHtml(draft.updatedAt)}</p>`

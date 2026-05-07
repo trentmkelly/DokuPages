@@ -46,6 +46,10 @@ The save path:
 
 Rendered headings include DokuWiki-style section edit anchors when the renderer has a page ID. The links target the page editor with `section=N` so templates have stable section affordances while section-scoped save behavior is implemented separately.
 
+## Page Templates
+
+Missing-page edits look for DokuWiki page templates before rendering the editor. The resolver checks the current namespace `_template` page first, then inherited `__template` pages from the current namespace toward the root. Supported substitutions are `@ID@`, `@NS@`, `@PAGE@`, `@!PAGE@`, `@!!PAGE@`, and `@!PAGE!@`.
+
 ## Verified Against Production
 
 The deployed `dokutest.pages.dev` project was smoke tested against remote D1:

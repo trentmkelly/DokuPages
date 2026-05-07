@@ -357,6 +357,28 @@ describe("handleRequest", () => {
     expect(html).toContain('name="minor" type="checkbox"');
   });
 
+  it("prefills missing page edits from namespace page templates", async () => {
+    state.row = {
+      id: "wiki:_template",
+      namespace: "wiki",
+      title: "_template",
+      revision_id: "wiki:_template@2026-05-07T00:00:00.000Z",
+      content: "====== @!PAGE!@ ======\n\nCreate @ID@ in @NS@.",
+      updated_at: "2026-05-07T00:00:00.000Z"
+    };
+
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/wiki/new_page?do=edit"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('name="baseRevisionId" value=""');
+    expect(html).toContain("====== New Page ======");
+    expect(html).toContain("Create wiki:new_page in wiki.");
+  });
+
   it("returns source text for existing pages", async () => {
     const response = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=source"),
