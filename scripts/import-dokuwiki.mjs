@@ -34,6 +34,11 @@ export async function buildImportPlan(sourceRoot) {
   );
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
+  const { configSettings, pluginConfigSettings } = await discoverConfigSettings([
+    { file: path.join(confRoot, "dokuwiki.php"), layer: "default", locked: false },
+    { file: path.join(confRoot, "local.php"), layer: "local", locked: false },
+    { file: path.join(confRoot, "local.protected.php"), layer: "protected", locked: true }
+  ]);
   const pluginSettings = await discoverPluginSettings([
     { file: path.join(confRoot, "plugins.php"), locked: false },
     { file: path.join(confRoot, "plugins.local.php"), locked: false },
@@ -63,6 +68,8 @@ export async function buildImportPlan(sourceRoot) {
       mediaMetadata: mediaMetadata.length,
       aclRules: aclRules.length,
       users: users.length,
+      configSettings: configSettings.length,
+      pluginConfigSettings: pluginConfigSettings.length,
       pluginSettings: pluginSettings.length,
       interwikiTemplates: interwikiTemplates.length,
       mimeTypes: mimeTypes.length,
@@ -78,6 +85,8 @@ export async function buildImportPlan(sourceRoot) {
     mediaMetadata,
     aclRules,
     users,
+    configSettings,
+    pluginConfigSettings,
     pluginSettings,
     interwikiTemplates,
     mimeTypes,
@@ -370,6 +379,102 @@ export async function discoverUsers(file) {
         groups: groups.split(",").filter(Boolean)
       };
     });
+}
+
+export async function discoverConfigSettings(sources) {
+  const configSettings = new Map();
+  const pluginConfigSettings = new Map();
+
+  for (const source of sources) {
+    const text = await readTextIfExists(source.file);
+    if (!text) continue;
+
+    for (const line of text.split(/\r?\n/)) {
+      const assignment = parseConfAssignment(line, source);
+      if (!assignment) continue;
+
+      if (assignment.path[0] === "plugin" && assignment.path.length >= 3) {
+        const plugin = assignment.path[1];
+        const keyPath = assignment.path.slice(2);
+        pluginConfigSettings.set(`${plugin}:${keyPath.join(".")}`, {
+          plugin,
+          key: keyPath.join("."),
+          path: keyPath,
+          value: assignment.value,
+          rawValue: assignment.rawValue,
+          source: assignment.source,
+          layer: assignment.layer,
+          locked: assignment.locked
+        });
+        continue;
+      }
+
+      configSettings.set(assignment.path.join("."), assignment);
+    }
+  }
+
+  return {
+    configSettings: [...configSettings.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    pluginConfigSettings: [...pluginConfigSettings.values()].sort(
+      (a, b) => a.plugin.localeCompare(b.plugin) || a.key.localeCompare(b.key)
+    )
+  };
+}
+
+function parseConfAssignment(line, source) {
+  const match = line.match(/^\s*\$conf((?:\[['"][^'"]+['"]\])+)\s*=\s*(.+?);\s*(?:(?:\/\/|#).*)?$/);
+  if (!match) return null;
+
+  const pathParts = [...match[1].matchAll(/\[['"]([^'"]+)['"]\]/g)].map((part) => part[1]);
+  if (pathParts.length === 0) return null;
+
+  const rawValue = match[2].trim();
+
+  return {
+    key: pathParts.join("."),
+    path: pathParts,
+    value: parsePhpConfigValue(rawValue),
+    rawValue,
+    source: path.basename(source.file),
+    layer: source.layer,
+    locked: source.locked
+  };
+}
+
+function parsePhpConfigValue(rawValue) {
+  const value = rawValue.trim();
+  const lower = value.toLowerCase();
+
+  if (lower === "true") return true;
+  if (lower === "false") return false;
+  if (lower === "null") return null;
+  if (/^-?\d+$/.test(value)) return Number.parseInt(value, 10);
+  if (/^-?\d+\.\d+$/.test(value)) return Number.parseFloat(value);
+  if (isQuotedPhpString(value)) return unquotePhpString(value);
+
+  return { raw: value };
+}
+
+function isQuotedPhpString(value) {
+  return (
+    (value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))
+  );
+}
+
+function unquotePhpString(value) {
+  const quote = value[0];
+  const body = value.slice(1, -1);
+
+  if (quote === "'") {
+    return body.replace(/\\\\/g, "\\").replace(/\\'/g, "'");
+  }
+
+  return body
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, "\\")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t");
 }
 
 export async function discoverPluginSettings(sources) {

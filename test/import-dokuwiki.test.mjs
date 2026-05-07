@@ -46,6 +46,18 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
+    await writeFile(
+      path.join(root, "conf/dokuwiki.php"),
+      "$conf['title'] = 'Default Wiki';\n$conf['lang'] = 'en';\n$conf['plugin']['testing']['mode'] = 'default';\n"
+    );
+    await writeFile(
+      path.join(root, "conf/local.php"),
+      "$conf['title'] = 'Imported Wiki';\n$conf['lang'] = 'pt-br';\n$conf['plugin']['testing']['mode'] = 'local';\n"
+    );
+    await writeFile(
+      path.join(root, "conf/local.protected.php"),
+      "$conf['license'] = 'cc-by-sa';\n$conf['plugin']['testing']['locked'] = true;\n"
+    );
     await writeFile(path.join(root, "conf/plugins.php"), "$plugins['testing'] = 0;\n");
     await writeFile(path.join(root, "conf/plugins.local.php"), "$plugins['testing'] = 1;\n");
     await writeFile(
@@ -76,6 +88,8 @@ describe("DokuWiki import planner", () => {
       mediaMetadata: 1,
       aclRules: 2,
       users: 1,
+      configSettings: 3,
+      pluginConfigSettings: 2,
       pluginSettings: 3,
       interwikiTemplates: 2,
       mimeTypes: 2,
@@ -124,6 +138,53 @@ describe("DokuWiki import planner", () => {
     });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
+    expect(plan.configSettings).toContainEqual({
+      key: "title",
+      path: ["title"],
+      value: "Imported Wiki",
+      rawValue: "'Imported Wiki'",
+      source: "local.php",
+      layer: "local",
+      locked: false
+    });
+    expect(plan.configSettings).toContainEqual({
+      key: "lang",
+      path: ["lang"],
+      value: "pt-br",
+      rawValue: "'pt-br'",
+      source: "local.php",
+      layer: "local",
+      locked: false
+    });
+    expect(plan.configSettings).toContainEqual({
+      key: "license",
+      path: ["license"],
+      value: "cc-by-sa",
+      rawValue: "'cc-by-sa'",
+      source: "local.protected.php",
+      layer: "protected",
+      locked: true
+    });
+    expect(plan.pluginConfigSettings).toContainEqual({
+      plugin: "testing",
+      key: "mode",
+      path: ["mode"],
+      value: "local",
+      rawValue: "'local'",
+      source: "local.php",
+      layer: "local",
+      locked: false
+    });
+    expect(plan.pluginConfigSettings).toContainEqual({
+      plugin: "testing",
+      key: "locked",
+      path: ["locked"],
+      value: true,
+      rawValue: "true",
+      source: "local.protected.php",
+      layer: "protected",
+      locked: true
+    });
     expect(plan.pluginSettings).toContainEqual({
       plugin: "acl",
       enabled: true,

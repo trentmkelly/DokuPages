@@ -20,7 +20,7 @@ Namespaces are stored as colon-separated IDs in page and media records. They can
 
 ## Metadata
 
-`metadata` stores JSON metadata for pages, media, config, and plugin subjects. This replaces `.meta` files and media metadata files.
+`metadata` stores JSON metadata for pages, media, config, and plugin subjects. This replaces `.meta` files, media metadata files, and imported DokuWiki `$conf` values that are not first-class runtime environment variables.
 
 ## Changelogs
 
@@ -46,7 +46,7 @@ D1 postings are the launch search backend. DokuWiki's legacy `data/index` files 
 
 ## Config, Plugins, Audit, And Imports
 
-`plugin_settings`, `audit_log`, `import_jobs`, and `schema_versions` provide first-class records for operational data that was previously spread across PHP config files, logs, and local files.
+`plugin_settings`, `audit_log`, `import_jobs`, and `schema_versions` provide first-class records for operational data that was previously spread across PHP config files, logs, and local files. The import planner reports plugin enablement separately from plugin-specific `$conf['plugin'][...]` settings so the Pages port can decide which plugins are native, migration-only, or unsupported.
 
 ## Timestamp Replacement
 

@@ -424,9 +424,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Configuration
 
-- [ ] Map `conf/dokuwiki.php` defaults to the new configuration model.
-- [ ] Map `conf/local.php` overrides to the new configuration model.
-- [ ] Map plugin configuration to the new configuration model.
+- [x] Map `conf/dokuwiki.php` defaults to the new configuration model.
+- [x] Map `conf/local.php` overrides to the new configuration model.
+- [x] Map plugin configuration to the new configuration model.
 - [x] Map MIME configuration.
 - [x] Map interwiki configuration.
 - [x] Map acronym configuration.
