@@ -90,6 +90,35 @@ describe("handleRequest", () => {
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
+  it("redirects legacy DokuWiki query URLs to canonical page routes", async () => {
+    const page = await handleRequest(
+      new Request("https://example.com/doku.php?id=Wiki:Welcome"),
+      env
+    );
+    const edit = await handleRequest(
+      new Request("https://example.com/doku.php?id=Wiki:Welcome&do=edit"),
+      env
+    );
+    const diff = await handleRequest(
+      new Request(
+        "https://example.com/doku.php?id=Wiki:Welcome&do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+    const start = await handleRequest(new Request("https://example.com/wiki/"), env);
+
+    expect(page.status).toBe(301);
+    expect(page.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(edit.status).toBe(301);
+    expect(edit.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
+    expect(diff.status).toBe(301);
+    expect(diff.headers.get("location")).toBe(
+      "/wiki/wiki/welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+    );
+    expect(start.status).toBe(301);
+    expect(start.headers.get("location")).toBe("/wiki/wiki/welcome");
+  });
+
   it("uses matching rendered page cache entries", async () => {
     renderCache.set(
       "page:wiki:welcome",

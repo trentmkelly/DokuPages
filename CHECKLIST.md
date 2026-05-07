@@ -193,10 +193,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement route handling for admin pages.
 - [ ] Implement route handling for remote APIs if supported.
 - [ ] Implement 404 behavior compatible with DokuWiki settings.
-- [ ] Implement redirects compatible with DokuWiki actions.
+- [x] Implement redirects compatible with DokuWiki actions.
 - [ ] Implement canonical URL behavior.
-- [ ] Implement pretty URL support.
-- [ ] Implement compatibility for query parameter based DokuWiki URLs.
+- [x] Implement pretty URL support.
+- [x] Implement compatibility for query parameter based DokuWiki URLs.
 
 ## DokuWiki Syntax Parser
 
@@ -236,7 +236,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [x] Implement page ID cleaning.
 - [x] Implement namespace resolution.
-- [ ] Implement start page resolution.
+- [x] Implement start page resolution.
 - [x] Implement page existence checks.
 - [x] Implement raw page reads.
 - [x] Implement page creation.
@@ -596,17 +596,17 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## URL Compatibility And Redirects
 
 - [ ] Inventory existing URL patterns.
-- [ ] Preserve `doku.php?id=...` routes if required.
-- [ ] Preserve nice URL routes if required.
+- [x] Preserve `doku.php?id=...` routes if required.
+- [x] Preserve nice URL routes if required.
 - [ ] Preserve media fetch URLs if required.
 - [x] Preserve feed URLs if required.
 - [x] Preserve sitemap URLs if required.
-- [ ] Preserve revision URLs if required.
-- [ ] Preserve diff URLs if required.
+- [x] Preserve revision URLs if required.
+- [x] Preserve diff URLs if required.
 - [ ] Preserve admin URLs where possible.
 - [ ] Implement redirect rules for unsupported legacy endpoints.
 - [ ] Implement canonical URL generation.
-- [ ] Add URL compatibility tests.
+- [x] Add URL compatibility tests.
 - [ ] Generate redirect audit report.
 
 ## Build And Deployment
@@ -658,7 +658,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add integration tests for logout.
 - [ ] Add integration tests for admin actions.
 - [x] Add migration tests using fixture wiki data.
-- [ ] Add URL compatibility tests.
+- [x] Add URL compatibility tests.
 - [ ] Add API compatibility tests if APIs are supported.
 - [ ] Add accessibility tests.
 - [ ] Add visual regression tests.

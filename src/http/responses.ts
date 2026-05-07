@@ -28,9 +28,9 @@ export function conflictResponse(message: string): Response {
   return jsonResponse({ error: message }, { status: 409 });
 }
 
-export function redirectResponse(location: string): Response {
+export function redirectResponse(location: string, status = 303): Response {
   return new Response(null, {
-    status: 303,
+    status,
     headers: {
       location
     }

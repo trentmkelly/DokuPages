@@ -41,6 +41,14 @@ export async function handleRequest(
 ): Promise<Response> {
   const url = new URL(request.url);
 
+  if (url.pathname === "/doku.php") {
+    return redirectLegacyDokuPhp(url, env);
+  }
+
+  if (url.pathname === "/wiki" || url.pathname === "/wiki/") {
+    return redirectResponse(pagePath(startPageId(env)), 301);
+  }
+
   if (url.pathname === "/api/health") {
     return healthResponse(env);
   }
@@ -229,6 +237,58 @@ export async function handleRequest(
   return notFoundResponse("Not found.");
 }
 
+function redirectLegacyDokuPhp(url: URL, env: Env): Response {
+  const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
+  const target = new URL(pagePath(id || startPageId(env)), url);
+  const action = normalizeLegacyAction(url.searchParams.get("do"));
+  const revisionId = url.searchParams.get("rev");
+  const secondRevisionId = url.searchParams.get("rev2");
+
+  if (action) {
+    target.searchParams.set("do", action);
+  }
+
+  if (revisionId) {
+    target.searchParams.set("rev", revisionId);
+  }
+
+  if (secondRevisionId) {
+    target.searchParams.set("rev2", secondRevisionId);
+  }
+
+  return redirectResponse(`${target.pathname}${target.search}`, 301);
+}
+
+function normalizeLegacyAction(action: string | null): string | null {
+  switch (action) {
+    case null:
+    case "":
+    case "show":
+      return null;
+    case "edit":
+    case "source":
+    case "revisions":
+    case "recent":
+    case "search":
+    case "index":
+    case "backlink":
+    case "backlinks":
+    case "wanted":
+    case "orphan":
+    case "orphans":
+    case "revert":
+    case "draft":
+    case "diff":
+      return action;
+    default:
+      return null;
+  }
+}
+
+function startPageId(env: Env): string {
+  return cleanPageId(env.START_PAGE ?? "wiki:welcome") || "wiki:welcome";
+}
+
 async function renderPageHtml(
   env: Env,
   id: string,
@@ -289,9 +349,9 @@ function renderBreadcrumbs(id: string): string {
   return `<nav aria-label="Breadcrumb">${crumbs}</nav>`;
 }
 
-function renderHeaderBreadcrumbs(pageId?: string): string {
+function renderHeaderBreadcrumbs(pageId: string | undefined, startId: string): string {
   if (!pageId) {
-    return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span><a href="/wiki/Wiki/Welcome">start</a></div></div>`;
+    return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span><a href="${pagePath(startId)}">start</a></div></div>`;
   }
 
   const segments = pageId.split(":").filter(Boolean);
@@ -661,6 +721,8 @@ interface HtmlShellOptions {
 
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
   const siteName = env.SITE_NAME ?? "DokuWiki Pages";
+  const startId = startPageId(env);
+  const startPath = pagePath(startId);
   const pageId = options.pageId;
   const pageIdHtml = pageId ? `<div class="pageId"><span>${escapeHtml(pageId)}</span></div>` : "";
   const docInfo = options.updatedAt
@@ -685,7 +747,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       <header id="dokuwiki__header">
         <div class="pad group">
         <div class="headings">
-          <h1 class="logo"><a href="/wiki/Wiki/Welcome"><img src="/dokuwiki-logo.png" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
+          <h1 class="logo"><a href="${startPath}"><img src="/dokuwiki-logo.png" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">
@@ -702,7 +764,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             </ul>
           </nav>
         </div>
-        ${renderHeaderBreadcrumbs(pageId)}
+        ${renderHeaderBreadcrumbs(pageId, startId)}
         <hr class="a11y">
         </div>
       </header>
