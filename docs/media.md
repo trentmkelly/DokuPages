@@ -7,7 +7,7 @@ Media storage uses D1 for metadata and R2 for object bodies.
 - `GET /media/:id` streams the current media object from R2.
 - `GET /media/:id?rev=:revisionId` streams an immutable media revision from R2.
 - `GET /media-detail/:id` renders metadata and image previews.
-- `GET /media-manager?ns=:namespace` browses media in a namespace and renders an upload form.
+- `GET /media-manager?ns=:namespace&q=:query` browses or searches media in a namespace and renders an upload form.
 - `POST /api/media/upload` uploads a media object.
 - `POST /api/media/delete` marks the current media object deleted.
 - `POST /api/media/revert` restores an old media revision as current.
@@ -31,3 +31,7 @@ The upload path writes the R2 object first, then stores current media metadata, 
 ## Revert Semantics
 
 `POST /api/media/revert` expects `id`, `revisionId`, and optional `summary`. Revert points the current media row back at the selected immutable R2 object, creates a new `revert` media revision, appends a media changelog row, and records the source revision ID in metadata. Delete revisions cannot be restored directly.
+
+## Search Semantics
+
+Media manager search is namespace-scoped. The `q` parameter matches active media IDs and MIME types in D1 and excludes deleted media rows.

@@ -270,6 +270,16 @@ describe("handleRequest", () => {
     const pagedManagerHtml = await pagedManager.text();
     expect(pagedManagerHtml).toContain("limit=1");
     expect(pagedManagerHtml).toContain("offset=1");
+    const searchManager = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki&q=svg"),
+      env
+    );
+    const emptySearchManager = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki&q=missing"),
+      env
+    );
+    expect(await searchManager.text()).toContain("logo.svg");
+    expect(await emptySearchManager.text()).toContain("No media found.");
     expect(legacyFetch.status).toBe(301);
     expect(legacyFetch.headers.get("location")).toBe("/media/wiki/logo.svg?download=1");
     expect(legacyDetail.status).toBe(301);
@@ -1370,10 +1380,21 @@ function createD1Stub(state: D1StubState): D1Database {
           }
 
           if (sql.includes("from media") && sql.includes("where namespace = ?")) {
+            const query = sql.includes("like")
+              ? String(values[1] ?? "")
+                  .replaceAll("%", "")
+                  .replaceAll("\\", "")
+                  .toLowerCase()
+              : "";
             return {
               results: applyPagination(
                 state.media.filter(
-                  (media) => media.namespace === idOrLimit && media.is_deleted === 0
+                  (media) =>
+                    media.namespace === idOrLimit &&
+                    media.is_deleted === 0 &&
+                    (!query ||
+                      String(media.id).toLowerCase().includes(query) ||
+                      String(media.mime_type).toLowerCase().includes(query))
                 ),
                 200
               )

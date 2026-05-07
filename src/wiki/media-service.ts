@@ -222,6 +222,32 @@ export async function listNamespaceMedia(
   return result.results.map(mapCurrentMedia);
 }
 
+export async function searchMedia(
+  db: D1Database,
+  namespace: string,
+  query: string,
+  limit = 200,
+  offset = 0
+): Promise<CurrentMedia[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
+  const pattern = likePattern(query);
+  const result = await db
+    .prepare(
+      `select id, namespace, object_key, mime_type, byte_length, content_hash,
+              current_revision_id, created_at, updated_at
+       from media
+       where namespace = ? and is_deleted = 0
+         and (id like ? escape '\\' or mime_type like ? escape '\\')
+       order by id asc
+       limit ? offset ?`
+    )
+    .bind(namespace, pattern, pattern, safeLimit, safeOffset)
+    .all<CurrentMediaRow>();
+
+  return result.results.map(mapCurrentMedia);
+}
+
 export async function saveMediaUpload(
   db: D1Database,
   bucket: R2Bucket,
@@ -634,4 +660,8 @@ function buildMediaMetadataStatements(
 async function sha256(value: ArrayBuffer): Promise<string> {
   const buffer = await crypto.subtle.digest("SHA-256", value);
   return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function likePattern(query: string): string {
+  return `%${query.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
 }

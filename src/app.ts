@@ -46,6 +46,7 @@ import {
   mediaPath,
   revertMedia,
   saveMediaUpload,
+  searchMedia,
   type CurrentMedia,
   type MediaRevision
 } from "./wiki/media-service";
@@ -569,8 +570,11 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
 
 async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
   const namespace = cleanMediaId(url.searchParams.get("ns") ?? "");
+  const query = (url.searchParams.get("q") ?? "").trim();
   const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
-  const media = await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset);
+  const media = query
+    ? await searchMedia(env.DB, namespace, query, pagination.limit, pagination.offset)
+    : await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset);
   const emptyState = media.length === 0 ? "<p>No media found.</p>" : "";
   const items = media
     .map(
@@ -589,7 +593,9 @@ async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
     <form class="search" method="get" action="/media-manager">
       <label for="media__ns">Namespace</label>
       <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
-      <button type="submit">Browse</button>
+      <label for="media__q">Search</label>
+      <input id="media__q" name="q" type="search" value="${escapeAttribute(query)}">
+      <button type="submit">Search</button>
     </form>
     <form class="upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
       <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
