@@ -542,7 +542,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement MIME validation.
 - [x] Implement XSS protections for rendered wiki syntax.
 - [x] Implement SVG safety policy.
-- [ ] Implement HTML embedding policy.
+- [x] Implement HTML embedding policy.
 - [x] Implement external link rel policy.
 - [x] Implement wordblock checks.
 - [x] Implement IP extraction through Cloudflare headers.

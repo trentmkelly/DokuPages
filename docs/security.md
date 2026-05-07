@@ -13,6 +13,10 @@ media titles, tables, code, file blocks, and malformed syntax. External links ar
 limited to HTTP(S), FTP autolinks, mail links, interwiki mappings, and internal
 wiki routes; JavaScript URLs are not emitted as external hrefs.
 
+Raw HTML embedding is not enabled in the Pages port. DokuWiki content that uses
+HTML tags renders as escaped text unless the syntax is one of the native,
+explicitly supported safe formatting forms such as `sup`, `sub`, or `del`.
+
 ## Rate Limits
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
