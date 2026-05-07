@@ -6,4 +6,8 @@ export interface Env {
   SITE_NAME?: string;
   START_PAGE?: string;
   SESSION_COOKIE_NAME?: string;
+  APP_VERSION?: string;
+  CF_PAGES_BRANCH?: string;
+  CF_PAGES_COMMIT_SHA?: string;
+  CF_PAGES_URL?: string;
 }

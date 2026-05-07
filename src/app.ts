@@ -1,4 +1,9 @@
 import type { Env } from "./env";
+import {
+  collectDiagnostics,
+  type DiagnosticsSnapshot,
+  type StorageCheck
+} from "./http/diagnostics";
 import { getClientIp } from "./http/client-ip";
 import { healthResponse } from "./http/health";
 import { paginationFromUrl, type Pagination } from "./http/pagination";
@@ -43,6 +48,7 @@ import {
 } from "./wiki/page-service";
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
+import { APP_VERSION } from "./version";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -108,6 +114,14 @@ export async function handleRequest(
 
   if (url.pathname === "/api/health") {
     return healthResponse(env);
+  }
+
+  if (url.pathname === "/api/diagnostics") {
+    return jsonResponse(await collectDiagnostics(env));
+  }
+
+  if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
+    return htmlResponse(await renderDiagnosticsPage(env));
   }
 
   if (url.pathname === "/recent") {
@@ -850,6 +864,70 @@ async function renderRecentPage(env: Env, url: URL): Promise<string> {
   );
 }
 
+async function renderDiagnosticsPage(env: Env): Promise<string> {
+  const diagnostics = await collectDiagnostics(env);
+  const deploymentRows = renderDiagnosticsDefinitionList([
+    ["Version", diagnostics.version],
+    ["Generated", diagnostics.generatedAt],
+    ["Site name", diagnostics.site.siteName],
+    ["Start page", diagnostics.site.startPage],
+    ["Branch", diagnostics.deployment.branch ?? "(not provided)"],
+    ["Commit", diagnostics.deployment.commitSha ?? "(not provided)"],
+    ["Pages URL", diagnostics.deployment.pagesUrl ?? "(not provided)"]
+  ]);
+
+  return htmlShell(
+    env,
+    "Diagnostics",
+    `<h1>Diagnostics</h1>
+    <p class="${diagnostics.ok ? "success" : "error"}">
+      Runtime status: ${diagnostics.ok ? "healthy" : "attention required"}
+    </p>
+    <h2>Runtime</h2>
+    <dl class="diagnostics">${deploymentRows}</dl>
+    <h2>Storage health</h2>
+    <table class="diagnostics">
+      <thead>
+        <tr><th>Binding</th><th>Status</th><th>Latency</th><th>Message</th></tr>
+      </thead>
+      <tbody>${renderStorageHealthRows(diagnostics)}</tbody>
+    </table>`
+  );
+}
+
+function renderDiagnosticsDefinitionList(rows: Array<[string, string]>): string {
+  return rows
+    .map(
+      ([term, value]) =>
+        `<dt>${escapeHtml(term)}</dt><dd>${value.startsWith("http") ? `<a href="${escapeAttribute(value)}">${escapeHtml(value)}</a>` : escapeHtml(value)}</dd>`
+    )
+    .join("");
+}
+
+function renderStorageHealthRows(diagnostics: DiagnosticsSnapshot): string {
+  const rows: Array<[string, StorageCheck]> = [
+    ["D1 database", diagnostics.storage.d1],
+    ["Render cache KV", diagnostics.storage.kv],
+    ["Media R2 bucket", diagnostics.storage.r2],
+    ["Page lock Durable Object", diagnostics.storage.durableObjects]
+  ];
+
+  return rows
+    .map(
+      ([name, check]) => `<tr>
+        <th scope="row">${escapeHtml(name)}</th>
+        <td>${renderStorageStatus(check)}</td>
+        <td>${check.latencyMs === undefined ? "-" : `${check.latencyMs} ms`}</td>
+        <td>${escapeHtml(check.message)}</td>
+      </tr>`
+    )
+    .join("");
+}
+
+function renderStorageStatus(check: StorageCheck): string {
+  return `<span class="diagnostics__status diagnostics__status--${escapeAttribute(check.status)}">${escapeHtml(check.status)}</span>`;
+}
+
 async function renderSearchPage(env: Env, url: URL): Promise<string> {
   const query = url.searchParams.get("q")?.trim() ?? "";
   const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
@@ -1106,6 +1184,7 @@ interface HtmlShellOptions {
 
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
   const siteName = env.SITE_NAME ?? "DokuWiki Pages";
+  const appVersion = env.APP_VERSION ?? APP_VERSION;
   const startId = startPageId(env);
   const startPath = pagePath(startId);
   const pageId = options.pageId;
@@ -1150,6 +1229,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             <ul>
               <li><a href="/recent">Recent changes</a></li>
               <li><a href="/index?ns=wiki">Index</a></li>
+              <li><a href="/diagnostics">Diagnostics</a></li>
             </ul>
           </nav>
         </div>
@@ -1171,7 +1251,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       </div>
       <footer id="dokuwiki__footer">
         <div class="pad">
-          <div class="license">Except where otherwise noted, content is available under the original wiki license. Template structure and styling are adapted from DokuWiki's GPL-2.0 default template.</div>
+          <div class="license">Except where otherwise noted, content is available under the original wiki license. Template structure and styling are adapted from DokuWiki's GPL-2.0 default template. DokuWiki Pages.dev Port ${escapeHtml(appVersion)}.</div>
           <div class="buttons">
             <a href="https://validator.w3.org/check/referer" title="Valid HTML5"><img src="/images/button-html5.png" width="80" height="15" alt="Valid HTML5"></a>
             <a href="https://jigsaw.w3.org/css-validator/check/referer?profile=css3" title="Valid CSS"><img src="/images/button-css.png" width="80" height="15" alt="Valid CSS"></a>
@@ -1201,6 +1281,7 @@ function renderMobileTools(pageId?: string): string {
         <option value="/recent">Recent changes</option>
         <option value="/index?ns=wiki">Index</option>
         <option value="/search">Search</option>
+        <option value="/diagnostics">Diagnostics</option>
       </select>
     </div>`;
 }

@@ -78,13 +78,41 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       ok: true,
+      version: "0.1.0",
       bindings: {
         d1: true,
         r2: true,
         kv: true,
         durableObjects: true
+      },
+      storage: {
+        d1: { status: "ok" },
+        kv: { status: "ok" },
+        r2: { status: "ok" },
+        durableObjects: { status: "ok" }
       }
     });
+  });
+
+  it("returns native diagnostics as JSON and HTML", async () => {
+    const json = await handleRequest(new Request("https://example.com/api/diagnostics"), env);
+    const html = await handleRequest(new Request("https://example.com/diagnostics"), env);
+
+    expect(json.status).toBe(200);
+    await expect(json.json()).resolves.toMatchObject({
+      service: "dokuwiki-pages-dev-port",
+      version: "0.1.0",
+      site: {
+        siteName: "Test Wiki"
+      },
+      storage: {
+        d1: { status: "ok" },
+        kv: { status: "ok" },
+        r2: { status: "ok" }
+      }
+    });
+    expect(html.status).toBe(200);
+    await expect(html.text()).resolves.toContain("<h1>Diagnostics</h1>");
   });
 
   it("handles wiki routes through the Pages Function router", async () => {
@@ -908,6 +936,10 @@ function createD1Stub(state: D1StubState): D1Database {
         values,
         first: async () => {
           const [id] = values;
+          if (sql.includes("select 1 as ok")) {
+            return { ok: 1 };
+          }
+
           if (sql.includes("from media_revisions")) {
             return state.mediaRevisions.find((revision) => revision.id === id) ?? null;
           }
@@ -1191,6 +1223,9 @@ function createR2Stub(): R2Bucket {
   ]);
 
   return {
+    head: async (key: string) => {
+      return objects.has(key) ? ({} as R2Object) : null;
+    },
     get: async (key: string) => {
       const value = objects.get(key);
       if (!value) return null;

@@ -480,6 +480,56 @@ form.search button {
   background-color: var(--dw-background-alt);
 }
 
+.dokuwiki .page p.success {
+  padding: 0.5em 0.7em;
+  border: 1px solid #8cacbb;
+  background-color: #f7fafb;
+  color: #080;
+}
+
+.dokuwiki .page p.error {
+  padding: 0.5em 0.7em;
+  border: 1px solid #e3b7aa;
+  background-color: #fff7f5;
+  color: #d30;
+}
+
+.dokuwiki .page dl.diagnostics {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35em 1em;
+}
+
+.dokuwiki .page dl.diagnostics dt {
+  margin: 0;
+  font-weight: bold;
+}
+
+.dokuwiki .page dl.diagnostics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.dokuwiki .page table.diagnostics {
+  width: 100%;
+}
+
+.dokuwiki .page .diagnostics__status {
+  font-weight: bold;
+}
+
+.dokuwiki .page .diagnostics__status--ok {
+  color: #080;
+}
+
+.dokuwiki .page .diagnostics__status--error {
+  color: #d30;
+}
+
+.dokuwiki .page .diagnostics__status--not_configured {
+  color: var(--dw-text-neutral);
+}
+
 .dokuwiki .page pre {
   padding: 0.8em 1em;
   overflow: auto;

@@ -1,16 +1,16 @@
 import type { Env } from "../env";
+import { collectDiagnostics } from "./diagnostics";
 import { jsonResponse } from "./responses";
 
-export function healthResponse(env: Env): Response {
+export async function healthResponse(env: Env): Promise<Response> {
+  const diagnostics = await collectDiagnostics(env);
+
   return jsonResponse({
-    ok: true,
-    service: "dokuwiki-pages-dev-port",
-    siteName: env.SITE_NAME ?? "DokuWiki Pages.dev Port",
-    bindings: {
-      d1: Boolean(env.DB),
-      r2: Boolean(env.MEDIA_BUCKET),
-      kv: Boolean(env.RENDER_CACHE),
-      durableObjects: Boolean(env.PAGE_LOCKS)
-    }
+    ok: diagnostics.ok,
+    service: diagnostics.service,
+    version: diagnostics.version,
+    siteName: diagnostics.site.siteName,
+    bindings: diagnostics.bindings,
+    storage: diagnostics.storage
   });
 }

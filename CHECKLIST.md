@@ -449,7 +449,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Port the authplain plugin or replace it with native auth.
 - [ ] Port the config plugin or replace it with native admin UI.
 - [ ] Port the extension manager plugin or remove it for Pages.
-- [ ] Port the info plugin or replace it with native diagnostics.
+- [x] Port the info plugin or replace it with native diagnostics.
 - [ ] Port the logviewer plugin or replace it with Cloudflare logs.
 - [ ] Port the popularity plugin or remove it.
 - [ ] Port the revert plugin.
@@ -480,9 +480,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement cache purge.
 - [ ] Implement media cleanup.
 - [ ] Implement orphaned revision cleanup if needed.
-- [ ] Implement diagnostics.
-- [ ] Implement version display.
-- [ ] Implement storage health checks.
+- [x] Implement diagnostics.
+- [x] Implement version display.
+- [x] Implement storage health checks.
 - [ ] Implement migration status display.
 - [ ] Implement audit log view.
 - [ ] Implement maintenance mode if needed.
