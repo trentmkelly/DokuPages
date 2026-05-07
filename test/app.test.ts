@@ -189,6 +189,48 @@ describe("handleRequest", () => {
     expect(html).toContain("<ins>Imported page.</ins>");
   });
 
+  it("renders a revert form for an old page revision", async () => {
+    const response = await handleRequest(
+      new Request(
+        "https://example.com/wiki/Wiki/Welcome?do=revert&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Revert wiki:welcome");
+    expect(html).toContain('name="revisionId" value="wiki:welcome@2026-05-06T00:00:00.000Z"');
+    expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
+  });
+
+  it("reverts a page through the save pipeline", async () => {
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("revisionId", "wiki:welcome@2026-05-06T00:00:00.000Z");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("summary", "Restore older page");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages/revert", {
+        method: "POST",
+        body: form
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(state.row?.content).toContain("Older page.");
+    expect(state.revisions[0]).toMatchObject({
+      page_id: "wiki:welcome",
+      content: "====== Welcome ======\n\nOlder page.",
+      change_type: "revert",
+      summary: "Restore older page"
+    });
+    expect(purgedKeys).toContain("page:wiki:welcome");
+  });
+
   it("renders recent page changes", async () => {
     const response = await handleRequest(new Request("https://example.com/recent"), env);
 

@@ -242,7 +242,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement page creation.
 - [x] Implement page edits.
 - [x] Implement page deletion through empty content.
-- [ ] Implement page revert.
+- [x] Implement page revert.
 - [x] Implement edit summaries.
 - [ ] Implement minor edits.
 - [x] Implement conflict detection.
@@ -648,7 +648,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add integration tests for page view.
 - [ ] Add integration tests for page edit.
 - [ ] Add integration tests for page delete.
-- [ ] Add integration tests for page revert.
+- [x] Add integration tests for page revert.
 - [x] Add integration tests for revisions.
 - [x] Add integration tests for diff.
 - [x] Add integration tests for search.

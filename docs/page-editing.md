@@ -6,7 +6,9 @@ The first page editing implementation is intentionally small but exercises the r
 
 - `GET /wiki/:id?do=edit` renders an HTML edit form.
 - `GET /wiki/:id?do=source` returns raw wiki text.
+- `GET /wiki/:id?do=revert&rev=:revisionId` renders a revert confirmation form.
 - `POST /api/pages` saves page content.
+- `POST /api/pages/revert` restores an old revision through the save path.
 - `POST /api/pages/preview` returns rendered preview JSON.
 
 ## Save Semantics
@@ -27,8 +29,10 @@ The save path:
 - creates a page when no current revision exists
 - edits a page when content is non-empty
 - deletes a page when content is empty
+- reverts a page by copying an old revision into a new `revert` revision
 - records immutable page revisions
 - appends changelog rows
+- updates search postings
 - purges page-related KV cache keys
 - redirects back to the page with HTTP 303
 

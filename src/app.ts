@@ -104,6 +104,10 @@ export async function handleRequest(
     return handleSave(request, env);
   }
 
+  if (url.pathname === "/api/pages/revert" && request.method === "POST") {
+    return handleRevert(request, env);
+  }
+
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
     const form = await request.formData();
     const content = String(form.get("content") ?? "");
@@ -152,6 +156,10 @@ export async function handleRequest(
 
     if (url.searchParams.get("do") === "orphan" || url.searchParams.get("do") === "orphans") {
       return htmlResponse(await renderOrphanPage(env));
+    }
+
+    if (url.searchParams.get("do") === "revert") {
+      return htmlResponse(await renderRevertPage(env, id, url));
     }
 
     const revisionId = url.searchParams.get("rev");
@@ -243,6 +251,7 @@ async function renderRevisionsPage(env: Env, id: string): Promise<string> {
         ${escapeHtml(revision.changeType)}
         ${revision.summary ? ` - ${escapeHtml(revision.summary)}` : ""}
         <a href="${pagePath(id)}?do=diff&rev=${encodeURIComponent(revision.id)}">diff</a>
+        <a href="${pagePath(id)}?do=revert&rev=${encodeURIComponent(revision.id)}">revert</a>
       </li>`
     )
     .join("");
@@ -275,6 +284,40 @@ async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
     env,
     `Diff for ${id}`,
     `<h1>Diff for ${escapeHtml(id)}</h1><table><tbody>${rows}</tbody></table>`
+  );
+}
+
+async function renderRevertPage(env: Env, id: string, url: URL): Promise<string> {
+  const revisionId = url.searchParams.get("rev");
+
+  if (!revisionId) {
+    return htmlShell(env, "Missing revision", "<p>Missing revision.</p>");
+  }
+
+  const revision = await getPageRevision(env.DB, revisionId);
+  const current = await getCurrentPage(env.DB, id);
+
+  if (!revision || revision.pageId !== id || !current) {
+    return htmlShell(env, "Revision not found", "<p>Revision not found.</p>");
+  }
+
+  const summary = `Reverted to ${revision.createdAt}`;
+
+  return htmlShell(
+    env,
+    `Revert ${id}`,
+    `<h1>Revert ${escapeHtml(id)}</h1>
+    <p>Restore revision ${escapeHtml(revision.createdAt)}.</p>
+    <form method="post" action="/api/pages/revert">
+      <input type="hidden" name="id" value="${escapeHtml(id)}">
+      <input type="hidden" name="revisionId" value="${escapeHtml(revision.id)}">
+      <input type="hidden" name="baseRevisionId" value="${escapeHtml(current.revisionId)}">
+      <p>
+        <label for="summary">Summary</label><br>
+        <input id="summary" name="summary" type="text" value="${escapeHtml(summary)}">
+      </p>
+      <button type="submit">Revert</button>
+    </form>`
   );
 }
 
@@ -560,6 +603,38 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
 
   if (!result.ok) {
     return conflictResponse("The page changed before your edit could be saved.");
+  }
+
+  await purgePageCache(env, id, result.page.revisionId);
+
+  return redirectResponse(pagePath(id));
+}
+
+async function handleRevert(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanPageId(String(form.get("id") ?? ""));
+  const revisionId = String(form.get("revisionId") ?? "");
+
+  if (!id || !revisionId) {
+    return jsonResponse({ error: "Missing page id or revision id." }, { status: 400 });
+  }
+
+  const revision = await getPageRevision(env.DB, revisionId);
+  if (!revision || revision.pageId !== id) {
+    return notFoundResponse(`Revision '${revisionId}' was not found.`);
+  }
+
+  const result = await savePage(env.DB, {
+    id,
+    content: revision.content,
+    summary: String(form.get("summary") || "") || `Reverted to ${revision.createdAt}`,
+    baseRevisionId: String(form.get("baseRevisionId") || "") || null,
+    changeType: "revert",
+    ip: request.headers.get("cf-connecting-ip") ?? null
+  });
+
+  if (!result.ok) {
+    return conflictResponse("The page changed before your revert could be saved.");
   }
 
   await purgePageCache(env, id, result.page.revisionId);
