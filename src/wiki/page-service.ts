@@ -235,6 +235,7 @@ export async function listRecentChanges(db: D1Database, limit = 50): Promise<Rec
 export async function searchPages(
   db: D1Database,
   query: string,
+  namespace = "",
   limit = 25
 ): Promise<PageSearchResult[]> {
   const terms = parseSearchQuery(query);
@@ -242,18 +243,19 @@ export async function searchPages(
 
   const safeLimit = Math.max(1, Math.min(limit, 50));
   const placeholders = terms.map(() => "?").join(", ");
+  const namespaceClause = namespace ? " and p.namespace = ?" : "";
   const result = await db
     .prepare(
       `select p.id, p.title, r.content, p.updated_at, sum(sp.frequency) as score
        from search_postings sp
        join pages p on p.id = sp.page_id
        join page_revisions r on r.id = p.current_revision_id
-       where sp.term in (${placeholders}) and p.is_deleted = 0
+       where sp.term in (${placeholders}) and p.is_deleted = 0${namespaceClause}
        group by p.id
        order by score desc, p.updated_at desc
        limit ?`
     )
-    .bind(...terms, safeLimit)
+    .bind(...terms, ...(namespace ? [namespace] : []), safeLimit)
     .all<PageSearchRow>();
 
   return result.results.map((row) => ({

@@ -344,7 +344,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement media indexing if supported.
 - [x] Implement search query parsing.
 - [x] Implement search result ranking.
-- [ ] Implement namespace-limited search.
+- [x] Implement namespace-limited search.
 - [ ] Implement ACL filtering for search results.
 - [ ] Implement index rebuild job.
 - [x] Implement incremental index updates on save.

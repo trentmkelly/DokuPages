@@ -687,7 +687,8 @@ async function renderRecentPage(env: Env): Promise<string> {
 
 async function renderSearchPage(env: Env, url: URL): Promise<string> {
   const query = url.searchParams.get("q")?.trim() ?? "";
-  const results = query ? await searchPages(env.DB, query) : [];
+  const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
+  const results = query ? await searchPages(env.DB, query, namespace) : [];
   const resultItems = results
     .map(
       (result) => `<li>
@@ -706,8 +707,11 @@ async function renderSearchPage(env: Env, url: URL): Promise<string> {
     <form method="get" action="/search">
       <label for="q">Search pages</label>
       <input id="q" name="q" type="search" value="${escapeHtml(query)}">
+      <label for="search__ns">Namespace</label>
+      <input id="search__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
       <button type="submit">Search</button>
     </form>
+    ${namespace ? `<p>Search scope: ${escapeHtml(namespace)}</p>` : ""}
     ${emptyState}
     <ol>${resultItems}</ol>`
   );

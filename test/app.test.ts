@@ -354,12 +354,21 @@ describe("handleRequest", () => {
 
   it("renders search results from the page index", async () => {
     const response = await handleRequest(new Request("https://example.com/search?q=welcome"), env);
+    const scoped = await handleRequest(
+      new Request("https://example.com/search?q=welcome&ns=playground"),
+      env
+    );
 
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Search");
     expect(html).toContain("/wiki/wiki/welcome");
     expect(html).toContain("Imported page.");
+    expect(scoped.status).toBe(200);
+    const scopedHtml = await scoped.text();
+    expect(scopedHtml).toContain("Search scope: playground");
+    expect(scopedHtml).toContain("No matching pages found.");
+    expect(scopedHtml).not.toContain('<li>\n        <a href="/wiki/wiki/welcome"');
   });
 
   it("handles DokuWiki-style page search actions", async () => {
@@ -693,7 +702,9 @@ function createD1Stub(state: D1StubState): D1Database {
           }
 
           if (sql.includes("from search_postings sp")) {
-            const terms = values.slice(0, -1);
+            const hasNamespaceFilter = sql.includes("p.namespace = ?");
+            const terms = values.slice(0, hasNamespaceFilter ? -2 : -1);
+            const namespace = hasNamespaceFilter ? values.at(-2) : null;
             const searchLimit = Number(values.at(-1));
             const scored = new Map<string, number>();
 
@@ -706,7 +717,10 @@ function createD1Stub(state: D1StubState): D1Database {
 
             return {
               results: [...scored.entries()]
-                .filter(([pageId]) => !state.deleted && state.row?.id === pageId)
+                .filter(([pageId]) => {
+                  if (state.deleted || state.row?.id !== pageId) return false;
+                  return !namespace || state.row.namespace === namespace;
+                })
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, Number.isFinite(searchLimit) ? searchLimit : 25)
                 .map(([, score]) => ({
