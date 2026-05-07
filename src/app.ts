@@ -50,6 +50,7 @@ import {
   type CurrentMedia,
   type MediaRevision
 } from "./wiki/media-service";
+import { validateMediaUpload } from "./wiki/media-validation";
 import { cleanPageId } from "./wiki/page-id";
 import {
   getCurrentPage,
@@ -1782,10 +1783,28 @@ async function handleMediaUpload(
     return jsonResponse({ error: "Missing media id." }, { status: 400 });
   }
 
+  const body = await file.arrayBuffer();
+  const validation = validateMediaUpload({
+    id,
+    body,
+    mimeType: file.type || null
+  });
+
+  if (!validation.ok) {
+    if (acceptsJson(request)) {
+      return jsonResponse({ error: validation.error }, { status: 400 });
+    }
+
+    return htmlResponse(
+      htmlShell(env, "Media upload rejected", `<p>${escapeHtml(validation.error)}</p>`),
+      { status: 400 }
+    );
+  }
+
   const author = principalAuthor(principal);
   const result = await saveMediaUpload(env.DB, env.MEDIA_BUCKET, {
     id,
-    body: await file.arrayBuffer(),
+    body,
     mimeType: file.type || null,
     summary: String(form.get("summary") ?? ""),
     overwrite: Boolean(form.get("overwrite")),

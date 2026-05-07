@@ -24,6 +24,8 @@ Media storage uses D1 for metadata and R2 for object bodies.
 
 The upload path writes the R2 object first, then stores current media metadata, an immutable `media_revisions` row, changelog row, and technical metadata rows in D1. If the D1 write fails after the object write, the newly written R2 object is deleted.
 
+Uploads are validated before R2 writes. The native validator enforces a 25 MiB body limit, allows only a conservative extension set, checks non-generic MIME types against the file extension, and rejects SVG content containing scripts, event handlers, doctypes, entities, foreign objects, or `javascript:` links.
+
 ## Delete Semantics
 
 `POST /api/media/delete` expects `id` and optional `summary`. Deletion marks the current `media` row deleted, creates a `delete` media revision, appends a media changelog row, and records deletion metadata. R2 objects are kept so immutable old revisions remain fetchable.

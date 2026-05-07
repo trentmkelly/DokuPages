@@ -378,6 +378,28 @@ describe("handleRequest", () => {
     });
   });
 
+  it("rejects unsafe media uploads before writing R2 objects", async () => {
+    const form = new FormData();
+    form.set("ns", "wiki");
+    form.set("file", new File(["<?php"], "shell.php", { type: "application/x-httpd-php" }));
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringContaining("not allowed")
+    });
+    expect(state.media).toHaveLength(1);
+    expect(state.mediaRevisions).toHaveLength(1);
+  });
+
   it("deletes current media while preserving immutable media revisions", async () => {
     const form = new FormData();
     form.set("id", "wiki:logo.svg");

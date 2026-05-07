@@ -289,9 +289,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement download headers.
 - [x] Implement cache headers for immutable media revisions.
 - [x] Implement cache headers for current media files.
-- [ ] Implement large upload limits and validation.
-- [ ] Implement SVG safety checks.
-- [ ] Implement upload content safety checks.
+- [x] Implement large upload limits and validation.
+- [x] Implement SVG safety checks.
+- [x] Implement upload content safety checks.
 
 ## Authentication
 
@@ -538,10 +538,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Anti-Abuse And Security
 
 - [ ] Implement CSRF protection for all state-changing actions.
-- [ ] Implement upload validation.
-- [ ] Implement MIME validation.
+- [x] Implement upload validation.
+- [x] Implement MIME validation.
 - [ ] Implement XSS protections for rendered wiki syntax.
-- [ ] Implement SVG safety policy.
+- [x] Implement SVG safety policy.
 - [ ] Implement HTML embedding policy.
 - [x] Implement external link rel policy.
 - [x] Implement wordblock checks.
