@@ -36,7 +36,9 @@ Namespaces are stored as colon-separated IDs in page and media records. They can
 
 ## Search
 
-`search_terms` and `search_postings` model a D1-backed inverted index. This may later be replaced with D1 FTS or an external search service if performance requires it.
+`search_terms` and `search_postings` model a D1-backed inverted index. The first implementation tokenizes rendered wiki source into normalized terms, applies a small stopword list, weights title matches above body matches, and updates postings during flat-file import plus page save and delete operations.
+
+D1 postings are the launch search backend. DokuWiki's legacy `data/index` files are not read directly because they encode PHP filesystem assumptions; a rebuild importer can be added later if production data requires exact legacy ranking.
 
 ## Rendered Cache
 

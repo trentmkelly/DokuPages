@@ -62,7 +62,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Identify all code paths that send email.
 - [ ] Identify all image processing paths.
 - [ ] Identify all gzip and bzip revision storage paths.
-- [ ] Identify all search index paths.
+- [x] Identify all search index paths.
 - [ ] Identify all cache invalidation paths.
 - [ ] Identify all extension and plugin hook points.
 
@@ -175,7 +175,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for revisions.
 - [x] Implement route handling for diffs.
 - [ ] Implement route handling for backlinks.
-- [ ] Implement route handling for search.
+- [x] Implement route handling for search.
 - [ ] Implement route handling for namespace index.
 - [x] Implement route handling for recent changes.
 - [ ] Implement route handling for media fetches.
@@ -334,23 +334,23 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Search And Indexing
 
-- [ ] Decide whether to port DokuWiki fulltext search, use D1 FTS, use an external service, or implement a simpler search.
-- [ ] Implement tokenizer compatibility.
-- [ ] Implement stopword handling.
-- [ ] Implement page indexing.
+- [x] Decide whether to port DokuWiki fulltext search, use D1 FTS, use an external service, or implement a simpler search.
+- [x] Implement tokenizer compatibility.
+- [x] Implement stopword handling.
+- [x] Implement page indexing.
 - [ ] Implement metadata indexing.
-- [ ] Implement title indexing.
-- [ ] Implement page deletion from index.
+- [x] Implement title indexing.
+- [x] Implement page deletion from index.
 - [ ] Implement media indexing if supported.
-- [ ] Implement search query parsing.
-- [ ] Implement search result ranking.
+- [x] Implement search query parsing.
+- [x] Implement search result ranking.
 - [ ] Implement namespace-limited search.
 - [ ] Implement ACL filtering for search results.
 - [ ] Implement index rebuild job.
-- [ ] Implement incremental index updates on save.
+- [x] Implement incremental index updates on save.
 - [ ] Implement index migration from existing `data/index` if needed.
 - [ ] Add search performance tests.
-- [ ] Add search correctness tests.
+- [x] Add search correctness tests.
 
 ## Cache And Rendering Performance
 
@@ -388,7 +388,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Port conflict UI.
 - [ ] Port revision UI.
 - [ ] Port diff UI.
-- [ ] Port search UI.
+- [x] Port search UI.
 - [ ] Port media manager UI.
 - [ ] Port admin UI.
 - [ ] Port login UI.
@@ -643,7 +643,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add unit tests for auth behavior.
 - [ ] Add unit tests for storage adapters.
 - [ ] Add unit tests for cache behavior.
-- [ ] Add unit tests for search behavior.
+- [x] Add unit tests for search behavior.
 - [ ] Add unit tests for media behavior.
 - [ ] Add integration tests for page view.
 - [ ] Add integration tests for page edit.
@@ -651,7 +651,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add integration tests for page revert.
 - [x] Add integration tests for revisions.
 - [x] Add integration tests for diff.
-- [ ] Add integration tests for search.
+- [x] Add integration tests for search.
 - [ ] Add integration tests for media upload.
 - [ ] Add integration tests for media fetch.
 - [ ] Add integration tests for login.
@@ -750,7 +750,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Verify auth and ACL behavior.
 - [ ] Verify page rendering for representative content.
 - [ ] Verify media rendering for representative media.
-- [ ] Verify search results.
+- [x] Verify search results.
 - [ ] Verify admin workflows.
 - [ ] Verify backup and restore.
 - [ ] Verify rollback.

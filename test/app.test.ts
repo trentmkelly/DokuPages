@@ -6,6 +6,7 @@ interface D1StubState {
   row: Record<string, unknown> | null;
   revisions: Record<string, unknown>[];
   changelog: Record<string, unknown>[];
+  searchPostings: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
 }
@@ -14,6 +15,7 @@ const state: D1StubState = {
   row: currentPageRow(),
   revisions: seedRevisions(),
   changelog: seedChangelog(),
+  searchPostings: seedSearchPostings(),
   deleted: false,
   batches: []
 };
@@ -37,6 +39,7 @@ describe("handleRequest", () => {
     state.row = currentPageRow();
     state.revisions = seedRevisions();
     state.changelog = seedChangelog();
+    state.searchPostings = seedSearchPostings();
     state.deleted = false;
     state.batches = [];
     purgedKeys.length = 0;
@@ -144,6 +147,26 @@ describe("handleRequest", () => {
     expect(html).toContain("/wiki/wiki/welcome");
   });
 
+  it("renders search results from the page index", async () => {
+    const response = await handleRequest(new Request("https://example.com/search?q=welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Search");
+    expect(html).toContain("/wiki/wiki/welcome");
+    expect(html).toContain("Imported page.");
+  });
+
+  it("handles DokuWiki-style page search actions", async () => {
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=search&q=welcome"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain("/wiki/wiki/welcome");
+  });
+
   it("previews submitted wiki text", async () => {
     const form = new FormData();
     form.set("content", "====== Preview ======\n\n**Text**");
@@ -220,6 +243,9 @@ describe("handleRequest", () => {
     expect(createResponse.status).toBe(303);
     const createdRow = state.row as unknown as Record<string, unknown>;
     expect(createdRow.id).toBe("wiki:new");
+    expect(state.searchPostings).toContainEqual(
+      expect.objectContaining({ page_id: "wiki:new", term: "created" })
+    );
 
     const remove = new FormData();
     remove.set("id", "wiki:new");
@@ -236,6 +262,7 @@ describe("handleRequest", () => {
 
     expect(deleteResponse.status).toBe(303);
     expect(state.deleted).toBe(true);
+    expect(state.searchPostings.some((posting) => posting.page_id === "wiki:new")).toBe(false);
   });
 
   it("falls back to static assets for non-dynamic routes", async () => {
@@ -266,6 +293,41 @@ function createD1Stub(state: D1StubState): D1Database {
         all: async () => {
           const [idOrLimit, rawLimit] = values;
           const limit = typeof rawLimit === "number" ? rawLimit : Number(idOrLimit);
+
+          if (sql.includes("from search_postings") && sql.includes("where page_id = ?")) {
+            return {
+              results: state.searchPostings
+                .filter((posting) => posting.page_id === idOrLimit)
+                .map((posting) => ({ term: posting.term }))
+            };
+          }
+
+          if (sql.includes("from search_postings sp")) {
+            const terms = values.slice(0, -1);
+            const searchLimit = Number(values.at(-1));
+            const scored = new Map<string, number>();
+
+            for (const posting of state.searchPostings) {
+              if (terms.includes(posting.term)) {
+                const pageId = String(posting.page_id);
+                scored.set(pageId, (scored.get(pageId) ?? 0) + Number(posting.frequency));
+              }
+            }
+
+            return {
+              results: [...scored.entries()]
+                .filter(([pageId]) => !state.deleted && state.row?.id === pageId)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, Number.isFinite(searchLimit) ? searchLimit : 25)
+                .map(([, score]) => ({
+                  id: state.row?.id,
+                  title: state.row?.title,
+                  content: state.row?.content,
+                  updated_at: state.row?.updated_at,
+                  score
+                }))
+            };
+          }
 
           if (sql.includes("from page_revisions")) {
             return {
@@ -348,6 +410,34 @@ function createD1Stub(state: D1StubState): D1Database {
         });
       }
 
+      for (const statement of statements) {
+        if (statement.sql.includes("delete from search_postings where page_id = ?")) {
+          const [pageId] = statement.values;
+          state.searchPostings = state.searchPostings.filter(
+            (posting) => posting.page_id !== pageId
+          );
+        }
+
+        if (statement.sql.includes("insert into search_postings")) {
+          const [term, pageId, frequency, updatedAt] = statement.values;
+          const existing = state.searchPostings.find(
+            (posting) => posting.term === term && posting.page_id === pageId
+          );
+
+          if (existing) {
+            existing.frequency = frequency;
+            existing.updated_at = updatedAt;
+          } else {
+            state.searchPostings.push({
+              term,
+              page_id: pageId,
+              frequency,
+              updated_at: updatedAt
+            });
+          }
+        }
+      }
+
       return [];
     }
   } as unknown as D1Database;
@@ -398,6 +488,23 @@ function seedChangelog(): Record<string, unknown>[] {
       summary: "Initial import",
       size_change: 38,
       created_at: "2026-05-07T00:00:00.000Z"
+    }
+  ];
+}
+
+function seedSearchPostings(): Record<string, unknown>[] {
+  return [
+    {
+      term: "welcome",
+      page_id: "wiki:welcome",
+      frequency: 5,
+      updated_at: "2026-05-07T00:00:00.000Z"
+    },
+    {
+      term: "imported",
+      page_id: "wiki:welcome",
+      frequency: 1,
+      updated_at: "2026-05-07T00:00:00.000Z"
     }
   ];
 }

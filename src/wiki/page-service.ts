@@ -1,3 +1,5 @@
+import { buildSearchTermFrequencies, makeSearchSnippet, parseSearchQuery } from "./search";
+
 export interface CurrentPage {
   id: string;
   title: string | null;
@@ -25,6 +27,14 @@ export interface RecentChange {
   summary: string;
   sizeChange: number;
   createdAt: string;
+}
+
+export interface PageSearchResult {
+  id: string;
+  title: string | null;
+  snippet: string;
+  score: number;
+  updatedAt: string;
 }
 
 export interface SavePageInput {
@@ -77,6 +87,18 @@ interface RecentChangeRow {
   summary: string;
   size_change: number;
   created_at: string;
+}
+
+interface SearchTermRow {
+  term: string;
+}
+
+interface PageSearchRow {
+  id: string;
+  title: string | null;
+  content: string;
+  updated_at: string;
+  score: number;
 }
 
 export async function getCurrentPage(db: D1Database, id: string): Promise<CurrentPage | null> {
@@ -160,6 +182,39 @@ export async function listRecentChanges(db: D1Database, limit = 50): Promise<Rec
   }));
 }
 
+export async function searchPages(
+  db: D1Database,
+  query: string,
+  limit = 25
+): Promise<PageSearchResult[]> {
+  const terms = parseSearchQuery(query);
+  if (terms.length === 0) return [];
+
+  const safeLimit = Math.max(1, Math.min(limit, 50));
+  const placeholders = terms.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `select p.id, p.title, r.content, p.updated_at, sum(sp.frequency) as score
+       from search_postings sp
+       join pages p on p.id = sp.page_id
+       join page_revisions r on r.id = p.current_revision_id
+       where sp.term in (${placeholders}) and p.is_deleted = 0
+       group by p.id
+       order by score desc, p.updated_at desc
+       limit ?`
+    )
+    .bind(...terms, safeLimit)
+    .all<PageSearchRow>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    title: row.title,
+    snippet: makeSearchSnippet(row.content, terms),
+    score: row.score,
+    updatedAt: row.updated_at
+  }));
+}
+
 export async function savePage(db: D1Database, input: SavePageInput): Promise<SavePageResult> {
   const current = await getCurrentPage(db, input.id);
   const currentRevisionId = current?.revisionId ?? null;
@@ -182,6 +237,10 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   const changeType = isDelete ? "delete" : current ? "edit" : "create";
   const sizeChange = input.content.length - (current?.content.length ?? 0);
   const contentHash = await sha256(input.content);
+  const indexedTerms = await listIndexedTerms(db, input.id);
+  const searchTerms = isDelete
+    ? new Map<string, number>()
+    : buildSearchTermFrequencies(input.content, title);
 
   await db.batch([
     db
@@ -233,7 +292,8 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
         input.summary,
         sizeChange,
         now
-      )
+      ),
+    ...buildSearchIndexStatements(db, input.id, searchTerms, indexedTerms, now)
   ]);
 
   return {
@@ -267,6 +327,70 @@ function mapRevision(row: PageRevisionRow): PageRevision {
     sizeChange: row.size_change,
     createdAt: row.created_at
   };
+}
+
+async function listIndexedTerms(db: D1Database, pageId: string): Promise<string[]> {
+  const result = await db
+    .prepare(
+      `select term
+       from search_postings
+       where page_id = ?`
+    )
+    .bind(pageId)
+    .all<SearchTermRow>();
+
+  return result.results.map((row) => row.term);
+}
+
+function buildSearchIndexStatements(
+  db: D1Database,
+  pageId: string,
+  terms: Map<string, number>,
+  previousTerms: string[],
+  updatedAt: string
+): D1PreparedStatement[] {
+  const impactedTerms = new Set([...previousTerms, ...terms.keys()]);
+  const statements = [db.prepare("delete from search_postings where page_id = ?").bind(pageId)];
+
+  for (const [term, frequency] of terms) {
+    statements.push(
+      db
+        .prepare(
+          `insert into search_terms (term, document_count)
+           values (?, 0)
+           on conflict(term) do nothing`
+        )
+        .bind(term),
+      db
+        .prepare(
+          `insert into search_postings (term, page_id, frequency, updated_at)
+           values (?, ?, ?, ?)
+           on conflict(term, page_id) do update set
+             frequency = excluded.frequency,
+             updated_at = excluded.updated_at`
+        )
+        .bind(term, pageId, frequency, updatedAt)
+    );
+  }
+
+  for (const term of impactedTerms) {
+    statements.push(
+      db
+        .prepare(
+          `update search_terms
+           set document_count = (
+             select count(*)
+             from search_postings
+             where search_postings.term = search_terms.term
+           )
+           where term = ?`
+        )
+        .bind(term),
+      db.prepare("delete from search_terms where term = ? and document_count = 0").bind(term)
+    );
+  }
+
+  return statements;
 }
 
 function extractTitle(content: string): string | null {

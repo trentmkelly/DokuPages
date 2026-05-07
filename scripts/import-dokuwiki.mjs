@@ -73,7 +73,35 @@ on conflict(id) do update set
   'Imported from DokuWiki flat files', 'create', ${page.byteLength}, ${sql(page.modifiedAt)}
 );`
     );
+
+    const searchTerms = buildSearchTermFrequencies(content, title);
+    statements.push(`delete from search_postings where page_id = ${sql(page.id)};`);
+
+    for (const [term, frequency] of searchTerms) {
+      statements.push(
+        `insert into search_terms (term, document_count)
+values (${sql(term)}, 0)
+on conflict(term) do nothing;`
+      );
+      statements.push(
+        `insert into search_postings (term, page_id, frequency, updated_at)
+values (${sql(term)}, ${sql(page.id)}, ${frequency}, ${sql(page.modifiedAt)})
+on conflict(term, page_id) do update set
+  frequency = excluded.frequency,
+  updated_at = excluded.updated_at;`
+      );
+    }
   }
+
+  statements.push(
+    `update search_terms
+set document_count = (
+  select count(*)
+  from search_postings
+  where search_postings.term = search_terms.term
+);`
+  );
+  statements.push("delete from search_terms where document_count = 0;");
 
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
   await fs.writeFile(outputFile, `${statements.join("\n\n")}\n`);
@@ -296,6 +324,82 @@ function sha256(content) {
 function extractTitle(content) {
   const match = content.match(/^(={2,6})\s*(.*?)\s*\1\s*$/m);
   return match?.[2]?.trim() || null;
+}
+
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "but",
+  "by",
+  "for",
+  "from",
+  "if",
+  "in",
+  "into",
+  "is",
+  "it",
+  "no",
+  "not",
+  "of",
+  "on",
+  "or",
+  "such",
+  "that",
+  "the",
+  "their",
+  "then",
+  "there",
+  "these",
+  "this",
+  "to",
+  "was",
+  "will",
+  "with",
+  "you",
+  "your"
+]);
+
+const TERM_PATTERN = /[a-z0-9][a-z0-9_-]{1,63}/g;
+
+function buildSearchTermFrequencies(content, title) {
+  const terms = new Map();
+  addTerms(terms, tokenizeSearchText(stripWikiSyntaxForSearch(content)), 1);
+
+  if (title) {
+    addTerms(terms, tokenizeSearchText(title), 3);
+  }
+
+  return terms;
+}
+
+function tokenizeSearchText(text) {
+  return (text.toLowerCase().normalize("NFKD").match(TERM_PATTERN) ?? []).filter(
+    (term) => !STOP_WORDS.has(term)
+  );
+}
+
+function stripWikiSyntaxForSearch(content) {
+  return content
+    .replace(/^={2,6}\s*(.*?)\s*={2,6}$/gm, "$1")
+    .replace(/\[\[[^\]|]+?\|([^\]]+?)\]\]/g, "$1")
+    .replace(/\[\[([^\]]+?)\]\]/g, "$1")
+    .replace(/\{\{[^|}]+?\|([^}]+?)\}\}/g, "$1")
+    .replace(/\{\{([^}]+?)\}\}/g, "$1")
+    .replace(/<code[\s\S]*?<\/code>/gi, " ")
+    .replace(/<file[\s\S]*?<\/file>/gi, " ")
+    .replace(/%%[\s\S]*?%%/g, " ")
+    .replace(/[=*_/`~[\]{}|<>#]/g, " ");
+}
+
+function addTerms(target, terms, weight) {
+  for (const term of terms) {
+    target.set(term, (target.get(term) ?? 0) + weight);
+  }
 }
 
 function sql(value) {

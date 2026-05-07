@@ -51,6 +51,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert into pages");
     expect(sql).toContain("on conflict(id) do update");
     expect(sql).toContain("insert or replace into page_revisions");
+    expect(sql).toContain("insert into search_terms");
+    expect(sql).toContain("insert into search_postings");
     expect(sql).toContain("'wiki:welcome'");
   });
 });

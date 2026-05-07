@@ -15,6 +15,7 @@ import {
   listRecentChanges,
   pagePath,
   savePage,
+  searchPages,
   type CurrentPage,
   type PageRevision
 } from "./wiki/page-service";
@@ -35,6 +36,10 @@ export async function handleRequest(
 
   if (url.pathname === "/recent") {
     return htmlResponse(await renderRecentPage(env));
+  }
+
+  if (url.pathname === "/search") {
+    return htmlResponse(await renderSearchPage(env, url));
   }
 
   if (url.pathname === "/api/pages" && request.method === "POST") {
@@ -69,6 +74,10 @@ export async function handleRequest(
 
     if (url.searchParams.get("do") === "recent") {
       return htmlResponse(await renderRecentPage(env));
+    }
+
+    if (url.searchParams.get("do") === "search") {
+      return htmlResponse(await renderSearchPage(env, url));
     }
 
     const revisionId = url.searchParams.get("rev");
@@ -188,6 +197,34 @@ async function renderRecentPage(env: Env): Promise<string> {
     .join("");
 
   return htmlShell(env, "Recent changes", `<h1>Recent changes</h1><ul>${items}</ul>`);
+}
+
+async function renderSearchPage(env: Env, url: URL): Promise<string> {
+  const query = url.searchParams.get("q")?.trim() ?? "";
+  const results = query ? await searchPages(env.DB, query) : [];
+  const resultItems = results
+    .map(
+      (result) => `<li>
+        <a href="${pagePath(result.id)}">${escapeHtml(result.title ?? result.id)}</a>
+        <p>${escapeHtml(result.snippet)}</p>
+        <small>${escapeHtml(result.id)} - score ${result.score}</small>
+      </li>`
+    )
+    .join("");
+  const emptyState = query && results.length === 0 ? "<p>No matching pages found.</p>" : "";
+
+  return htmlShell(
+    env,
+    "Search",
+    `<h1>Search</h1>
+    <form method="get" action="/search">
+      <label for="q">Search pages</label>
+      <input id="q" name="q" type="search" value="${escapeHtml(query)}">
+      <button type="submit">Search</button>
+    </form>
+    ${emptyState}
+    <ol>${resultItems}</ol>`
+  );
 }
 
 function renderLineDiff(left: string, right: string): string {
