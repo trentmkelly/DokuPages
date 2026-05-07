@@ -6,13 +6,9 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "dokuwiki_pages_dev"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "bb1c5614-9eb2-4f06-9727-fb41cfb1786b"
 migrations_dir = "migrations"
-
-[[r2_buckets]]
-binding = "MEDIA_BUCKET"
-bucket_name = "dokuwiki-pages-dev-media"
 
 [[kv_namespaces]]
 binding = "RENDER_CACHE"
-id = "00000000000000000000000000000000"
+id = "ecc7148dc3264d2cb4d9e67283c6fbfd"

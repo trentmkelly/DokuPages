@@ -102,7 +102,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add CI workflow.
 - [x] Add environment configuration templates.
 - [x] Add D1 migration directory.
-- [x] Add R2 bucket binding configuration.
+- [ ] Add R2 bucket binding configuration.
 - [x] Add KV namespace binding configuration if used.
 - [ ] Add Durable Object binding configuration if used.
 - [ ] Add local seed data for development.
@@ -611,25 +611,25 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Build And Deployment
 
-- [ ] Define build output directory.
-- [ ] Define Pages project settings.
-- [ ] Define production branch.
-- [ ] Define preview branch behavior.
-- [ ] Configure Pages build command.
-- [ ] Configure Pages Functions output.
-- [ ] Configure D1 bindings.
+- [x] Define build output directory.
+- [x] Define Pages project settings.
+- [x] Define production branch.
+- [x] Define preview branch behavior.
+- [x] Configure Pages build command.
+- [x] Configure Pages Functions output.
+- [x] Configure D1 bindings.
 - [ ] Configure R2 bindings.
-- [ ] Configure KV bindings if used.
+- [x] Configure KV bindings if used.
 - [ ] Configure Durable Object bindings if used.
-- [ ] Configure environment variables.
+- [x] Configure environment variables.
 - [ ] Configure secrets.
 - [ ] Configure custom domain if used.
 - [ ] Configure cache rules if needed.
 - [ ] Configure security headers.
 - [ ] Configure redirects.
-- [ ] Configure preview deployments.
-- [ ] Configure production deployments.
-- [ ] Configure database migration deployment.
+- [x] Configure preview deployments.
+- [x] Configure production deployments.
+- [x] Configure database migration deployment.
 - [ ] Configure backup before deployment.
 - [ ] Configure rollback deployment.
 

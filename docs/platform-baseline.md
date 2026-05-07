@@ -17,7 +17,7 @@ Primary references:
 ## Binding Decisions
 
 - D1 stores relational wiki data: page records, revisions, users, ACLs, metadata, search postings, imports, and audit logs.
-- R2 stores media bodies, old media revisions, and large exported archives.
+- R2 is the correct target for media bodies, old media revisions, and large exported archives, but it is currently blocked because the Cloudflare account has not enabled R2.
 - KV stores rendered cache entries that can be invalidated by key.
 - Durable Objects are the planned mechanism for page and media locks where concurrent writes need coordination. The binding is not active in `wrangler.toml` until the Pages Functions entrypoint export is finalized.
 - The Cache API remains available for public rendered pages and immutable derived assets once cache policy is implemented.
@@ -28,7 +28,8 @@ Primary references:
 - Preview deployment uses `wrangler pages deploy public --project-name dokutest --branch preview`.
 - Production deployment uses `wrangler pages deploy public --project-name dokutest --branch main`.
 - D1 migrations live under `migrations/` and are referenced from `wrangler.toml`.
-- R2 bucket and KV namespace names are declared in `wrangler.toml`; placeholder IDs must be replaced after resources are provisioned.
+- D1 and KV bindings are declared in `wrangler.toml` with provisioned resource IDs.
+- R2 binding remains pending until R2 is enabled for the Cloudflare account.
 - Durable Object configuration remains pending because the local Pages Functions compile rejected the first binding attempt.
 
 ## Security And Anti-Abuse
