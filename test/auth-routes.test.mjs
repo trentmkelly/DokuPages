@@ -130,6 +130,18 @@ describe("auth routes", () => {
     expect(page.status).toBe(200);
     await expect(page.text()).resolves.toContain("Access control list manager");
 
+    const rebuild = await handleRequest(
+      new Request("https://example.com/api/admin/search/rebuild", {
+        method: "POST",
+        body: new FormData(),
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(rebuild.status).toBe(303);
+    expect(rebuild.headers.get("location")).toBe("/admin?searchRebuild=ok");
+
     const form = new FormData();
     form.set("scope", "private:*");
     form.set("principalType", "group");

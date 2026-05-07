@@ -348,7 +348,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement search result ranking.
 - [x] Implement namespace-limited search.
 - [x] Implement ACL filtering for search results.
-- [ ] Implement index rebuild job.
+- [x] Implement index rebuild job.
 - [x] Implement incremental index updates on save.
 - [ ] Implement index migration from existing `data/index` if needed.
 - [ ] Add search performance tests.
@@ -475,8 +475,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement configuration management.
 - [ ] Implement user management.
 - [x] Implement ACL management.
-- [ ] Implement page index rebuild.
-- [ ] Implement search index rebuild.
+- [x] Implement page index rebuild.
+- [x] Implement search index rebuild.
 - [x] Implement cache purge.
 - [ ] Implement media cleanup.
 - [ ] Implement orphaned revision cleanup if needed.

@@ -80,6 +80,7 @@ import {
   listRecentChanges,
   listWantedPages,
   pagePath,
+  rebuildSearchIndex,
   savePage,
   savePageDraft,
   searchPages,
@@ -206,7 +207,9 @@ export async function handleRequest(
   }
 
   if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
-    return renderAdminDashboardPage(request, env, principal);
+    const csrf = csrfContext(request);
+    const page = renderAdminDashboardPage(request, env, principal, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
@@ -225,6 +228,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/admin/acl/delete" && request.method === "POST") {
     return handleAclRuleDelete(request, env, principal);
+  }
+
+  if (url.pathname === "/api/admin/search/rebuild" && request.method === "POST") {
+    return handleSearchIndexRebuild(request, env, principal);
   }
 
   if (url.pathname === "/recent") {
@@ -1469,7 +1476,12 @@ function renderImportJobTable(jobs: ImportJobStatus[]): string {
   </table>`;
 }
 
-function renderAdminDashboardPage(request: Request, env: Env, principal: AuthPrincipal): Response {
+function renderAdminDashboardPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  csrfToken: string
+): string | Response {
   if (!isManagerPrincipal(principal)) {
     return managerDeniedResponse(request, env);
   }
@@ -1477,18 +1489,23 @@ function renderAdminDashboardPage(request: Request, env: Env, principal: AuthPri
   const aclTool = isAdminPrincipal(principal)
     ? `<li><a href="/admin/acl">Access control list manager</a></li>`
     : "";
+  const adminActions = isAdminPrincipal(principal)
+    ? `<form method="post" action="/api/admin/search/rebuild">
+        ${csrfInput(csrfToken)}
+        <button type="submit">Rebuild search index</button>
+      </form>`
+    : "";
 
-  return htmlResponse(
-    htmlShell(
-      env,
-      "Administration",
-      `<h1>Administration</h1>
+  return htmlShell(
+    env,
+    "Administration",
+    `<h1>Administration</h1>
       <ul class="admin__tools">
         <li><a href="/admin/diagnostics">Diagnostics</a></li>
         ${aclTool}
         <li><a href="/media-manager">Media manager</a></li>
-      </ul>`
-    )
+      </ul>
+      ${adminActions}`
   );
 }
 
@@ -1864,6 +1881,28 @@ async function handleAclRuleDelete(
 
   await new D1AclStore(env.DB).deleteRule(id);
   return redirectResponse("/admin/acl");
+}
+
+async function handleSearchIndexRebuild(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const result = await rebuildSearchIndex(env.DB);
+
+  if (acceptsJson(request)) {
+    return jsonResponse(result);
+  }
+
+  return redirectResponse("/admin?searchRebuild=ok");
 }
 
 function parseAclRuleForm(

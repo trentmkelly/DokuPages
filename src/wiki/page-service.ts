@@ -65,6 +65,12 @@ export interface PageDraft {
   updatedAt: string;
 }
 
+export interface RebuildSearchIndexResult {
+  pageCount: number;
+  termCount: number;
+  postingCount: number;
+}
+
 export interface SavePageInput {
   id: string;
   content: string;
@@ -539,6 +545,62 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   };
 }
 
+export async function rebuildSearchIndex(
+  db: D1Database,
+  now = new Date(),
+  limit = 5_000
+): Promise<RebuildSearchIndexResult> {
+  const pages = await listCurrentPageSources(db, limit);
+  const updatedAt = now.toISOString();
+  const termDocumentCounts = new Map<string, number>();
+  const postings: Array<{ term: string; pageId: string; frequency: number }> = [];
+
+  for (const page of pages) {
+    const title = page.title ?? pageTitleFromId(page.id);
+    const terms = buildSearchTermFrequencies(page.content, title);
+
+    for (const [term, frequency] of terms) {
+      postings.push({ term, pageId: page.id, frequency });
+      termDocumentCounts.set(term, (termDocumentCounts.get(term) ?? 0) + 1);
+    }
+  }
+
+  const statements: D1PreparedStatement[] = [
+    db.prepare("delete from search_postings"),
+    db.prepare("delete from search_terms")
+  ];
+
+  for (const [term, documentCount] of termDocumentCounts) {
+    statements.push(
+      db
+        .prepare(
+          `insert into search_terms (term, document_count)
+           values (?, ?)`
+        )
+        .bind(term, documentCount)
+    );
+  }
+
+  for (const posting of postings) {
+    statements.push(
+      db
+        .prepare(
+          `insert into search_postings (term, page_id, frequency, updated_at)
+           values (?, ?, ?, ?)`
+        )
+        .bind(posting.term, posting.pageId, posting.frequency, updatedAt)
+    );
+  }
+
+  await db.batch(statements);
+
+  return {
+    pageCount: pages.length,
+    termCount: termDocumentCounts.size,
+    postingCount: postings.length
+  };
+}
+
 interface PageMetadataInput {
   title: string;
   revisionId: string;
@@ -689,6 +751,10 @@ function buildSearchIndexStatements(
 function extractTitle(content: string): string | null {
   const match = content.match(/^(={2,6})\s*(.*?)\s*\1\s*$/m);
   return match?.[2]?.trim() || null;
+}
+
+function pageTitleFromId(id: string): string {
+  return id.includes(":") ? id.slice(id.lastIndexOf(":") + 1) : id;
 }
 
 async function sha256(content: string): Promise<string> {
