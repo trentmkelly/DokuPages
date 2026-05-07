@@ -185,7 +185,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for feeds.
 - [x] Implement route handling for sitemap.
 - [x] Implement route handling for manifest and opensearch.
-- [ ] Implement route handling for CSS and JavaScript assets.
+- [x] Implement route handling for CSS and JavaScript assets.
 - [ ] Implement route handling for AJAX endpoints.
 - [ ] Implement route handling for login and logout.
 - [ ] Implement route handling for registration if supported.
@@ -359,7 +359,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement rendered HTML cache.
 - [ ] Implement parser instruction cache if needed.
 - [ ] Implement metadata cache if needed.
-- [ ] Implement CSS cache or prebuilt CSS.
+- [x] Implement CSS cache or prebuilt CSS.
 - [ ] Implement JavaScript cache or prebuilt JavaScript.
 - [ ] Implement feed cache.
 - [ ] Implement sitemap cache.
@@ -374,15 +374,15 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Template And Frontend
 
 - [ ] Port the default DokuWiki template.
-- [ ] Preserve current HTML structure where compatibility matters.
-- [ ] Preserve current CSS behavior where compatibility matters.
-- [ ] Port template navigation.
-- [ ] Port page tools.
-- [ ] Port site tools.
+- [x] Preserve current HTML structure where compatibility matters.
+- [x] Preserve current CSS behavior where compatibility matters.
+- [x] Port template navigation.
+- [x] Port page tools.
+- [x] Port site tools.
 - [ ] Port user tools.
 - [ ] Port mobile navigation.
-- [ ] Port breadcrumbs.
-- [ ] Port table of contents rendering.
+- [x] Port breadcrumbs.
+- [x] Port table of contents rendering.
 - [ ] Port editor UI.
 - [ ] Port preview UI.
 - [ ] Port conflict UI.
@@ -405,20 +405,20 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Static Assets
 
-- [ ] Decide which existing static assets are copied directly to Pages output.
-- [ ] Decide which assets are bundled.
+- [x] Decide which existing static assets are copied directly to Pages output.
+- [x] Decide which assets are bundled.
 - [ ] Decide which assets are generated at build time.
-- [ ] Port image assets.
-- [ ] Port icon assets.
-- [ ] Port CSS assets.
+- [x] Port image assets.
+- [x] Port icon assets.
+- [x] Port CSS assets.
 - [ ] Port JavaScript assets.
 - [ ] Port language assets needed by the selected locales.
-- [ ] Port template assets.
+- [x] Port template assets.
 - [ ] Port plugin assets for supported plugins.
 - [ ] Add asset fingerprinting.
 - [ ] Add asset cache headers.
 - [ ] Add asset integrity checks if needed.
-- [ ] Verify all asset references resolve under pages.dev.
+- [x] Verify all asset references resolve under pages.dev.
 
 ## Configuration
 
@@ -498,7 +498,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement `robots.txt` behavior.
 - [x] Implement OpenSearch document.
 - [x] Implement web app manifest.
-- [ ] Implement favicon behavior.
+- [x] Implement favicon behavior.
 - [x] Preserve existing feed URLs if required.
 - [x] Preserve existing sitemap URLs if required.
 

@@ -28,7 +28,7 @@ import {
   type PageDraft,
   type PageRevision
 } from "./wiki/page-service";
-import { renderWikiText } from "./wiki/render";
+import { renderWikiText, type TocItem } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
@@ -37,6 +37,7 @@ interface RenderCacheEntry {
   revisionId: string;
   title: string;
   html: string;
+  toc: TocItem[];
 }
 
 export async function handleRequest(
@@ -249,7 +250,12 @@ async function renderPageHtml(
   const cached = await readRenderCache(env, cacheKey, revisionId);
 
   if (cached) {
-    return htmlShell(env, cached.title, `${renderBreadcrumbs(id)}${revisionNotice}${cached.html}`);
+    return htmlShell(
+      env,
+      cached.title,
+      `${renderBreadcrumbs(id)}${renderToc(cached.toc)}${revisionNotice}${cached.html}`,
+      { pageId: id, updatedAt: revisionDate ?? page?.updatedAt }
+    );
   }
 
   const rendered = renderWikiText(content);
@@ -257,10 +263,16 @@ async function renderPageHtml(
   await writeRenderCache(env, cacheKey, {
     revisionId,
     title,
-    html: rendered.html
+    html: rendered.html,
+    toc: rendered.toc
   });
 
-  return htmlShell(env, title, `${renderBreadcrumbs(id)}${revisionNotice}${rendered.html}`);
+  return htmlShell(
+    env,
+    title,
+    `${renderBreadcrumbs(id)}${renderToc(rendered.toc)}${revisionNotice}${rendered.html}`,
+    { pageId: id, updatedAt: revisionDate ?? page?.updatedAt }
+  );
 }
 
 function renderBreadcrumbs(id: string): string {
@@ -281,6 +293,44 @@ function renderBreadcrumbs(id: string): string {
     .join(" / ");
 
   return `<nav aria-label="Breadcrumb">${crumbs}</nav>`;
+}
+
+function renderHeaderBreadcrumbs(pageId?: string): string {
+  if (!pageId) {
+    return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span><a href="/wiki/Wiki/Welcome">start</a></div></div>`;
+  }
+
+  const segments = pageId.split(":").filter(Boolean);
+  const crumbs = segments
+    .map((segment, index) => {
+      const currentId = segments.slice(0, index + 1).join(":");
+      const label = escapeHtml(segment);
+
+      if (index === segments.length - 1) {
+        return `<span>${label}</span>`;
+      }
+
+      return `<a href="${pagePath(currentId)}">${label}</a>`;
+    })
+    .join(' <span class="bcsep">&raquo;</span> ');
+
+  return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span>${crumbs}</div></div>`;
+}
+
+function renderToc(toc: TocItem[]): string {
+  if (toc.length < 2) return "";
+
+  const items = toc
+    .map(
+      (item) =>
+        `<li class="level${item.level}"><div class="li"><a href="#${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></div></li>`
+    )
+    .join("");
+
+  return `<nav id="dw__toc" aria-labelledby="dw__toc__heading">
+    <h3 class="toggle" id="dw__toc__heading">Table of Contents <strong><span>show</span></strong></h3>
+    <div><ul class="toc">${items}</ul></div>
+  </nav>`;
 }
 
 async function renderRevisionsPage(env: Env, id: string): Promise<string> {
@@ -594,18 +644,101 @@ function getComparablePageId(page: CurrentPage | PageRevision): string {
   return "pageId" in page ? page.pageId : page.id;
 }
 
-function htmlShell(env: Env, title: string, body: string): string {
+interface HtmlShellOptions {
+  pageId?: string;
+  updatedAt?: string;
+}
+
+function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
+  const siteName = env.SITE_NAME ?? "DokuWiki Pages";
+  const pageId = options.pageId;
+  const pageIdHtml = pageId ? `<div class="pageId"><span>${escapeHtml(pageId)}</span></div>` : "";
+  const docInfo = options.updatedAt
+    ? `<div class="docInfo">Last modified: ${escapeHtml(options.updatedAt)}</div>`
+    : "";
+  const pageTools = pageId ? renderPageTools(pageId) : "";
+
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)} - ${escapeHtml(env.SITE_NAME ?? "DokuWiki Pages")}</title>
+  <title>${escapeHtml(title)} - ${escapeHtml(siteName)}</title>
+  <link rel="icon" href="/images/favicon.ico">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+  <link rel="stylesheet" href="/dokuwiki.css">
 </head>
-<body>
-  <main>${body}</main>
+<body class="dokuwiki">
+  <div id="dokuwiki__site">
+    <div id="dokuwiki__top" class="site dokuwiki mode_show tpl_dokuwiki">
+      <header id="dokuwiki__header">
+        <div class="pad group">
+        <div class="headings">
+          <h1 class="logo"><a href="/wiki/Wiki/Welcome"><img src="/dokuwiki-logo.png" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
+          <p class="claim">Cloudflare Pages DokuWiki port</p>
+        </div>
+        <div class="tools">
+          <nav id="dokuwiki__usertools" aria-label="User tools">
+            <h3 class="a11y">User tools</h3>
+            <ul>
+              <li><a href="/wiki/Wiki/Welcome?do=edit">Edit</a></li>
+              <li><a href="/recent">Recent changes</a></li>
+              <li><a href="/index?ns=wiki">Index</a></li>
+            </ul>
+          </nav>
+          <nav id="dokuwiki__sitetools" aria-label="Site tools">
+            <h3 class="a11y">Site tools</h3>
+            <form class="search" method="get" action="/search">
+              <input name="q" type="search" placeholder="Search">
+              <button type="submit">Search</button>
+            </form>
+          </nav>
+        </div>
+        ${renderHeaderBreadcrumbs(pageId)}
+        <hr class="a11y">
+        </div>
+      </header>
+      <div class="wrapper group">
+        <main id="dokuwiki__content">
+          <div class="pad group">
+            ${pageIdHtml}
+            <div class="page group">
+              ${body}
+            </div>
+            ${docInfo}
+          </div>
+        </main>
+        ${pageTools}
+      </div>
+      <footer id="dokuwiki__footer">
+        <div class="pad">
+          <div class="license">Except where otherwise noted, content is available under the original wiki license. Template structure and styling are adapted from DokuWiki's GPL-2.0 default template.</div>
+          <div class="buttons">
+            <a href="https://validator.w3.org/check/referer" title="Valid HTML5"><img src="/images/button-html5.png" width="80" height="15" alt="Valid HTML5"></a>
+            <a href="https://jigsaw.w3.org/css-validator/check/referer?profile=css3" title="Valid CSS"><img src="/images/button-css.png" width="80" height="15" alt="Valid CSS"></a>
+            <a href="https://www.dokuwiki.org/" title="Driven by DokuWiki"><img src="/images/button-dw.png" width="80" height="15" alt="Driven by DokuWiki"></a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </div>
 </body>
 </html>`;
+}
+
+function renderPageTools(pageId: string): string {
+  return `<nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">
+    <h3 class="a11y" id="dokuwiki__pagetools__heading">Page tools</h3>
+    <div class="tools">
+      <ul>
+        <li class="edit"><a href="${pagePath(pageId)}?do=edit"><span class="label">Edit</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="source"><a href="${pagePath(pageId)}?do=source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="revisions"><a href="${pagePath(pageId)}?do=revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="backlink"><a href="${pagePath(pageId)}?do=backlink"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="top"><a href="#dokuwiki__top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
+      </ul>
+    </div>
+  </nav>`;
 }
 
 function xmlResponse(body: string, contentType = "application/xml; charset=utf-8"): Response {
@@ -729,16 +862,10 @@ function renderEditPage(
     ? `<p><strong>Draft recovered:</strong> ${escapeHtml(draft.updatedAt)}</p>`
     : "";
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Edit ${escapeHtml(title)} - ${escapeHtml(env.SITE_NAME ?? "DokuWiki Pages")}</title>
-</head>
-<body>
-  <main>
-    <h1>Edit ${escapeHtml(title)}</h1>
+  return htmlShell(
+    env,
+    `Edit ${title}`,
+    `<h1>Edit ${escapeHtml(title)}</h1>
     ${draftNotice}
     <form method="post" action="/api/pages">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
@@ -758,9 +885,9 @@ function renderEditPage(
       <button type="submit" formaction="/api/pages/draft">Save draft</button>
       <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>
     </form>
-  </main>
-</body>
-</html>`;
+  `,
+    { pageId: id, updatedAt: page?.updatedAt }
+  );
 }
 
 function renderDraftPage(id: string, draft: PageDraft, env: Env): string {
@@ -792,7 +919,8 @@ async function readRenderCache(
     if (
       cached?.revisionId === revisionId &&
       typeof cached.title === "string" &&
-      typeof cached.html === "string"
+      typeof cached.html === "string" &&
+      Array.isArray(cached.toc)
     ) {
       return cached;
     }

@@ -94,7 +94,8 @@ describe("handleRequest", () => {
       JSON.stringify({
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
-        html: "<p>Cached body.</p>"
+        html: "<p>Cached body.</p>",
+        toc: []
       })
     );
 
@@ -114,7 +115,8 @@ describe("handleRequest", () => {
       JSON.stringify({
         revisionId: "stale",
         title: "Stale",
-        html: "<p>Stale body.</p>"
+        html: "<p>Stale body.</p>",
+        toc: []
       })
     );
 
@@ -124,6 +126,20 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("Imported page.");
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("renders table of contents for multi-heading pages", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content: "====== Welcome ======\n\n===== Details =====\n\nMore text."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('id="dw__toc"');
+    expect(html).toContain('<a href="#details">Details</a>');
   });
 
   it("returns 404 when a wiki page does not exist", async () => {
