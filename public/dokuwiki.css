@@ -93,6 +93,18 @@ img.icon.smiley {
   margin-right: auto;
 }
 
+.leftalign {
+  text-align: left;
+}
+
+.centeralign {
+  text-align: center;
+}
+
+.rightalign {
+  text-align: right;
+}
+
 table {
   border-spacing: 0;
   border-collapse: collapse;

@@ -214,4 +214,18 @@ describe("renderWikiText", () => {
 
     expect(rendered.html).toBe("<table><tr><th>Head</th></tr><tr><td>Cell</td></tr></table>");
   });
+
+  it("renders DokuWiki table headers, spans, and alignment", () => {
+    const rendered = renderWikiText(
+      "^           Table with alignment           ^^^\n|         right|    center    |left          |\n| Row 1 Col 1 | vertical | Row 1 Col 3 |\n| Row 2 Col 1 | ::: | Row 2 Col 3 |"
+    );
+
+    expect(rendered.html).toContain(
+      '<th class="centeralign" colspan="3">Table with alignment</th>'
+    );
+    expect(rendered.html).toContain('<td class="rightalign">right</td>');
+    expect(rendered.html).toContain('<td class="centeralign">center</td>');
+    expect(rendered.html).toContain('<td class="leftalign">left</td>');
+    expect(rendered.html).toContain('<td rowspan="2">vertical</td>');
+  });
 });

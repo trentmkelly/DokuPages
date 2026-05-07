@@ -380,20 +380,103 @@ function flushCode(blocks: string[], state: ParserState): void {
 function flushTable(blocks: string[], state: ParserState, context: RenderContext): void {
   if (state.table.length === 0) return;
 
-  const rows = state.table.map((row) => {
-    const headerRow = row.startsWith("^");
-    const separator = headerRow ? "^" : "|";
-    const cells = row
-      .split(separator)
-      .slice(1, -1)
-      .map((cell) => cell.trim());
-    const tag = headerRow ? "th" : "td";
-
-    return `<tr>${cells.map((cell) => `<${tag}>${renderInline(cell, context)}</${tag}>`).join("")}</tr>`;
+  const rows = applyTableRowspans(state.table.map(parseTableRow)).map((row) => {
+    return `<tr>${row.map((cell) => renderTableCell(cell, context)).join("")}</tr>`;
   });
 
   blocks.push(`<table>${rows.join("")}</table>`);
   state.table = [];
+}
+
+interface TableCell {
+  header: boolean;
+  raw: string;
+  content: string;
+  colspan: number;
+  rowspan: number;
+  align: "left" | "center" | "right" | null;
+}
+
+function parseTableRow(row: string): TableCell[] {
+  const cells: TableCell[] = [];
+  let separator = row[0];
+  let raw = "";
+
+  for (const char of row.slice(1)) {
+    if (char === "|" || char === "^") {
+      const content = raw.trim();
+
+      if (content === "" && cells.length > 0) {
+        cells[cells.length - 1].colspan += 1;
+      } else {
+        cells.push({
+          header: separator === "^",
+          raw,
+          content,
+          colspan: 1,
+          rowspan: 1,
+          align: tableCellAlign(raw)
+        });
+      }
+
+      separator = char;
+      raw = "";
+    } else {
+      raw += char;
+    }
+  }
+
+  return cells;
+}
+
+function applyTableRowspans(rows: TableCell[][]): TableCell[][] {
+  const spanningCells = new Map<number, TableCell>();
+
+  return rows.map((row) => {
+    const renderedRow: TableCell[] = [];
+    let column = 0;
+
+    for (const cell of row) {
+      if (cell.content === ":::") {
+        const spanningCell = spanningCells.get(column);
+        if (spanningCell) {
+          spanningCell.rowspan += 1;
+        }
+        column += cell.colspan;
+        continue;
+      }
+
+      renderedRow.push(cell);
+      for (let offset = 0; offset < cell.colspan; offset += 1) {
+        spanningCells.set(column + offset, cell);
+      }
+      column += cell.colspan;
+    }
+
+    return renderedRow;
+  });
+}
+
+function tableCellAlign(raw: string): TableCell["align"] {
+  const leading = raw.match(/^\s*/)?.[0].length ?? 0;
+  const trailing = raw.match(/\s*$/)?.[0].length ?? 0;
+
+  if (leading >= 2 && trailing >= 2) return "center";
+  if (leading >= 2) return "right";
+  if (trailing >= 2) return "left";
+  return null;
+}
+
+function renderTableCell(cell: TableCell, context: RenderContext): string {
+  const tag = cell.header ? "th" : "td";
+  const attributes = [
+    cell.align ? `class="${cell.align}align"` : "",
+    cell.colspan > 1 ? `colspan="${cell.colspan}"` : "",
+    cell.rowspan > 1 ? `rowspan="${cell.rowspan}"` : ""
+  ].filter(Boolean);
+  const attributeText = attributes.length > 0 ? ` ${attributes.join(" ")}` : "";
+
+  return `<${tag}${attributeText}>${renderInline(cell.content, context)}</${tag}>`;
 }
 
 function flushQuote(blocks: string[], state: ParserState, context: RenderContext): void {
