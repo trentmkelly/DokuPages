@@ -299,8 +299,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement anonymous user behavior.
 - [ ] Implement login.
 - [ ] Implement logout.
-- [ ] Implement password hashing.
-- [ ] Implement password verification.
+- [x] Implement password hashing.
+- [x] Implement password verification.
 - [ ] Implement password reset if supported.
 - [ ] Implement registration if supported.
 - [ ] Implement profile update if supported.
