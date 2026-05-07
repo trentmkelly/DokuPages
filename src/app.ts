@@ -42,6 +42,7 @@ import {
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
+type ExportMode = "raw" | "xhtml" | "xhtmlbody";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const RENDER_CACHE_VERSION = 15;
 
@@ -237,7 +238,25 @@ export async function handleRequest(
       return redirectResponse(pagePath(id));
     }
 
+    const exportMode = normalizeExportMode(url.searchParams.get("do"));
     const revisionId = url.searchParams.get("rev");
+
+    if (exportMode) {
+      const exportPage = revisionId
+        ? await getPageRevision(env.DB, revisionId)
+        : await getCurrentPage(env.DB, id);
+
+      if (!exportPage || getComparablePageId(exportPage) !== id) {
+        return notFoundResponse(
+          revisionId
+            ? `Revision '${revisionId}' was not found.`
+            : `Wiki page '${id}' was not found.`
+        );
+      }
+
+      return renderPageExport(env, url, id, exportPage, exportMode);
+    }
+
     if (revisionId) {
       const revision = await getPageRevision(env.DB, revisionId);
       if (!revision || revision.pageId !== id) {
@@ -489,7 +508,29 @@ function normalizeLegacyAction(action: string | null): string | null {
     case "revert":
     case "draft":
     case "diff":
+    case "export_raw":
+    case "export_xhtml":
+    case "export_xhtmlbody":
       return action;
+    case "export_html":
+      return "export_xhtml";
+    case "export_htmlbody":
+      return "export_xhtmlbody";
+    default:
+      return null;
+  }
+}
+
+function normalizeExportMode(action: string | null): ExportMode | null {
+  switch (action) {
+    case "export_raw":
+      return "raw";
+    case "export_xhtml":
+    case "export_html":
+      return "xhtml";
+    case "export_xhtmlbody":
+    case "export_htmlbody":
+      return "xhtmlbody";
     default:
       return null;
   }
@@ -542,6 +583,57 @@ async function renderPageHtml(
     `${renderBreadcrumbs(id)}${renderToc(rendered.toc)}${revisionNotice}${rendered.html}`,
     { pageId: id, updatedAt: revisionDate ?? page?.updatedAt }
   );
+}
+
+function renderPageExport(
+  env: Env,
+  url: URL,
+  id: string,
+  page: CurrentPage | PageRevision,
+  mode: ExportMode
+): Response {
+  const content = page.content;
+  const revisionId = "revisionId" in page ? page.revisionId : page.id;
+  const rendered = renderWikiText(content, { pageId: id });
+  const title = rendered.title ?? ("title" in page ? page.title : null) ?? id;
+  const headers = securityHeaders({ "x-robots-tag": "noindex" });
+
+  if (mode === "raw") {
+    headers.set("content-type", "text/plain; charset=utf-8");
+    headers.set("content-disposition", `attachment; filename=${exportFileName(id)}.txt`);
+    return new Response(content, { headers });
+  }
+
+  headers.set("content-type", "text/html; charset=utf-8");
+
+  if (mode === "xhtmlbody") {
+    return new Response(rendered.html, { headers });
+  }
+
+  const revisionComment = revisionId ? `<!-- revision: ${escapeHtml(revisionId)} -->\n` : "";
+
+  return new Response(
+    `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <link rel="stylesheet" href="${escapeAttribute(new URL("/dokuwiki.css", url).pathname)}">
+</head>
+<body>
+<div class="dokuwiki export">
+${revisionComment}${renderToc(rendered.toc)}
+${rendered.html}
+</div>
+</body>
+</html>`,
+    { headers }
+  );
+}
+
+function exportFileName(id: string): string {
+  const name = id.split(":").filter(Boolean).at(-1) || "page";
+  return name.replace(/[^a-z0-9._-]+/gi, "_");
 }
 
 function renderBreadcrumbs(id: string): string {

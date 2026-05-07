@@ -138,6 +138,22 @@ describe("handleRequest", () => {
     expect(start.headers.get("location")).toBe("/wiki/wiki/welcome");
   });
 
+  it("redirects legacy DokuWiki export URL aliases to page routes", async () => {
+    const raw = await handleRequest(
+      new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_raw"),
+      env
+    );
+    const htmlAlias = await handleRequest(
+      new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_htmlbody"),
+      env
+    );
+
+    expect(raw.status).toBe(301);
+    expect(raw.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_raw");
+    expect(htmlAlias.status).toBe(301);
+    expect(htmlAlias.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_xhtmlbody");
+  });
+
   it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
     const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
     const download = await handleRequest(
@@ -281,6 +297,39 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain("Imported page.");
+  });
+
+  it("exports pages as raw text and rendered HTML modes", async () => {
+    const raw = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=export_raw"),
+      env
+    );
+    const xhtmlBody = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=export_xhtmlbody"),
+      env
+    );
+    const xhtml = await handleRequest(
+      new Request(
+        "https://example.com/wiki/Wiki/Welcome?do=export_xhtml&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+
+    expect(raw.status).toBe(200);
+    expect(raw.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(raw.headers.get("content-disposition")).toBe("attachment; filename=welcome.txt");
+    expect(raw.headers.get("x-robots-tag")).toBe("noindex");
+    await expect(raw.text()).resolves.toContain("Imported page.");
+
+    expect(xhtmlBody.status).toBe(200);
+    expect(xhtmlBody.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    await expect(xhtmlBody.text()).resolves.toContain("<p>Imported page.</p>");
+
+    expect(xhtml.status).toBe(200);
+    const html = await xhtml.text();
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain('<div class="dokuwiki export">');
+    expect(html).toContain("<p>Older page.</p>");
   });
 
   it("renders page revision history", async () => {

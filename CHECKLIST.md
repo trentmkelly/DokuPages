@@ -261,7 +261,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement old revisions.
 - [x] Implement page diff.
 - [x] Implement source view.
-- [ ] Implement export modes that remain in scope.
+- [x] Implement export modes that remain in scope.
 - [x] Implement page metadata updates.
 - [x] Implement changelog updates.
 - [x] Implement purge behavior.
