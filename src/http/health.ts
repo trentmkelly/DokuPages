@@ -11,6 +11,10 @@ export async function healthResponse(env: Env): Promise<Response> {
     version: diagnostics.version,
     siteName: diagnostics.site.siteName,
     bindings: diagnostics.bindings,
-    storage: diagnostics.storage
+    storage: diagnostics.storage,
+    config: {
+      ok: diagnostics.config.ok,
+      issueCount: diagnostics.config.issues.length
+    }
   });
 }

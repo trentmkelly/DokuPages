@@ -436,9 +436,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Map license configuration.
 - [x] Map manifest configuration.
 - [ ] Map language configuration.
-- [ ] Implement environment-specific config.
+- [x] Implement environment-specific config.
 - [ ] Implement secret-specific config.
-- [ ] Implement config validation.
+- [x] Implement config validation.
 - [ ] Implement admin config editing if supported.
 - [ ] Implement config export and backup.
 

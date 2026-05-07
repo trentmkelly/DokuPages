@@ -1,3 +1,4 @@
+import { getRuntimeConfig, type ConfigValidation } from "./config";
 import type { Env } from "./env";
 import {
   collectDiagnostics,
@@ -51,7 +52,6 @@ import {
 } from "./wiki/page-service";
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
-import { APP_VERSION } from "./version";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -573,7 +573,7 @@ function normalizeExportMode(action: string | null): ExportMode | null {
 }
 
 function startPageId(env: Env): string {
-  return cleanPageId(env.START_PAGE ?? "wiki:welcome") || "wiki:welcome";
+  return getRuntimeConfig(env).startPage;
 }
 
 async function renderPageHtml(
@@ -888,6 +888,8 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
     </p>
     <h2>Runtime</h2>
     <dl class="diagnostics">${deploymentRows}</dl>
+    <h2>Configuration</h2>
+    ${renderConfigValidation(diagnostics.config)}
     <h2>Storage health</h2>
     <table class="diagnostics">
       <thead>
@@ -931,6 +933,30 @@ function renderStorageHealthRows(diagnostics: DiagnosticsSnapshot): string {
 
 function renderStorageStatus(check: StorageCheck): string {
   return `<span class="diagnostics__status diagnostics__status--${escapeAttribute(check.status)}">${escapeHtml(check.status)}</span>`;
+}
+
+function renderConfigValidation(config: ConfigValidation): string {
+  if (config.issues.length === 0) {
+    return '<p class="success">Runtime configuration is valid.</p>';
+  }
+
+  const rows = config.issues
+    .map(
+      (issue) => `<tr>
+        <td>${escapeHtml(issue.severity)}</td>
+        <td><code>${escapeHtml(issue.key)}</code></td>
+        <td>${escapeHtml(issue.message)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<p class="${config.ok ? "success" : "error"}">
+      Runtime configuration has ${config.issues.length} issue${config.issues.length === 1 ? "" : "s"}.
+    </p>
+    <table class="diagnostics">
+      <thead><tr><th>Severity</th><th>Key</th><th>Message</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderMigrationStatus(migration: MigrationStatus): string {
@@ -1134,7 +1160,7 @@ ${urls}
 
 async function renderRssFeed(env: Env, url: URL): Promise<string> {
   const changes = await listRecentChanges(env.DB);
-  const title = env.SITE_NAME ?? "DokuWiki Pages";
+  const title = getRuntimeConfig(env).siteName;
   const items = changes
     .map(
       (change) => `<item>
@@ -1160,7 +1186,7 @@ ${items}
 
 async function renderAtomFeed(env: Env, url: URL): Promise<string> {
   const changes = await listRecentChanges(env.DB);
-  const title = env.SITE_NAME ?? "DokuWiki Pages";
+  const title = getRuntimeConfig(env).siteName;
   const updated = changes[0]?.createdAt ?? new Date(0).toISOString();
   const entries = changes
     .map(
@@ -1185,7 +1211,7 @@ ${entries}
 }
 
 function renderOpenSearch(env: Env, url: URL): string {
-  const title = env.SITE_NAME ?? "DokuWiki Pages";
+  const title = getRuntimeConfig(env).siteName;
   const searchTemplate = `${new URL("/search", url).href}?q={searchTerms}`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -1198,7 +1224,7 @@ function renderOpenSearch(env: Env, url: URL): string {
 }
 
 function renderWebManifest(env: Env): Record<string, unknown> {
-  const name = env.SITE_NAME ?? "DokuWiki Pages";
+  const name = getRuntimeConfig(env).siteName;
 
   return {
     name,
@@ -1246,8 +1272,9 @@ interface HtmlShellOptions {
 }
 
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
-  const siteName = env.SITE_NAME ?? "DokuWiki Pages";
-  const appVersion = env.APP_VERSION ?? APP_VERSION;
+  const config = getRuntimeConfig(env);
+  const siteName = config.siteName;
+  const appVersion = config.appVersion;
   const startId = startPageId(env);
   const startPath = pagePath(startId);
   const pageId = options.pageId;

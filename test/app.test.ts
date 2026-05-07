@@ -90,6 +90,10 @@ describe("handleRequest", () => {
         kv: { status: "ok" },
         r2: { status: "ok" },
         durableObjects: { status: "ok" }
+      },
+      config: {
+        ok: true,
+        issueCount: 0
       }
     });
   });
@@ -112,10 +116,15 @@ describe("handleRequest", () => {
       },
       migration: {
         latestSchemaVersion: 1
+      },
+      config: {
+        ok: true
       }
     });
     expect(html.status).toBe(200);
-    await expect(html.text()).resolves.toContain("<h2>Migration status</h2>");
+    const diagnosticsHtml = await html.text();
+    expect(diagnosticsHtml).toContain("<h2>Configuration</h2>");
+    expect(diagnosticsHtml).toContain("<h2>Migration status</h2>");
   });
 
   it("handles wiki routes through the Pages Function router", async () => {

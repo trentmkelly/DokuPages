@@ -1,5 +1,5 @@
 import type { Env } from "../env";
-import { APP_VERSION } from "../version";
+import { getRuntimeConfig, validateRuntimeConfig, type ConfigValidation } from "../config";
 
 export type StorageCheckStatus = "ok" | "error" | "not_configured";
 
@@ -37,6 +37,7 @@ export interface DiagnosticsSnapshot {
     durableObjects: StorageCheck;
   };
   migration: MigrationStatus;
+  config: ConfigValidation;
 }
 
 export interface MigrationStatus {
@@ -64,6 +65,8 @@ export interface ImportJobStatus {
 }
 
 export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot> {
+  const runtimeConfig = getRuntimeConfig(env);
+  const config = validateRuntimeConfig(env);
   const storage = {
     d1: await checkD1(env),
     kv: await checkKv(env),
@@ -72,16 +75,20 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
   };
   const migration = await readMigrationStatus(env, storage.d1.ok);
   const ok =
-    storage.d1.ok && storage.kv.ok && storage.r2.status !== "error" && migration.status !== "error";
+    storage.d1.ok &&
+    storage.kv.ok &&
+    storage.r2.status !== "error" &&
+    migration.status !== "error" &&
+    config.ok;
 
   return {
     ok,
     service: "dokuwiki-pages-dev-port",
-    version: env.APP_VERSION ?? APP_VERSION,
+    version: runtimeConfig.appVersion,
     generatedAt: new Date().toISOString(),
     site: {
-      siteName: env.SITE_NAME ?? "DokuWiki Pages.dev Port",
-      startPage: env.START_PAGE ?? "wiki:welcome"
+      siteName: runtimeConfig.siteName,
+      startPage: runtimeConfig.startPage
     },
     deployment: {
       branch: env.CF_PAGES_BRANCH ?? null,
@@ -95,7 +102,8 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
       durableObjects: Boolean(env.PAGE_LOCKS)
     },
     storage,
-    migration
+    migration,
+    config
   };
 }
 
