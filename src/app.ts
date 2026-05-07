@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { getClientIp } from "./http/client-ip";
 import { healthResponse } from "./http/health";
+import { paginationFromUrl, type Pagination } from "./http/pagination";
 import {
   htmlResponse,
   jsonResponse,
@@ -110,7 +111,7 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/recent") {
-    return htmlResponse(await renderRecentPage(env));
+    return htmlResponse(await renderRecentPage(env, url));
   }
 
   if (url.pathname === "/search") {
@@ -119,7 +120,7 @@ export async function handleRequest(
 
   if (url.pathname === "/index") {
     return htmlResponse(
-      await renderNamespaceIndexPage(env, cleanPageId(url.searchParams.get("ns") ?? ""))
+      await renderNamespaceIndexPage(env, cleanPageId(url.searchParams.get("ns") ?? ""), url)
     );
   }
 
@@ -210,7 +211,7 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "revisions") {
-      return htmlResponse(await renderRevisionsPage(env, id));
+      return htmlResponse(await renderRevisionsPage(env, id, url));
     }
 
     if (url.searchParams.get("do") === "diff") {
@@ -218,7 +219,7 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "recent") {
-      return htmlResponse(await renderRecentPage(env));
+      return htmlResponse(await renderRecentPage(env, url));
     }
 
     if (url.searchParams.get("do") === "search") {
@@ -226,7 +227,7 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "index") {
-      return htmlResponse(await renderNamespaceIndexPage(env, namespaceForIndex(id)));
+      return htmlResponse(await renderNamespaceIndexPage(env, namespaceForIndex(id), url));
     }
 
     if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
@@ -466,7 +467,8 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
 
 async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
   const namespace = cleanMediaId(url.searchParams.get("ns") ?? "");
-  const media = await listNamespaceMedia(env.DB, namespace);
+  const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
+  const media = await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset);
   const emptyState = media.length === 0 ? "<p>No media found.</p>" : "";
   const items = media
     .map(
@@ -488,7 +490,8 @@ async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
       <button type="submit">Browse</button>
     </form>
     ${emptyState}
-    <ul class="idx media__manager">${items}</ul>`
+    <ul class="idx media__manager">${items}</ul>
+    ${renderPaginationControls(url, pagination, media.length)}`
   );
 }
 
@@ -730,8 +733,9 @@ function renderToc(toc: TocItem[]): string {
   </nav>`;
 }
 
-async function renderRevisionsPage(env: Env, id: string): Promise<string> {
-  const revisions = await listPageRevisions(env.DB, id);
+async function renderRevisionsPage(env: Env, id: string, url: URL): Promise<string> {
+  const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
+  const revisions = await listPageRevisions(env.DB, id, pagination.limit, pagination.offset);
   const items = revisions
     .map(
       (revision) => `<li class="${revision.changeType === "minor" ? "minor" : ""}">
@@ -751,7 +755,8 @@ async function renderRevisionsPage(env: Env, id: string): Promise<string> {
     `<h1>Revisions for ${escapeHtml(id)}</h1>
     <form class="changes" method="get" action="${pagePath(id)}">
       <ul>${items}</ul>
-    </form>`,
+    </form>
+    ${renderPaginationControls(url, pagination, revisions.length)}`,
     { pageId: id }
   );
 }
@@ -824,8 +829,9 @@ async function renderRevertPage(env: Env, id: string, url: URL): Promise<string>
   );
 }
 
-async function renderRecentPage(env: Env): Promise<string> {
-  const changes = await listRecentChanges(env.DB);
+async function renderRecentPage(env: Env, url: URL): Promise<string> {
+  const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
+  const changes = await listRecentChanges(env.DB, pagination.limit, pagination.offset);
   const items = changes
     .map(
       (change) => `<li>
@@ -837,7 +843,11 @@ async function renderRecentPage(env: Env): Promise<string> {
     )
     .join("");
 
-  return htmlShell(env, "Recent changes", `<h1>Recent changes</h1><ul>${items}</ul>`);
+  return htmlShell(
+    env,
+    "Recent changes",
+    `<h1>Recent changes</h1><ul>${items}</ul>${renderPaginationControls(url, pagination, changes.length)}`
+  );
 }
 
 async function renderSearchPage(env: Env, url: URL): Promise<string> {
@@ -872,8 +882,9 @@ async function renderSearchPage(env: Env, url: URL): Promise<string> {
   );
 }
 
-async function renderNamespaceIndexPage(env: Env, namespace: string): Promise<string> {
-  const pages = await listNamespacePages(env.DB, namespace);
+async function renderNamespaceIndexPage(env: Env, namespace: string, url: URL): Promise<string> {
+  const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
+  const pages = await listNamespacePages(env.DB, namespace, pagination.limit, pagination.offset);
   const title = namespace ? `Index of ${namespace}` : "Index";
   const items = renderPageReferenceList(
     pages.map((page) => ({
@@ -884,7 +895,11 @@ async function renderNamespaceIndexPage(env: Env, namespace: string): Promise<st
   );
   const emptyState = pages.length === 0 ? "<p>No pages found in this namespace.</p>" : "";
 
-  return htmlShell(env, title, `<h1>${escapeHtml(title)}</h1>${emptyState}<ul>${items}</ul>`);
+  return htmlShell(
+    env,
+    title,
+    `<h1>${escapeHtml(title)}</h1>${emptyState}<ul>${items}</ul>${renderPaginationControls(url, pagination, pages.length)}`
+  );
 }
 
 async function renderBacklinksPage(env: Env, id: string): Promise<string> {
@@ -934,6 +949,29 @@ function renderPageReferenceList(
       </li>`
     )
     .join("");
+}
+
+function renderPaginationControls(url: URL, pagination: Pagination, itemCount: number): string {
+  const previousOffset = Math.max(0, pagination.offset - pagination.limit);
+  const previous =
+    pagination.offset > 0
+      ? `<a class="prev" href="${escapeAttribute(paginationHref(url, previousOffset, pagination.limit))}">Previous</a>`
+      : "";
+  const next =
+    itemCount === pagination.limit
+      ? `<a class="next" href="${escapeAttribute(paginationHref(url, pagination.offset + pagination.limit, pagination.limit))}">Next</a>`
+      : "";
+
+  if (!previous && !next) return "";
+
+  return `<nav class="pagination" aria-label="Pagination">${previous}${next}</nav>`;
+}
+
+function paginationHref(url: URL, offset: number, limit: number): string {
+  const next = new URL(url.href);
+  next.searchParams.set("offset", String(offset));
+  next.searchParams.set("limit", String(limit));
+  return `${next.pathname}${next.search}`;
 }
 
 async function renderSitemap(env: Env, url: URL): Promise<string> {

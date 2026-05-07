@@ -202,6 +202,13 @@ describe("handleRequest", () => {
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
     await expect(detail.text()).resolves.toContain("Media detail");
     await expect(manager.text()).resolves.toContain("logo.svg");
+    const pagedManager = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki&limit=1"),
+      env
+    );
+    const pagedManagerHtml = await pagedManager.text();
+    expect(pagedManagerHtml).toContain("limit=1");
+    expect(pagedManagerHtml).toContain("offset=1");
     expect(legacyFetch.status).toBe(301);
     expect(legacyFetch.headers.get("location")).toBe("/media/wiki/logo.svg?download=1");
     expect(legacyDetail.status).toBe(301);
@@ -364,6 +371,17 @@ describe("handleRequest", () => {
     expect(html).toContain('class="diff_link"');
     expect(html).toContain("Initial import");
     expect(html).toContain("wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z");
+
+    const paged = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=revisions&limit=1&offset=1"),
+      env
+    );
+    const pagedHtml = await paged.text();
+    expect(paged.status).toBe(200);
+    expect(pagedHtml).toContain("Older import");
+    expect(pagedHtml).not.toContain("Initial import");
+    expect(pagedHtml).toContain("limit=1");
+    expect(pagedHtml).toContain("offset=0");
   });
 
   it("renders an old page revision", async () => {
@@ -448,6 +466,12 @@ describe("handleRequest", () => {
     expect(html).toContain("Recent changes");
     expect(html).toContain("Initial import");
     expect(html).toContain("/wiki/wiki/welcome");
+
+    const paged = await handleRequest(new Request("https://example.com/recent?limit=1"), env);
+    const pagedHtml = await paged.text();
+    expect(paged.status).toBe(200);
+    expect(pagedHtml).toContain("limit=1");
+    expect(pagedHtml).toContain("offset=1");
   });
 
   it("renders search results from the page index", async () => {
@@ -487,6 +511,15 @@ describe("handleRequest", () => {
     expect(html).toContain("Index of wiki");
     expect(html).toContain("/wiki/wiki/welcome");
     expect(html).toContain("/wiki/wiki/guide");
+
+    const paged = await handleRequest(
+      new Request("https://example.com/index?ns=wiki&limit=1"),
+      env
+    );
+    const pagedHtml = await paged.text();
+    expect(paged.status).toBe(200);
+    expect(pagedHtml).toContain("limit=1");
+    expect(pagedHtml).toContain("offset=1");
   });
 
   it("renders backlinks for a page", async () => {
@@ -895,7 +928,16 @@ function createD1Stub(state: D1StubState): D1Database {
         },
         all: async () => {
           const [idOrLimit, rawLimit] = values;
-          const limit = typeof rawLimit === "number" ? rawLimit : Number(idOrLimit);
+          const hasOffset = sql.includes("offset ?");
+          const limit = Number(
+            hasOffset ? values.at(-2) : typeof rawLimit === "number" ? rawLimit : idOrLimit
+          );
+          const offset = hasOffset ? Number(values.at(-1)) : 0;
+          const applyPagination = <T>(rows: T[], fallbackLimit: number): T[] => {
+            const safeLimit = Number.isFinite(limit) ? limit : fallbackLimit;
+            const safeOffset = Number.isFinite(offset) ? offset : 0;
+            return rows.slice(safeOffset, safeOffset + safeLimit);
+          };
 
           if (sql.includes("from search_postings") && sql.includes("where page_id = ?")) {
             return {
@@ -939,17 +981,21 @@ function createD1Stub(state: D1StubState): D1Database {
 
           if (sql.includes("from media") && sql.includes("where namespace = ?")) {
             return {
-              results: state.media
-                .filter((media) => media.namespace === idOrLimit && media.is_deleted === 0)
-                .slice(0, Number.isFinite(limit) ? limit : 200)
+              results: applyPagination(
+                state.media.filter(
+                  (media) => media.namespace === idOrLimit && media.is_deleted === 0
+                ),
+                200
+              )
             };
           }
 
           if (sql.includes("from pages") && sql.includes("where namespace = ?")) {
             return {
-              results: currentPageSourceRows(state)
-                .filter((page) => page.namespace === idOrLimit)
-                .slice(0, Number.isFinite(limit) ? limit : 200)
+              results: applyPagination(
+                currentPageSourceRows(state).filter((page) => page.namespace === idOrLimit),
+                200
+              )
             };
           }
 
@@ -973,15 +1019,16 @@ function createD1Stub(state: D1StubState): D1Database {
 
           if (sql.includes("from page_revisions")) {
             return {
-              results: state.revisions
-                .filter((revision) => revision.page_id === idOrLimit)
-                .slice(0, Number.isFinite(limit) ? limit : 50)
+              results: applyPagination(
+                state.revisions.filter((revision) => revision.page_id === idOrLimit),
+                50
+              )
             };
           }
 
           if (sql.includes("from changelog")) {
             return {
-              results: state.changelog.slice(0, Number.isFinite(limit) ? limit : 50)
+              results: applyPagination(state.changelog, 50)
             };
           }
 

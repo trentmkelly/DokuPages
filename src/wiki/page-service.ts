@@ -193,32 +193,41 @@ export async function getPageRevision(
 export async function listPageRevisions(
   db: D1Database,
   pageId: string,
-  limit = 50
+  limit = 50,
+  offset = 0
 ): Promise<PageRevision[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const safeOffset = Math.max(0, offset);
   const result = await db
     .prepare(
       `select id, page_id, content, summary, change_type, size_change, created_at
        from page_revisions
        where page_id = ?
        order by created_at desc
-       limit ?`
+       limit ? offset ?`
     )
-    .bind(pageId, Math.max(1, Math.min(limit, 100)))
+    .bind(pageId, safeLimit, safeOffset)
     .all<PageRevisionRow>();
 
   return result.results.map(mapRevision);
 }
 
-export async function listRecentChanges(db: D1Database, limit = 50): Promise<RecentChange[]> {
+export async function listRecentChanges(
+  db: D1Database,
+  limit = 50,
+  offset = 0
+): Promise<RecentChange[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const safeOffset = Math.max(0, offset);
   const result = await db
     .prepare(
       `select id, subject_id, revision_id, user_name, change_type, summary, size_change, created_at
        from changelog
        where subject_type = 'page'
        order by created_at desc
-       limit ?`
+       limit ? offset ?`
     )
-    .bind(Math.max(1, Math.min(limit, 100)))
+    .bind(safeLimit, safeOffset)
     .all<RecentChangeRow>();
 
   return result.results.map((row) => ({
@@ -271,17 +280,20 @@ export async function searchPages(
 export async function listNamespacePages(
   db: D1Database,
   namespace: string,
-  limit = 200
+  limit = 200,
+  offset = 0
 ): Promise<NamespacePage[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
   const result = await db
     .prepare(
       `select id, namespace, title, updated_at
        from pages
        where namespace = ? and is_deleted = 0
        order by id
-       limit ?`
+       limit ? offset ?`
     )
-    .bind(namespace, Math.max(1, Math.min(limit, 500)))
+    .bind(namespace, safeLimit, safeOffset)
     .all<NamespacePageRow>();
 
   return result.results.map((row) => ({

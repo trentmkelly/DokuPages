@@ -116,8 +116,11 @@ export async function getMediaRevision(
 export async function listNamespaceMedia(
   db: D1Database,
   namespace: string,
-  limit = 200
+  limit = 200,
+  offset = 0
 ): Promise<CurrentMedia[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
   const result = await db
     .prepare(
       `select id, namespace, object_key, mime_type, byte_length, content_hash,
@@ -125,9 +128,9 @@ export async function listNamespaceMedia(
        from media
        where namespace = ? and is_deleted = 0
        order by id asc
-       limit ?`
+       limit ? offset ?`
     )
-    .bind(namespace, Math.max(1, Math.min(limit, 500)))
+    .bind(namespace, safeLimit, safeOffset)
     .all<CurrentMediaRow>();
 
   return result.results.map(mapCurrentMedia);
