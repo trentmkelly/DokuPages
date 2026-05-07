@@ -600,7 +600,11 @@ describe("handleRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("set-cookie")).toContain("DW_LOCK_");
+    const lockCookie = response.headers.get("set-cookie") ?? "";
+    expect(lockCookie).toContain("DW_LOCK_");
+    expect(lockCookie).toContain("HttpOnly");
+    expect(lockCookie).toContain("SameSite=Lax");
+    expect(lockCookie).toContain("Secure");
     const html = await response.text();
     expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
     expect(html).toContain('name="lockToken" value="');

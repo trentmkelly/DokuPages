@@ -14,7 +14,7 @@ Requests without a valid session resolve to an anonymous principal. Anonymous pr
 
 ## Login Sessions
 
-Native login uses D1-backed users with the native password hash format. Successful logins create a random session token, store only its SHA-256 hash in D1, and issue an HTTP-only `SameSite=Lax` session cookie. Logout deletes the session row and clears the cookie.
+Native login uses D1-backed users with the native password hash format. Successful logins create a random session token, store only its SHA-256 hash in D1, and issue an HTTP-only `SameSite=Lax` session cookie with `Secure` on HTTPS. Logout deletes the session row and clears the cookie. Page edit lock cookies use the same `HttpOnly`, `SameSite=Lax`, and HTTPS `Secure` flags.
 
 ## Password Hashing
 
