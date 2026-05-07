@@ -1,31 +1,33 @@
 # Parser And Renderer
 
-The initial parser is a native TypeScript renderer in `src/wiki/render.ts`. It is intentionally scoped to syntax needed by the bundled seed pages and early migration tests, not full DokuWiki compatibility.
+The native TypeScript renderer lives in `src/wiki/render.ts`. It targets the
+DokuWiki syntax surface needed by the port and migration tests, but it is not a
+drop-in implementation of DokuWiki's PHP parser mode system.
 
-## Supported In This Slice
+## Supported
 
 - headings with title metadata and table-of-contents extraction
 - paragraphs
 - bold, italic, underline, monospace, subscript, superscript, and deleted text
 - internal links
 - external links through explicit DokuWiki link syntax
+- interwiki links
+- Windows share links
+- email links with mailguard behavior
 - media embeds
 - unordered lists
+- nested lists
+- quote blocks
+- footnotes
 - indented code blocks
+- file blocks
 - nowiki spans
 - simple tables
+- acronym, entity, smiley, and typography replacement
+- section edit anchors
 
 ## Still Pending
 
 - full DokuWiki parser mode compatibility
-- nested lists
-- footnotes
-- quotes
-- file blocks
-- interwiki links
-- Windows share links
-- email links and mailguard behavior
-- acronym, entity, smiley, and typography replacement
-- section edit anchors
 - parser instruction caching
 - plugin syntax hooks

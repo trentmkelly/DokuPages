@@ -11,6 +11,9 @@ The current deployment is a Cloudflare Pages scaffold with:
 - migration planning and architecture notes in `docs/`
 - admin operations in `docs/admin.md`
 - data import workflow in `docs/data-import.md`
+- deployment and environment setup in `docs/deployment.md`
+- supported features and limitations in `docs/features.md`
+- backup, restore, rollback, and launch operations in `docs/operations.md`
 - remote API decisions in `docs/remote-api.md`
 - security notes in `docs/security.md`
 - testing workflow in `docs/testing.md`

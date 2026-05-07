@@ -486,8 +486,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement migration status display.
 - [x] Implement audit log view.
 - [ ] Implement maintenance mode if needed.
-- [ ] Implement backup export.
-- [ ] Implement restore import.
+- [x] Implement backup export.
+- [x] Implement restore import.
 
 ## Feeds, Sitemap, And Discovery
 
@@ -593,7 +593,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Make migration idempotent.
 - [ ] Make migration resumable.
 - [x] Add dry-run mode.
-- [ ] Add rollback or restore plan.
+- [x] Add rollback or restore plan.
 
 ## URL Compatibility And Redirects
 
@@ -719,24 +719,24 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Documentation
 
-- [ ] Document architecture decisions.
-- [ ] Document supported DokuWiki features.
-- [ ] Document unsupported DokuWiki features.
-- [ ] Document storage schema.
-- [ ] Document local development setup.
-- [ ] Document deployment setup.
-- [ ] Document environment variables.
-- [ ] Document D1 migration workflow.
+- [x] Document architecture decisions.
+- [x] Document supported DokuWiki features.
+- [x] Document unsupported DokuWiki features.
+- [x] Document storage schema.
+- [x] Document local development setup.
+- [x] Document deployment setup.
+- [x] Document environment variables.
+- [x] Document D1 migration workflow.
 - [x] Document R2 bucket workflow.
 - [x] Document data import workflow.
-- [ ] Document backup workflow.
-- [ ] Document restore workflow.
-- [ ] Document rollback workflow.
-- [ ] Document plugin compatibility.
+- [x] Document backup workflow.
+- [x] Document restore workflow.
+- [x] Document rollback workflow.
+- [x] Document plugin compatibility.
 - [x] Document admin operations.
-- [ ] Document security model.
-- [ ] Document known limitations.
-- [ ] Document launch checklist.
+- [x] Document security model.
+- [x] Document known limitations.
+- [x] Document launch checklist.
 
 ## Pre-Launch
 

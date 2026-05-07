@@ -1,0 +1,109 @@
+# Deployment And Environment
+
+The current validation target is the Cloudflare Pages project `dokutest`.
+
+## Bindings
+
+`wrangler.toml` defines the Pages deployment shape:
+
+- `DB`: D1 database `dokuwiki_pages_dev`.
+- `RENDER_CACHE`: KV namespace used for rendered/discovery cache and rate-limit counters.
+- `MEDIA_BUCKET`: R2 bucket `dokuwiki-pages-dev-media`.
+- `PAGE_LOCKS`: Durable Object binding to the companion `dokutest-page-locks` Worker.
+
+`wrangler.page-locks.toml` deploys the companion Durable Object Worker that owns
+the `PageLockObject` class. Deploy it before Pages when lock code or the Durable
+Object config changes.
+
+## Runtime Variables
+
+Optional Pages environment variables:
+
+- `SITE_NAME`: wiki display name. Default: `DokuWiki Pages`.
+- `START_PAGE`: start page ID. Default: `wiki:welcome`.
+- `WIKI_LANG`: supported language tag. Defaults to English fallback.
+- `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
+- `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
+- `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.
+- `APP_VERSION`: display/build version override. Defaults to the package version.
+
+Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
+and `CF_PAGES_URL` are read when available.
+
+No secret-specific runtime variable is required for the current implementation.
+Wrangler authentication stays outside the repository and should never be checked
+in. `npm run scan:secrets` guards tracked files for high-signal tokens.
+
+## Local Setup
+
+```sh
+npm install
+npm run db:migrate:local
+npm run db:seed:local
+npm run dev
+```
+
+## D1 Migration Workflow
+
+Local migration:
+
+```sh
+npm run db:migrate:local
+```
+
+Remote migration:
+
+```sh
+npx wrangler d1 migrations apply dokuwiki_pages_dev --remote
+```
+
+For imported DokuWiki data, generate SQL and execute it against the target D1
+database:
+
+```sh
+npm run import:sql
+npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-import.sql
+```
+
+## Deploy
+
+Deploy the Durable Object Worker when needed:
+
+```sh
+npm run deploy:locks
+```
+
+Deploy a Pages preview branch:
+
+```sh
+npm run deploy:preview
+```
+
+Deploy the current main branch to the validation Pages project:
+
+```sh
+npm run deploy
+```
+
+After deployment:
+
+```sh
+npm run test:e2e -- --base-url https://dokutest.pages.dev
+```
+
+## Backup And Restore
+
+Export the validation D1 database and referenced R2 media objects:
+
+```sh
+npm run backup:export
+```
+
+Restore a backup into the configured validation resources:
+
+```sh
+npm run backup:restore -- --backup .wrangler/backups/<timestamp> --yes
+```
+
+Use `--dry-run` on either command to print the Wrangler operations before
+performing writes.

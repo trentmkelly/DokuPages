@@ -34,4 +34,7 @@ Primary references:
 
 ## Security And Anti-Abuse
 
-Cloudflare Access and Turnstile are candidates for production hardening. Native CSRF, upload validation, the ACL matcher, route-level ACL enforcement, and aggregate-result ACL filtering are implemented; rate limiting remains pending.
+Cloudflare Access and Turnstile are candidates for production hardening. Native
+CSRF, upload validation, the ACL matcher, route-level ACL enforcement,
+aggregate-result ACL filtering, and KV-backed rate limiting for login, page
+edits, and media uploads are implemented.

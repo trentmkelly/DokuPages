@@ -18,6 +18,8 @@
     "import:sql": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run --sql-out .wrangler/dokuwiki-import.sql",
     "import:media-manifest": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run --media-manifest-out .wrangler/dokuwiki-media-manifest.json",
     "import:media-upload": "node scripts/upload-r2-media.mjs --manifest .wrangler/dokuwiki-media-manifest.json --bucket dokuwiki-pages-dev-media --remote",
+    "backup:export": "node scripts/export-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
+    "backup:restore": "node scripts/restore-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
     "smoke": "node scripts/smoke-pages.mjs",
     "test:e2e": "node scripts/smoke-pages.mjs",
     "lint": "eslint .",
