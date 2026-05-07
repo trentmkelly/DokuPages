@@ -9,6 +9,7 @@
     "deploy:preview": "wrangler pages deploy public --project-name dokutest --branch preview",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "import:dry-run": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

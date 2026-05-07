@@ -558,17 +558,17 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Data Migration
 
-- [ ] Write importer for `data/pages`.
-- [ ] Write importer for `data/attic`.
+- [x] Write importer for `data/pages`.
+- [x] Write importer for `data/attic`.
 - [ ] Write importer for compressed old page revisions.
-- [ ] Write importer for `data/media`.
-- [ ] Write importer for `data/media_attic`.
+- [x] Write importer for `data/media`.
+- [x] Write importer for `data/media_attic`.
 - [ ] Write importer for `data/meta`.
 - [ ] Write importer for `data/media_meta`.
 - [ ] Write importer for page changelogs.
 - [ ] Write importer for media changelogs.
-- [ ] Write importer for `conf/acl.auth.php`.
-- [ ] Write importer for `conf/users.auth.php`.
+- [x] Write importer for `conf/acl.auth.php`.
+- [x] Write importer for `conf/users.auth.php`.
 - [ ] Write importer for plugin settings.
 - [ ] Write importer for interwiki configuration.
 - [ ] Write importer for MIME configuration.
@@ -587,10 +587,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Validate imported user counts.
 - [ ] Validate imported ACL counts.
 - [ ] Validate content hashes before and after import.
-- [ ] Produce migration report.
+- [x] Produce migration report.
 - [ ] Make migration idempotent.
 - [ ] Make migration resumable.
-- [ ] Add dry-run mode.
+- [x] Add dry-run mode.
 - [ ] Add rollback or restore plan.
 
 ## URL Compatibility And Redirects
@@ -657,7 +657,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add integration tests for login.
 - [ ] Add integration tests for logout.
 - [ ] Add integration tests for admin actions.
-- [ ] Add migration tests using fixture wiki data.
+- [x] Add migration tests using fixture wiki data.
 - [ ] Add URL compatibility tests.
 - [ ] Add API compatibility tests if APIs are supported.
 - [ ] Add accessibility tests.

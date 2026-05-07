@@ -8,6 +8,17 @@ export default [
     ignores: ["node_modules/", ".wrangler/", "coverage/"]
   },
   {
+    files: ["scripts/**/*.mjs", "test/**/*.mjs", "eslint.config.mjs"],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly"
+      }
+    }
+  },
+  {
     files: ["**/*.ts"],
     languageOptions: {
       parserOptions: {
