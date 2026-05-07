@@ -2,6 +2,8 @@ import type { Env } from "./env";
 import { healthResponse } from "./http/health";
 import { htmlResponse, notFoundResponse } from "./http/responses";
 import { cleanPageId } from "./wiki/page-id";
+import { getCurrentPage } from "./wiki/page-service";
+import { renderWikiText } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
 
@@ -24,18 +26,26 @@ export async function handleRequest(
       return notFoundResponse("Missing wiki page id.");
     }
 
+    const page = await getCurrentPage(env.DB, id);
+
+    if (!page) {
+      return notFoundResponse(`Wiki page '${id}' was not found.`);
+    }
+
+    const rendered = renderWikiText(page.content);
+    const title = rendered.title ?? page.title ?? id;
+
     return htmlResponse(
       `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(id)} - ${escapeHtml(env.SITE_NAME ?? "DokuWiki Pages")}</title>
+  <title>${escapeHtml(title)} - ${escapeHtml(env.SITE_NAME ?? "DokuWiki Pages")}</title>
 </head>
 <body>
   <main>
-    <h1>${escapeHtml(id)}</h1>
-    <p>This route is reserved for the Pages-native wiki page renderer.</p>
+    ${rendered.html}
   </main>
 </body>
 </html>`

@@ -10,6 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "import:dry-run": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run",
+    "import:sql": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run --sql-out .wrangler/dokuwiki-import.sql",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

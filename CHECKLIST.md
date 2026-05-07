@@ -168,7 +168,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Request Routing
 
-- [ ] Implement route handling for page views.
+- [x] Implement route handling for page views.
 - [ ] Implement route handling for edit pages.
 - [ ] Implement route handling for saves.
 - [ ] Implement route handling for preview.
@@ -234,11 +234,11 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Page Behavior
 
-- [ ] Implement page ID cleaning.
-- [ ] Implement namespace resolution.
+- [x] Implement page ID cleaning.
+- [x] Implement namespace resolution.
 - [ ] Implement start page resolution.
-- [ ] Implement page existence checks.
-- [ ] Implement raw page reads.
+- [x] Implement page existence checks.
+- [x] Implement raw page reads.
 - [ ] Implement page creation.
 - [ ] Implement page edits.
 - [ ] Implement page deletion through empty content.
@@ -576,12 +576,12 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Write importer for custom language files if present.
 - [ ] Write importer for custom template files if present.
 - [ ] Write importer for custom media metadata if present.
-- [ ] Preserve original timestamps.
+- [x] Preserve original timestamps.
 - [ ] Preserve author information.
 - [ ] Preserve edit summaries.
 - [ ] Preserve delete events.
 - [ ] Preserve media revision history.
-- [ ] Validate imported page counts.
+- [x] Validate imported page counts.
 - [ ] Validate imported media counts.
 - [ ] Validate imported revision counts.
 - [ ] Validate imported user counts.

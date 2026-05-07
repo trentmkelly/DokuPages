@@ -9,7 +9,7 @@ The port is a native TypeScript implementation on Cloudflare Pages Functions. Th
 `functions/[[path]].ts` is the catch-all Pages Function. It delegates to `src/app.ts`, which currently routes:
 
 - `GET /api/health`
-- `/wiki/:id` scaffold page routes
+- `/wiki/:id` page views backed by D1 current page records and the native wiki renderer
 - all other paths to static asset fallback
 
 Specific endpoint files may be added under `functions/` as the route surface expands.
