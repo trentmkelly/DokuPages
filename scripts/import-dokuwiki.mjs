@@ -223,6 +223,29 @@ on conflict(id) do update set
     );
   }
 
+  for (const entry of [...plan.pageMetadata, ...plan.mediaMetadata]) {
+    statements.push(
+      `insert or replace into metadata (subject_type, subject_id, key, value_json, updated_at)
+values (${sql(entry.subjectType)}, ${sql(entry.subjectId)}, 'dokuwiki', ${sql(
+        JSON.stringify(entry.value)
+      )}, ${sql(entry.modifiedAt)});`
+    );
+  }
+
+  for (const change of [...plan.pageChangelogEntries, ...plan.mediaChangelogEntries]) {
+    statements.push(
+      `insert or replace into changelog (
+  id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+  change_type, summary, size_change, created_at
+) values (
+  ${sql(change.id)}, ${sql(change.subjectType)}, ${sql(change.subjectId)}, ${sql(change.revisionId)}, null, ${sql(
+    change.userName
+  )}, ${sql(change.ip)},
+  ${sql(change.changeType)}, ${sql(change.summary)}, ${sql(change.sizeChange)}, ${sql(change.createdAt)}
+);`
+    );
+  }
+
   for (const rule of plan.aclRules) {
     statements.push(
       `insert into acl_rules (id, scope, principal_type, principal, permission, created_at)

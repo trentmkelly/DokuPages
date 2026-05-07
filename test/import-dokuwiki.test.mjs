@@ -36,7 +36,10 @@ describe("DokuWiki import planner", () => {
     );
     await writeFile(
       path.join(root, "data/meta/_dokuwiki.changes"),
-      "1767225600\t203.0.113.7\tC\twiki:welcome\talice\tCreated page\t\t24\n"
+      [
+        "1767225600\t203.0.113.7\tC\twiki:welcome\talice\tCreated page\t\t24",
+        "1767225602\t203.0.113.9\tD\twiki:old\talice\tDeleted old page\t\t-24"
+      ].join("\n")
     );
     await writeFile(
       path.join(root, "data/meta/_media.changes"),
@@ -97,7 +100,7 @@ describe("DokuWiki import planner", () => {
     expect(plan.counts).toMatchObject({
       pages: 1,
       pageRevisions: 1,
-      pageChangelogEntries: 1,
+      pageChangelogEntries: 2,
       pageMetadata: 1,
       media: 1,
       mediaRevisions: 1,
@@ -127,6 +130,13 @@ describe("DokuWiki import planner", () => {
       changeType: "create",
       sizeChange: 24,
       createdAt: "2026-01-01T00:00:00.000Z"
+    });
+    expect(plan.pageChangelogEntries[1]).toMatchObject({
+      subjectId: "wiki:old",
+      changeType: "delete",
+      summary: "Deleted old page",
+      sizeChange: -24,
+      createdAt: "2026-01-01T00:00:02.000Z"
     });
     expect(plan.pageMetadata[0]).toMatchObject({
       subjectType: "page",
@@ -315,6 +325,8 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media_attic/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/meta/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/media_meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
     await writeFile(
       path.join(root, "data/pages/wiki/welcome.txt"),
@@ -324,6 +336,18 @@ describe("DokuWiki import planner", () => {
     await writeFile(
       path.join(root, "data/media_attic/wiki/logo.1767225600.svg"),
       "<svg>old</svg>\n"
+    );
+    await writeFile(
+      path.join(root, "data/meta/_dokuwiki.changes"),
+      "1767225602\t203.0.113.9\tD\twiki:welcome\talice\tDeleted page\t\t-24\n"
+    );
+    await writeFile(
+      path.join(root, "data/meta/wiki/welcome.meta"),
+      'a:1:{s:7:"current";a:1:{s:5:"title";s:7:"Welcome";}}'
+    );
+    await writeFile(
+      path.join(root, "data/media_meta/wiki/logo.svg.meta"),
+      'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
     );
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 8\n");
     await writeFile(
@@ -346,6 +370,10 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert or replace into media_revisions");
     expect(sql).toContain("'media/current/wiki/logo.svg'");
     expect(sql).toContain("'wiki:logo.svg@2026-01-01T00:00:00.000Z'");
+    expect(sql).toContain("insert or replace into metadata");
+    expect(sql).toContain("insert or replace into changelog");
+    expect(sql).toContain("'delete'");
+    expect(sql).toContain("'Deleted page'");
     expect(sql).toContain("insert into acl_rules");
     expect(sql).toContain("insert into users");
     expect(sql).toContain("insert into groups");

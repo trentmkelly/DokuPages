@@ -579,18 +579,18 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Write importer for custom template files if present.
 - [ ] Write importer for custom media metadata if present.
 - [x] Preserve original timestamps.
-- [ ] Preserve author information.
-- [ ] Preserve edit summaries.
-- [ ] Preserve delete events.
+- [x] Preserve author information.
+- [x] Preserve edit summaries.
+- [x] Preserve delete events.
 - [x] Preserve media revision history.
 - [x] Validate imported page counts.
 - [x] Validate imported media counts.
 - [x] Validate imported revision counts.
 - [x] Validate imported user counts.
-- [ ] Validate imported ACL counts.
+- [x] Validate imported ACL counts.
 - [ ] Validate content hashes before and after import.
 - [x] Produce migration report.
-- [ ] Make migration idempotent.
+- [x] Make migration idempotent.
 - [ ] Make migration resumable.
 - [x] Add dry-run mode.
 - [ ] Add rollback or restore plan.
@@ -728,7 +728,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Document environment variables.
 - [ ] Document D1 migration workflow.
 - [x] Document R2 bucket workflow.
-- [ ] Document data import workflow.
+- [x] Document data import workflow.
 - [ ] Document backup workflow.
 - [ ] Document restore workflow.
 - [ ] Document rollback workflow.
