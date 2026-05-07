@@ -633,6 +633,7 @@ function renderPageExport(
   const rendered = renderWikiText(content, { pageId: id });
   const title = rendered.title ?? ("title" in page ? page.title : null) ?? id;
   const headers = securityHeaders({ "x-robots-tag": "noindex" });
+  const language = getRuntimeConfig(env).language;
 
   if (mode === "raw") {
     headers.set("content-type", "text/plain; charset=utf-8");
@@ -650,7 +651,7 @@ function renderPageExport(
 
   return new Response(
     `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeAttribute(language)}">
 <head>
   <meta charset="utf-8">
   <title>${escapeHtml(title)}</title>
@@ -874,6 +875,7 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
     ["Generated", diagnostics.generatedAt],
     ["Site name", diagnostics.site.siteName],
     ["Start page", diagnostics.site.startPage],
+    ["Language", diagnostics.site.language],
     ["Branch", diagnostics.deployment.branch ?? "(not provided)"],
     ["Commit", diagnostics.deployment.commitSha ?? "(not provided)"],
     ["Pages URL", diagnostics.deployment.pagesUrl ?? "(not provided)"]
@@ -1288,7 +1290,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const pageTools = pageId ? renderPageTools(pageId) : "";
 
   return `<!doctype html>
-<html lang="en">
+<html lang="${escapeAttribute(config.language)}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

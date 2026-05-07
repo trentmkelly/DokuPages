@@ -5,6 +5,7 @@ export interface Env {
   PAGE_LOCKS?: DurableObjectNamespace;
   SITE_NAME?: string;
   START_PAGE?: string;
+  WIKI_LANG?: string;
   SESSION_COOKIE_NAME?: string;
   APP_VERSION?: string;
   CF_PAGES_BRANCH?: string;

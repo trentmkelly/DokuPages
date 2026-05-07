@@ -18,6 +18,7 @@ export interface DiagnosticsSnapshot {
   site: {
     siteName: string;
     startPage: string;
+    language: string;
   };
   deployment: {
     branch: string | null;
@@ -88,7 +89,8 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     generatedAt: new Date().toISOString(),
     site: {
       siteName: runtimeConfig.siteName,
-      startPage: runtimeConfig.startPage
+      startPage: runtimeConfig.startPage,
+      language: runtimeConfig.language
     },
     deployment: {
       branch: env.CF_PAGES_BRANCH ?? null,

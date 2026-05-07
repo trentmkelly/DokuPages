@@ -1,5 +1,11 @@
 import type { Env } from "./env";
 import { APP_VERSION } from "./version";
+import {
+  isSupportedLanguage,
+  normalizeLanguage,
+  resolveLanguage,
+  type SupportedLanguage
+} from "./wiki/language";
 import { cleanPageId } from "./wiki/page-id";
 
 const DEFAULT_SITE_NAME = "DokuWiki Pages";
@@ -10,6 +16,7 @@ const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 export interface RuntimeConfig {
   siteName: string;
   startPage: string;
+  language: SupportedLanguage;
   sessionCookieName: string;
   appVersion: string;
 }
@@ -29,6 +36,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
   return {
     siteName: nonEmpty(env.SITE_NAME) ?? DEFAULT_SITE_NAME,
     startPage: normalizedStartPage(env.START_PAGE),
+    language: resolveLanguage(env.WIKI_LANG),
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
@@ -39,6 +47,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
 
   validateSiteName(env.SITE_NAME, issues);
   validateStartPage(env.START_PAGE, issues);
+  validateLanguage(env.WIKI_LANG, issues);
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
   validateAppVersion(env.APP_VERSION, issues);
 
@@ -79,6 +88,49 @@ function validateStartPage(value: string | undefined, issues: ConfigValidationIs
       message: `START_PAGE will be normalized to '${normalized}'.`
     });
   }
+}
+
+function validateLanguage(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  if (value === undefined) return;
+
+  const normalized = normalizeLanguage(value);
+
+  if (!normalized) {
+    issues.push({
+      key: "WIKI_LANG",
+      severity: "error",
+      message: "WIKI_LANG does not resolve to a supported DokuWiki language."
+    });
+    return;
+  }
+
+  if (isSupportedLanguage(normalized)) {
+    if (normalized !== value) {
+      issues.push({
+        key: "WIKI_LANG",
+        severity: "warning",
+        message: `WIKI_LANG will be normalized to '${normalized}'.`
+      });
+    }
+    return;
+  }
+
+  const baseLanguage = normalized.split("-")[0];
+
+  if (baseLanguage && isSupportedLanguage(baseLanguage)) {
+    issues.push({
+      key: "WIKI_LANG",
+      severity: "warning",
+      message: `WIKI_LANG '${normalized}' is not bundled; '${baseLanguage}' will be used.`
+    });
+    return;
+  }
+
+  issues.push({
+    key: "WIKI_LANG",
+    severity: "error",
+    message: `WIKI_LANG '${normalized}' is not a bundled DokuWiki language.`
+  });
 }
 
 function validateSessionCookieName(
