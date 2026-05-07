@@ -444,29 +444,29 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Plugins And Extension Compatibility
 
-- [ ] Decide support level for bundled plugins.
+- [x] Decide support level for bundled plugins.
 - [x] Port the ACL plugin or replace it with native admin UI.
 - [x] Port the authplain plugin or replace it with native auth.
 - [ ] Port the config plugin or replace it with native admin UI.
-- [ ] Port the extension manager plugin or remove it for Pages.
+- [x] Port the extension manager plugin or remove it for Pages.
 - [x] Port the info plugin or replace it with native diagnostics.
-- [ ] Port the logviewer plugin or replace it with Cloudflare logs.
-- [ ] Port the popularity plugin or remove it.
-- [ ] Port the revert plugin.
-- [ ] Port the safefnrecode plugin or make it migration-only.
-- [ ] Port the styling plugin or replace it with build-time theme configuration.
+- [x] Port the logviewer plugin or replace it with Cloudflare logs.
+- [x] Port the popularity plugin or remove it.
+- [x] Port the revert plugin.
+- [x] Port the safefnrecode plugin or make it migration-only.
+- [x] Port the styling plugin or replace it with build-time theme configuration.
 - [ ] Port the usermanager plugin or replace it with native user management.
-- [ ] Decide support for authad.
-- [ ] Decide support for authldap.
-- [ ] Decide support for authpdo.
-- [ ] Define a Pages-compatible extension API.
-- [ ] Define supported action hooks.
-- [ ] Define supported syntax hooks.
-- [ ] Define supported renderer hooks.
-- [ ] Define supported auth hooks.
-- [ ] Define supported admin hooks.
-- [ ] Define plugin packaging rules for Pages.
-- [ ] Define plugin security boundaries.
+- [x] Decide support for authad.
+- [x] Decide support for authldap.
+- [x] Decide support for authpdo.
+- [x] Define a Pages-compatible extension API.
+- [x] Define supported action hooks.
+- [x] Define supported syntax hooks.
+- [x] Define supported renderer hooks.
+- [x] Define supported auth hooks.
+- [x] Define supported admin hooks.
+- [x] Define plugin packaging rules for Pages.
+- [x] Define plugin security boundaries.
 - [ ] Add plugin compatibility tests for supported plugins.
 
 ## Admin And Maintenance
@@ -597,7 +597,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## URL Compatibility And Redirects
 
-- [ ] Inventory existing URL patterns.
+- [x] Inventory existing URL patterns.
 - [x] Preserve `doku.php?id=...` routes if required.
 - [x] Preserve nice URL routes if required.
 - [x] Preserve media fetch URLs if required.
@@ -606,10 +606,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Preserve revision URLs if required.
 - [x] Preserve diff URLs if required.
 - [x] Preserve admin URLs where possible.
-- [ ] Implement redirect rules for unsupported legacy endpoints.
+- [x] Implement redirect rules for unsupported legacy endpoints.
 - [x] Implement canonical URL generation.
 - [x] Add URL compatibility tests.
-- [ ] Generate redirect audit report.
+- [x] Generate redirect audit report.
 
 ## Build And Deployment
 
@@ -628,7 +628,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Configure custom domain if used.
 - [ ] Configure cache rules if needed.
 - [x] Configure security headers.
-- [ ] Configure redirects.
+- [x] Configure redirects.
 - [x] Configure preview deployments.
 - [x] Configure production deployments.
 - [x] Configure database migration deployment.

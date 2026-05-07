@@ -281,6 +281,37 @@ describe("handleRequest", () => {
     });
   });
 
+  it("handles unsupported legacy executable endpoints explicitly", async () => {
+    const index = await handleRequest(new Request("https://example.com/index.php"), env);
+    const install = await handleRequest(new Request("https://example.com/install.php"), env);
+    const css = await handleRequest(new Request("https://example.com/lib/exe/css.php?t=1"), env);
+    const js = await handleRequest(new Request("https://example.com/lib/exe/js.php?t=1"), env);
+    const jquery = await handleRequest(new Request("https://example.com/lib/exe/jquery.php"), env);
+    const indexer = await handleRequest(
+      new Request("https://example.com/lib/exe/indexer.php"),
+      env
+    );
+    const taskrunner = await handleRequest(
+      new Request("https://example.com/lib/exe/taskrunner.php"),
+      env
+    );
+
+    expect(index.status).toBe(301);
+    expect(index.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(css.status).toBe(301);
+    expect(css.headers.get("location")).toBe("/dokuwiki.css");
+    expect(js.status).toBe(301);
+    expect(js.headers.get("location")).toBe("/dokuwiki.js");
+    expect(jquery.status).toBe(301);
+    expect(jquery.headers.get("location")).toBe("/dokuwiki.js");
+    expect(install.status).toBe(410);
+    await expect(install.json()).resolves.toMatchObject({ status: "not_available" });
+    expect(indexer.status).toBe(501);
+    await expect(indexer.json()).resolves.toMatchObject({ status: "not_available" });
+    expect(taskrunner.status).toBe(204);
+    expect(taskrunner.headers.get("cache-control")).toBe("no-store");
+  });
+
   it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
     const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
     const download = await handleRequest(

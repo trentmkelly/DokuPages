@@ -14,9 +14,11 @@ The current deployment is a Cloudflare Pages scaffold with:
 - deployment and environment setup in `docs/deployment.md`
 - supported features and limitations in `docs/features.md`
 - backup, restore, rollback, and launch operations in `docs/operations.md`
+- plugin compatibility decisions in `docs/plugin-compatibility.md`
 - remote API decisions in `docs/remote-api.md`
 - security notes in `docs/security.md`
 - testing workflow in `docs/testing.md`
+- URL compatibility and redirect audit in `docs/url-compatibility.md`
 - a tracked migration checklist in `CHECKLIST.md`
 - GPL attribution and licensing notes in `NOTICE.md` and `COPYING`
 

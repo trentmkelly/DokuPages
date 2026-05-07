@@ -134,8 +134,24 @@ export async function handleRequest(
     return redirectResponse(pagePath(startPageId(env)), 302);
   }
 
+  if (url.pathname === "/index.php") {
+    return redirectResponse(pagePath(startPageId(env)), 301);
+  }
+
+  if (url.pathname === "/install.php") {
+    return legacyEndpointNotAvailableResponse("DokuWiki installer", 410);
+  }
+
   if (url.pathname === "/doku.php") {
     return redirectLegacyDokuPhp(url, env);
+  }
+
+  if (url.pathname === "/lib/exe/css.php") {
+    return redirectResponse("/dokuwiki.css", 301);
+  }
+
+  if (url.pathname === "/lib/exe/js.php" || url.pathname === "/lib/exe/jquery.php") {
+    return redirectResponse("/dokuwiki.js", 301);
   }
 
   if (url.pathname === "/lib/exe/fetch.php") {
@@ -163,6 +179,17 @@ export async function handleRequest(
 
   if (url.pathname === "/lib/exe/openapi.php") {
     return remoteApiNotImplementedResponse("OpenAPI");
+  }
+
+  if (url.pathname === "/lib/exe/indexer.php") {
+    return legacyEndpointNotAvailableResponse("DokuWiki HTTP indexer", 501);
+  }
+
+  if (url.pathname === "/lib/exe/taskrunner.php") {
+    return new Response(null, {
+      status: 204,
+      headers: securityHeaders({ "cache-control": "no-store" })
+    });
   }
 
   if (url.pathname === "/lib/exe/ajax.php") {
@@ -611,6 +638,16 @@ function remoteApiNotImplementedResponse(apiName: string): Response {
       status: "not_implemented"
     },
     { status: 501 }
+  );
+}
+
+function legacyEndpointNotAvailableResponse(endpointName: string, status: 410 | 501): Response {
+  return jsonResponse(
+    {
+      error: `${endpointName} is not available in this Pages port.`,
+      status: "not_available"
+    },
+    { status }
   );
 }
 
