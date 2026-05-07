@@ -47,7 +47,11 @@ describe("DokuWiki import planner", () => {
     );
     await writeFile(
       path.join(root, "conf/users.auth.php"),
-      "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
+      [
+        "alice:$2y$hash:Alice Example:alice@example.test:user,admin",
+        "bob:hash\\:with\\:colon:Bob%20Example:bob@example.test:",
+        "carol:hash\\#fragment:Carol\\# Example:carol@example.test:@ops,user # trailing comment"
+      ].join("\n")
     );
     await writeFile(
       path.join(root, "conf/dokuwiki.php"),
@@ -90,7 +94,7 @@ describe("DokuWiki import planner", () => {
       mediaChangelogEntries: 1,
       mediaMetadata: 1,
       aclRules: 4,
-      users: 1,
+      users: 3,
       configSettings: 3,
       pluginConfigSettings: 2,
       pluginSettings: 3,
@@ -163,7 +167,30 @@ describe("DokuWiki import planner", () => {
       principal: "%GROUP%",
       permission: 8
     });
-    expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
+    expect(plan.users[0]).toMatchObject({
+      id: "user:alice",
+      username: "alice",
+      passwordHash: "$2y$hash",
+      displayName: "Alice Example",
+      email: "alice@example.test",
+      groups: ["user", "admin"],
+      isDisabled: false
+    });
+    expect(plan.users[1]).toMatchObject({
+      id: "user:bob",
+      username: "bob",
+      passwordHash: "hash:with:colon",
+      displayName: "Bob Example",
+      email: "bob@example.test",
+      groups: ["user"]
+    });
+    expect(plan.users[2]).toMatchObject({
+      id: "user:carol",
+      username: "carol",
+      passwordHash: "hash#fragment",
+      displayName: "Carol# Example",
+      groups: ["ops", "user"]
+    });
     expect(plan.configSettings).toContainEqual({
       key: "title",
       path: ["title"],
@@ -254,6 +281,10 @@ describe("DokuWiki import planner", () => {
       "====== Welcome ======\n\nText\n"
     );
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 8\n");
+    await writeFile(
+      path.join(root, "conf/users.auth.php"),
+      "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
+    );
 
     const plan = await buildImportPlan(root);
     const output = path.join(root, "import.sql");
@@ -267,6 +298,11 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("insert into search_postings");
     expect(sql).toContain("insert into acl_rules");
+    expect(sql).toContain("insert into users");
+    expect(sql).toContain("insert into groups");
+    expect(sql).toContain("insert into user_groups");
+    expect(sql).toContain("'user:alice'");
+    expect(sql).toContain("'group:admin'");
     expect(sql).toContain("'all'");
     expect(sql).toContain("'wiki:welcome'");
   });

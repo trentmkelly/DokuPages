@@ -309,10 +309,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement CSRF tokens.
 - [ ] Implement bearer token auth if remote APIs are supported.
 - [ ] Implement admin and manager role checks.
-- [ ] Implement default group assignment.
+- [x] Implement default group assignment.
 - [ ] Implement user manager behavior.
-- [ ] Implement account disable behavior if supported.
-- [ ] Implement auth migration from `users.auth.php`.
+- [x] Implement account disable behavior if supported.
+- [x] Implement auth migration from `users.auth.php`.
 - [ ] Implement auth event hooks or replacement extension points.
 - [ ] Add auth rate limiting.
 - [ ] Add brute force protection.
@@ -446,7 +446,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [ ] Decide support level for bundled plugins.
 - [x] Port the ACL plugin or replace it with native admin UI.
-- [ ] Port the authplain plugin or replace it with native auth.
+- [x] Port the authplain plugin or replace it with native auth.
 - [ ] Port the config plugin or replace it with native admin UI.
 - [ ] Port the extension manager plugin or remove it for Pages.
 - [x] Port the info plugin or replace it with native diagnostics.
@@ -586,7 +586,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Validate imported page counts.
 - [ ] Validate imported media counts.
 - [ ] Validate imported revision counts.
-- [ ] Validate imported user counts.
+- [x] Validate imported user counts.
 - [ ] Validate imported ACL counts.
 - [ ] Validate content hashes before and after import.
 - [x] Produce migration report.

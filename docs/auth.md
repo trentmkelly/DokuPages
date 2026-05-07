@@ -16,7 +16,7 @@ Native admin-only routes currently require membership in the `admin` group.
 
 ## Login Sessions
 
-Native login uses D1-backed users with the native password hash format. Successful logins create a random session token, store only its SHA-256 hash in D1, and issue an HTTP-only `SameSite=Lax` session cookie with `Secure` on HTTPS. Logout deletes the session row and clears the cookie. Page edit lock cookies use the same `HttpOnly`, `SameSite=Lax`, and HTTPS `Secure` flags.
+Native login uses D1-backed users with the native password hash format. Successful logins create a random session token, store only its SHA-256 hash in D1, and issue an HTTP-only `SameSite=Lax` session cookie with `Secure` on HTTPS. Logout deletes the session row and clears the cookie. Page edit lock cookies use the same `HttpOnly`, `SameSite=Lax`, and HTTPS `Secure` flags. Disabled user rows are rejected during login and when existing session cookies are resolved.
 
 ## Password Hashing
 
@@ -26,4 +26,4 @@ New native accounts use PBKDF2-HMAC-SHA-256 through Web Crypto. Encoded hashes u
 pbkdf2-sha256$iterations$saltBase64$hashBase64
 ```
 
-The verifier rejects unsupported formats without throwing. Migration of existing DokuWiki `users.auth.php` hashes remains separate from native hash verification.
+The importer migrates `users.auth.php` rows into D1 users, groups, and user-group memberships using DokuWiki `authplain` escaping rules. Migrated legacy hashes are preserved for auditability, but the native verifier rejects unsupported hash formats without throwing until a reset or rehash path converts those accounts.

@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const gunzipAsync = promisify(gunzip);
+const DEFAULT_AUTH_GROUP = "user";
 
 export async function buildImportPlan(sourceRoot) {
   const root = path.resolve(sourceRoot);
@@ -169,6 +170,49 @@ on conflict(id) do update set
   permission = excluded.permission,
   created_at = excluded.created_at;`
     );
+  }
+
+  for (const user of plan.users) {
+    statements.push(
+      `insert into users (
+  id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
+) values (
+  ${sql(user.id)}, ${sql(user.username)}, ${sql(user.displayName)}, ${sql(user.email)}, ${sql(user.passwordHash)},
+  ${user.isDisabled ? 1 : 0}, ${sql(user.createdAt)}, ${sql(user.updatedAt)}
+)
+on conflict(id) do update set
+  username = excluded.username,
+  display_name = excluded.display_name,
+  email = excluded.email,
+  password_hash = excluded.password_hash,
+  is_disabled = excluded.is_disabled,
+  updated_at = excluded.updated_at;`
+    );
+  }
+
+  const groups = new Map();
+  for (const user of plan.users) {
+    for (const group of user.groups) {
+      groups.set(group, user.createdAt);
+    }
+  }
+
+  for (const [group, createdAt] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    statements.push(
+      `insert into groups (id, name, created_at)
+values (${sql(groupId(group))}, ${sql(group)}, ${sql(createdAt)})
+on conflict(name) do nothing;`
+    );
+  }
+
+  for (const user of plan.users) {
+    for (const group of user.groups) {
+      statements.push(
+        `insert into user_groups (user_id, group_id, created_at)
+values (${sql(user.id)}, ${sql(groupId(group))}, ${sql(user.createdAt)})
+on conflict(user_id, group_id) do nothing;`
+      );
+    }
   }
 
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
@@ -395,21 +439,88 @@ function aclPrincipalType(principal) {
 export async function discoverUsers(file) {
   const text = await readTextIfExists(file);
   if (!text) return [];
+  const stat = await fs.stat(file);
+  const createdAt = stat.mtime.toISOString();
 
   return text
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-      const [username, passwordHash, displayName, email, groups = ""] = line.split(":");
-      return {
-        username,
-        passwordHash,
-        displayName,
-        email,
-        groups: groups.split(",").filter(Boolean)
-      };
-    });
+    .map((line) => parseUserLine(line, createdAt))
+    .filter(Boolean);
+}
+
+function parseUserLine(line, createdAt) {
+  const trimmed = line.replace(/(?<!\\)#.*$/, "").trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+
+  const row = splitEscapedUserLine(trimmed).map(unescapeUserField);
+  while (row.length < 5) row.push("");
+
+  const [username, passwordHash, displayName, email, rawGroups] = row;
+  if (!username) return null;
+
+  const groups = normalizeUserGroups(rawGroups);
+
+  return {
+    id: userId(username),
+    username,
+    passwordHash,
+    displayName: safeDecodeURIComponent(displayName) || username,
+    email: email || null,
+    groups,
+    isDisabled: false,
+    createdAt,
+    updatedAt: createdAt
+  };
+}
+
+function splitEscapedUserLine(line) {
+  const fields = [];
+  let current = "";
+  let escaped = false;
+
+  for (const char of line) {
+    if (char === ":" && !escaped && fields.length < 4) {
+      fields.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+    escaped = char === "\\" && !escaped;
+    if (char !== "\\") escaped = false;
+  }
+
+  fields.push(current);
+  return fields;
+}
+
+function unescapeUserField(value) {
+  return value.replace(/\\:/g, ":").replace(/\\\\/g, "\\").replace(/\\#/g, "#");
+}
+
+function normalizeUserGroups(groups) {
+  const normalized = groups
+    .split(",")
+    .map((group) => group.trim().replace(/^@+/, ""))
+    .filter(Boolean);
+
+  return [...new Set(normalized.length > 0 ? normalized : [DEFAULT_AUTH_GROUP])];
+}
+
+function safeDecodeURIComponent(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function userId(username) {
+  return `user:${username}`;
+}
+
+function groupId(group) {
+  return `group:${group}`;
 }
 
 export async function discoverConfigSettings(sources) {
