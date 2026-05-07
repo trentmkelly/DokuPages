@@ -260,9 +260,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement page diff.
 - [x] Implement source view.
 - [ ] Implement export modes that remain in scope.
-- [ ] Implement page metadata updates.
+- [x] Implement page metadata updates.
 - [x] Implement changelog updates.
-- [ ] Implement purge behavior.
+- [x] Implement purge behavior.
 - [x] Implement cache invalidation after save.
 
 ## Media Behavior
@@ -338,7 +338,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement tokenizer compatibility.
 - [x] Implement stopword handling.
 - [x] Implement page indexing.
-- [ ] Implement metadata indexing.
+- [x] Implement metadata indexing.
 - [x] Implement title indexing.
 - [x] Implement page deletion from index.
 - [ ] Implement media indexing if supported.
@@ -363,7 +363,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement JavaScript cache or prebuilt JavaScript.
 - [ ] Implement feed cache.
 - [ ] Implement sitemap cache.
-- [ ] Implement page purge behavior.
+- [x] Implement page purge behavior.
 - [ ] Implement global purge behavior.
 - [ ] Implement user-sensitive cache bypass for private pages.
 - [ ] Implement cache warming for important pages.

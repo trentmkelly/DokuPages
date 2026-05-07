@@ -221,6 +221,15 @@ export async function handleRequest(
       return htmlResponse(await renderRevertPage(env, id, url));
     }
 
+    if (url.searchParams.get("do") === "purge") {
+      const page = await getCurrentPage(env.DB, id);
+      if (!page) {
+        return notFoundResponse(`Wiki page '${id}' was not found.`);
+      }
+      await purgePageCache(env, id, page.revisionId);
+      return redirectResponse(pagePath(id));
+    }
+
     const revisionId = url.searchParams.get("rev");
     if (revisionId) {
       const revision = await getPageRevision(env.DB, revisionId);
@@ -1023,6 +1032,7 @@ function renderPageTools(pageId: string): string {
         <li class="source"><a href="${pagePath(pageId)}?do=source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>
         <li class="revisions"><a href="${pagePath(pageId)}?do=revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>
         <li class="backlink"><a href="${pagePath(pageId)}?do=backlink"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="purge"><a href="${pagePath(pageId)}?do=purge"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>
         <li class="top"><a href="#dokuwiki__top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
       </ul>
     </div>

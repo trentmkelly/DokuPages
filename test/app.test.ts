@@ -9,6 +9,7 @@ interface D1StubState {
   searchPostings: Record<string, unknown>[];
   media: Record<string, unknown>[];
   mediaRevisions: Record<string, unknown>[];
+  metadata: Record<string, unknown>[];
   drafts: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
@@ -21,6 +22,7 @@ const state: D1StubState = {
   searchPostings: seedSearchPostings(),
   media: seedMedia(),
   mediaRevisions: seedMediaRevisions(),
+  metadata: [],
   drafts: [],
   deleted: false,
   batches: []
@@ -60,6 +62,7 @@ describe("handleRequest", () => {
     state.searchPostings = seedSearchPostings();
     state.media = seedMedia();
     state.mediaRevisions = seedMediaRevisions();
+    state.metadata = [];
     state.drafts = [];
     state.deleted = false;
     state.batches = [];
@@ -481,7 +484,34 @@ describe("handleRequest", () => {
     expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(state.row?.title).toBe("Updated");
     expect(state.batches).toHaveLength(1);
+    expect(state.metadata).toContainEqual(
+      expect.objectContaining({
+        subject_type: "page",
+        subject_id: "wiki:welcome",
+        key: "outgoingLinks",
+        value_json: "[]"
+      })
+    );
+    expect(state.metadata).toContainEqual(
+      expect.objectContaining({
+        subject_type: "page",
+        subject_id: "wiki:welcome",
+        key: "contentHash"
+      })
+    );
     expect(purgedKeys).toContain("page:wiki:welcome");
+  });
+
+  it("purges rendered page cache through the page action", async () => {
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=purge"),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(purgedKeys).toContain("page:wiki:welcome");
+    expect(purgedKeys).toContain("page:wiki:welcome:wiki:welcome@2026-05-07T00:00:00.000Z");
   });
 
   it("records minor edits for existing pages", async () => {
@@ -901,6 +931,29 @@ function createD1Stub(state: D1StubState): D1Database {
               term,
               page_id: pageId,
               frequency,
+              updated_at: updatedAt
+            });
+          }
+        }
+
+        if (statement.sql.includes("insert into metadata")) {
+          const [subjectId, key, valueJson, updatedAt] = statement.values;
+          const existing = state.metadata.find(
+            (record) =>
+              record.subject_type === "page" &&
+              record.subject_id === subjectId &&
+              record.key === key
+          );
+
+          if (existing) {
+            existing.value_json = valueJson;
+            existing.updated_at = updatedAt;
+          } else {
+            state.metadata.push({
+              subject_type: "page",
+              subject_id: subjectId,
+              key,
+              value_json: valueJson,
               updated_at: updatedAt
             });
           }

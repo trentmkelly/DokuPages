@@ -445,6 +445,7 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   const searchTerms = isDelete
     ? new Map<string, number>()
     : buildSearchTermFrequencies(input.content, title);
+  const outgoingLinks = isDelete ? [] : extractInternalPageLinks(input.content);
 
   await db.batch([
     db
@@ -497,7 +498,17 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
         sizeChange,
         now
       ),
-    ...buildSearchIndexStatements(db, input.id, searchTerms, indexedTerms, now)
+    ...buildSearchIndexStatements(db, input.id, searchTerms, indexedTerms, now),
+    ...buildPageMetadataStatements(db, input.id, now, {
+      title,
+      revisionId,
+      namespace,
+      contentHash,
+      outgoingLinks,
+      isDeleted: isDelete,
+      size: input.content.length,
+      wordCount: countWords(input.content)
+    })
   ]);
 
   return {
@@ -511,6 +522,40 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
       updatedAt: now
     }
   };
+}
+
+interface PageMetadataInput {
+  title: string;
+  revisionId: string;
+  namespace: string;
+  contentHash: string;
+  outgoingLinks: string[];
+  isDeleted: boolean;
+  size: number;
+  wordCount: number;
+}
+
+function buildPageMetadataStatements(
+  db: D1Database,
+  pageId: string,
+  updatedAt: string,
+  metadata: PageMetadataInput
+): D1PreparedStatement[] {
+  return Object.entries(metadata).map(([key, value]) =>
+    db
+      .prepare(
+        `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+         values ('page', ?, ?, ?, ?)
+         on conflict(subject_type, subject_id, key) do update set
+           value_json = excluded.value_json,
+           updated_at = excluded.updated_at`
+      )
+      .bind(pageId, key, JSON.stringify(value), updatedAt)
+  );
+}
+
+function countWords(content: string): number {
+  return content.match(/[A-Za-z0-9][A-Za-z0-9_-]*/g)?.length ?? 0;
 }
 
 export function pagePath(id: string): string {
