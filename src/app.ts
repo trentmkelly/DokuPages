@@ -46,7 +46,10 @@ import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./w
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
+const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 15;
+const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
+type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 
 interface RenderCacheEntry {
   rendererVersion: number;
@@ -129,15 +132,21 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap") {
-    return xmlResponse(await renderSitemap(env, url));
+    return cachedXmlResponse(env, "sitemap", url, "application/xml; charset=utf-8", () =>
+      renderSitemap(env, url)
+    );
   }
 
   if (url.pathname === "/feed.php" || url.pathname === "/feed" || url.pathname === "/feed.xml") {
-    return xmlResponse(await renderRssFeed(env, url), "application/rss+xml; charset=utf-8");
+    return cachedXmlResponse(env, "rss", url, "application/rss+xml; charset=utf-8", () =>
+      renderRssFeed(env, url)
+    );
   }
 
   if (url.pathname === "/atom.xml") {
-    return xmlResponse(await renderAtomFeed(env, url), "application/atom+xml; charset=utf-8");
+    return cachedXmlResponse(env, "atom", url, "application/atom+xml; charset=utf-8", () =>
+      renderAtomFeed(env, url)
+    );
   }
 
   if (url.pathname === "/lib/exe/opensearch.php" || url.pathname === "/opensearch.xml") {
@@ -236,7 +245,7 @@ export async function handleRequest(
       if (!page) {
         return notFoundResponse(`Wiki page '${id}' was not found.`);
       }
-      await purgePageCache(env, id, page.revisionId);
+      await purgePageCache(env, id, page.revisionId, url.origin);
       return redirectResponse(pagePath(id));
     }
 
@@ -1169,11 +1178,16 @@ function renderPageTools(pageId: string): string {
   </nav>`;
 }
 
-function xmlResponse(body: string, contentType = "application/xml; charset=utf-8"): Response {
+function xmlResponse(
+  body: string,
+  contentType = "application/xml; charset=utf-8",
+  extraHeaders: Record<string, string> = {}
+): Response {
   return new Response(body, {
     headers: securityHeaders({
       "content-type": contentType,
-      "x-content-type-options": "nosniff"
+      "x-content-type-options": "nosniff",
+      ...extraHeaders
     })
   });
 }
@@ -1216,7 +1230,7 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
     return htmlResponse(renderConflictPage(env, id, content, current), { status: 409 });
   }
 
-  await purgePageCache(env, id, result.page.revisionId);
+  await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
   await deletePageDraft(env.DB, id);
 
   return redirectResponse(pagePath(id));
@@ -1255,7 +1269,7 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
     return htmlResponse(renderConflictPage(env, id, revision.content, current), { status: 409 });
   }
 
-  await purgePageCache(env, id, result.page.revisionId);
+  await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
 
   return redirectResponse(pagePath(id));
 }
@@ -1434,11 +1448,64 @@ function renderDraftPage(id: string, draft: PageDraft, env: Env): string {
   );
 }
 
-async function purgePageCache(env: Env, id: string, revisionId: string): Promise<void> {
-  await Promise.all([
-    env.RENDER_CACHE.delete(`page:${id}`),
-    env.RENDER_CACHE.delete(`page:${id}:${revisionId}`)
-  ]);
+async function purgePageCache(
+  env: Env,
+  id: string,
+  revisionId: string,
+  origin?: string
+): Promise<void> {
+  const keys = [`page:${id}`, `page:${id}:${revisionId}`];
+
+  if (origin) {
+    keys.push(...DISCOVERY_CACHE_KINDS.map((kind) => discoveryCacheKey(kind, origin)));
+  }
+
+  await Promise.all(keys.map((key) => env.RENDER_CACHE.delete(key)));
+}
+
+async function cachedXmlResponse(
+  env: Env,
+  kind: DiscoveryCacheKind,
+  url: URL,
+  contentType: string,
+  render: () => Promise<string>
+): Promise<Response> {
+  const cacheKey = discoveryCacheKey(kind, url.origin);
+  const cached = await readTextCache(env, cacheKey);
+  const cacheHeaders = { "cache-control": `public, max-age=${DISCOVERY_CACHE_TTL_SECONDS}` };
+
+  if (cached) {
+    return xmlResponse(cached, contentType, cacheHeaders);
+  }
+
+  const body = await render();
+  await writeTextCache(env, cacheKey, body, DISCOVERY_CACHE_TTL_SECONDS);
+  return xmlResponse(body, contentType, cacheHeaders);
+}
+
+function discoveryCacheKey(kind: DiscoveryCacheKind, origin: string): string {
+  return `discovery:${kind}:${origin}`;
+}
+
+async function readTextCache(env: Env, cacheKey: string): Promise<string | null> {
+  try {
+    return await env.RENDER_CACHE.get(cacheKey);
+  } catch {
+    return null;
+  }
+}
+
+async function writeTextCache(
+  env: Env,
+  cacheKey: string,
+  value: string,
+  expirationTtl: number
+): Promise<void> {
+  try {
+    await env.RENDER_CACHE.put(cacheKey, value, { expirationTtl });
+  } catch {
+    // Discovery documents should remain available when KV is degraded.
+  }
 }
 
 async function readRenderCache(

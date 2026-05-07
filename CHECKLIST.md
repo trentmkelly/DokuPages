@@ -363,8 +363,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement metadata cache if needed.
 - [x] Implement CSS cache or prebuilt CSS.
 - [x] Implement JavaScript cache or prebuilt JavaScript.
-- [ ] Implement feed cache.
-- [ ] Implement sitemap cache.
+- [x] Implement feed cache.
+- [x] Implement sitemap cache.
 - [x] Implement page purge behavior.
 - [ ] Implement global purge behavior.
 - [ ] Implement user-sensitive cache bypass for private pages.
@@ -494,9 +494,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement RSS feed.
 - [x] Implement Atom feed if supported.
 - [ ] Implement feed ACL filtering.
-- [ ] Implement feed cache.
+- [x] Implement feed cache.
 - [x] Implement sitemap generation.
-- [ ] Implement sitemap cache.
+- [x] Implement sitemap cache.
 - [x] Implement `robots.txt` behavior.
 - [x] Implement OpenSearch document.
 - [x] Implement web app manifest.

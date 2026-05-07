@@ -529,6 +529,46 @@ describe("handleRequest", () => {
     await expect(robots.text()).resolves.toContain("Sitemap: https://example.com/sitemap.xml");
   });
 
+  it("caches sitemap and feed documents in KV", async () => {
+    const sitemap = await handleRequest(new Request("https://example.com/sitemap.xml"), env);
+    const rss = await handleRequest(new Request("https://example.com/feed.php"), env);
+    const atom = await handleRequest(new Request("https://example.com/atom.xml"), env);
+
+    const sitemapText = await sitemap.text();
+    const rssText = await rss.text();
+    const atomText = await atom.text();
+
+    expect(sitemap.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(rss.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(atom.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(cachePuts).toEqual(
+      expect.arrayContaining([
+        "discovery:sitemap:https://example.com",
+        "discovery:rss:https://example.com",
+        "discovery:atom:https://example.com"
+      ])
+    );
+
+    state.row = null;
+    state.changelog = [];
+
+    await expect(
+      handleRequest(new Request("https://example.com/sitemap.xml"), env).then((response) =>
+        response.text()
+      )
+    ).resolves.toBe(sitemapText);
+    await expect(
+      handleRequest(new Request("https://example.com/feed.php"), env).then((response) =>
+        response.text()
+      )
+    ).resolves.toBe(rssText);
+    await expect(
+      handleRequest(new Request("https://example.com/atom.xml"), env).then((response) =>
+        response.text()
+      )
+    ).resolves.toBe(atomText);
+  });
+
   it("previews submitted wiki text", async () => {
     const form = new FormData();
     form.set("id", "wiki:guide:start");
@@ -558,6 +598,9 @@ describe("handleRequest", () => {
     form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
     form.set("content", "====== Updated ======\n\nChanged.");
     form.set("summary", "Updated page");
+    renderCache.set("discovery:sitemap:https://example.com", "stale sitemap");
+    renderCache.set("discovery:rss:https://example.com", "stale rss");
+    renderCache.set("discovery:atom:https://example.com", "stale atom");
 
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
@@ -589,6 +632,9 @@ describe("handleRequest", () => {
       })
     );
     expect(purgedKeys).toContain("page:wiki:welcome");
+    expect(purgedKeys).toContain("discovery:sitemap:https://example.com");
+    expect(purgedKeys).toContain("discovery:rss:https://example.com");
+    expect(purgedKeys).toContain("discovery:atom:https://example.com");
   });
 
   it("blocks page edits that match the wordblock list", async () => {
