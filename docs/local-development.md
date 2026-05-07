@@ -23,6 +23,17 @@ npm run dev
 
 Wrangler reads `wrangler.toml` and serves static assets from `public/`.
 
+## Seed Local D1
+
+Apply migrations and seed a small local wiki:
+
+```sh
+npm run db:migrate:local
+npm run db:seed:local
+```
+
+The seed file is `seed/local.sql`. It is idempotent and creates a welcome page, syntax page, sidebar, playground page, search postings, changelog rows, and diagnostics-visible import metadata.
+
 ## Deploy
 
 Preview:

@@ -7,6 +7,8 @@
     "dev": "wrangler pages dev public",
     "deploy": "wrangler pages deploy public --project-name dokutest --branch main",
     "deploy:preview": "wrangler pages deploy public --project-name dokutest --branch preview",
+    "db:migrate:local": "wrangler d1 migrations apply dokuwiki_pages_dev --local",
+    "db:seed:local": "wrangler d1 execute dokuwiki_pages_dev --local --file seed/local.sql",
     "audit": "npm audit --audit-level=high",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

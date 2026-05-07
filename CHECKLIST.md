@@ -105,7 +105,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add R2 bucket binding configuration.
 - [x] Add KV namespace binding configuration if used.
 - [ ] Add Durable Object binding configuration if used.
-- [ ] Add local seed data for development.
+- [x] Add local seed data for development.
 - [x] Add local fixture data migrated from current `data/`.
 
 ## Data Model
