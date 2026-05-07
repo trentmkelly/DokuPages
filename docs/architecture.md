@@ -57,7 +57,7 @@ Wrangler is the deployment tool. Static assets are in `public/`, Functions are i
 
 ## Observability
 
-The app should emit structured logs with request IDs, storage errors, auth events, migration status, and performance timings. The initial scaffold includes no production logging beyond HTTP responses.
+The app emits structured request logs with request IDs and maps known D1, KV, R2, and Durable Object failures into stable JSON responses with a storage code, service name, retry hint, and request ID.
 
 ## Migration And Rollback
 

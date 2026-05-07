@@ -1,4 +1,5 @@
 import { jsonResponse } from "./responses";
+import { mapStorageError } from "../storage/errors";
 
 type RequestHandler = () => Promise<Response>;
 
@@ -16,6 +17,22 @@ export async function withRequestObservability(
     return response;
   } catch (error) {
     logError(request, requestId, Date.now() - startedAt, error);
+    const storageError = mapStorageError(error);
+    if (storageError) {
+      const response = jsonResponse(
+        {
+          error: storageError.message,
+          code: storageError.code,
+          service: storageError.service,
+          retryable: storageError.retryable,
+          requestId
+        },
+        { status: storageError.status }
+      );
+      response.headers.set("x-request-id", requestId);
+      return response;
+    }
+
     const response = jsonResponse(
       {
         error: "Internal server error.",
@@ -55,6 +72,7 @@ function logRequest(request: Request, requestId: string, status: number, duratio
 function logError(request: Request, requestId: string, durationMs: number, error: unknown): void {
   const url = new URL(request.url);
   const exception = error instanceof Error ? error : new Error(String(error));
+  const storageError = mapStorageError(exception);
 
   console.error(
     JSON.stringify({
@@ -68,7 +86,14 @@ function logError(request: Request, requestId: string, durationMs: number, error
         name: exception.name,
         message: exception.message,
         stack: exception.stack
-      }
+      },
+      storage: storageError
+        ? {
+            code: storageError.code,
+            service: storageError.service,
+            retryable: storageError.retryable
+          }
+        : undefined
     })
   );
 }
