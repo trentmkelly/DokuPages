@@ -6,6 +6,13 @@ State-changing POST routes require a DokuWiki-style `sectok` value or `x-csrf-to
 
 Preview rendering is exempt because it does not write storage.
 
+## Rendered Content
+
+The native wiki renderer escapes raw HTML in headings, paragraphs, link labels,
+media titles, tables, code, file blocks, and malformed syntax. External links are
+limited to HTTP(S), FTP autolinks, mail links, interwiki mappings, and internal
+wiki routes; JavaScript URLs are not emitted as external hrefs.
+
 ## Rate Limits
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.

@@ -540,7 +540,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement CSRF protection for all state-changing actions.
 - [x] Implement upload validation.
 - [x] Implement MIME validation.
-- [ ] Implement XSS protections for rendered wiki syntax.
+- [x] Implement XSS protections for rendered wiki syntax.
 - [x] Implement SVG safety policy.
 - [ ] Implement HTML embedding policy.
 - [x] Implement external link rel policy.
@@ -667,7 +667,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add mobile viewport tests.
 - [ ] Add performance tests.
 - [ ] Add load tests within Workers limits.
-- [ ] Add security tests for XSS.
+- [x] Add security tests for XSS.
 - [x] Add security tests for CSRF.
 - [x] Add security tests for ACL bypass.
 - [x] Add security tests for upload bypass.

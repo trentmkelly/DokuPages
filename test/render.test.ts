@@ -241,6 +241,20 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain("<script>");
   });
 
+  it("escapes XSS payloads in rendered wiki syntax", () => {
+    const rendered = renderWikiText(
+      '====== <script>alert(1)</script> ======\n\n[[https://example.test|<script>alert(2)</script>]] [[javascript:alert(3)|Jump]]\n\n{{wiki:logo.svg|"><svg onload=alert(4)>}}\n\n| <iframe src=x></iframe> |'
+    );
+
+    expect(rendered.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(rendered.html).toContain("&lt;script&gt;alert(2)&lt;/script&gt;");
+    expect(rendered.html).toContain("&lt;iframe src=x&gt;&lt;/iframe&gt;");
+    expect(rendered.html).not.toContain("<script");
+    expect(rendered.html).not.toContain("<iframe");
+    expect(rendered.html).not.toContain("<svg");
+    expect(rendered.html).not.toContain('href="javascript:');
+  });
+
   it("flushes unterminated code and file blocks safely at end of input", () => {
     const code = renderWikiText("<code>\n<unsafe>\n**literal**");
     const file = renderWikiText("<file txt example.txt>\n<unsafe>");
