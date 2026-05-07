@@ -167,6 +167,10 @@ describe("handleRequest", () => {
     expect(html).toContain('<link rel="stylesheet" href="/dokuwiki.css?v=0.1.0">');
     expect(html).toContain('<script src="/dokuwiki.js?v=0.1.0" defer></script>');
     expect(html).toContain('id="mobile__tools"');
+    expect(html).toContain('<a href="/login">Login</a>');
+    expect(html).toContain('<a href="/register">Register</a>');
+    expect(html).toContain('<option value="/login">Login</option>');
+    expect(html).toContain('<option value="/register">Register</option>');
     expect(html).toContain(
       '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
     );

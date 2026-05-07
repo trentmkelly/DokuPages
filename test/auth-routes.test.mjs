@@ -37,23 +37,33 @@ describe("auth routes", () => {
 
   it("returns explicit not-supported responses for deferred account flows", async () => {
     env = createEnv();
-    const urls = [
+    const browserUrls = [
       "https://example.com/register",
       "https://example.com/profile",
       "https://example.com/resendpwd",
       "https://example.com/password-reset",
-      "https://example.com/api/auth/register",
-      "https://example.com/api/auth/profile",
-      "https://example.com/api/auth/password-reset",
       "https://example.com/doku.php?do=register",
       "https://example.com/doku.php?do=profile",
       "https://example.com/doku.php?do=resendpwd",
       "https://example.com/wiki/wiki/welcome?do=register"
     ];
+    const apiUrls = [
+      "https://example.com/api/auth/register",
+      "https://example.com/api/auth/profile",
+      "https://example.com/api/auth/password-reset"
+    ];
 
-    for (const url of urls) {
+    for (const url of browserUrls) {
       const response = await handleRequest(new Request(url), env);
       expect(response.status, url).toBe(501);
+      expect(response.headers.get("content-type"), url).toContain("text/html");
+      await expect(response.text(), url).resolves.toContain("not supported");
+    }
+
+    for (const url of apiUrls) {
+      const response = await handleRequest(new Request(url), env);
+      expect(response.status, url).toBe(501);
+      expect(response.headers.get("content-type"), url).toContain("application/json");
       await expect(response.json(), url).resolves.toMatchObject({
         status: "not_supported"
       });

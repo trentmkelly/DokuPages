@@ -144,7 +144,7 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/doku.php") {
-    return redirectLegacyDokuPhp(url, env);
+    return redirectLegacyDokuPhp(request, url, env);
   }
 
   if (url.pathname === "/lib/exe/css.php") {
@@ -245,7 +245,7 @@ export async function handleRequest(
 
   const unsupportedAccountPath = unsupportedAccountFeatureForPath(url.pathname);
   if (unsupportedAccountPath) {
-    return authFeatureNotSupportedResponse(unsupportedAccountPath);
+    return authFeatureNotSupportedResponse(request, env, unsupportedAccountPath);
   }
 
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
@@ -455,7 +455,7 @@ export async function handleRequest(
 
     const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
     if (unsupportedAccountAction) {
-      return authFeatureNotSupportedResponse(unsupportedAccountAction);
+      return authFeatureNotSupportedResponse(request, env, unsupportedAccountAction);
     }
 
     if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
@@ -586,7 +586,7 @@ export async function handleRequest(
   return notFoundResponse("Not found.");
 }
 
-function redirectLegacyDokuPhp(url: URL, env: Env): Response {
+function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
   if (url.searchParams.get("do") === "admin" && !url.searchParams.get("page")) {
     return redirectResponse("/admin", 301);
   }
@@ -597,7 +597,7 @@ function redirectLegacyDokuPhp(url: URL, env: Env): Response {
 
   const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
   if (unsupportedAccountAction) {
-    return authFeatureNotSupportedResponse(unsupportedAccountAction);
+    return authFeatureNotSupportedResponse(request, env, unsupportedAccountAction);
   }
 
   const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
@@ -3335,15 +3335,44 @@ function unsupportedAccountFeatureForAction(action: string | null): string | nul
   }
 }
 
-function authFeatureNotSupportedResponse(feature: string): Response {
-  return jsonResponse(
-    {
-      error: `${feature} is not supported by this Pages port yet.`,
-      feature,
-      status: "not_supported"
-    },
+function authFeatureNotSupportedResponse(request: Request, env: Env, feature: string): Response {
+  const message = `${accountFeatureLabel(feature)} is not supported by this Pages port yet.`;
+  const pathname = new URL(request.url).pathname;
+
+  if (acceptsJson(request) || pathname.startsWith("/api/")) {
+    return jsonResponse(
+      {
+        error: message,
+        feature,
+        status: "not_supported"
+      },
+      { status: 501 }
+    );
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      accountFeatureLabel(feature),
+      `<h1>${escapeHtml(accountFeatureLabel(feature))}</h1>
+      <p>${escapeHtml(message)}</p>
+      <p><a href="/login">Login</a></p>`
+    ),
     { status: 501 }
   );
+}
+
+function accountFeatureLabel(feature: string): string {
+  switch (feature) {
+    case "registration":
+      return "Registration";
+    case "profile_update":
+      return "Profile";
+    case "password_reset":
+      return "Password reset";
+    default:
+      return "Account feature";
+  }
 }
 
 function renderLoginPage(
@@ -3495,6 +3524,8 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
               <li><a href="/recent">Recent changes</a></li>
               <li><a href="/index?ns=wiki">Index</a></li>
               <li><a href="/diagnostics">Diagnostics</a></li>
+              <li><a href="/login">Login</a></li>
+              <li><a href="/register">Register</a></li>
             </ul>
           </nav>
         </div>
@@ -3547,6 +3578,8 @@ function renderMobileTools(pageId?: string): string {
         <option value="/index?ns=wiki">Index</option>
         <option value="/search">Search</option>
         <option value="/diagnostics">Diagnostics</option>
+        <option value="/login">Login</option>
+        <option value="/register">Register</option>
       </select>
     </div>`;
 }
