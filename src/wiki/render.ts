@@ -8,10 +8,16 @@ export interface TocItem {
   title: string;
 }
 
+export interface CacheDependency {
+  subjectType: "page" | "media";
+  subjectId: string;
+}
+
 export interface RenderedWikiText {
   html: string;
   title: string | null;
   toc: TocItem[];
+  dependencies: CacheDependency[];
   noCache: boolean;
   noToc: boolean;
 }
@@ -138,6 +144,7 @@ export function renderWikiText(
   const toc: TocItem[] = [];
   const context: RenderContext = {
     footnotes: [],
+    dependencies: new Map(),
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
     sectionIndex: 0
   };
@@ -265,6 +272,7 @@ export function renderWikiText(
     html: blocks.join("\n"),
     title: title.value,
     toc: directives.noToc ? [] : toc,
+    dependencies: sortedDependencies(context.dependencies),
     noCache: directives.noCache,
     noToc: directives.noToc
   };
@@ -315,6 +323,7 @@ interface SpecialBlock {
 
 interface RenderContext {
   footnotes: string[];
+  dependencies: Map<string, CacheDependency>;
   pageId?: string;
   sectionIndex: number;
 }
@@ -577,6 +586,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
           note,
           {
             footnotes: [],
+            dependencies: context.dependencies,
             pageId: context.pageId,
             sectionIndex: context.sectionIndex
           }
@@ -615,7 +625,7 @@ function renderInline(source: string, context: RenderContext): string {
 
   rendered = escapeHtml(rendered);
   rendered = renderTypography(rendered);
-  rendered = renderMedia(rendered, protectHtml);
+  rendered = renderMedia(rendered, context, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
@@ -691,12 +701,14 @@ function renderAcronyms(source: string, protectHtml: (html: string) => string): 
 
 function renderMedia(
   source: string,
+  context: RenderContext,
   protectHtml: (html: string, options?: { linkLabelHtml?: string }) => string
 ): string {
   return source.replace(/\{\{([^}]+)\}\}/g, (_match, rawMedia: string) => {
     const parsed = parseMedia(rawMedia);
     const title = parsed.title?.trim() || null;
     const linkTitle = escapeAttribute(parsed.id);
+    addCacheDependency(context, "media", parsed.id);
 
     if (parsed.linking === "linkonly" || !isImageMedia(parsed.id)) {
       const label = title || mediaName(parsed.id);
@@ -800,17 +812,24 @@ function renderLinks(
     const external = /^https?:\/\//i.test(target);
     const interwiki = external ? null : resolveInterwikiLink(target);
     const windowsShare = external || interwiki ? null : windowsSharePath(target);
+    const internal = !external && !interwiki && !windowsShare;
+    const internalLink = internal ? resolveInternalLink(target, context.pageId) : null;
+
+    if (internalLink?.pageId) {
+      addCacheDependency(context, "page", internalLink.pageId);
+    }
+
     const href = external
       ? target
       : interwiki
         ? interwiki.href
         : windowsShare
           ? windowsShare
-          : internalLinkPath(target, context.pageId);
+          : (internalLink?.href ?? "#");
     const classNames = linkClassNames({
       external,
       interwikiShortcut: interwiki ? interwikiShortcut(target) : null,
-      internal: !external && !interwiki && !windowsShare,
+      internal,
       windowsShare: Boolean(windowsShare)
     });
     const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
@@ -900,15 +919,43 @@ function windowsSharePath(target: string): string | null {
   return target.startsWith("\\\\") ? `file:///${target.replaceAll("\\", "/")}` : null;
 }
 
-function internalLinkPath(target: string, currentPageId: string | undefined): string {
+function resolveInternalLink(
+  target: string,
+  currentPageId: string | undefined
+): { href: string; pageId: string | null } {
   const [rawPageId = "", rawFragment] = target.split("#", 2);
   const fragment = rawFragment ? `#${slugify(rawFragment)}` : "";
 
   if (!rawPageId) {
-    return fragment || "#";
+    return {
+      href: fragment || "#",
+      pageId: currentPageId ? cleanPageId(currentPageId) : null
+    };
   }
 
-  return `${pageIdToRoutePath(resolvePageLinkId(rawPageId, currentPageId))}${fragment}`;
+  const pageId = resolvePageLinkId(rawPageId, currentPageId);
+
+  return {
+    href: `${pageIdToRoutePath(pageId)}${fragment}`,
+    pageId
+  };
+}
+
+function addCacheDependency(
+  context: RenderContext,
+  subjectType: CacheDependency["subjectType"],
+  subjectId: string
+): void {
+  if (!subjectId) return;
+
+  const key = `${subjectType}:${subjectId}`;
+  context.dependencies.set(key, { subjectType, subjectId });
+}
+
+function sortedDependencies(dependencies: Map<string, CacheDependency>): CacheDependency[] {
+  return [...dependencies.values()].sort(
+    (a, b) => a.subjectType.localeCompare(b.subjectType) || a.subjectId.localeCompare(b.subjectId)
+  );
 }
 
 function uniqueAnchor(base: string, toc: TocItem[]): string {

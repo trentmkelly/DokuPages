@@ -35,7 +35,7 @@ The first D1 schema is `migrations/0001_initial.sql`. It models pages, page revi
 
 ## Cache Model
 
-Current rendered page HTML is cached in KV under `page:{id}` with revision IDs and renderer versions stored in the payload to reject stale entries. Old revision render output is cached under `page:{id}:{revisionId}`. This rendered output cache is the Pages-native replacement for DokuWiki's parser instruction cache. Pages that are not readable by anonymous users bypass shared rendered-cache reads and writes. The page save path purges the current page key and the new immutable revision key. Admin users can run a global purge that removes `page:` and `discovery:` KV entries and clears D1 rendered-cache rows; later dependency tracking can broaden invalidation for backlinks and feeds.
+Current rendered page HTML is cached in KV under `page:{id}` with revision IDs and renderer versions stored in the payload to reject stale entries. Old revision render output is cached under `page:{id}:{revisionId}`. This rendered output cache is the Pages-native replacement for DokuWiki's parser instruction cache. Pages that are not readable by anonymous users bypass shared rendered-cache reads and writes. Rendered payloads carry page/media dependencies extracted from internal links and media syntax. D1 `cache_dependencies` rows mirror those dependencies by cache key so page saves and media uploads/deletes/reverts can purge dependent rendered pages without scanning KV. The page save path also purges the current page key and the new immutable revision key. Admin users can run a global purge that removes `page:` and `discovery:` KV entries and clears D1 rendered-cache/dependency rows.
 
 ## Auth And Sessions
 

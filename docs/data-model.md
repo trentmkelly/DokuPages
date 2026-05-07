@@ -42,7 +42,7 @@ D1 postings are the launch search backend. DokuWiki's legacy `data/index` files 
 
 ## Rendered Cache
 
-`rendered_cache` stores render metadata and HTML for deterministic cache rebuilds. Hot cache entries may be mirrored into KV.
+`rendered_cache` stores render metadata and HTML for deterministic cache rebuilds. Hot cache entries may be mirrored into KV. `cache_dependencies` maps rendered cache keys to page and media subjects referenced by the rendered output so saves, uploads, deletes, and reverts can purge dependent page HTML.
 
 ## Config, Plugins, Audit, And Imports
 

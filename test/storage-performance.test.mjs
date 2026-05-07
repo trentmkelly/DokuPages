@@ -121,6 +121,15 @@ describe("storage performance guardrails", () => {
     );
     expectPlanUsesIndex(
       db,
+      "rendered cache dependency purge",
+      `select cache_key
+       from cache_dependencies
+       where dependency_type = ? and dependency_id = ?`,
+      ["media", "wiki:bulk.png"],
+      "idx_cache_dependencies_subject"
+    );
+    expectPlanUsesIndex(
+      db,
       "audit log pagination",
       `select id, actor_id, action, target_type, target_id, details_json, created_at
        from audit_log

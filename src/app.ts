@@ -100,7 +100,12 @@ import {
   type PageDraft,
   type PageRevision
 } from "./wiki/page-service";
-import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
+import {
+  getWikiRenderDirectives,
+  renderWikiText,
+  type CacheDependency,
+  type TocItem
+} from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
 import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interfaces";
@@ -131,6 +136,7 @@ interface RenderCacheEntry {
   title: string;
   html: string;
   toc: TocItem[];
+  dependencies?: CacheDependency[];
 }
 
 export async function handleRequest(
@@ -1114,6 +1120,8 @@ async function handleNativeApiMediaUpload(
     return jsonResponse({ error: `Media '${id}' already exists.` }, { status: 409 });
   }
 
+  await purgeDependentRenderCache(env, "media", id);
+
   logMetric("media_metric", {
     operation: "upload",
     namespace: mediaNamespace(id) || null,
@@ -1164,6 +1172,8 @@ async function handleNativeApiMediaDelete(
     return jsonResponse({ error: `Media '${id}' was not found.` }, { status: 404 });
   }
 
+  await purgeDependentRenderCache(env, "media", id);
+
   return jsonResponse({ ok: true, id, revision: nativeMediaRevisionPayload(result.revision) });
 }
 
@@ -1206,6 +1216,8 @@ async function handleNativeApiMediaRevert(
       { status: result.reason === "delete_revision" ? 400 : 404 }
     );
   }
+
+  await purgeDependentRenderCache(env, "media", id);
 
   return jsonResponse({
     ok: true,
@@ -2042,7 +2054,8 @@ async function renderPageHtml(
       revisionId,
       title,
       html: rendered.html,
-      toc: rendered.toc
+      toc: rendered.toc,
+      dependencies: rendered.dependencies
     });
     logMetric("cache_metric", {
       cache: "rendered_page",
@@ -4686,6 +4699,8 @@ async function handleMediaUpload(
     );
   }
 
+  await purgeDependentRenderCache(env, "media", id);
+
   logMetric("media_metric", {
     operation: "upload",
     namespace: mediaNamespace(id) || null,
@@ -4738,6 +4753,8 @@ async function handleMediaDelete(
       status: 404
     });
   }
+
+  await purgeDependentRenderCache(env, "media", id);
 
   logMetric("media_metric", {
     operation: "delete",
@@ -4798,6 +4815,8 @@ async function handleMediaRevert(
       status
     });
   }
+
+  await purgeDependentRenderCache(env, "media", id);
 
   logMetric("media_metric", {
     operation: "revert",
@@ -5590,16 +5609,45 @@ async function purgePageCache(
   origin?: string
 ): Promise<void> {
   const startedAt = Date.now();
-  const keys = [`page:${id}`, `page:${id}:${revisionId}`];
+  const keys = new Set([`page:${id}`, `page:${id}:${revisionId}`]);
 
-  if (origin) {
-    keys.push(...DISCOVERY_CACHE_KINDS.map((kind) => discoveryCacheKey(kind, origin)));
+  for (const key of await dependentRenderCacheKeys(env, "page", id)) {
+    keys.add(key);
   }
 
-  await Promise.all(keys.map((key) => env.RENDER_CACHE.delete(key)));
+  if (origin) {
+    for (const kind of DISCOVERY_CACHE_KINDS) {
+      keys.add(discoveryCacheKey(kind, origin));
+    }
+  }
+
+  const cacheKeys = [...keys];
+  await Promise.all(cacheKeys.map((key) => env.RENDER_CACHE.delete(key)));
+  await deleteRenderCacheDependencyRows(env, cacheKeys);
   logMetric("cache_metric", {
     cache: "rendered_page",
     action: "purge",
+    keyCount: cacheKeys.length,
+    durationMs: elapsedSince(startedAt)
+  });
+}
+
+async function purgeDependentRenderCache(
+  env: Env,
+  dependencyType: CacheDependency["subjectType"],
+  dependencyId: string
+): Promise<void> {
+  const startedAt = Date.now();
+  const keys = await dependentRenderCacheKeys(env, dependencyType, dependencyId);
+  if (keys.length === 0) return;
+
+  await Promise.all(keys.map((key) => env.RENDER_CACHE.delete(key)));
+  await deleteRenderCacheDependencyRows(env, keys);
+  logMetric("cache_metric", {
+    cache: "rendered_page",
+    action: "dependency_purge",
+    dependencyType,
+    dependencyId,
     keyCount: keys.length,
     durationMs: elapsedSince(startedAt)
   });
@@ -5615,6 +5663,9 @@ async function purgeGlobalCache(env: Env): Promise<GlobalCachePurgeResult> {
   const kvKeysPurged = await purgeKvCachePrefixes(env, ["page:", "discovery:"]);
 
   await env.DB.prepare("delete from rendered_cache").run();
+  await env.DB.prepare("delete from cache_dependencies")
+    .run()
+    .catch(() => undefined);
 
   logMetric("cache_metric", {
     cache: "global",
@@ -5747,9 +5798,83 @@ async function writeRenderCache(
     await env.RENDER_CACHE.put(cacheKey, JSON.stringify(entry), {
       expirationTtl: RENDER_CACHE_TTL_SECONDS
     });
+    await replaceRenderCacheDependencies(env, cacheKey, entry.dependencies ?? []);
   } catch {
     // Rendering should remain available when KV is degraded.
   }
+}
+
+async function replaceRenderCacheDependencies(
+  env: Env,
+  cacheKey: string,
+  dependencies: CacheDependency[]
+): Promise<void> {
+  const uniqueDependencies = uniqueCacheDependencies(dependencies).slice(0, 100);
+  const statements = [
+    env.DB.prepare("delete from cache_dependencies where cache_key = ?").bind(cacheKey),
+    ...uniqueDependencies.map((dependency) =>
+      env.DB.prepare(
+        `insert into cache_dependencies (
+             cache_key, dependency_type, dependency_id
+           ) values (?, ?, ?)
+           on conflict(cache_key, dependency_type, dependency_id) do nothing`
+      ).bind(cacheKey, dependency.subjectType, dependency.subjectId)
+    )
+  ];
+
+  try {
+    await env.DB.batch(statements);
+  } catch {
+    // Dependency tracking is an invalidation aid; cache writes should still succeed.
+  }
+}
+
+async function dependentRenderCacheKeys(
+  env: Env,
+  dependencyType: CacheDependency["subjectType"],
+  dependencyId: string
+): Promise<string[]> {
+  try {
+    const result = await env.DB.prepare(
+      `select cache_key
+       from cache_dependencies
+       where dependency_type = ? and dependency_id = ?`
+    )
+      .bind(dependencyType, dependencyId)
+      .all<{ cache_key: string }>();
+
+    return result.results.map((row) => row.cache_key);
+  } catch {
+    return [];
+  }
+}
+
+async function deleteRenderCacheDependencyRows(env: Env, cacheKeys: string[]): Promise<void> {
+  const uniqueKeys = [...new Set(cacheKeys)].filter((key) => key.startsWith("page:"));
+  if (uniqueKeys.length === 0) return;
+
+  try {
+    await env.DB.batch(
+      uniqueKeys.map((key) =>
+        env.DB.prepare("delete from cache_dependencies where cache_key = ?").bind(key)
+      )
+    );
+  } catch {
+    // KV purge already happened; stale dependency rows will be replaced on next write.
+  }
+}
+
+function uniqueCacheDependencies(dependencies: CacheDependency[]): CacheDependency[] {
+  const unique = new Map<string, CacheDependency>();
+
+  for (const dependency of dependencies) {
+    if (!dependency.subjectId) continue;
+    unique.set(`${dependency.subjectType}:${dependency.subjectId}`, dependency);
+  }
+
+  return [...unique.values()].sort(
+    (a, b) => a.subjectType.localeCompare(b.subjectType) || a.subjectId.localeCompare(b.subjectId)
+  );
 }
 
 function escapeHtml(value: string): string {

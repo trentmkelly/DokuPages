@@ -103,7 +103,8 @@ describe("renderWikiText", () => {
 
   it("renders internal links, external links, and media embeds", () => {
     const rendered = renderWikiText(
-      "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}"
+      "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}",
+      { pageId: "wiki:welcome" }
     );
 
     expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">Syntax</a>');
@@ -117,6 +118,10 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain(
       '<a href="/media-detail/wiki/dokuwiki.svg" class="media" title="wiki:dokuwiki.svg"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
     );
+    expect(rendered.dependencies).toEqual([
+      { subjectType: "media", subjectId: "wiki:dokuwiki.svg" },
+      { subjectType: "page", subjectId: "wiki:syntax" }
+    ]);
   });
 
   it("renders DokuWiki media alignment, sizing, and link options", () => {
@@ -159,6 +164,13 @@ describe("renderWikiText", () => {
       '<a href="/wiki/wiki/syntax#head-line" class="wikilink1">Syntax</a>'
     );
     expect(rendered.html).toContain('<a href="#local-section" class="wikilink1">Local</a>');
+    expect(rendered.dependencies).toEqual([
+      { subjectType: "page", subjectId: "start" },
+      { subjectType: "page", subjectId: "wiki:guide:child" },
+      { subjectType: "page", subjectId: "wiki:guide:page" },
+      { subjectType: "page", subjectId: "wiki:root" },
+      { subjectType: "page", subjectId: "wiki:syntax" }
+    ]);
   });
 
   it("renders interwiki links from the default DokuWiki map", () => {

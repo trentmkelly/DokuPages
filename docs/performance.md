@@ -74,6 +74,12 @@ posting searches to 100 results.
 
 The port uses revision-aware rendered HTML cache entries instead of DokuWiki's
 PHP parser instruction cache. Cache entries store the renderer version, revision
-ID, page title, rendered HTML, and table of contents. Current page entries are
-invalidated on save, private ACL pages bypass the shared cache, and old revision
-entries are immutable until renderer-version invalidation.
+ID, page title, rendered HTML, table of contents, and extracted page/media
+dependencies. Current page entries are invalidated on save, private ACL pages
+bypass the shared cache, and old revision entries are immutable until
+renderer-version invalidation.
+
+Cache dependency tracking is mirrored in D1 `cache_dependencies` rows with an
+index on `(dependency_type, dependency_id, cache_key)`. Page saves and media
+uploads/deletes/reverts use that index to purge rendered pages that reference
+the changed subject.

@@ -12,6 +12,7 @@ interface D1StubState {
   media: Record<string, unknown>[];
   mediaRevisions: Record<string, unknown>[];
   metadata: Record<string, unknown>[];
+  cacheDependencies: Record<string, unknown>[];
   drafts: Record<string, unknown>[];
   aclRules: Record<string, unknown>[];
   deleted: boolean;
@@ -26,6 +27,7 @@ const state: D1StubState = {
   media: seedMedia(),
   mediaRevisions: seedMediaRevisions(),
   metadata: [],
+  cacheDependencies: [],
   drafts: [],
   aclRules: seedAclRules(),
   deleted: false,
@@ -71,6 +73,7 @@ describe("handleRequest", () => {
     state.media = seedMedia();
     state.mediaRevisions = seedMediaRevisions();
     state.metadata = [];
+    state.cacheDependencies = [];
     state.drafts = [];
     state.aclRules = seedAclRules();
     state.deleted = false;
@@ -737,6 +740,14 @@ describe("handleRequest", () => {
   });
 
   it("deletes current media while preserving immutable media revisions", async () => {
+    renderCache.set("page:wiki:welcome", "cached page");
+    state.cacheDependencies = [
+      {
+        cache_key: "page:wiki:welcome",
+        dependency_type: "media",
+        dependency_id: "wiki:logo.svg"
+      }
+    ];
     const form = new FormData();
     form.set("id", "wiki:logo.svg");
     form.set("summary", "Remove logo");
@@ -790,6 +801,8 @@ describe("handleRequest", () => {
     expect(current.status).toBe(404);
     expect(oldRevision.status).toBe(200);
     await expect(oldRevision.text()).resolves.toBe("<svg>old</svg>");
+    expect(purgedKeys).toContain("page:wiki:welcome");
+    expect(state.cacheDependencies).toEqual([]);
   });
 
   it("prevents media upload and delete ACL bypasses", async () => {
@@ -949,6 +962,34 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("Imported page.");
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("stores rendered page cache dependencies for invalidation", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content: "====== Welcome ======\n\n[[wiki:syntax|Syntax]] {{wiki:logo.svg|Logo}}"
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const cached = JSON.parse(renderCache.get("page:wiki:welcome") ?? "{}");
+    expect(cached.dependencies).toEqual([
+      { subjectType: "media", subjectId: "wiki:logo.svg" },
+      { subjectType: "page", subjectId: "wiki:syntax" }
+    ]);
+    expect(state.cacheDependencies).toEqual([
+      {
+        cache_key: "page:wiki:welcome",
+        dependency_type: "media",
+        dependency_id: "wiki:logo.svg"
+      },
+      {
+        cache_key: "page:wiki:welcome",
+        dependency_type: "page",
+        dependency_id: "wiki:syntax"
+      }
+    ]);
   });
 
   it("emits cache, search, and media metric events", async () => {
@@ -1547,7 +1588,17 @@ describe("handleRequest", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(state.row?.title).toBe("Updated");
-    expect(state.batches).toHaveLength(1);
+    expect(state.batches).toHaveLength(2);
+    expect(
+      state.batches[0].some((statement) =>
+        String((statement as { sql?: unknown }).sql).includes("insert into pages")
+      )
+    ).toBe(true);
+    expect(
+      state.batches[1].every((statement) =>
+        String((statement as { sql?: unknown }).sql).includes("delete from cache_dependencies")
+      )
+    ).toBe(true);
     expect(state.changelog[0]).toMatchObject({
       user_name: null,
       ip: "203.0.113.10"
@@ -2002,6 +2053,19 @@ function createD1Stub(state: D1StubState): D1Database {
             };
           }
 
+          if (sql.includes("from cache_dependencies")) {
+            const [dependencyType, dependencyId] = values;
+            return {
+              results: state.cacheDependencies
+                .filter(
+                  (dependency) =>
+                    dependency.dependency_type === dependencyType &&
+                    dependency.dependency_id === dependencyId
+                )
+                .map((dependency) => ({ cache_key: dependency.cache_key }))
+            };
+          }
+
           if (sql.includes("from search_postings sp")) {
             const hasNamespaceFilter = sql.includes("p.namespace = ?");
             const terms = values.slice(0, hasNamespaceFilter ? -2 : -1);
@@ -2134,6 +2198,13 @@ function createD1Stub(state: D1StubState): D1Database {
           if (sql.includes("delete from drafts")) {
             const [id] = values;
             state.drafts = state.drafts.filter((draft) => draft.id !== id);
+          }
+
+          if (sql.includes("delete from cache_dependencies")) {
+            const [cacheKey] = values;
+            state.cacheDependencies = cacheKey
+              ? state.cacheDependencies.filter((dependency) => dependency.cache_key !== cacheKey)
+              : [];
           }
 
           return { success: true };
@@ -2362,6 +2433,31 @@ function createD1Stub(state: D1StubState): D1Database {
               key,
               value_json: valueJson,
               updated_at: updatedAt
+            });
+          }
+        }
+
+        if (statement.sql.includes("delete from cache_dependencies where cache_key = ?")) {
+          const [cacheKey] = statement.values;
+          state.cacheDependencies = state.cacheDependencies.filter(
+            (dependency) => dependency.cache_key !== cacheKey
+          );
+        }
+
+        if (statement.sql.includes("insert into cache_dependencies")) {
+          const [cacheKey, dependencyType, dependencyId] = statement.values;
+          const existing = state.cacheDependencies.find(
+            (dependency) =>
+              dependency.cache_key === cacheKey &&
+              dependency.dependency_type === dependencyType &&
+              dependency.dependency_id === dependencyId
+          );
+
+          if (!existing) {
+            state.cacheDependencies.push({
+              cache_key: cacheKey,
+              dependency_type: dependencyType,
+              dependency_id: dependencyId
             });
           }
         }

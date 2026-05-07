@@ -357,7 +357,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Cache And Rendering Performance
 
 - [x] Define rendered page cache key structure.
-- [ ] Define cache dependency tracking.
+- [x] Define cache dependency tracking.
 - [x] Implement rendered HTML cache.
 - [x] Implement parser instruction cache if needed.
 - [ ] Implement metadata cache if needed.
