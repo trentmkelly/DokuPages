@@ -433,7 +433,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Map entity configuration.
 - [x] Map smiley configuration.
 - [x] Map wordblock configuration.
-- [ ] Map license configuration.
+- [x] Map license configuration.
 - [x] Map manifest configuration.
 - [ ] Map language configuration.
 - [ ] Implement environment-specific config.
