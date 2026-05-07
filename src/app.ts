@@ -147,6 +147,10 @@ export async function handleRequest(
     );
   }
 
+  if (url.pathname === "/lib/exe/ajax.php") {
+    return handleAjax(request, env, url, principal);
+  }
+
   if (url.pathname === "/wiki" || url.pathname === "/wiki/") {
     return redirectResponse(pagePath(startPageId(env)), 301);
   }
@@ -569,6 +573,141 @@ function redirectLegacyMediaDetail(url: URL): Response {
   }
 
   return redirectResponse(mediaDetailPath(id), 301);
+}
+
+async function handleAjax(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const params = await readAjaxParams(request, url);
+  const call = params.get("call")?.toLowerCase() ?? "";
+
+  if (call === "qsearch") {
+    const query = params.get("q")?.trim() ?? "";
+    if (!query) return ajaxHtmlResponse("");
+
+    const results = await filterReadablePageItems(
+      env,
+      principal,
+      await searchPages(env.DB, query, "", 50)
+    );
+    const items = results
+      .map(
+        (page) =>
+          `<li><a href="${pagePath(page.id)}" class="wikilink1">${escapeHtml(pageLabel(page))}</a></li>`
+      )
+      .join("");
+
+    return ajaxHtmlResponse(items ? `<strong>Quick hits</strong><ul>${items}</ul>` : "");
+  }
+
+  if (call === "suggestions") {
+    const query = cleanPageId(params.get("q") ?? "");
+    if (!query) {
+      return new Response(JSON.stringify([query, [], [], []]), {
+        headers: securityHeaders({ "content-type": "application/x-suggestions+json" })
+      });
+    }
+
+    const results = await filterReadablePageItems(
+      env,
+      principal,
+      await searchPages(env.DB, query, "", 15)
+    );
+    const names = [...new Set(results.map((page) => pageName(page.id)))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+
+    return new Response(JSON.stringify([query, names, [], []]), {
+      headers: securityHeaders({ "content-type": "application/x-suggestions+json" })
+    });
+  }
+
+  if (call === "linkwiz") {
+    const query = cleanPageId(params.get("q") ?? "");
+    const namespace = query.includes(":") ? query.slice(0, query.lastIndexOf(":")) : "";
+
+    if (query) {
+      const results = await filterReadablePageItems(
+        env,
+        principal,
+        await searchPages(env.DB, query, namespace, 50)
+      );
+      return ajaxHtmlResponse(renderAjaxPageList(results));
+    }
+
+    const pages = await filterReadablePageItems(
+      env,
+      principal,
+      await listNamespacePages(env.DB, namespace, 50)
+    );
+    return ajaxHtmlResponse(renderAjaxPageList(pages));
+  }
+
+  if (call === "index") {
+    const namespace = cleanPageId(params.get("idx") ?? params.get("ns") ?? "");
+    const pages = await filterReadablePageItems(
+      env,
+      principal,
+      await listNamespacePages(env.DB, namespace, 200)
+    );
+    return ajaxHtmlResponse(
+      `<ul class="idx">${pages.map((page) => `<li>${ajaxPageLink(page)}</li>`).join("")}</ul>`
+    );
+  }
+
+  return new Response(`AJAX call '${escapeHtml(call)}' unknown.\n`, {
+    status: 400,
+    headers: securityHeaders({ "content-type": "text/plain; charset=utf-8" })
+  });
+}
+
+async function readAjaxParams(request: Request, url: URL): Promise<URLSearchParams> {
+  const params = new URLSearchParams(url.search);
+
+  if (request.method === "POST") {
+    const form = await request.formData();
+    for (const [key, value] of form.entries()) {
+      if (typeof value === "string") params.set(key, value);
+    }
+  }
+
+  return params;
+}
+
+function renderAjaxPageList<T extends { id: string; title?: string | null }>(pages: T[]): string {
+  if (pages.length === 0) return "Nothing found.";
+
+  return pages
+    .map(
+      (page, index) =>
+        `<div class="${index % 2 === 0 ? "even" : "odd"} type_f">${ajaxPageLink(page)}${
+          page.title ? `<span>${escapeHtml(page.title)}</span>` : ""
+        }</div>`
+    )
+    .join("");
+}
+
+function ajaxPageLink(page: { id: string; title?: string | null }): string {
+  return `<a href="${pagePath(page.id)}" title="${escapeAttribute(page.id)}" class="wikilink1">${escapeHtml(
+    pageLabel(page)
+  )}</a>`;
+}
+
+function pageLabel(page: { id: string; title?: string | null }): string {
+  return page.title || pageName(page.id);
+}
+
+function pageName(id: string): string {
+  return id.includes(":") ? id.slice(id.lastIndexOf(":") + 1) : id;
+}
+
+function ajaxHtmlResponse(body: string): Response {
+  return new Response(body, {
+    headers: securityHeaders({ "content-type": "text/html; charset=utf-8" })
+  });
 }
 
 async function handleMediaFetch(

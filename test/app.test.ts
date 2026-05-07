@@ -231,6 +231,37 @@ describe("handleRequest", () => {
     expect(htmlAlias.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_xhtmlbody");
   });
 
+  it("serves DokuWiki-compatible AJAX search and index endpoints", async () => {
+    const quick = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=qsearch&q=welcome"),
+      env
+    );
+    const suggestions = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=suggestions&q=welcome"),
+      env
+    );
+    const linkwiz = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=linkwiz&q=welcome"),
+      env
+    );
+    const index = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=index&idx=wiki"),
+      env
+    );
+    const unknown = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=missing"),
+      env
+    );
+
+    expect(quick.status).toBe(200);
+    await expect(quick.text()).resolves.toContain("Quick hits");
+    expect(suggestions.headers.get("content-type")).toBe("application/x-suggestions+json");
+    await expect(suggestions.json()).resolves.toEqual(["welcome", ["welcome"], [], []]);
+    await expect(linkwiz.text()).resolves.toContain('class="wikilink1"');
+    await expect(index.text()).resolves.toContain('<ul class="idx">');
+    expect(unknown.status).toBe(400);
+  });
+
   it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
     const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
     const download = await handleRequest(

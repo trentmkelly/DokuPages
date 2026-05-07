@@ -186,7 +186,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for sitemap.
 - [x] Implement route handling for manifest and opensearch.
 - [x] Implement route handling for CSS and JavaScript assets.
-- [ ] Implement route handling for AJAX endpoints.
+- [x] Implement route handling for AJAX endpoints.
 - [x] Implement route handling for login and logout.
 - [ ] Implement route handling for registration if supported.
 - [ ] Implement route handling for profile updates if supported.
