@@ -3104,7 +3104,7 @@ async function handleGlobalCachePurge(
   env: Env,
   principal: AuthPrincipal
 ): Promise<Response> {
-  const form = await request.formData();
+  const form = await readFormDataOrEmpty(request);
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
@@ -3125,6 +3125,14 @@ async function handleGlobalCachePurge(
   }
 
   return redirectResponse("/admin");
+}
+
+async function readFormDataOrEmpty(request: Request): Promise<FormData> {
+  try {
+    return await request.formData();
+  } catch {
+    return new FormData();
+  }
 }
 
 async function handleSearchIndexRebuild(

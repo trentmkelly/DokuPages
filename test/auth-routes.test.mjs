@@ -534,6 +534,12 @@ describe("auth routes", () => {
     await env.RENDER_CACHE.put("auth:login:203.0.113.10:alice", "4");
     const cookie = await loginAsAlice(env);
 
+    const missingCsrf = await handleRequest(
+      new Request("https://example.com/api/admin/cache/purge", {
+        method: "POST"
+      }),
+      env
+    );
     const dashboard = await handleRequest(
       new Request("https://example.com/admin", {
         headers: { cookie }
@@ -550,6 +556,7 @@ describe("auth routes", () => {
       env
     );
 
+    expect(missingCsrf.status).toBe(403);
     await expect(dashboard.text()).resolves.toContain("Purge render cache");
     expect(purged.status).toBe(303);
     expect(purged.headers.get("location")).toBe("/admin");
