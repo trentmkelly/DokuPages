@@ -20,6 +20,10 @@ export async function buildImportPlan(sourceRoot) {
   const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
+  const interwikiTemplates = await discoverInterwikiTemplates([
+    path.join(confRoot, "interwiki.conf"),
+    path.join(confRoot, "interwiki.local.conf")
+  ]);
   const mimeTypes = await discoverMimeTypes([
     path.join(confRoot, "mime.conf"),
     path.join(confRoot, "mime.local.conf")
@@ -36,6 +40,7 @@ export async function buildImportPlan(sourceRoot) {
       mediaRevisions: mediaRevisions.length,
       aclRules: aclRules.length,
       users: users.length,
+      interwikiTemplates: interwikiTemplates.length,
       mimeTypes: mimeTypes.length,
       wordblockPatterns: wordblockPatterns.length
     },
@@ -45,6 +50,7 @@ export async function buildImportPlan(sourceRoot) {
     mediaRevisions,
     aclRules,
     users,
+    interwikiTemplates,
     mimeTypes,
     wordblockPatterns
   };
@@ -262,6 +268,30 @@ export async function discoverUsers(file) {
     });
 }
 
+export async function discoverInterwikiTemplates(files) {
+  const templates = new Map();
+
+  for (const file of files) {
+    const text = await readTextIfExists(file);
+    if (!text) continue;
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const [shortcut, rawTemplate] = line.split(/\s+/);
+      if (!shortcut || !rawTemplate) continue;
+
+      templates.set(shortcut.toLowerCase(), {
+        shortcut: shortcut.toLowerCase(),
+        template: decodeConfigEntities(rawTemplate)
+      });
+    }
+  }
+
+  return [...templates.values()].sort((a, b) => a.shortcut.localeCompare(b.shortcut));
+}
+
 export async function discoverMimeTypes(files) {
   const entries = new Map();
 
@@ -288,6 +318,10 @@ export async function discoverMimeTypes(files) {
   }
 
   return [...entries.values()].sort((a, b) => a.extension.localeCompare(b.extension));
+}
+
+function decodeConfigEntities(value) {
+  return value.replaceAll("&amp;", "&");
 }
 
 export async function discoverWordblockPatterns(file) {

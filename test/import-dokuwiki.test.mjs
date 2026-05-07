@@ -19,6 +19,14 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
+    await writeFile(
+      path.join(root, "conf/interwiki.conf"),
+      "wp https://en.wikipedia.org/wiki/{NAME}\ngo https://www.google.com/search?q={URL}&amp;btnI=lucky\n"
+    );
+    await writeFile(
+      path.join(root, "conf/interwiki.local.conf"),
+      "wp https://wiki.example/{URL}\n"
+    );
     await writeFile(path.join(root, "conf/mime.conf"), "jpg image/jpeg\nzip !application/zip\n");
     await writeFile(path.join(root, "conf/mime.local.conf"), "zip application/x-custom-zip\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
@@ -30,6 +38,7 @@ describe("DokuWiki import planner", () => {
       media: 1,
       aclRules: 2,
       users: 1,
+      interwikiTemplates: 2,
       mimeTypes: 2,
       wordblockPatterns: 2
     });
@@ -37,6 +46,14 @@ describe("DokuWiki import planner", () => {
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
+    expect(plan.interwikiTemplates).toContainEqual({
+      shortcut: "go",
+      template: "https://www.google.com/search?q={URL}&btnI=lucky"
+    });
+    expect(plan.interwikiTemplates).toContainEqual({
+      shortcut: "wp",
+      template: "https://wiki.example/{URL}"
+    });
     expect(plan.mimeTypes).toContainEqual({
       extension: "jpg",
       mimeType: "image/jpeg",

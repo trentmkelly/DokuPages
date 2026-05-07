@@ -572,7 +572,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Write importer for `conf/acl.auth.php`.
 - [x] Write importer for `conf/users.auth.php`.
 - [ ] Write importer for plugin settings.
-- [ ] Write importer for interwiki configuration.
+- [x] Write importer for interwiki configuration.
 - [x] Write importer for MIME configuration.
 - [x] Write importer for wordblock configuration.
 - [ ] Write importer for custom language files if present.
