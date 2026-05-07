@@ -23,3 +23,16 @@ export function htmlResponse(body: string, init: ResponseInit = {}): Response {
 export function notFoundResponse(message: string): Response {
   return jsonResponse({ error: message }, { status: 404 });
 }
+
+export function conflictResponse(message: string): Response {
+  return jsonResponse({ error: message }, { status: 409 });
+}
+
+export function redirectResponse(location: string): Response {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      location
+    }
+  });
+}

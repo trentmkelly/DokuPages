@@ -159,8 +159,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement R2-backed adapters.
 - [ ] Implement KV-backed adapters if used.
 - [ ] Implement Durable Object-backed locking if used.
-- [ ] Implement transactional page save behavior.
-- [ ] Implement optimistic concurrency checks.
+- [x] Implement transactional page save behavior.
+- [x] Implement optimistic concurrency checks.
 - [ ] Implement rollback behavior for partially failed writes.
 - [ ] Implement pagination helpers for large namespaces, revisions, logs, and media lists.
 - [ ] Implement storage error mapping.
@@ -169,9 +169,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Request Routing
 
 - [x] Implement route handling for page views.
-- [ ] Implement route handling for edit pages.
-- [ ] Implement route handling for saves.
-- [ ] Implement route handling for preview.
+- [x] Implement route handling for edit pages.
+- [x] Implement route handling for saves.
+- [x] Implement route handling for preview.
 - [ ] Implement route handling for revisions.
 - [ ] Implement route handling for diffs.
 - [ ] Implement route handling for backlinks.
@@ -239,13 +239,13 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement start page resolution.
 - [x] Implement page existence checks.
 - [x] Implement raw page reads.
-- [ ] Implement page creation.
-- [ ] Implement page edits.
-- [ ] Implement page deletion through empty content.
+- [x] Implement page creation.
+- [x] Implement page edits.
+- [x] Implement page deletion through empty content.
 - [ ] Implement page revert.
-- [ ] Implement edit summaries.
+- [x] Implement edit summaries.
 - [ ] Implement minor edits.
-- [ ] Implement conflict detection.
+- [x] Implement conflict detection.
 - [ ] Implement edit locks.
 - [ ] Implement draft autosave.
 - [ ] Implement draft recovery.
@@ -258,12 +258,12 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement recent changes.
 - [ ] Implement old revisions.
 - [ ] Implement page diff.
-- [ ] Implement source view.
+- [x] Implement source view.
 - [ ] Implement export modes that remain in scope.
 - [ ] Implement page metadata updates.
-- [ ] Implement changelog updates.
+- [x] Implement changelog updates.
 - [ ] Implement purge behavior.
-- [ ] Implement cache invalidation after save.
+- [x] Implement cache invalidation after save.
 
 ## Media Behavior
 

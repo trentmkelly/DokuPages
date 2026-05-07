@@ -10,13 +10,17 @@ The port is a native TypeScript implementation on Cloudflare Pages Functions. Th
 
 - `GET /api/health`
 - `/wiki/:id` page views backed by D1 current page records and the native wiki renderer
+- `/wiki/:id?do=edit` edit forms backed by D1 current page records
+- `/wiki/:id?do=source` raw wiki text responses
+- `POST /api/pages` page create, edit, and delete saves
+- `POST /api/pages/preview` rendered preview responses
 - all other paths to static asset fallback
 
 Specific endpoint files may be added under `functions/` as the route surface expands.
 
 ## Data Access Layer
 
-Storage contracts live in `src/storage/interfaces.ts`. D1-backed page storage begins in `src/storage/d1.ts`; future adapters should implement the same contracts for media, ACLs, users, metadata, drafts, locks, rendered cache, and search.
+Storage contracts live in `src/storage/interfaces.ts`. D1-backed page reads and saves begin in `src/wiki/page-service.ts` and `src/storage/d1.ts`; future adapters should implement the same contracts for media, ACLs, users, metadata, drafts, locks, rendered cache, and search.
 
 ## Storage Schema
 
