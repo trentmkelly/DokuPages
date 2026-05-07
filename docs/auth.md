@@ -20,12 +20,19 @@ Native login uses D1-backed users with the native password hash format. Successf
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
 
-Login success, login failure, login rate-limit, and logout events emit structured `auth_event` logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
+Login success, login failure, login rate-limit, logout, and profile update events emit structured `auth_event` logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
+
+## Profile Updates
+
+Authenticated users can update their display name and email address at
+`/profile`. Password changes are supported through the same page after the user
+confirms their current password. Changing a password keeps the current session
+and removes other active sessions for that user.
 
 ## Deferred Account Flows
 
-Registration, profile editing, password reset, and persistent remember-me tokens
-are not supported for the first Pages launch. Direct native paths, matching
+Registration, password reset, and persistent remember-me tokens are not
+supported for the first Pages launch. Direct native paths, matching
 `/api/auth/*` paths, and legacy DokuWiki actions return explicit `501` JSON
 instead of falling through to unrelated page views.
 

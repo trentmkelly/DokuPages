@@ -394,7 +394,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port media manager UI.
 - [x] Port admin UI.
 - [x] Port login UI.
-- [ ] Port profile UI if supported.
+- [x] Port profile UI if supported.
 - [x] Port user manager UI if supported.
 - [ ] Port styling plugin behavior if supported.
 - [ ] Port configuration UI if supported.

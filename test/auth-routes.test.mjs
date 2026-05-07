@@ -39,17 +39,14 @@ describe("auth routes", () => {
     env = createEnv();
     const browserUrls = [
       "https://example.com/register",
-      "https://example.com/profile",
       "https://example.com/resendpwd",
       "https://example.com/password-reset",
       "https://example.com/doku.php?do=register",
-      "https://example.com/doku.php?do=profile",
       "https://example.com/doku.php?do=resendpwd",
       "https://example.com/wiki/wiki/welcome?do=register"
     ];
     const apiUrls = [
       "https://example.com/api/auth/register",
-      "https://example.com/api/auth/profile",
       "https://example.com/api/auth/password-reset"
     ];
 
@@ -68,6 +65,98 @@ describe("auth routes", () => {
         status: "not_supported"
       });
     }
+  });
+
+  it("allows authenticated users to update their profile and password", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const anonymous = await handleRequest(new Request("https://example.com/profile"), env);
+    const legacy = await handleRequest(new Request("https://example.com/doku.php?do=profile"), env);
+    const profile = await handleRequest(
+      new Request("https://example.com/profile", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(anonymous.status).toBe(303);
+    expect(anonymous.headers.get("location")).toBe("/login?returnTo=%2Fprofile");
+    expect(legacy.status).toBe(301);
+    expect(legacy.headers.get("location")).toBe("/profile");
+    expect(profile.status).toBe(200);
+    const html = await profile.text();
+    expect(html).toContain('id="dw__profile"');
+    expect(html).toContain("Alice Example");
+
+    const invalid = new FormData();
+    invalid.set("displayName", "Alice Updated");
+    invalid.set("email", "alice.updated@example.test");
+    invalid.set("currentPassword", "wrong password");
+    invalid.set("newPassword", "new correct battery staple");
+    invalid.set("newPasswordConfirm", "new correct battery staple");
+
+    const rejected = await handleRequest(
+      new Request("https://example.com/api/auth/profile", {
+        method: "POST",
+        body: invalid,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(rejected.status).toBe(400);
+    await expect(rejected.text()).resolves.toContain("Current password is incorrect.");
+
+    const form = new FormData();
+    form.set("displayName", "Alice Updated");
+    form.set("email", "alice.updated@example.test");
+    form.set("currentPassword", "correct horse battery staple");
+    form.set("newPassword", "new correct battery staple");
+    form.set("newPasswordConfirm", "new correct battery staple");
+
+    const saved = await handleRequest(
+      new Request("https://example.com/api/auth/profile", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    expect(saved.headers.get("location")).toBe("/profile?updated=1");
+    await expect(
+      env.DB.prepare(
+        `select display_name, email
+         from users
+         where id = ?`
+      )
+        .bind("user-1")
+        .first()
+    ).resolves.toMatchObject({
+      display_name: "Alice Updated",
+      email: "alice.updated@example.test"
+    });
+
+    const oldLogin = await postLogin(env, "alice", "correct horse battery staple");
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await postLogin(env, "alice", "new correct battery staple");
+    expect(newLogin.status).toBe(303);
+
+    const updatedSession = await handleRequest(
+      new Request("https://example.com/api/auth/session", {
+        headers: { cookie }
+      }),
+      env
+    );
+    await expect(updatedSession.json()).resolves.toMatchObject({
+      principal: {
+        username: "alice",
+        displayName: "Alice Updated"
+      }
+    });
   });
 
   it("logs in native users, resolves the session principal, and logs out", async () => {

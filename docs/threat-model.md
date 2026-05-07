@@ -57,8 +57,8 @@ Operational permissions:
 
 ## Residual Risks
 
-- User management, profile editing, password reset, email, and runtime plugin
-  execution are not in launch scope.
+- Password reset, email delivery, and runtime plugin execution are not in launch
+  scope.
 - Runtime PHP plugin hooks are intentionally unsupported; future native modules
   need their own review.
 - Production alerting and quota pressure alerts remain open checklist items.

@@ -13,6 +13,7 @@ import {
   readCookie,
   sessionCookieHeader
 } from "./auth/session";
+import { hashPassword } from "./auth/password";
 import { getRuntimeConfig, type ConfigValidation } from "./config";
 import type { Env } from "./env";
 import {
@@ -242,6 +243,12 @@ export async function handleRequest(
     return htmlResponseWithCsrf(request, renderLogoutPage(env, url, undefined, csrf.token), csrf);
   }
 
+  if (url.pathname === "/profile" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    const page = renderProfilePage(request, env, url, principal, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
   const unsupportedAccountPath = unsupportedAccountFeatureForPath(url.pathname);
   if (unsupportedAccountPath) {
     return authFeatureNotSupportedResponse(request, env, unsupportedAccountPath);
@@ -253,6 +260,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/auth/logout" && request.method === "POST") {
     return handleLogout(request, env, principal);
+  }
+
+  if (url.pathname === "/api/auth/profile" && request.method === "POST") {
+    return handleProfileUpdate(request, env, principal);
   }
 
   if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
@@ -462,6 +473,10 @@ export async function handleRequest(
       return htmlResponse(renderLogoutPage(env, url, pagePath(id)));
     }
 
+    if (url.searchParams.get("do") === "profile") {
+      return redirectResponse("/profile", 302);
+    }
+
     const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
     if (unsupportedAccountAction) {
       return authFeatureNotSupportedResponse(request, env, unsupportedAccountAction);
@@ -602,6 +617,10 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
 
   if (url.searchParams.get("do") === "admin" && url.searchParams.get("page") === "acl") {
     return redirectResponse("/admin/acl", 301);
+  }
+
+  if (url.searchParams.get("do") === "profile") {
+    return redirectResponse("/profile", 301);
   }
 
   const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
@@ -3591,9 +3610,250 @@ async function handleLogout(
   });
 }
 
+interface ProfileFormValues {
+  displayName: string;
+  email: string;
+}
+
+async function handleProfileUpdate(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (principal.type !== "user") {
+    return accountLoginRequiredResponse(request, env, "/profile");
+  }
+
+  const values = profileValuesFromForm(form, principal);
+  const parsed = parseProfileForm(form);
+  const csrf = csrfContext(request);
+
+  if (!parsed.ok) {
+    return profileUpdateErrorResponse(request, env, principal, values, parsed.error, csrf);
+  }
+
+  let passwordHash: string | null = null;
+  if (parsed.newPassword) {
+    const authenticated = await authenticateUser(
+      env.DB,
+      principal.username,
+      parsed.currentPassword
+    );
+
+    if (!authenticated || authenticated.id !== principal.id) {
+      return profileUpdateErrorResponse(
+        request,
+        env,
+        principal,
+        values,
+        "Current password is incorrect.",
+        csrf
+      );
+    }
+
+    passwordHash = await hashPassword(parsed.newPassword);
+  }
+
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    passwordHash
+      ? `update users
+         set display_name = ?, email = ?, password_hash = ?, updated_at = ?
+         where id = ?`
+      : `update users
+         set display_name = ?, email = ?, updated_at = ?
+         where id = ?`
+  )
+    .bind(
+      ...(passwordHash
+        ? [parsed.displayName, parsed.email, passwordHash, now, principal.id]
+        : [parsed.displayName, parsed.email, now, principal.id])
+    )
+    .run();
+
+  if (passwordHash) {
+    await deleteOtherLoginSessions(request, env, principal.id);
+  }
+
+  logAuthEvent(request, "profile_update", {
+    userId: principal.id,
+    username: principal.username,
+    passwordChanged: Boolean(passwordHash)
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({
+      ok: true,
+      principal: {
+        ...publicPrincipal(principal),
+        displayName: parsed.displayName
+      }
+    });
+  }
+
+  return redirectResponse("/profile?updated=1");
+}
+
+function renderProfilePage(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  csrfToken: string,
+  message: { type: "success" | "error"; text: string } | null = null,
+  values: ProfileFormValues | null = null
+): string | Response {
+  if (principal.type !== "user") {
+    return accountLoginRequiredResponse(request, env, "/profile");
+  }
+
+  const formValues = values ?? profileValuesFromPrincipal(principal);
+  const notice = message ?? profileNoticeFromUrl(url);
+  const noticeHtml = notice ? `<p class="${notice.type}">${escapeHtml(notice.text)}</p>` : "";
+
+  return htmlShell(
+    env,
+    "Update Profile",
+    `<h1>Update Profile</h1>
+    ${noticeHtml}
+    <form id="dw__profile" method="post" action="/api/auth/profile">
+      ${csrfInput(csrfToken)}
+      <fieldset>
+        <legend>User profile</legend>
+        <label for="profile__user">Username</label>
+        <input id="profile__user" class="edit" type="text" value="${escapeAttribute(principal.username)}" readonly>
+        <label for="profile__display">Full name</label>
+        <input id="profile__display" name="displayName" class="edit" type="text" value="${escapeAttribute(formValues.displayName)}" autocomplete="name" required>
+        <label for="profile__email">Email</label>
+        <input id="profile__email" name="email" class="edit" type="email" value="${escapeAttribute(formValues.email)}" autocomplete="email">
+      </fieldset>
+      <fieldset>
+        <legend>Change password</legend>
+        <label for="profile__current_password">Current password</label>
+        <input id="profile__current_password" name="currentPassword" class="edit" type="password" autocomplete="current-password">
+        <label for="profile__new_password">New password</label>
+        <input id="profile__new_password" name="newPassword" class="edit" type="password" autocomplete="new-password">
+        <label for="profile__new_password_confirm">Confirm password</label>
+        <input id="profile__new_password_confirm" name="newPasswordConfirm" class="edit" type="password" autocomplete="new-password">
+      </fieldset>
+      <button type="submit">Update Profile</button>
+    </form>`
+  );
+}
+
+function parseProfileForm(form: FormData):
+  | {
+      ok: true;
+      displayName: string;
+      email: string | null;
+      currentPassword: string;
+      newPassword: string | null;
+    }
+  | { ok: false; error: string } {
+  const displayName = String(form.get("displayName") ?? "").trim();
+  if (!displayName) {
+    return { ok: false, error: "Full name is required." };
+  }
+
+  const email = String(form.get("email") ?? "").trim() || null;
+  const currentPassword = String(form.get("currentPassword") ?? "");
+  const newPassword = String(form.get("newPassword") ?? "");
+  const newPasswordConfirm = String(form.get("newPasswordConfirm") ?? "");
+
+  if (newPassword || newPasswordConfirm) {
+    if (!currentPassword) {
+      return { ok: false, error: "Current password is required to change password." };
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      return { ok: false, error: "New passwords do not match." };
+    }
+
+    if (newPassword.length < 8) {
+      return { ok: false, error: "New password must be at least 8 characters." };
+    }
+  }
+
+  return {
+    ok: true,
+    displayName,
+    email,
+    currentPassword,
+    newPassword: newPassword || null
+  };
+}
+
+function profileValuesFromPrincipal(principal: AuthPrincipal): ProfileFormValues {
+  return {
+    displayName: principal.displayName,
+    email: principal.email ?? ""
+  };
+}
+
+function profileValuesFromForm(form: FormData, principal: AuthPrincipal): ProfileFormValues {
+  return {
+    displayName: String(form.get("displayName") ?? principal.displayName).trim(),
+    email: String(form.get("email") ?? principal.email ?? "").trim()
+  };
+}
+
+function profileNoticeFromUrl(url: URL): { type: "success" | "error"; text: string } | null {
+  return url.searchParams.get("updated") === "1"
+    ? { type: "success", text: "Profile updated." }
+    : null;
+}
+
+function profileUpdateErrorResponse(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  values: ProfileFormValues,
+  error: string,
+  csrf: CsrfContext
+): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error }, { status: 400 });
+  }
+
+  return htmlResponseWithCsrf(
+    request,
+    renderProfilePage(
+      request,
+      env,
+      new URL(request.url),
+      principal,
+      csrf.token,
+      { type: "error", text: error },
+      values
+    ) as string,
+    csrf,
+    { status: 400 }
+  );
+}
+
+async function deleteOtherLoginSessions(request: Request, env: Env, userId: string): Promise<void> {
+  const sessionId = sessionIdFromCookie(
+    readCookie(request, getRuntimeConfig(env).sessionCookieName)
+  );
+
+  if (!sessionId) return;
+
+  await env.DB.prepare("delete from sessions where user_id = ? and id <> ?")
+    .bind(userId, sessionId)
+    .run();
+}
+
+function sessionIdFromCookie(value: string | null): string | null {
+  return value?.split(".")[0] || null;
+}
+
 function logAuthEvent(
   request: Request,
-  authEvent: "login_success" | "login_failure" | "login_rate_limited" | "logout",
+  authEvent: "login_success" | "login_failure" | "login_rate_limited" | "logout" | "profile_update",
   details: Record<string, unknown>
 ): void {
   const url = new URL(request.url);
@@ -3634,9 +3894,6 @@ function unsupportedAccountFeatureForPath(pathname: string): string | null {
     case "/register":
     case "/api/auth/register":
       return "registration";
-    case "/profile":
-    case "/api/auth/profile":
-      return "profile_update";
     case "/resendpwd":
     case "/password-reset":
     case "/api/auth/password-reset":
@@ -3650,8 +3907,6 @@ function unsupportedAccountFeatureForAction(action: string | null): string | nul
   switch (action) {
     case "register":
       return "registration";
-    case "profile":
-      return "profile_update";
     case "password":
     case "password_reset":
     case "resendpwd":
@@ -3852,6 +4107,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
               <li><a href="/diagnostics">Diagnostics</a></li>
               <li><a href="/login">Login</a></li>
               <li><a href="/register">Register</a></li>
+              <li><a href="/profile">Update Profile</a></li>
             </ul>
           </nav>
         </div>
@@ -3906,6 +4162,7 @@ function renderMobileTools(pageId?: string): string {
         <option value="/diagnostics">Diagnostics</option>
         <option value="/login">Login</option>
         <option value="/register">Register</option>
+        <option value="/profile">Update Profile</option>
       </select>
     </div>`;
 }
@@ -4729,6 +4986,14 @@ function adminDeniedResponse(request: Request, env: Env): Response {
     ),
     { status: 403 }
   );
+}
+
+function accountLoginRequiredResponse(request: Request, env: Env, returnTo: string): Response {
+  if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
+    return jsonResponse({ error: "Login is required." }, { status: 401 });
+  }
+
+  return redirectResponse(`/login?returnTo=${encodeURIComponent(safeReturnPath(returnTo, env))}`);
 }
 
 function managerDeniedResponse(request: Request, env: Env): Response {
