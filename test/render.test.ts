@@ -3,11 +3,22 @@ import { renderWikiText } from "../src/wiki/render";
 
 describe("renderWikiText", () => {
   it("renders headings, title metadata, and a table of contents", () => {
-    const rendered = renderWikiText("====== Welcome Page ======\n\nText");
+    const rendered = renderWikiText("====== Welcome Page ======\n\nText", {
+      pageId: "wiki:welcome"
+    });
 
     expect(rendered.title).toBe("Welcome Page");
     expect(rendered.toc).toEqual([{ id: "welcome-page", level: 1, title: "Welcome Page" }]);
+    expect(rendered.html).toContain(
+      '<h1 id="welcome-page">Welcome Page<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome Page">Edit</a></h1>'
+    );
+  });
+
+  it("omits section edit anchors without page context", () => {
+    const rendered = renderWikiText("====== Welcome Page ======\n\nText");
+
     expect(rendered.html).toContain('<h1 id="welcome-page">Welcome Page</h1>');
+    expect(rendered.html).not.toContain("secedit");
   });
 
   it("honors standalone rendering control macros", () => {

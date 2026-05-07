@@ -138,7 +138,8 @@ export function renderWikiText(
   const toc: TocItem[] = [];
   const context: RenderContext = {
     footnotes: [],
-    pageId: options.pageId ? cleanPageId(options.pageId) : undefined
+    pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
+    sectionIndex: 0
   };
   const title: { value: string | null } = { value: null };
   const state: ParserState = {
@@ -186,8 +187,12 @@ export function renderWikiText(
       const id = uniqueAnchor(slugify(heading.title), toc);
       toc.push({ id, level: heading.level, title: heading.title });
       title.value ??= heading.title;
+      context.sectionIndex += 1;
       blocks.push(
-        `<h${heading.level} id="${id}">${renderInline(heading.title, context)}</h${heading.level}>`
+        `<h${heading.level} id="${id}">${renderInline(heading.title, context)}${renderSectionEditLink(
+          heading.title,
+          context
+        )}</h${heading.level}>`
       );
       continue;
     }
@@ -305,6 +310,7 @@ interface SpecialBlock {
 interface RenderContext {
   footnotes: string[];
   pageId?: string;
+  sectionIndex: number;
 }
 
 function parseHeading(line: string): { level: number; title: string } | null {
@@ -315,6 +321,14 @@ function parseHeading(line: string): { level: number; title: string } | null {
     level: 7 - match[1].length,
     title: match[2].trim()
   };
+}
+
+function renderSectionEditLink(title: string, context: RenderContext): string {
+  if (!context.pageId) return "";
+
+  const href = `${pageIdToRoutePath(context.pageId)}?do=edit&section=${context.sectionIndex}`;
+
+  return `<a class="secedit" href="${escapeAttribute(href)}" aria-label="Edit section ${escapeAttribute(title)}">Edit</a>`;
 }
 
 function flushAll(blocks: string[], state: ParserState, context: RenderContext): void {
@@ -553,7 +567,14 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
   const notes = context.footnotes
     .map(
       (note, index) =>
-        `<div class="fn" id="fn__${index + 1}"><sup><a href="#fnt__${index + 1}">${index + 1})</a></sup> ${renderInline(note, { footnotes: [], pageId: context.pageId })}</div>`
+        `<div class="fn" id="fn__${index + 1}"><sup><a href="#fnt__${index + 1}">${index + 1})</a></sup> ${renderInline(
+          note,
+          {
+            footnotes: [],
+            pageId: context.pageId,
+            sectionIndex: context.sectionIndex
+          }
+        )}</div>`
     )
     .join("");
 

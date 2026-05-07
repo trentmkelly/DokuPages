@@ -57,7 +57,7 @@ type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 15;
+const RENDER_CACHE_VERSION = 16;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 

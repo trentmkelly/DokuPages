@@ -458,6 +458,20 @@ form.search button {
   font-size: 0.875em;
 }
 
+.dokuwiki .page .secedit {
+  float: right;
+  margin-left: 1em;
+  font-size: 0.5em;
+  font-weight: normal;
+  line-height: 1.6;
+}
+
+.dokuwiki .page h4 .secedit,
+.dokuwiki .page h5 .secedit,
+.dokuwiki .page h6 .secedit {
+  font-size: 0.75em;
+}
+
 .dokuwiki a.wikilink1 {
   color: var(--dw-existing);
   background-color: inherit;

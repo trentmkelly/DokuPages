@@ -139,7 +139,9 @@ describe("handleRequest", () => {
     expect(html).toContain('<link rel="canonical" href="/wiki/wiki/welcome">');
     expect(html).toContain('<script src="/dokuwiki.js" defer></script>');
     expect(html).toContain('id="mobile__tools"');
-    expect(html).toContain('<h1 id="welcome">Welcome</h1>');
+    expect(html).toContain(
+      '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
+    );
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
@@ -259,7 +261,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 15,
+        rendererVersion: 16,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",

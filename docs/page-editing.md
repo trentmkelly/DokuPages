@@ -42,6 +42,10 @@ The save path:
 - purges page-related KV cache keys
 - redirects back to the page with HTTP 303
 
+## Section Edit Anchors
+
+Rendered headings include DokuWiki-style section edit anchors when the renderer has a page ID. The links target the page editor with `section=N` so templates have stable section affordances while section-scoped save behavior is implemented separately.
+
 ## Verified Against Production
 
 The deployed `dokutest.pages.dev` project was smoke tested against remote D1:

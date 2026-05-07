@@ -226,7 +226,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement typography replacements.
 - [x] Implement table of contents extraction.
 - [x] Implement control macros.
-- [ ] Implement section edit anchors.
+- [x] Implement section edit anchors.
 - [x] Implement metadata extraction.
 - [ ] Implement instruction caching or equivalent.
 - [ ] Implement renderer output compatible with current templates.
