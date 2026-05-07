@@ -83,3 +83,11 @@ Cache dependency tracking is mirrored in D1 `cache_dependencies` rows with an
 index on `(dependency_type, dependency_id, cache_key)`. Page saves and media
 uploads/deletes/reverts use that index to purge rendered pages that reference
 the changed subject.
+
+## Metadata Cache Decision
+
+No separate metadata cache is used for launch. Page and media saves write
+metadata rows in the same D1 batches as their canonical records, but hot routes
+read current page/media rows directly instead of issuing repeated metadata
+lookups. The `metadata(subject_type, subject_id, key)` primary key remains the
+bounded access path for admin, import, backup, and diagnostic uses.

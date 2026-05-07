@@ -19,6 +19,11 @@ npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-im
 
 The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, changelog rows, ACL rules, users, groups, and group memberships.
 
+Legacy `data/index` files are not migrated directly. The importer rebuilds
+search postings from canonical page source during import, which avoids carrying
+over PHP filesystem index formats and gives the Pages port deterministic D1
+search state.
+
 ## R2 Media
 
 ```sh

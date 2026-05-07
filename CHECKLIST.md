@@ -343,14 +343,14 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement metadata indexing.
 - [x] Implement title indexing.
 - [x] Implement page deletion from index.
-- [ ] Implement media indexing if supported.
+- [x] Implement media indexing if supported.
 - [x] Implement search query parsing.
 - [x] Implement search result ranking.
 - [x] Implement namespace-limited search.
 - [x] Implement ACL filtering for search results.
 - [x] Implement index rebuild job.
 - [x] Implement incremental index updates on save.
-- [ ] Implement index migration from existing `data/index` if needed.
+- [x] Implement index migration from existing `data/index` if needed.
 - [x] Add search performance tests.
 - [x] Add search correctness tests.
 
@@ -360,7 +360,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Define cache dependency tracking.
 - [x] Implement rendered HTML cache.
 - [x] Implement parser instruction cache if needed.
-- [ ] Implement metadata cache if needed.
+- [x] Implement metadata cache if needed.
 - [x] Implement CSS cache or prebuilt CSS.
 - [x] Implement JavaScript cache or prebuilt JavaScript.
 - [x] Implement feed cache.

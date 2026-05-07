@@ -40,6 +40,8 @@ Namespaces are stored as colon-separated IDs in page and media records. They can
 
 D1 postings are the launch search backend. DokuWiki's legacy `data/index` files are not read directly because they encode PHP filesystem assumptions; a rebuild importer can be added later if production data requires exact legacy ranking.
 
+Media search does not use a separate full-text index. The media manager searches current D1 media metadata by namespace, media ID, and MIME type, backed by the namespace/deleted/id index used for media browsing. This keeps media search tied to canonical media rows instead of migrating DokuWiki's filesystem index files.
+
 ## Rendered Cache
 
 `rendered_cache` stores render metadata and HTML for deterministic cache rebuilds. Hot cache entries may be mirrored into KV. `cache_dependencies` maps rendered cache keys to page and media subjects referenced by the rendered output so saves, uploads, deletes, and reverts can purge dependent page HTML.
