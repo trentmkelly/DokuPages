@@ -37,3 +37,7 @@ Uploads are validated before R2 writes. The native validator enforces a 25 MiB b
 ## Search Semantics
 
 Media manager search is namespace-scoped. The `q` parameter matches active media IDs and MIME types in D1 and excludes deleted media rows.
+
+## Derivative Strategy
+
+The Pages port does not generate thumbnail or resized image files inside Workers. Media fetches return the original R2 object and include `x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`, and `x-dokuwiki-exif-policy` headers documenting the replacement strategy. Image previews use browser-constrained originals with lazy decoding. JPEG EXIF metadata is not parsed in the request path.

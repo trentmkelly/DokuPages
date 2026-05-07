@@ -233,6 +233,10 @@ describe("handleRequest", () => {
       new Request("https://example.com/media/wiki/logo.svg?download=1"),
       env
     );
+    const resized = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?w=80"),
+      env
+    );
     const revision = await handleRequest(
       new Request("https://example.com/media/wiki/logo.svg?rev=media-rev-1"),
       env
@@ -257,6 +261,8 @@ describe("handleRequest", () => {
     expect(fetch.status).toBe(200);
     expect(fetch.headers.get("content-type")).toBe("image/svg+xml");
     expect(fetch.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(fetch.headers.get("x-dokuwiki-thumbnail-policy")).toBe("original");
+    expect(resized.headers.get("x-dokuwiki-resize-policy")).toBe("browser-constrained-original");
     await expect(fetch.text()).resolves.toBe("<svg>current</svg>");
     expect(download.headers.get("content-disposition")).toBe('attachment; filename="logo.svg"');
     expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");

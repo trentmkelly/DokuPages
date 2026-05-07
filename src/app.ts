@@ -74,6 +74,7 @@ import {
 } from "./wiki/page-service";
 import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
+import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
 
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
@@ -512,6 +513,12 @@ async function handleMediaFetch(env: Env, url: URL): Promise<Response> {
     revisionId ? "public, max-age=31536000, immutable" : "public, max-age=3600"
   );
 
+  for (const [name, value] of Object.entries(
+    mediaDerivativeHeaders(media, hasRequestedMediaSize(url))
+  )) {
+    headers.set(name, value);
+  }
+
   if (url.searchParams.get("download") === "1") {
     headers.set(
       "content-disposition",
@@ -531,7 +538,7 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
   }
 
   const preview = media.mimeType.startsWith("image/")
-    ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}"></a></p>`
+    ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}" loading="lazy" decoding="async"></a></p>`
     : `<p><a href="${mediaPath(id)}">Download ${escapeHtml(mediaName(id))}</a></p>`;
 
   return htmlShell(

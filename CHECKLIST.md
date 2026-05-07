@@ -283,9 +283,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement media detail pages.
 - [x] Implement media manager browsing.
 - [x] Implement media search.
-- [ ] Implement thumbnail generation or a replacement strategy.
-- [ ] Implement image resizing or a replacement strategy.
-- [ ] Implement EXIF/JPEG metadata behavior if supported.
+- [x] Implement thumbnail generation or a replacement strategy.
+- [x] Implement image resizing or a replacement strategy.
+- [x] Implement EXIF/JPEG metadata behavior if supported.
 - [x] Implement download headers.
 - [x] Implement cache headers for immutable media revisions.
 - [x] Implement cache headers for current media files.
