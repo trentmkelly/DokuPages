@@ -671,7 +671,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add security tests for CSRF.
 - [ ] Add security tests for ACL bypass.
 - [ ] Add security tests for upload bypass.
-- [ ] Add dependency scanning.
+- [x] Add dependency scanning.
 - [x] Add smoke tests for preview deployments.
 - [x] Add smoke tests for production deployments.
 
