@@ -247,7 +247,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement minor edits.
 - [x] Implement conflict detection.
 - [ ] Implement edit locks.
-- [ ] Implement draft autosave.
+- [x] Implement draft autosave.
 - [x] Implement draft recovery.
 - [ ] Implement page templates.
 - [x] Implement breadcrumbs.
@@ -360,7 +360,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement parser instruction cache if needed.
 - [ ] Implement metadata cache if needed.
 - [x] Implement CSS cache or prebuilt CSS.
-- [ ] Implement JavaScript cache or prebuilt JavaScript.
+- [x] Implement JavaScript cache or prebuilt JavaScript.
 - [ ] Implement feed cache.
 - [ ] Implement sitemap cache.
 - [ ] Implement page purge behavior.
@@ -380,12 +380,12 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port page tools.
 - [x] Port site tools.
 - [ ] Port user tools.
-- [ ] Port mobile navigation.
+- [x] Port mobile navigation.
 - [x] Port breadcrumbs.
 - [x] Port table of contents rendering.
-- [ ] Port editor UI.
-- [ ] Port preview UI.
-- [ ] Port conflict UI.
+- [x] Port editor UI.
+- [x] Port preview UI.
+- [x] Port conflict UI.
 - [ ] Port revision UI.
 - [ ] Port diff UI.
 - [x] Port search UI.
@@ -400,8 +400,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Ensure keyboard accessibility.
 - [ ] Ensure screen reader accessibility.
 - [ ] Ensure text does not overflow in common layouts.
-- [ ] Verify desktop rendering with screenshots.
-- [ ] Verify mobile rendering with screenshots.
+- [x] Verify desktop rendering with screenshots.
+- [x] Verify mobile rendering with screenshots.
 
 ## Static Assets
 
@@ -411,7 +411,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port image assets.
 - [x] Port icon assets.
 - [x] Port CSS assets.
-- [ ] Port JavaScript assets.
+- [x] Port JavaScript assets.
 - [ ] Port language assets needed by the selected locales.
 - [x] Port template assets.
 - [ ] Port plugin assets for supported plugins.

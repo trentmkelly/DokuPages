@@ -1,12 +1,6 @@
 import type { Env } from "./env";
 import { healthResponse } from "./http/health";
-import {
-  conflictResponse,
-  htmlResponse,
-  jsonResponse,
-  notFoundResponse,
-  redirectResponse
-} from "./http/responses";
+import { htmlResponse, jsonResponse, notFoundResponse, redirectResponse } from "./http/responses";
 import { cleanPageId } from "./wiki/page-id";
 import {
   getCurrentPage,
@@ -667,6 +661,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   <link rel="icon" href="/images/favicon.ico">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
   <link rel="stylesheet" href="/dokuwiki.css">
+  <script src="/dokuwiki.js" defer></script>
 </head>
 <body class="dokuwiki">
   <div id="dokuwiki__site">
@@ -678,20 +673,17 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">
-          <nav id="dokuwiki__usertools" aria-label="User tools">
-            <h3 class="a11y">User tools</h3>
-            <ul>
-              <li><a href="/wiki/Wiki/Welcome?do=edit">Edit</a></li>
-              <li><a href="/recent">Recent changes</a></li>
-              <li><a href="/index?ns=wiki">Index</a></li>
-            </ul>
-          </nav>
           <nav id="dokuwiki__sitetools" aria-label="Site tools">
             <h3 class="a11y">Site tools</h3>
             <form class="search" method="get" action="/search">
               <input name="q" type="search" placeholder="Search">
               <button type="submit">Search</button>
             </form>
+            ${renderMobileTools(pageId)}
+            <ul>
+              <li><a href="/recent">Recent changes</a></li>
+              <li><a href="/index?ns=wiki">Index</a></li>
+            </ul>
           </nav>
         </div>
         ${renderHeaderBreadcrumbs(pageId)}
@@ -724,6 +716,26 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   </div>
 </body>
 </html>`;
+}
+
+function renderMobileTools(pageId?: string): string {
+  const pageOptions = pageId
+    ? `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>
+      <option value="${pagePath(pageId)}?do=source">Show source</option>
+      <option value="${pagePath(pageId)}?do=revisions">Old revisions</option>
+      <option value="${pagePath(pageId)}?do=backlink">Backlinks</option>`
+    : "";
+
+  return `<div class="mobileTools">
+      <label class="a11y" for="mobile__tools">Tools</label>
+      <select id="mobile__tools">
+        <option value="">Tools</option>
+        ${pageOptions}
+        <option value="/recent">Recent changes</option>
+        <option value="/index?ns=wiki">Index</option>
+        <option value="/search">Search</option>
+      </select>
+    </div>`;
 }
 
 function renderPageTools(pageId: string): string {
@@ -762,6 +774,7 @@ function manifestResponse(body: Record<string, unknown>): Response {
 async function handleSave(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
+  const content = String(form.get("content") ?? "");
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
@@ -769,7 +782,7 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
 
   const result = await savePage(env.DB, {
     id,
-    content: String(form.get("content") ?? ""),
+    content,
     summary: String(form.get("summary") ?? ""),
     baseRevisionId: String(form.get("baseRevisionId") || "") || null,
     changeType: form.get("minor") ? "minor" : undefined,
@@ -777,7 +790,8 @@ async function handleSave(request: Request, env: Env): Promise<Response> {
   });
 
   if (!result.ok) {
-    return conflictResponse("The page changed before your edit could be saved.");
+    const current = await getCurrentPage(env.DB, id);
+    return htmlResponse(renderConflictPage(env, id, content, current), { status: 409 });
   }
 
   await purgePageCache(env, id, result.page.revisionId);
@@ -810,7 +824,8 @@ async function handleRevert(request: Request, env: Env): Promise<Response> {
   });
 
   if (!result.ok) {
-    return conflictResponse("The page changed before your revert could be saved.");
+    const current = await getCurrentPage(env.DB, id);
+    return htmlResponse(renderConflictPage(env, id, revision.content, current), { status: 409 });
   }
 
   await purgePageCache(env, id, result.page.revisionId);
@@ -833,7 +848,17 @@ async function handleSaveDraft(request: Request, env: Env): Promise<Response> {
     String(form.get("baseRevisionId") || "") || null
   );
 
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, id });
+  }
+
   return redirectResponse(`${pagePath(id)}?do=edit`);
+}
+
+function acceptsJson(request: Request): boolean {
+  const accept = request.headers.get("accept") ?? "";
+  const requestedWith = request.headers.get("x-requested-with") ?? "";
+  return accept.includes("application/json") || requestedWith.toLowerCase() === "xmlhttprequest";
 }
 
 async function handleDeleteDraft(request: Request, env: Env): Promise<Response> {
@@ -867,26 +892,66 @@ function renderEditPage(
     `Edit ${title}`,
     `<h1>Edit ${escapeHtml(title)}</h1>
     ${draftNotice}
-    <form method="post" action="/api/pages">
+    <div class="editBox">
+    <form id="dw__editform" class="edit" method="post" action="/api/pages">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <input type="hidden" name="baseRevisionId" value="${escapeHtml(baseRevisionId)}">
-      <p>
-        <label for="content">Wiki text</label><br>
-        <textarea id="content" name="content" rows="24" cols="100">${escapeHtml(content)}</textarea>
-      </p>
-      <p>
-        <label for="summary">Summary</label><br>
-        <input id="summary" name="summary" type="text" value="">
-      </p>
-      <p>
-        <label><input name="minor" type="checkbox" value="1"> Minor edit</label>
-      </p>
-      <button type="submit">Save</button>
-      <button type="submit" formaction="/api/pages/draft">Save draft</button>
-      <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>
+      <div class="toolbar group">
+        <div id="tool__bar" role="toolbar" aria-label="Editor toolbar">
+          <button class="toolbutton" type="button" data-wrap-before="**" data-wrap-after="**" data-placeholder="strong text" title="Bold"><strong>B</strong></button>
+          <button class="toolbutton" type="button" data-wrap-before="//" data-wrap-after="//" data-placeholder="emphasized text" title="Italic"><em>I</em></button>
+          <button class="toolbutton" type="button" data-line-before="====== " data-line-after=" ======" data-placeholder="Headline" title="Level 1 headline">H1</button>
+          <button class="toolbutton" type="button" data-line-before="===== " data-line-after=" =====" data-placeholder="Headline" title="Level 2 headline">H2</button>
+          <button class="toolbutton" type="button" data-wrap-before="[[" data-wrap-after="]]" data-placeholder="page:id|Link text" title="Internal link">Link</button>
+          <button class="toolbutton" type="button" data-prefix="  * " data-placeholder="List item" title="Unordered list">UL</button>
+          <button class="toolbutton" type="button" data-prefix="  - " data-placeholder="List item" title="Ordered list">OL</button>
+          <button class="toolbutton" type="button" data-wrap-before="<code>" data-wrap-after="</code>" data-placeholder="code" title="Code">Code</button>
+        </div>
+        <div id="draft__status" aria-live="polite">Draft autosave ready.</div>
+      </div>
+      <textarea id="content" class="edit" name="content" rows="24" cols="100" data-preview-url="/api/pages/preview" data-draft-url="/api/pages/draft" data-autosave-delay="15000">${escapeHtml(content)}</textarea>
+      <div class="editBar">
+        <div class="editButtons">
+          <button type="submit">Save</button>
+          <button id="edbtn__preview" type="button">Preview</button>
+          <button type="submit" formaction="/api/pages/draft">Save draft</button>
+          <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>
+        </div>
+        <div class="summary">
+          <label for="summary"><span>Summary</span></label>
+          <input id="summary" name="summary" type="text" value="">
+          <label class="minor"><input name="minor" type="checkbox" value="1"> Minor edit</label>
+        </div>
+      </div>
+      <div id="wiki__preview" class="preview group" hidden aria-live="polite"></div>
     </form>
+    </div>
   `,
     { pageId: id, updatedAt: page?.updatedAt }
+  );
+}
+
+function renderConflictPage(
+  env: Env,
+  id: string,
+  submittedContent: string,
+  current: CurrentPage | null
+): string {
+  const currentDetails = current
+    ? `<p><strong>${escapeHtml(current.title ?? id)}</strong> · ${escapeHtml(current.updatedAt)}</p>`
+    : "<p>The current page could not be loaded.</p>";
+
+  return htmlShell(
+    env,
+    `Edit conflict for ${id}`,
+    `<h1>Edit conflict</h1>
+    <p>The page changed before your edit could be saved. Copy any changes you still need, then reopen the editor from the current page.</p>
+    <p><a href="${pagePath(id)}">View current page</a> · <a href="${pagePath(id)}?do=edit">Reopen editor</a></p>
+    <h2>Your submitted text</h2>
+    <pre><code>${escapeHtml(submittedContent)}</code></pre>
+    <h2>Current revision</h2>
+    ${currentDetails}`,
+    { pageId: id, updatedAt: current?.updatedAt }
   );
 }
 

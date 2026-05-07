@@ -84,6 +84,8 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain('<nav aria-label="Breadcrumb">');
     expect(html).toContain('<a href="/index?ns=wiki">wiki</a> / <span>welcome</span>');
+    expect(html).toContain('<script src="/dokuwiki.js" defer></script>');
+    expect(html).toContain('id="mobile__tools"');
     expect(html).toContain('<h1 id="welcome">Welcome</h1>');
     expect(cachePuts).toContain("page:wiki:welcome");
   });
@@ -157,6 +159,10 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
+    expect(html).toContain('id="dw__editform"');
+    expect(html).toContain('id="tool__bar"');
+    expect(html).toContain('id="edbtn__preview"');
+    expect(html).toContain('data-draft-url="/api/pages/draft"');
     expect(html).toContain('name="minor" type="checkbox"');
   });
 
@@ -426,6 +432,22 @@ describe("handleRequest", () => {
     expect(saveDraft.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
     expect(state.drafts).toHaveLength(1);
 
+    draft.set("content", "====== Draft ======\n\nAutosaved text.");
+    const autosaveDraft = await handleRequest(
+      new Request("https://example.com/api/pages/draft", {
+        method: "POST",
+        body: draft,
+        headers: {
+          accept: "application/json",
+          "x-requested-with": "XMLHttpRequest"
+        }
+      }),
+      env
+    );
+
+    expect(autosaveDraft.status).toBe(200);
+    await expect(autosaveDraft.json()).resolves.toMatchObject({ ok: true, id: "wiki:welcome" });
+
     const edit = await handleRequest(
       new Request("https://example.com/wiki/Wiki/Welcome?do=edit"),
       env
@@ -438,7 +460,7 @@ describe("handleRequest", () => {
     expect(edit.status).toBe(200);
     expect(draftView.status).toBe(200);
     await expect(edit.text()).resolves.toContain("Draft recovered:");
-    await expect(draftView.text()).resolves.toContain("Unsaved text.");
+    await expect(draftView.text()).resolves.toContain("Autosaved text.");
 
     const deleteDraft = await handleRequest(
       new Request("https://example.com/api/pages/draft/delete", {
@@ -494,6 +516,8 @@ describe("handleRequest", () => {
     );
 
     expect(response.status).toBe(409);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    await expect(response.text()).resolves.toContain("Edit conflict");
     expect(state.batches).toHaveLength(0);
   });
 

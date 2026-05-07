@@ -266,6 +266,19 @@ kbd {
   text-align: right;
 }
 
+#dokuwiki__header .mobileTools {
+  display: none;
+}
+
+#dokuwiki__header .mobileTools select {
+  width: 100%;
+  padding: 0.3em 0.1em;
+  border: 1px solid var(--dw-border);
+  background: var(--dw-background);
+  color: var(--dw-text);
+  font: inherit;
+}
+
 form.search {
   position: relative;
   display: block;
@@ -284,10 +297,14 @@ form.search input {
 }
 
 form.search button {
+  position: absolute;
+  top: 50%;
+  right: 4px;
   width: 19px;
   height: 14px;
-  margin-left: -20px;
+  margin-left: 0;
   padding: 0;
+  transform: translateY(-50%);
   border-width: 0;
   background: transparent url("/images/search.png") no-repeat 0 0;
   box-shadow: none;
@@ -514,6 +531,33 @@ form.search button {
   background: var(--dw-background-site);
 }
 
+.dokuwiki div.editBox {
+  margin-bottom: 1.4em;
+}
+
+.dokuwiki form#dw__editform {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dokuwiki div.toolbar {
+  display: block;
+  margin-bottom: 0.5em;
+}
+
+#tool__bar {
+  float: left;
+}
+
+#draft__status {
+  float: right;
+  margin-top: 0.25em;
+  color: var(--dw-text-alt);
+  background-color: inherit;
+  font-size: 0.875em;
+}
+
 .dokuwiki .page label {
   color: var(--dw-text-neutral);
   font-weight: bold;
@@ -538,6 +582,53 @@ form.search button {
     monospace;
 }
 
+.dokuwiki textarea.edit {
+  width: 100%;
+  margin-bottom: 0.5em;
+  resize: vertical;
+}
+
+.dokuwiki div.editBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7em 1em;
+  align-items: center;
+  margin-bottom: 0.5em;
+  overflow: hidden;
+}
+
+.dokuwiki .editBar .editButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+}
+
+.dokuwiki .editBar .summary {
+  display: flex;
+  flex: 1 1 28em;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  align-items: center;
+}
+
+.dokuwiki .editBar .summary label {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dokuwiki .editBar .summary input {
+  flex: 1 1 18em;
+  width: auto;
+  min-width: 12em;
+}
+
+.dokuwiki .editBar .summary .minor {
+  display: inline-flex;
+  gap: 0.25em;
+  align-items: center;
+  font-weight: normal;
+}
+
 .dokuwiki .page button {
   margin-right: 0.35em;
   padding: 0.35em 0.8em;
@@ -552,6 +643,34 @@ form.search button {
 .dokuwiki .page button:focus {
   border-color: #777;
   background: linear-gradient(#fff, #ccc);
+}
+
+.dokuwiki div.toolbar button.toolbutton {
+  min-width: 2.3em;
+  margin-right: -1px;
+  padding: 0.1em 0.35em;
+  border-radius: 0;
+}
+
+.dokuwiki div.toolbar button.toolbutton:first-child {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.dokuwiki div.toolbar button.toolbutton:last-child {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.dokuwiki div.preview {
+  margin-bottom: 1.4em;
+  padding: 1.4em 0;
+  border: dotted var(--dw-border);
+  border-width: 0.2em 0;
+}
+
+.dokuwiki div.preview[hidden] {
+  display: none;
 }
 
 .dokuwiki .page del {
@@ -734,12 +853,13 @@ form.search button {
   }
 }
 
-@media only screen and (max-width: 480px) {
+@media only screen and (max-width: 520px) {
   #dokuwiki__header {
     padding: 0.5em 0;
   }
 
   #dokuwiki__usertools,
+  #dokuwiki__sitetools ul,
   .dokuwiki div.breadcrumbs,
   .dokuwiki .pageId {
     display: none;
@@ -747,16 +867,41 @@ form.search button {
 
   #dokuwiki__sitetools form.search {
     float: left;
-    width: 100%;
-    margin: 0 0 0.5em;
+    width: 49%;
+    margin: 0 0.2em 0.5em 0;
   }
 
   #dokuwiki__sitetools form.search input {
     width: 100%;
   }
 
+  #dokuwiki__header .mobileTools {
+    display: block;
+    float: right;
+    width: 49%;
+    margin: 0 0 0.5em;
+    font-size: 0.875em;
+  }
+
   .dokuwiki div.page {
     padding: 0.5em;
+  }
+
+  #tool__bar,
+  #draft__status {
+    float: none;
+  }
+
+  #draft__status {
+    margin: 0.5em 0;
+  }
+
+  .dokuwiki .editBar .summary {
+    flex-basis: 100%;
+  }
+
+  .dokuwiki .editBar .summary input {
+    flex-basis: 100%;
   }
 
   .dokuwiki .page nav[aria-label="Breadcrumb"] {
