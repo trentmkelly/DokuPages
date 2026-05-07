@@ -188,8 +188,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for CSS and JavaScript assets.
 - [x] Implement route handling for AJAX endpoints.
 - [x] Implement route handling for login and logout.
-- [ ] Implement route handling for registration if supported.
-- [ ] Implement route handling for profile updates if supported.
+- [x] Implement route handling for registration if supported.
+- [x] Implement route handling for profile updates if supported.
 - [x] Implement route handling for admin pages.
 - [x] Implement route handling for remote APIs if supported.
 - [x] Implement 404 behavior compatible with DokuWiki settings.
@@ -301,10 +301,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement logout.
 - [x] Implement password hashing.
 - [x] Implement password verification.
-- [ ] Implement password reset if supported.
-- [ ] Implement registration if supported.
-- [ ] Implement profile update if supported.
-- [ ] Implement remember-me behavior or a secure replacement.
+- [x] Implement password reset if supported.
+- [x] Implement registration if supported.
+- [x] Implement profile update if supported.
+- [x] Implement remember-me behavior or a secure replacement.
 - [x] Implement session cookie behavior.
 - [x] Implement CSRF tokens.
 - [ ] Implement bearer token auth if remote APIs are supported.
@@ -523,7 +523,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Email And Notifications
 
-- [ ] Decide whether email features are in scope.
+- [x] Decide whether email features are in scope.
 - [ ] Choose an email provider compatible with Workers.
 - [ ] Implement mail sending adapter.
 - [ ] Implement registration notifications.

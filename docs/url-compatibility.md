@@ -16,6 +16,9 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?id=<page>&do=export_xhtml`               | Redirects to the XHTML export route.                                |
 | `/doku.php?do=admin`                                | Redirects to `/admin`.                                              |
 | `/doku.php?do=admin&page=acl`                       | Redirects to `/admin/acl`.                                          |
+| `/doku.php?do=register`                             | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=profile`                              | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=resendpwd`                            | Returns explicit `501` JSON.                                        |
 | `/feed.php`, `/feed`, `/feed.xml`                   | Serves RSS.                                                         |
 | `/atom.xml`                                         | Serves Atom.                                                        |
 | `/sitemap.xml`, `/sitemap`                          | Serves sitemap XML.                                                 |
@@ -37,6 +40,9 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/lib/exe/indexer.php`                              | Returns explicit `501` JSON.                                        |
 | `/lib/exe/taskrunner.php`                           | Returns `204` because there is no PHP task runner.                  |
 | `/install.php`                                      | Returns explicit `410` JSON; production installs are not supported. |
+| `/register`, `/profile`, `/resendpwd`               | Returns explicit `501` JSON.                                        |
+| `/api/auth/register`, `/api/auth/profile`           | Returns explicit `501` JSON.                                        |
+| `/api/auth/password-reset`                          | Returns explicit `501` JSON.                                        |
 
 Unsupported legacy executables are handled deliberately so old clients receive a
 stable response instead of an ambiguous 404.

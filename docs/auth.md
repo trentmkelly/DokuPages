@@ -22,6 +22,17 @@ Failed login attempts are rate limited by client IP and username in KV. Five fai
 
 Login success, login failure, login rate-limit, and logout events emit structured `auth_event` logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
 
+## Deferred Account Flows
+
+Registration, profile editing, password reset, and persistent remember-me tokens
+are not supported for the first Pages launch. Direct native paths, matching
+`/api/auth/*` paths, and legacy DokuWiki actions return explicit `501` JSON
+instead of falling through to unrelated page views.
+
+The secure launch replacement for remember-me behavior is the HTTP-only native
+session cookie. Longer-lived persistent login tokens need a separate threat
+model before they are enabled.
+
 ## Password Hashing
 
 New native accounts use PBKDF2-HMAC-SHA-256 through Web Crypto. Encoded hashes use:

@@ -242,6 +242,11 @@ export async function handleRequest(
     return htmlResponseWithCsrf(request, renderLogoutPage(env, url, undefined, csrf.token), csrf);
   }
 
+  const unsupportedAccountPath = unsupportedAccountFeatureForPath(url.pathname);
+  if (unsupportedAccountPath) {
+    return authFeatureNotSupportedResponse(unsupportedAccountPath);
+  }
+
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     return handleLogin(request, env);
   }
@@ -442,6 +447,11 @@ export async function handleRequest(
       return htmlResponse(renderLogoutPage(env, url, pagePath(id)));
     }
 
+    const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
+    if (unsupportedAccountAction) {
+      return authFeatureNotSupportedResponse(unsupportedAccountAction);
+    }
+
     if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
@@ -577,6 +587,11 @@ function redirectLegacyDokuPhp(url: URL, env: Env): Response {
 
   if (url.searchParams.get("do") === "admin" && url.searchParams.get("page") === "acl") {
     return redirectResponse("/admin/acl", 301);
+  }
+
+  const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
+  if (unsupportedAccountAction) {
+    return authFeatureNotSupportedResponse(unsupportedAccountAction);
   }
 
   const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
@@ -2396,6 +2411,49 @@ function logAuthEvent(
       ip: getClientIp(request),
       ...details
     })
+  );
+}
+
+function unsupportedAccountFeatureForPath(pathname: string): string | null {
+  switch (pathname) {
+    case "/register":
+    case "/api/auth/register":
+      return "registration";
+    case "/profile":
+    case "/api/auth/profile":
+      return "profile_update";
+    case "/resendpwd":
+    case "/password-reset":
+    case "/api/auth/password-reset":
+      return "password_reset";
+    default:
+      return null;
+  }
+}
+
+function unsupportedAccountFeatureForAction(action: string | null): string | null {
+  switch (action) {
+    case "register":
+      return "registration";
+    case "profile":
+      return "profile_update";
+    case "password":
+    case "password_reset":
+    case "resendpwd":
+      return "password_reset";
+    default:
+      return null;
+  }
+}
+
+function authFeatureNotSupportedResponse(feature: string): Response {
+  return jsonResponse(
+    {
+      error: `${feature} is not supported by this Pages port yet.`,
+      feature,
+      status: "not_supported"
+    },
+    { status: 501 }
   );
 }
 

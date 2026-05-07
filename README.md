@@ -12,6 +12,7 @@ The current deployment is a Cloudflare Pages scaffold with:
 - admin operations in `docs/admin.md`
 - data import workflow in `docs/data-import.md`
 - deployment and environment setup in `docs/deployment.md`
+- email scope in `docs/email.md`
 - supported features and limitations in `docs/features.md`
 - backup, restore, rollback, and launch operations in `docs/operations.md`
 - plugin compatibility decisions in `docs/plugin-compatibility.md`

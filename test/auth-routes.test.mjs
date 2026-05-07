@@ -35,6 +35,31 @@ describe("auth routes", () => {
     expect(html).toContain('name="sectok"');
   });
 
+  it("returns explicit not-supported responses for deferred account flows", async () => {
+    env = createEnv();
+    const urls = [
+      "https://example.com/register",
+      "https://example.com/profile",
+      "https://example.com/resendpwd",
+      "https://example.com/password-reset",
+      "https://example.com/api/auth/register",
+      "https://example.com/api/auth/profile",
+      "https://example.com/api/auth/password-reset",
+      "https://example.com/doku.php?do=register",
+      "https://example.com/doku.php?do=profile",
+      "https://example.com/doku.php?do=resendpwd",
+      "https://example.com/wiki/wiki/welcome?do=register"
+    ];
+
+    for (const url of urls) {
+      const response = await handleRequest(new Request(url), env);
+      expect(response.status, url).toBe(501);
+      await expect(response.json(), url).resolves.toMatchObject({
+        status: "not_supported"
+      });
+    }
+  });
+
   it("logs in native users, resolves the session principal, and logs out", async () => {
     env = createEnv();
     await seedUser(env.DB);
