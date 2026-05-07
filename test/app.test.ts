@@ -184,7 +184,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 7,
+        rendererVersion: 8,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -233,6 +233,22 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain('id="dw__toc"');
     expect(html).toContain('<a href="#details">Details</a>');
+  });
+
+  it("honors page render control macros", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content: "~~NOTOC~~\n~~NOCACHE~~\n====== Welcome ======\n\n===== Details =====\n\nMore text."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).not.toContain('id="dw__toc"');
+    expect(html).not.toContain("~~NOTOC~~");
+    expect(html).not.toContain("~~NOCACHE~~");
+    expect(cachePuts).toHaveLength(0);
   });
 
   it("returns 404 when a wiki page does not exist", async () => {

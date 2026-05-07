@@ -12,6 +12,8 @@ export interface RenderedWikiText {
   html: string;
   title: string | null;
   toc: TocItem[];
+  noCache: boolean;
+  noToc: boolean;
 }
 
 export interface RenderWikiTextOptions {
@@ -22,6 +24,7 @@ export function renderWikiText(
   source: string,
   options: RenderWikiTextOptions = {}
 ): RenderedWikiText {
+  const directives = getWikiRenderDirectives(source);
   const blocks: string[] = [];
   const toc: TocItem[] = [];
   const context: RenderContext = {
@@ -39,6 +42,10 @@ export function renderWikiText(
   };
 
   for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
+    if (isRenderDirectiveLine(line)) {
+      continue;
+    }
+
     if (state.specialBlock) {
       if (line.trim().toLowerCase() === `</${state.specialBlock.type}>`) {
         flushSpecialBlock(blocks, state);
@@ -133,8 +140,27 @@ export function renderWikiText(
   return {
     html: blocks.join("\n"),
     title: title.value,
-    toc
+    toc: directives.noToc ? [] : toc,
+    noCache: directives.noCache,
+    noToc: directives.noToc
   };
+}
+
+export function getWikiRenderDirectives(source: string): { noCache: boolean; noToc: boolean } {
+  const directives = { noCache: false, noToc: false };
+
+  for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
+    const trimmed = line.trim().toUpperCase();
+    directives.noCache ||= trimmed === "~~NOCACHE~~";
+    directives.noToc ||= trimmed === "~~NOTOC~~";
+  }
+
+  return directives;
+}
+
+function isRenderDirectiveLine(line: string): boolean {
+  const trimmed = line.trim().toUpperCase();
+  return trimmed === "~~NOCACHE~~" || trimmed === "~~NOTOC~~";
 }
 
 interface ParserState {

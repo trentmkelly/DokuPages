@@ -39,11 +39,11 @@ import {
   type PageDraft,
   type PageRevision
 } from "./wiki/page-service";
-import { renderWikiText, type TocItem } from "./wiki/render";
+import { getWikiRenderDirectives, renderWikiText, type TocItem } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
-const RENDER_CACHE_VERSION = 7;
+const RENDER_CACHE_VERSION = 8;
 
 interface RenderCacheEntry {
   rendererVersion: number;
@@ -508,10 +508,11 @@ async function renderPageHtml(
   page?: CurrentPage
 ): Promise<string> {
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
+  const directives = getWikiRenderDirectives(content);
   const revisionNotice = revisionDate
     ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
     : "";
-  const cached = await readRenderCache(env, cacheKey, revisionId);
+  const cached = directives.noCache ? null : await readRenderCache(env, cacheKey, revisionId);
 
   if (cached) {
     return htmlShell(
@@ -524,13 +525,16 @@ async function renderPageHtml(
 
   const rendered = renderWikiText(content, { pageId: id });
   const title = rendered.title ?? page?.title ?? id;
-  await writeRenderCache(env, cacheKey, {
-    rendererVersion: RENDER_CACHE_VERSION,
-    revisionId,
-    title,
-    html: rendered.html,
-    toc: rendered.toc
-  });
+
+  if (!rendered.noCache) {
+    await writeRenderCache(env, cacheKey, {
+      rendererVersion: RENDER_CACHE_VERSION,
+      revisionId,
+      title,
+      html: rendered.html,
+      toc: rendered.toc
+    });
+  }
 
   return htmlShell(
     env,

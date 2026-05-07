@@ -10,6 +10,17 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<h1 id="welcome-page">Welcome Page</h1>');
   });
 
+  it("honors standalone rendering control macros", () => {
+    const rendered = renderWikiText("~~NOTOC~~\n~~NOCACHE~~\n====== One ======\n\n===== Two =====");
+
+    expect(rendered.noToc).toBe(true);
+    expect(rendered.noCache).toBe(true);
+    expect(rendered.toc).toEqual([]);
+    expect(rendered.html).toContain('<h1 id="one">One</h1>');
+    expect(rendered.html).not.toContain("~~NOTOC~~");
+    expect(rendered.html).not.toContain("~~NOCACHE~~");
+  });
+
   it("renders paragraphs and inline formatting", () => {
     const rendered = renderWikiText(
       "**bold** //italic// __under__ ''code'' ,,sub,, <sup>sup</sup> <del>gone</del>"
