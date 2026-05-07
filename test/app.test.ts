@@ -4,18 +4,16 @@ import type { Env } from "../src/env";
 
 interface D1StubState {
   row: Record<string, unknown> | null;
+  revisions: Record<string, unknown>[];
+  changelog: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
 }
 
 const state: D1StubState = {
-  row: {
-    id: "wiki:welcome",
-    title: "Welcome",
-    revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
-    content: "====== Welcome ======\n\nImported page.",
-    updated_at: "2026-05-07T00:00:00.000Z"
-  },
+  row: currentPageRow(),
+  revisions: seedRevisions(),
+  changelog: seedChangelog(),
   deleted: false,
   batches: []
 };
@@ -36,13 +34,9 @@ const env = {
 
 describe("handleRequest", () => {
   beforeEach(() => {
-    state.row = {
-      id: "wiki:welcome",
-      title: "Welcome",
-      revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
-      content: "====== Welcome ======\n\nImported page.",
-      updated_at: "2026-05-07T00:00:00.000Z"
-    };
+    state.row = currentPageRow();
+    state.revisions = seedRevisions();
+    state.changelog = seedChangelog();
     state.deleted = false;
     state.batches = [];
     purgedKeys.length = 0;
@@ -96,6 +90,58 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain("Imported page.");
+  });
+
+  it("renders page revision history", async () => {
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/Wiki/Welcome?do=revisions"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Revisions for wiki:welcome");
+    expect(html).toContain("Initial import");
+    expect(html).toContain("wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z");
+  });
+
+  it("renders an old page revision", async () => {
+    const response = await handleRequest(
+      new Request(
+        "https://example.com/wiki/Wiki/Welcome?rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Old revision:");
+    expect(html).toContain("Older page.");
+  });
+
+  it("renders a page diff against the current revision", async () => {
+    const response = await handleRequest(
+      new Request(
+        "https://example.com/wiki/Wiki/Welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Diff for wiki:welcome");
+    expect(html).toContain("<del>Older page.</del>");
+    expect(html).toContain("<ins>Imported page.</ins>");
+  });
+
+  it("renders recent page changes", async () => {
+    const response = await handleRequest(new Request("https://example.com/recent"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Recent changes");
+    expect(html).toContain("Initial import");
+    expect(html).toContain("/wiki/wiki/welcome");
   });
 
   it("previews submitted wiki text", async () => {
@@ -211,7 +257,31 @@ function createD1Stub(state: D1StubState): D1Database {
         values,
         first: async () => {
           const [id] = values;
+          if (sql.includes("from page_revisions") && !sql.includes("join")) {
+            return state.revisions.find((revision) => revision.id === id) ?? null;
+          }
+
           return !state.deleted && state.row?.id === id ? state.row : null;
+        },
+        all: async () => {
+          const [idOrLimit, rawLimit] = values;
+          const limit = typeof rawLimit === "number" ? rawLimit : Number(idOrLimit);
+
+          if (sql.includes("from page_revisions")) {
+            return {
+              results: state.revisions
+                .filter((revision) => revision.page_id === idOrLimit)
+                .slice(0, Number.isFinite(limit) ? limit : 50)
+            };
+          }
+
+          if (sql.includes("from changelog")) {
+            return {
+              results: state.changelog.slice(0, Number.isFinite(limit) ? limit : 50)
+            };
+          }
+
+          return { results: [] };
         }
       })
     }),
@@ -223,10 +293,14 @@ function createD1Stub(state: D1StubState): D1Database {
       const revisionStatement = statements.find((statement) =>
         statement.sql.includes("insert into page_revisions")
       );
+      const changelogStatement = statements.find((statement) =>
+        statement.sql.includes("insert into changelog")
+      );
 
       if (pagesStatement && revisionStatement) {
         const [id, , title, revisionId, isDeleted, , updatedAt] = pagesStatement.values;
-        const [, , content] = revisionStatement.values;
+        const [, pageId, content, , , , summary, changeType, sizeChange, createdAt] =
+          revisionStatement.values;
 
         state.deleted = isDeleted === 1;
         state.row = {
@@ -236,9 +310,94 @@ function createD1Stub(state: D1StubState): D1Database {
           content,
           updated_at: updatedAt
         };
+        state.revisions.unshift({
+          id: revisionId,
+          page_id: pageId,
+          content,
+          summary,
+          change_type: changeType,
+          size_change: sizeChange,
+          created_at: createdAt
+        });
+      }
+
+      if (changelogStatement) {
+        const [
+          changelogId,
+          subjectId,
+          revisionId,
+          ,
+          userName,
+          ,
+          changeType,
+          summary,
+          sizeChange,
+          createdAt
+        ] = changelogStatement.values;
+
+        state.changelog.unshift({
+          id: changelogId,
+          subject_type: "page",
+          subject_id: subjectId,
+          revision_id: revisionId,
+          user_name: userName,
+          change_type: changeType,
+          summary,
+          size_change: sizeChange,
+          created_at: createdAt
+        });
       }
 
       return [];
     }
   } as unknown as D1Database;
+}
+
+function currentPageRow(): Record<string, unknown> {
+  return {
+    id: "wiki:welcome",
+    title: "Welcome",
+    revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
+    content: "====== Welcome ======\n\nImported page.",
+    updated_at: "2026-05-07T00:00:00.000Z"
+  };
+}
+
+function seedRevisions(): Record<string, unknown>[] {
+  return [
+    {
+      id: "wiki:welcome@2026-05-07T00:00:00.000Z",
+      page_id: "wiki:welcome",
+      content: "====== Welcome ======\n\nImported page.",
+      summary: "Initial import",
+      change_type: "create",
+      size_change: 38,
+      created_at: "2026-05-07T00:00:00.000Z"
+    },
+    {
+      id: "wiki:welcome@2026-05-06T00:00:00.000Z",
+      page_id: "wiki:welcome",
+      content: "====== Welcome ======\n\nOlder page.",
+      summary: "Older import",
+      change_type: "edit",
+      size_change: 34,
+      created_at: "2026-05-06T00:00:00.000Z"
+    }
+  ];
+}
+
+function seedChangelog(): Record<string, unknown>[] {
+  return [
+    {
+      id: "page:wiki:welcome@2026-05-07T00:00:00.000Z",
+      subject_type: "page",
+      subject_id: "wiki:welcome",
+      revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
+      user_name: null,
+      change_type: "create",
+      summary: "Initial import",
+      size_change: 38,
+      created_at: "2026-05-07T00:00:00.000Z"
+    }
+  ];
 }

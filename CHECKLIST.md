@@ -172,12 +172,12 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for edit pages.
 - [x] Implement route handling for saves.
 - [x] Implement route handling for preview.
-- [ ] Implement route handling for revisions.
-- [ ] Implement route handling for diffs.
+- [x] Implement route handling for revisions.
+- [x] Implement route handling for diffs.
 - [ ] Implement route handling for backlinks.
 - [ ] Implement route handling for search.
 - [ ] Implement route handling for namespace index.
-- [ ] Implement route handling for recent changes.
+- [x] Implement route handling for recent changes.
 - [ ] Implement route handling for media fetches.
 - [ ] Implement route handling for media details.
 - [ ] Implement route handling for media manager.
@@ -255,9 +255,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement backlinks.
 - [ ] Implement orphan pages if supported.
 - [ ] Implement wanted pages if supported.
-- [ ] Implement recent changes.
-- [ ] Implement old revisions.
-- [ ] Implement page diff.
+- [x] Implement recent changes.
+- [x] Implement old revisions.
+- [x] Implement page diff.
 - [x] Implement source view.
 - [ ] Implement export modes that remain in scope.
 - [ ] Implement page metadata updates.
@@ -649,8 +649,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Add integration tests for page edit.
 - [ ] Add integration tests for page delete.
 - [ ] Add integration tests for page revert.
-- [ ] Add integration tests for revisions.
-- [ ] Add integration tests for diff.
+- [x] Add integration tests for revisions.
+- [x] Add integration tests for diff.
 - [ ] Add integration tests for search.
 - [ ] Add integration tests for media upload.
 - [ ] Add integration tests for media fetch.

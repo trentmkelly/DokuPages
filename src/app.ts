@@ -8,7 +8,16 @@ import {
   redirectResponse
 } from "./http/responses";
 import { cleanPageId } from "./wiki/page-id";
-import { getCurrentPage, pagePath, savePage } from "./wiki/page-service";
+import {
+  getCurrentPage,
+  getPageRevision,
+  listPageRevisions,
+  listRecentChanges,
+  pagePath,
+  savePage,
+  type CurrentPage,
+  type PageRevision
+} from "./wiki/page-service";
 import { renderWikiText } from "./wiki/render";
 
 type AssetFallback = () => Promise<Response>;
@@ -22,6 +31,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/health") {
     return healthResponse(env);
+  }
+
+  if (url.pathname === "/recent") {
+    return htmlResponse(await renderRecentPage(env));
   }
 
   if (url.pathname === "/api/pages" && request.method === "POST") {
@@ -46,6 +59,29 @@ export async function handleRequest(
       return jsonResponse({ error: "Method not allowed." }, { status: 405 });
     }
 
+    if (url.searchParams.get("do") === "revisions") {
+      return htmlResponse(await renderRevisionsPage(env, id));
+    }
+
+    if (url.searchParams.get("do") === "diff") {
+      return htmlResponse(await renderDiffPage(env, id, url));
+    }
+
+    if (url.searchParams.get("do") === "recent") {
+      return htmlResponse(await renderRecentPage(env));
+    }
+
+    const revisionId = url.searchParams.get("rev");
+    if (revisionId) {
+      const revision = await getPageRevision(env.DB, revisionId);
+      if (!revision || revision.pageId !== id) {
+        return notFoundResponse(`Revision '${revisionId}' was not found.`);
+      }
+      return htmlResponse(
+        renderPageHtml(env, revision.pageId, revision.content, revision.createdAt)
+      );
+    }
+
     const page = await getCurrentPage(env.DB, id);
 
     if (url.searchParams.get("do") === "edit") {
@@ -68,24 +104,7 @@ export async function handleRequest(
       return notFoundResponse(`Wiki page '${id}' was not found.`);
     }
 
-    const rendered = renderWikiText(page.content);
-    const title = rendered.title ?? page.title ?? id;
-
-    return htmlResponse(
-      `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)} - ${escapeHtml(env.SITE_NAME ?? "DokuWiki Pages")}</title>
-</head>
-<body>
-  <main>
-    ${rendered.html}
-  </main>
-</body>
-</html>`
-    );
+    return htmlResponse(renderPageHtml(env, id, page.content, undefined, page));
   }
 
   if (assetFallback) {
@@ -93,6 +112,121 @@ export async function handleRequest(
   }
 
   return notFoundResponse("Not found.");
+}
+
+function renderPageHtml(
+  env: Env,
+  id: string,
+  content: string,
+  revisionDate?: string,
+  page?: CurrentPage
+): string {
+  const rendered = renderWikiText(content);
+  const title = rendered.title ?? page?.title ?? id;
+  const revisionNotice = revisionDate
+    ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
+    : "";
+
+  return htmlShell(env, title, `${revisionNotice}${rendered.html}`);
+}
+
+async function renderRevisionsPage(env: Env, id: string): Promise<string> {
+  const revisions = await listPageRevisions(env.DB, id);
+  const items = revisions
+    .map(
+      (revision) => `<li>
+        <a href="${pagePath(id)}?rev=${encodeURIComponent(revision.id)}">${escapeHtml(revision.createdAt)}</a>
+        ${escapeHtml(revision.changeType)}
+        ${revision.summary ? ` - ${escapeHtml(revision.summary)}` : ""}
+        <a href="${pagePath(id)}?do=diff&rev=${encodeURIComponent(revision.id)}">diff</a>
+      </li>`
+    )
+    .join("");
+
+  return htmlShell(
+    env,
+    `Revisions for ${id}`,
+    `<h1>Revisions for ${escapeHtml(id)}</h1><ul>${items}</ul>`
+  );
+}
+
+async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
+  const rev = url.searchParams.get("rev");
+  const rev2 = url.searchParams.get("rev2");
+
+  if (!rev) {
+    return htmlShell(env, "Missing revision", "<p>Missing revision.</p>");
+  }
+
+  const left = await getPageRevision(env.DB, rev);
+  const right = rev2 ? await getPageRevision(env.DB, rev2) : await getCurrentPage(env.DB, id);
+
+  if (!left || !right || left.pageId !== id || getComparablePageId(right) !== id) {
+    return htmlShell(env, "Diff not found", "<p>Diff source not found.</p>");
+  }
+
+  const rows = renderLineDiff(left.content, right.content);
+
+  return htmlShell(
+    env,
+    `Diff for ${id}`,
+    `<h1>Diff for ${escapeHtml(id)}</h1><table><tbody>${rows}</tbody></table>`
+  );
+}
+
+async function renderRecentPage(env: Env): Promise<string> {
+  const changes = await listRecentChanges(env.DB);
+  const items = changes
+    .map(
+      (change) => `<li>
+        <a href="${pagePath(change.subjectId)}">${escapeHtml(change.subjectId)}</a>
+        ${escapeHtml(change.changeType)}
+        ${change.summary ? ` - ${escapeHtml(change.summary)}` : ""}
+        <time>${escapeHtml(change.createdAt)}</time>
+      </li>`
+    )
+    .join("");
+
+  return htmlShell(env, "Recent changes", `<h1>Recent changes</h1><ul>${items}</ul>`);
+}
+
+function renderLineDiff(left: string, right: string): string {
+  const oldLines = left.split("\n");
+  const newLines = right.split("\n");
+  const max = Math.max(oldLines.length, newLines.length);
+  const rows: string[] = [];
+
+  for (let index = 0; index < max; index += 1) {
+    const oldLine = oldLines[index] ?? "";
+    const newLine = newLines[index] ?? "";
+    const changed = oldLine !== newLine;
+
+    rows.push(`<tr>
+      <td>${index + 1}</td>
+      <td>${changed ? `<del>${escapeHtml(oldLine)}</del>` : escapeHtml(oldLine)}</td>
+      <td>${changed ? `<ins>${escapeHtml(newLine)}</ins>` : escapeHtml(newLine)}</td>
+    </tr>`);
+  }
+
+  return rows.join("");
+}
+
+function getComparablePageId(page: CurrentPage | PageRevision): string {
+  return "pageId" in page ? page.pageId : page.id;
+}
+
+function htmlShell(env: Env, title: string, body: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} - ${escapeHtml(env.SITE_NAME ?? "DokuWiki Pages")}</title>
+</head>
+<body>
+  <main>${body}</main>
+</body>
+</html>`;
 }
 
 async function handleSave(request: Request, env: Env): Promise<Response> {

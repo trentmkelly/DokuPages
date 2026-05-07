@@ -6,6 +6,27 @@ export interface CurrentPage {
   updatedAt: string;
 }
 
+export interface PageRevision {
+  id: string;
+  pageId: string;
+  content: string;
+  summary: string;
+  changeType: "create" | "edit" | "minor" | "delete" | "revert";
+  sizeChange: number;
+  createdAt: string;
+}
+
+export interface RecentChange {
+  id: string;
+  subjectId: string;
+  revisionId: string | null;
+  userName: string | null;
+  changeType: string;
+  summary: string;
+  sizeChange: number;
+  createdAt: string;
+}
+
 export interface SavePageInput {
   id: string;
   content: string;
@@ -37,6 +58,27 @@ interface CurrentPageRow {
   updated_at: string;
 }
 
+interface PageRevisionRow {
+  id: string;
+  page_id: string;
+  content: string;
+  summary: string;
+  change_type: PageRevision["changeType"];
+  size_change: number;
+  created_at: string;
+}
+
+interface RecentChangeRow {
+  id: string;
+  subject_id: string;
+  revision_id: string | null;
+  user_name: string | null;
+  change_type: string;
+  summary: string;
+  size_change: number;
+  created_at: string;
+}
+
 export async function getCurrentPage(db: D1Database, id: string): Promise<CurrentPage | null> {
   const row = await db
     .prepare(
@@ -57,6 +99,65 @@ export async function getCurrentPage(db: D1Database, id: string): Promise<Curren
     content: row.content,
     updatedAt: row.updated_at
   };
+}
+
+export async function getPageRevision(
+  db: D1Database,
+  revisionId: string
+): Promise<PageRevision | null> {
+  const row = await db
+    .prepare(
+      `select id, page_id, content, summary, change_type, size_change, created_at
+       from page_revisions
+       where id = ?`
+    )
+    .bind(revisionId)
+    .first<PageRevisionRow>();
+
+  return row ? mapRevision(row) : null;
+}
+
+export async function listPageRevisions(
+  db: D1Database,
+  pageId: string,
+  limit = 50
+): Promise<PageRevision[]> {
+  const result = await db
+    .prepare(
+      `select id, page_id, content, summary, change_type, size_change, created_at
+       from page_revisions
+       where page_id = ?
+       order by created_at desc
+       limit ?`
+    )
+    .bind(pageId, Math.max(1, Math.min(limit, 100)))
+    .all<PageRevisionRow>();
+
+  return result.results.map(mapRevision);
+}
+
+export async function listRecentChanges(db: D1Database, limit = 50): Promise<RecentChange[]> {
+  const result = await db
+    .prepare(
+      `select id, subject_id, revision_id, user_name, change_type, summary, size_change, created_at
+       from changelog
+       where subject_type = 'page'
+       order by created_at desc
+       limit ?`
+    )
+    .bind(Math.max(1, Math.min(limit, 100)))
+    .all<RecentChangeRow>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    subjectId: row.subject_id,
+    revisionId: row.revision_id,
+    userName: row.user_name,
+    changeType: row.change_type,
+    summary: row.summary,
+    sizeChange: row.size_change,
+    createdAt: row.created_at
+  }));
 }
 
 export async function savePage(db: D1Database, input: SavePageInput): Promise<SavePageResult> {
@@ -154,6 +255,18 @@ export function pagePath(id: string): string {
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/")}`;
+}
+
+function mapRevision(row: PageRevisionRow): PageRevision {
+  return {
+    id: row.id,
+    pageId: row.page_id,
+    content: row.content,
+    summary: row.summary,
+    changeType: row.change_type,
+    sizeChange: row.size_change,
+    createdAt: row.created_at
+  };
 }
 
 function extractTitle(content: string): string | null {
