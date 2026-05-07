@@ -98,7 +98,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add formatting.
 - [x] Add unit test framework.
 - [x] Add integration test framework.
-- [ ] Add end-to-end test framework.
+- [x] Add end-to-end test framework.
 - [x] Add CI workflow.
 - [x] Add environment configuration templates.
 - [x] Add D1 migration directory.

@@ -1,0 +1,13 @@
+# Testing
+
+The project has unit, integration, and deployed end-to-end checks.
+
+```sh
+npm test
+npm run typecheck
+npm run lint
+npm run format:check
+npm run test:e2e -- --base-url https://dokutest.pages.dev
+```
+
+`test:e2e` runs the Pages smoke runner against a deployed URL. It verifies health, page rendering, canonical redirects, and sitemap generation over real HTTP so Cloudflare bindings and routing are exercised outside the in-memory integration harness.
