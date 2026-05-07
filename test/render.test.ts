@@ -82,6 +82,12 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<a href="/doku.php?do=admin&amp;page=config">config</a>');
   });
 
+  it("renders Windows share links", () => {
+    const rendered = renderWikiText(String.raw`[[\\server\share|this]]`);
+
+    expect(rendered.html).toContain('<a href="file://///server/share" class="windows">this</a>');
+  });
+
   it("renders lists, code blocks, and nowiki spans", () => {
     const rendered = renderWikiText("  * first\n  * **second**\n\n  <unsafe>\n\n%%**literal**%%");
 

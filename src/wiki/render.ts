@@ -332,15 +332,23 @@ function renderLinks(source: string, context: RenderContext): string {
     const label = decodeHtmlEntities(rawLabel?.trim() || target);
     const external = /^https?:\/\//i.test(target);
     const interwiki = external ? null : resolveInterwikiLink(target);
+    const windowsShare = external || interwiki ? null : windowsSharePath(target);
     const href = external
       ? target
       : interwiki
         ? interwiki.href
-        : internalLinkPath(target, context.pageId);
+        : windowsShare
+          ? windowsShare
+          : internalLinkPath(target, context.pageId);
     const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
+    const linkClass = windowsShare ? ' class="windows"' : "";
 
-    return `<a href="${escapeAttribute(href)}"${rel}>${escapeHtml(label)}</a>`;
+    return `<a href="${escapeAttribute(href)}"${rel}${linkClass}>${escapeHtml(label)}</a>`;
   });
+}
+
+function windowsSharePath(target: string): string | null {
+  return target.startsWith("\\\\") ? `file:///${target.replaceAll("\\", "/")}` : null;
 }
 
 function internalLinkPath(target: string, currentPageId: string | undefined): string {

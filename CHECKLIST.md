@@ -210,7 +210,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement media links.
 - [x] Implement external links.
 - [x] Implement interwiki links.
-- [ ] Implement Windows share links if supported.
+- [x] Implement Windows share links if supported.
 - [ ] Implement email links and mailguard behavior.
 - [x] Implement lists.
 - [x] Implement tables.
