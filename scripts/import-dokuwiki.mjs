@@ -156,6 +156,23 @@ on conflict(term, page_id) do update set
     }
   }
 
+  for (const revision of plan.pageRevisions) {
+    const raw = await readMaybeCompressed(revision.sourcePath, revision.compression);
+    const content = raw.toString("utf8");
+    const createdAt = pageRevisionCreatedAt(revision);
+
+    statements.push(
+      `insert or replace into page_revisions (
+  id, page_id, content, content_hash, author_id, author_name, summary, change_type, size_change, created_at
+) values (
+  ${sql(`${revision.pageId}@${createdAt}`)}, ${sql(revision.pageId)}, ${sql(content)}, ${sql(
+    revision.contentHash
+  )}, null, null,
+  'Imported from DokuWiki attic', 'edit', ${revision.byteLength}, ${sql(createdAt)}
+);`
+    );
+  }
+
   statements.push(
     `update search_terms
 set document_count = (
@@ -319,6 +336,50 @@ export async function writeMediaManifest(plan, outputFile) {
   await fs.writeFile(outputFile, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
+export async function writeHashManifest(plan, outputFile) {
+  await fs.mkdir(path.dirname(outputFile), { recursive: true });
+  await fs.writeFile(outputFile, `${JSON.stringify(buildImportHashManifest(plan), null, 2)}\n`);
+}
+
+export function buildImportHashManifest(plan) {
+  return {
+    generatedAt: plan.generatedAt,
+    sourceRoot: plan.sourceRoot,
+    pages: plan.pages.map((page) => ({
+      id: page.id,
+      revisionId: `${page.id}@${page.modifiedAt}`,
+      sourcePath: page.sourcePath,
+      byteLength: page.byteLength,
+      contentHash: page.contentHash,
+      modifiedAt: page.modifiedAt
+    })),
+    pageRevisions: plan.pageRevisions.map((revision) => {
+      const createdAt = pageRevisionCreatedAt(revision);
+
+      return {
+        pageId: revision.pageId,
+        revisionId: `${revision.pageId}@${createdAt}`,
+        sourcePath: revision.sourcePath,
+        compression: revision.compression,
+        byteLength: revision.byteLength,
+        contentHash: revision.contentHash,
+        modifiedAt: revision.modifiedAt,
+        createdAt
+      };
+    }),
+    mediaObjects: mediaImportObjects(plan).map((object) => ({
+      role: object.role,
+      mediaId: object.mediaId,
+      revisionId: object.revisionId,
+      sourcePath: object.sourcePath,
+      objectKey: object.objectKey,
+      byteLength: object.byteLength,
+      contentHash: object.contentHash,
+      modifiedAt: object.modifiedAt
+    }))
+  };
+}
+
 export async function discoverPages(pagesRoot) {
   const files = await walkFiles(pagesRoot);
   const pages = [];
@@ -468,6 +529,14 @@ function mediaMimeType(id, mimeTypes) {
 }
 
 function mediaRevisionCreatedAt(revision) {
+  if (/^\d{10,}$/.test(revision.revision)) {
+    return new Date(Number.parseInt(revision.revision, 10) * 1000).toISOString();
+  }
+
+  return revision.modifiedAt;
+}
+
+function pageRevisionCreatedAt(revision) {
   if (/^\d{10,}$/.test(revision.revision)) {
     return new Date(Number.parseInt(revision.revision, 10) * 1000).toISOString();
   }
@@ -1175,7 +1244,8 @@ function parseArgs(argv) {
     source: "../dokuwiki",
     dryRun: false,
     sqlOut: "",
-    mediaManifestOut: ""
+    mediaManifestOut: "",
+    hashManifestOut: ""
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -1188,6 +1258,8 @@ function parseArgs(argv) {
       args.sqlOut = argv[++index];
     } else if (arg === "--media-manifest-out") {
       args.mediaManifestOut = argv[++index];
+    } else if (arg === "--hash-manifest-out") {
+      args.hashManifestOut = argv[++index];
     }
   }
 
@@ -1204,6 +1276,10 @@ async function main() {
 
   if (args.mediaManifestOut) {
     await writeMediaManifest(plan, args.mediaManifestOut);
+  }
+
+  if (args.hashManifestOut) {
+    await writeHashManifest(plan, args.hashManifestOut);
   }
 
   console.log(JSON.stringify(plan, null, 2));

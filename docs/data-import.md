@@ -29,6 +29,17 @@ npm run import:media-upload
 
 The manifest maps each `data/media` and `data/media_attic` file to the R2 object key stored in D1. The upload script requires either `--remote` or `--local`; the package script targets the remote `dokuwiki-pages-dev-media` bucket.
 
+## Hash Manifest
+
+```sh
+npm run import:hash-manifest
+```
+
+The hash manifest records expected SHA-256 hashes for current pages, attic page
+revisions, current media, and media attic objects. Use it after import to compare
+D1 `page_revisions.content_hash`, D1 media hash columns, and downloaded R2 object
+hashes against the source flat-file hashes.
+
 ## Validation
 
 After importing, run:

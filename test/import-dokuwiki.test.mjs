@@ -6,6 +6,7 @@ import { gzip } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   buildImportPlan,
+  writeHashManifest,
   writeMediaManifest,
   writePageImportSql
 } from "../scripts/import-dokuwiki.mjs";
@@ -318,11 +319,34 @@ describe("DokuWiki import planner", () => {
         objectKey: "media/revisions/wiki/logo.svg/1767225600"
       })
     );
+
+    const hashManifestOutput = path.join(root, "hash-manifest.json");
+    await writeHashManifest(plan, hashManifestOutput);
+    const hashManifest = JSON.parse(await readFile(hashManifestOutput, "utf8"));
+    expect(hashManifest.pages).toContainEqual(
+      expect.objectContaining({
+        id: "wiki:welcome",
+        contentHash: plan.pages[0].contentHash
+      })
+    );
+    expect(hashManifest.pageRevisions).toContainEqual(
+      expect.objectContaining({
+        revisionId: "wiki:welcome@2026-01-01T00:00:00.000Z",
+        contentHash: plan.pageRevisions[0].contentHash
+      })
+    );
+    expect(hashManifest.mediaObjects).toContainEqual(
+      expect.objectContaining({
+        objectKey: "media/current/wiki/logo.svg",
+        contentHash: plan.media[0].contentHash
+      })
+    );
   });
 
   it("generates idempotent SQL for D1 page imports", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-sql-"));
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
+    await mkdir(path.join(root, "data/attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media_attic/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/meta/wiki"), { recursive: true });
@@ -331,6 +355,10 @@ describe("DokuWiki import planner", () => {
     await writeFile(
       path.join(root, "data/pages/wiki/welcome.txt"),
       "====== Welcome ======\n\nText\n"
+    );
+    await writeFile(
+      path.join(root, "data/attic/wiki/welcome.1767225600.txt.gz"),
+      await gzipAsync("====== Old Welcome ======\n")
     );
     await writeFile(path.join(root, "data/media/wiki/logo.svg"), "<svg />\n");
     await writeFile(
@@ -364,6 +392,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert into pages");
     expect(sql).toContain("on conflict(id) do update");
     expect(sql).toContain("insert or replace into page_revisions");
+    expect(sql).toContain("'wiki:welcome@2026-01-01T00:00:00.000Z'");
+    expect(sql).toContain("Imported from DokuWiki attic");
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("insert into search_postings");
     expect(sql).toContain("insert into media (");
