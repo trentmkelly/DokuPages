@@ -36,11 +36,13 @@ import {
 } from "./storage/page-lock-client";
 import {
   cleanMediaId,
+  deleteMedia,
   getCurrentMedia,
   getMediaRevision,
   listNamespaceMedia,
   mediaDetailPath,
   mediaName,
+  mediaNamespace,
   mediaPath,
   saveMediaUpload,
   type CurrentMedia,
@@ -253,6 +255,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/media/upload" && request.method === "POST") {
     return handleMediaUpload(request, env, principal);
+  }
+
+  if (url.pathname === "/api/media/delete" && request.method === "POST") {
+    return handleMediaDelete(request, env, principal);
   }
 
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
@@ -537,6 +543,12 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
           <dt>Hash</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
         </dl>
       </div>
+      <form class="media__delete" method="post" action="/api/media/delete">
+        <input type="hidden" name="id" value="${escapeAttribute(id)}">
+        <label for="media__delete_summary">Delete summary</label>
+        <input id="media__delete_summary" name="summary" type="text">
+        <button type="submit">Delete media</button>
+      </form>
     </div>`
   );
 }
@@ -1784,6 +1796,44 @@ async function handleMediaUpload(
   }
 
   return redirectResponse(mediaDetailPath(id));
+}
+
+async function handleMediaDelete(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanMediaId(String(form.get("id") ?? ""));
+
+  if (!id) {
+    return jsonResponse({ error: "Missing media id." }, { status: 400 });
+  }
+
+  const author = principalAuthor(principal);
+  const result = await deleteMedia(env.DB, {
+    id,
+    summary: String(form.get("summary") ?? ""),
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    const message = `Media '${id}' was not found.`;
+    if (acceptsJson(request)) {
+      return jsonResponse({ error: message }, { status: 404 });
+    }
+    return htmlResponse(htmlShell(env, "Media not found", `<p>${escapeHtml(message)}</p>`), {
+      status: 404
+    });
+  }
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, id, revisionId: result.revision.id });
+  }
+
+  return redirectResponse(`/media-manager?ns=${encodeURIComponent(mediaNamespace(id))}`);
 }
 
 async function handleRevert(

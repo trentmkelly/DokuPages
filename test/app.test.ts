@@ -368,6 +368,62 @@ describe("handleRequest", () => {
     });
   });
 
+  it("deletes current media while preserving immutable media revisions", async () => {
+    const form = new FormData();
+    form.set("id", "wiki:logo.svg");
+    form.set("summary", "Remove logo");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/delete", {
+        method: "POST",
+        body: form,
+        headers: { "cf-connecting-ip": "203.0.113.30" }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/media-manager?ns=wiki");
+    expect(state.media[0]).toMatchObject({
+      id: "wiki:logo.svg",
+      is_deleted: 1
+    });
+    expect(state.mediaRevisions[0]).toMatchObject({
+      media_id: "wiki:logo.svg",
+      object_key: "media/current/wiki/logo.svg",
+      change_type: "delete",
+      summary: "Remove logo"
+    });
+    expect(state.changelog[0]).toMatchObject({
+      subject_type: "media",
+      subject_id: "wiki:logo.svg",
+      ip: "203.0.113.30",
+      change_type: "delete",
+      size_change: -18
+    });
+    expect(state.metadata).toContainEqual(
+      expect.objectContaining({
+        subject_type: "media",
+        subject_id: "wiki:logo.svg",
+        key: "deleted",
+        value_json: "true"
+      })
+    );
+
+    const current = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg"),
+      env
+    );
+    const oldRevision = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?rev=media-rev-1"),
+      env
+    );
+
+    expect(current.status).toBe(404);
+    expect(oldRevision.status).toBe(200);
+    await expect(oldRevision.text()).resolves.toBe("<svg>old</svg>");
+  });
+
   it("uses matching rendered page cache entries", async () => {
     renderCache.set(
       "page:wiki:welcome",
@@ -1366,6 +1422,9 @@ function createD1Stub(state: D1StubState): D1Database {
       const mediaStatement = statements.find((statement) =>
         statement.sql.includes("insert into media (")
       );
+      const mediaDeleteStatement = statements.find((statement) =>
+        statement.sql.includes("update media")
+      );
       const mediaRevisionStatement = statements.find((statement) =>
         statement.sql.includes("insert into media_revisions")
       );
@@ -1472,6 +1531,42 @@ function createD1Stub(state: D1StubState): D1Database {
             created_at: createdAt,
             updated_at: updatedAt
           });
+        }
+
+        state.mediaRevisions.unshift({
+          id: revisionId,
+          media_id: mediaId,
+          object_key: revisionObjectKey,
+          mime_type: revisionMimeType,
+          byte_length: revisionByteLength,
+          content_hash: revisionContentHash,
+          author_id: authorId,
+          summary,
+          change_type: changeType,
+          created_at: revisionCreatedAt
+        });
+      }
+
+      if (mediaDeleteStatement && mediaRevisionStatement) {
+        const [currentRevisionId, updatedAt, id] = mediaDeleteStatement.values;
+        const [
+          revisionId,
+          mediaId,
+          revisionObjectKey,
+          revisionMimeType,
+          revisionByteLength,
+          revisionContentHash,
+          authorId,
+          summary,
+          changeType,
+          revisionCreatedAt
+        ] = mediaRevisionStatement.values;
+        const existingMedia = state.media.find((media) => media.id === id);
+
+        if (existingMedia) {
+          existingMedia.current_revision_id = currentRevisionId;
+          existingMedia.is_deleted = 1;
+          existingMedia.updated_at = updatedAt;
         }
 
         state.mediaRevisions.unshift({

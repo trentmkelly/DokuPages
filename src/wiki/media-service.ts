@@ -49,6 +49,25 @@ export type SaveMediaUploadResult =
       reason: "exists";
     };
 
+export interface DeleteMediaInput {
+  id: string;
+  summary: string;
+  authorId?: string | null;
+  authorName?: string | null;
+  ip?: string | null;
+  now?: Date;
+}
+
+export type DeleteMediaResult =
+  | {
+      ok: true;
+      revision: MediaRevision;
+    }
+  | {
+      ok: false;
+      reason: "not_found";
+    };
+
 interface CurrentMediaRow {
   id: string;
   namespace: string;
@@ -287,6 +306,92 @@ export async function saveMediaUpload(
       byteLength,
       contentHash,
       changeType,
+      summary,
+      createdAt: now
+    }
+  };
+}
+
+export async function deleteMedia(
+  db: D1Database,
+  input: DeleteMediaInput
+): Promise<DeleteMediaResult> {
+  const id = cleanMediaId(input.id);
+  const current = await getCurrentMedia(db, id);
+
+  if (!current) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const now = (input.now ?? new Date()).toISOString();
+  const revisionId = `${id}@${now}`;
+  const summary = input.summary || "Deleted media";
+
+  await db.batch([
+    db
+      .prepare(
+        `update media
+         set current_revision_id = ?, is_deleted = 1, updated_at = ?
+         where id = ?`
+      )
+      .bind(revisionId, now, id),
+    db
+      .prepare(
+        `insert into media_revisions (
+           id, media_id, object_key, mime_type, byte_length, content_hash,
+           author_id, summary, change_type, created_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        revisionId,
+        id,
+        current.objectKey,
+        current.mimeType,
+        current.byteLength,
+        current.contentHash,
+        input.authorId ?? null,
+        summary,
+        "delete",
+        now
+      ),
+    db
+      .prepare(
+        `insert into changelog (
+           id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+           change_type, summary, size_change, created_at
+         ) values (?, 'media', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        `media:${revisionId}`,
+        id,
+        revisionId,
+        input.authorId ?? null,
+        input.authorName ?? null,
+        input.ip ?? null,
+        "delete",
+        summary,
+        -current.byteLength,
+        now
+      ),
+    ...buildMediaMetadataStatements(db, id, now, {
+      namespace: current.namespace,
+      revisionId,
+      objectKey: current.objectKey,
+      deleted: true,
+      deletedAt: now
+    })
+  ]);
+
+  return {
+    ok: true,
+    revision: {
+      id: revisionId,
+      mediaId: id,
+      objectKey: current.objectKey,
+      mimeType: current.mimeType,
+      byteLength: current.byteLength,
+      contentHash: current.contentHash,
+      changeType: "delete",
       summary,
       createdAt: now
     }
