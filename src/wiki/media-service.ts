@@ -68,6 +68,27 @@ export type DeleteMediaResult =
       reason: "not_found";
     };
 
+export interface RevertMediaInput {
+  id: string;
+  revisionId: string;
+  summary: string;
+  authorId?: string | null;
+  authorName?: string | null;
+  ip?: string | null;
+  now?: Date;
+}
+
+export type RevertMediaResult =
+  | {
+      ok: true;
+      media: CurrentMedia;
+      revision: MediaRevision;
+    }
+  | {
+      ok: false;
+      reason: "not_found" | "delete_revision";
+    };
+
 interface CurrentMediaRow {
   id: string;
   namespace: string;
@@ -78,6 +99,14 @@ interface CurrentMediaRow {
   current_revision_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface StoredMediaRow extends CurrentMediaRow {
+  is_deleted: number;
+}
+
+interface StoredMedia extends CurrentMedia {
+  isDeleted: boolean;
 }
 
 interface MediaRevisionRow {
@@ -137,6 +166,20 @@ export async function getCurrentMedia(db: D1Database, id: string): Promise<Curre
     .first<CurrentMediaRow>();
 
   return row ? mapCurrentMedia(row) : null;
+}
+
+async function getStoredMedia(db: D1Database, id: string): Promise<StoredMedia | null> {
+  const row = await db
+    .prepare(
+      `select id, namespace, object_key, mime_type, byte_length, content_hash,
+              current_revision_id, is_deleted, created_at, updated_at
+       from media
+       where id = ?`
+    )
+    .bind(id)
+    .first<StoredMediaRow>();
+
+  return row ? mapStoredMedia(row) : null;
 }
 
 export async function getMediaRevision(
@@ -398,6 +441,133 @@ export async function deleteMedia(
   };
 }
 
+export async function revertMedia(
+  db: D1Database,
+  input: RevertMediaInput
+): Promise<RevertMediaResult> {
+  const id = cleanMediaId(input.id);
+  const target = await getMediaRevision(db, input.revisionId);
+
+  if (!target || target.mediaId !== id) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (target.changeType === "delete") {
+    return { ok: false, reason: "delete_revision" };
+  }
+
+  const current = await getStoredMedia(db, id);
+  const now = (input.now ?? new Date()).toISOString();
+  const namespace = mediaNamespace(id);
+  const revisionId = `${id}@${now}`;
+  const summary = input.summary || `Reverted to ${target.createdAt}`;
+  const sizeChange = target.byteLength - (current && !current.isDeleted ? current.byteLength : 0);
+
+  await db.batch([
+    db
+      .prepare(
+        `insert into media (
+           id, namespace, object_key, mime_type, byte_length, content_hash,
+           current_revision_id, is_deleted, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+         on conflict(id) do update set
+           namespace = excluded.namespace,
+           object_key = excluded.object_key,
+           mime_type = excluded.mime_type,
+           byte_length = excluded.byte_length,
+           content_hash = excluded.content_hash,
+           current_revision_id = excluded.current_revision_id,
+           is_deleted = 0,
+           updated_at = excluded.updated_at`
+      )
+      .bind(
+        id,
+        namespace,
+        target.objectKey,
+        target.mimeType,
+        target.byteLength,
+        target.contentHash,
+        revisionId,
+        now,
+        now
+      ),
+    db
+      .prepare(
+        `insert into media_revisions (
+           id, media_id, object_key, mime_type, byte_length, content_hash,
+           author_id, summary, change_type, created_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        revisionId,
+        id,
+        target.objectKey,
+        target.mimeType,
+        target.byteLength,
+        target.contentHash,
+        input.authorId ?? null,
+        summary,
+        "revert",
+        now
+      ),
+    db
+      .prepare(
+        `insert into changelog (
+           id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+           change_type, summary, size_change, created_at
+         ) values (?, 'media', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        `media:${revisionId}`,
+        id,
+        revisionId,
+        input.authorId ?? null,
+        input.authorName ?? null,
+        input.ip ?? null,
+        "revert",
+        summary,
+        sizeChange,
+        now
+      ),
+    ...buildMediaMetadataStatements(db, id, now, {
+      namespace,
+      revisionId,
+      objectKey: target.objectKey,
+      mimeType: target.mimeType,
+      contentHash: target.contentHash,
+      size: target.byteLength,
+      deleted: false,
+      revertedFromRevisionId: target.id
+    })
+  ]);
+
+  return {
+    ok: true,
+    media: {
+      id,
+      namespace,
+      objectKey: target.objectKey,
+      mimeType: target.mimeType,
+      byteLength: target.byteLength,
+      contentHash: target.contentHash,
+      currentRevisionId: revisionId,
+      createdAt: current?.createdAt ?? now,
+      updatedAt: now
+    },
+    revision: {
+      id: revisionId,
+      mediaId: id,
+      objectKey: target.objectKey,
+      mimeType: target.mimeType,
+      byteLength: target.byteLength,
+      contentHash: target.contentHash,
+      changeType: "revert",
+      summary,
+      createdAt: now
+    }
+  };
+}
+
 function mapCurrentMedia(row: CurrentMediaRow): CurrentMedia {
   return {
     id: row.id,
@@ -409,6 +579,13 @@ function mapCurrentMedia(row: CurrentMediaRow): CurrentMedia {
     currentRevisionId: row.current_revision_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function mapStoredMedia(row: StoredMediaRow): StoredMedia {
+  return {
+    ...mapCurrentMedia(row),
+    isDeleted: row.is_deleted === 1
   };
 }
 

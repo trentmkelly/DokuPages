@@ -424,6 +424,53 @@ describe("handleRequest", () => {
     await expect(oldRevision.text()).resolves.toBe("<svg>old</svg>");
   });
 
+  it("reverts current media to an immutable media revision", async () => {
+    const form = new FormData();
+    form.set("id", "wiki:logo.svg");
+    form.set("revisionId", "media-rev-1");
+    form.set("summary", "Restore old logo");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/revert", {
+        method: "POST",
+        body: form,
+        headers: { "cf-connecting-ip": "203.0.113.40" }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/media-detail/wiki/logo.svg");
+    expect(state.media[0]).toMatchObject({
+      id: "wiki:logo.svg",
+      object_key: "media/revisions/wiki/logo.svg/20260506000000",
+      byte_length: 14,
+      content_hash: "old-media-hash",
+      is_deleted: 0
+    });
+    expect(state.mediaRevisions[0]).toMatchObject({
+      media_id: "wiki:logo.svg",
+      object_key: "media/revisions/wiki/logo.svg/20260506000000",
+      change_type: "revert",
+      summary: "Restore old logo"
+    });
+    expect(state.changelog[0]).toMatchObject({
+      subject_type: "media",
+      subject_id: "wiki:logo.svg",
+      ip: "203.0.113.40",
+      change_type: "revert",
+      size_change: -4
+    });
+
+    const current = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg"),
+      env
+    );
+
+    expect(current.status).toBe(200);
+    await expect(current.text()).resolves.toBe("<svg>old</svg>");
+  });
+
   it("uses matching rendered page cache entries", async () => {
     renderCache.set(
       "page:wiki:welcome",

@@ -44,6 +44,7 @@ import {
   mediaName,
   mediaNamespace,
   mediaPath,
+  revertMedia,
   saveMediaUpload,
   type CurrentMedia,
   type MediaRevision
@@ -259,6 +260,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/media/delete" && request.method === "POST") {
     return handleMediaDelete(request, env, principal);
+  }
+
+  if (url.pathname === "/api/media/revert" && request.method === "POST") {
+    return handleMediaRevert(request, env, principal);
   }
 
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
@@ -540,9 +545,18 @@ async function renderMediaDetailPage(env: Env, url: URL): Promise<string> {
           <dt>MIME type</dt><dd>${escapeHtml(media.mimeType)}</dd>
           <dt>Size</dt><dd>${media.byteLength.toLocaleString("en-US")} bytes</dd>
           <dt>Updated</dt><dd>${escapeHtml(media.updatedAt)}</dd>
+          <dt>Current revision</dt><dd><code>${escapeHtml(media.currentRevisionId ?? "")}</code></dd>
           <dt>Hash</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
         </dl>
       </div>
+      <form class="media__revert" method="post" action="/api/media/revert">
+        <input type="hidden" name="id" value="${escapeAttribute(id)}">
+        <label for="media__revert_revision">Revision ID</label>
+        <input id="media__revert_revision" name="revisionId" type="text" required>
+        <label for="media__revert_summary">Revert summary</label>
+        <input id="media__revert_summary" name="summary" type="text">
+        <button type="submit">Revert media</button>
+      </form>
       <form class="media__delete" method="post" action="/api/media/delete">
         <input type="hidden" name="id" value="${escapeAttribute(id)}">
         <label for="media__delete_summary">Delete summary</label>
@@ -1834,6 +1848,52 @@ async function handleMediaDelete(
   }
 
   return redirectResponse(`/media-manager?ns=${encodeURIComponent(mediaNamespace(id))}`);
+}
+
+async function handleMediaRevert(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanMediaId(String(form.get("id") ?? ""));
+  const revisionId = String(form.get("revisionId") ?? "");
+
+  if (!id || !revisionId) {
+    return jsonResponse({ error: "Missing media id or revision id." }, { status: 400 });
+  }
+
+  const author = principalAuthor(principal);
+  const result = await revertMedia(env.DB, {
+    id,
+    revisionId,
+    summary: String(form.get("summary") ?? ""),
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    const message =
+      result.reason === "delete_revision"
+        ? `Media revision '${revisionId}' is a delete revision and cannot be restored.`
+        : `Media revision '${revisionId}' was not found.`;
+    const status = result.reason === "delete_revision" ? 400 : 404;
+
+    if (acceptsJson(request)) {
+      return jsonResponse({ error: message }, { status });
+    }
+
+    return htmlResponse(htmlShell(env, "Media revert failed", `<p>${escapeHtml(message)}</p>`), {
+      status
+    });
+  }
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, id, revisionId: result.revision.id });
+  }
+
+  return redirectResponse(mediaDetailPath(id));
 }
 
 async function handleRevert(

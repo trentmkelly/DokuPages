@@ -277,7 +277,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement media overwrite rules.
 - [x] Implement media deletion.
 - [x] Implement media revisions.
-- [ ] Implement media revert.
+- [x] Implement media revert.
 - [x] Implement media changelog.
 - [x] Implement media metadata.
 - [x] Implement media detail pages.
