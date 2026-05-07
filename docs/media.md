@@ -57,6 +57,18 @@ npm run import:media-upload
 
 Media manager search is namespace-scoped. The `q` parameter matches active media IDs and MIME types in D1 and excludes deleted media rows.
 
+## Delivery Semantics
+
+Media fetches support `GET` and `HEAD`. Current media responses use a one-hour
+shared cache lifetime; immutable revision responses use a one-year immutable
+cache lifetime. Both current and revision fetches include strong ETags derived
+from the imported or uploaded content hash.
+
+Conditional requests are resolved from D1 media metadata before opening the R2
+object body. Matching `If-None-Match` or `If-Modified-Since` requests return
+`304 Not Modified` with zero R2 operations. `HEAD` requests verify the R2 object
+with `head` and return metadata without streaming the object body.
+
 ## Derivative Strategy
 
 The Pages port does not generate thumbnail or resized image files inside Workers. Media fetches return the original R2 object and include `x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`, and `x-dokuwiki-exif-policy` headers documenting the replacement strategy. Image previews use browser-constrained originals with lazy decoding. JPEG EXIF metadata is not parsed in the request path.

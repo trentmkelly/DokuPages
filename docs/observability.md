@@ -32,7 +32,7 @@ The runtime emits structured metric events to Cloudflare logs:
   namespace, surface, and duration.
 - `media_metric`: media fetch, media manager list/search, upload, delete, and
   revert operations with namespace, byte counts where relevant, result counts,
-  and duration.
+  delivery mode, R2 operation counts for fetches, and duration.
 - `migration_event`: import plan and artifact generation events emitted by the
   flat-file importer.
 

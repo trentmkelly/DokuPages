@@ -681,11 +681,11 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Measure warm request time.
 - [ ] Measure page render time.
 - [ ] Measure edit save time.
-- [ ] Measure media fetch time.
+- [x] Measure media fetch time.
 - [ ] Measure search time.
 - [ ] Measure migration time.
 - [ ] Measure D1 query counts per route.
-- [ ] Measure R2 operation counts per route.
+- [x] Measure R2 operation counts per route.
 - [ ] Measure KV operation counts per route if used.
 - [ ] Measure Worker CPU usage per route.
 - [ ] Measure Worker memory usage per route.
@@ -694,7 +694,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Optimize parser hot paths.
 - [ ] Optimize rendered page caching.
 - [ ] Optimize search indexing.
-- [ ] Optimize media delivery.
+- [x] Optimize media delivery.
 - [ ] Optimize database indexes.
 - [ ] Add alerts for limit pressure.
 

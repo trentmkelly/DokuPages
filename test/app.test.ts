@@ -315,6 +315,10 @@ describe("handleRequest", () => {
 
   it("fetches media, renders media detail, and redirects legacy media URLs", async () => {
     const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
+    const head = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg", { method: "HEAD" }),
+      env
+    );
     const download = await handleRequest(
       new Request("https://example.com/media/wiki/logo.svg?download=1"),
       env
@@ -350,6 +354,9 @@ describe("handleRequest", () => {
     expect(fetch.headers.get("x-dokuwiki-thumbnail-policy")).toBe("original");
     expect(resized.headers.get("x-dokuwiki-resize-policy")).toBe("browser-constrained-original");
     await expect(fetch.text()).resolves.toBe("<svg>current</svg>");
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-length")).toBe("18");
+    await expect(head.text()).resolves.toBe("");
     expect(download.headers.get("content-disposition")).toBe('attachment; filename="logo.svg"');
     expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
@@ -376,6 +383,31 @@ describe("handleRequest", () => {
     expect(legacyFetch.headers.get("location")).toBe("/media/wiki/logo.svg?download=1");
     expect(legacyDetail.status).toBe(301);
     expect(legacyDetail.headers.get("location")).toBe("/media-detail/wiki/logo.svg");
+  });
+
+  it("answers conditional media fetches without R2 body reads", async () => {
+    const r2Operations = { head: 0, get: 0, put: 0, delete: 0 };
+    env.MEDIA_BUCKET = createR2Stub(r2Operations);
+
+    const etag = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg", {
+        headers: { "if-none-match": '"current-media-hash"' }
+      }),
+      env
+    );
+    const modifiedSince = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg", {
+        headers: { "if-modified-since": "Thu, 07 May 2026 00:00:00 GMT" }
+      }),
+      env
+    );
+
+    expect(etag.status).toBe(304);
+    expect(etag.headers.get("etag")).toBe('"current-media-hash"');
+    expect(etag.headers.get("content-length")).toBe(null);
+    expect(modifiedSince.status).toBe(304);
+    expect(r2Operations.get).toBe(0);
+    expect(r2Operations.head).toBe(0);
   });
 
   it("uploads media to R2 and records D1 media revision metadata", async () => {
@@ -749,7 +781,9 @@ describe("handleRequest", () => {
             operation: "fetch",
             namespace: "wiki",
             mimeType: "image/svg+xml",
-            byteLength: 18
+            byteLength: 18,
+            delivery: "body",
+            r2Operations: 1
           })
         ])
       );
@@ -2125,7 +2159,9 @@ function createD1Stub(state: D1StubState): D1Database {
   } as unknown as D1Database;
 }
 
-function createR2Stub(): R2Bucket {
+type R2OperationCounters = Record<"head" | "get" | "put" | "delete", number>;
+
+function createR2Stub(counters?: R2OperationCounters): R2Bucket {
   const objects = new Map<string, BodyInit>([
     ["media/current/wiki/logo.svg", "<svg>current</svg>"],
     ["media/revisions/wiki/logo.svg/20260506000000", "<svg>old</svg>"]
@@ -2133,9 +2169,11 @@ function createR2Stub(): R2Bucket {
 
   return {
     head: async (key: string) => {
+      if (counters) counters.head += 1;
       return objects.has(key) ? ({} as R2Object) : null;
     },
     get: async (key: string) => {
+      if (counters) counters.get += 1;
       const value = objects.get(key);
       if (!value) return null;
 
@@ -2144,10 +2182,12 @@ function createR2Stub(): R2Bucket {
       };
     },
     put: async (key: string, value: BodyInit) => {
+      if (counters) counters.put += 1;
       objects.set(key, value);
       return {} as R2Object;
     },
     delete: async (key: string) => {
+      if (counters) counters.delete += 1;
       objects.delete(key);
     }
   } as unknown as R2Bucket;

@@ -16,6 +16,7 @@ The current deployment is a Cloudflare Pages scaffold with:
 - supported features and limitations in `docs/features.md`
 - observability notes in `docs/observability.md`
 - backup, restore, rollback, and launch operations in `docs/operations.md`
+- performance notes in `docs/performance.md`
 - plugin compatibility decisions in `docs/plugin-compatibility.md`
 - remote API decisions in `docs/remote-api.md`
 - security notes in `docs/security.md`

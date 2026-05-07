@@ -839,6 +839,10 @@ async function handleMediaFetch(
   const startedAt = Date.now();
   const id = mediaIdFromPath(url, "/media/");
 
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return jsonResponse({ error: "Method not allowed." }, { status: 405 });
+  }
+
   if (!id) {
     return notFoundResponse("Missing media id.");
   }
@@ -859,28 +863,7 @@ async function handleMediaFetch(
     return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
   }
 
-  const object = await env.MEDIA_BUCKET.get(media.objectKey);
-
-  if (!object) {
-    return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
-  }
-
-  const headers = securityHeaders();
-  headers.set("content-type", media.mimeType);
-  headers.set("content-length", String(media.byteLength));
-  headers.set("etag", `"${media.contentHash}"`);
-  headers.set("last-modified", new Date(getMediaTimestamp(media)).toUTCString());
-  headers.set("x-content-type-options", "nosniff");
-  headers.set(
-    "cache-control",
-    revisionId ? "public, max-age=31536000, immutable" : "public, max-age=3600"
-  );
-
-  for (const [name, value] of Object.entries(
-    mediaDerivativeHeaders(media, hasRequestedMediaSize(url))
-  )) {
-    headers.set(name, value);
-  }
+  const headers = mediaFetchHeaders(url, media, Boolean(revisionId));
 
   if (url.searchParams.get("download") === "1") {
     headers.set(
@@ -889,16 +872,119 @@ async function handleMediaFetch(
     );
   }
 
-  logMetric("media_metric", {
-    operation: "fetch",
-    namespace: mediaNamespace(id) || null,
-    revision: Boolean(revisionId),
-    mimeType: media.mimeType,
-    byteLength: media.byteLength,
-    durationMs: elapsedSince(startedAt)
+  if (isMediaNotModified(request, media)) {
+    headers.delete("content-length");
+    logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+      delivery: "not_modified",
+      r2Operations: 0
+    });
+    return new Response(null, { status: 304, headers });
+  }
+
+  if (request.method === "HEAD") {
+    const object = await env.MEDIA_BUCKET.head(media.objectKey);
+
+    if (!object) {
+      return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
+    }
+
+    logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+      delivery: "headers",
+      r2Operations: 1
+    });
+    return new Response(null, { headers });
+  }
+
+  const object = await env.MEDIA_BUCKET.get(media.objectKey);
+
+  if (!object) {
+    return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
+  }
+
+  logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+    delivery: "body",
+    r2Operations: 1
   });
 
   return new Response(object.body, { headers });
+}
+
+function mediaFetchHeaders(
+  url: URL,
+  media: CurrentMedia | MediaRevision,
+  revision: boolean
+): Headers {
+  const headers = securityHeaders();
+  headers.set("content-type", media.mimeType);
+  headers.set("content-length", String(media.byteLength));
+  headers.set("etag", mediaEtag(media));
+  headers.set("last-modified", new Date(getMediaTimestamp(media)).toUTCString());
+  headers.set("x-content-type-options", "nosniff");
+  headers.set(
+    "cache-control",
+    revision ? "public, max-age=31536000, immutable" : "public, max-age=3600"
+  );
+
+  for (const [name, value] of Object.entries(
+    mediaDerivativeHeaders(media, hasRequestedMediaSize(url))
+  )) {
+    headers.set(name, value);
+  }
+
+  return headers;
+}
+
+function isMediaNotModified(request: Request, media: CurrentMedia | MediaRevision): boolean {
+  const ifNoneMatch = request.headers.get("if-none-match");
+
+  if (ifNoneMatch) {
+    return matchesMediaEtag(ifNoneMatch, mediaEtag(media));
+  }
+
+  const ifModifiedSince = request.headers.get("if-modified-since");
+  if (!ifModifiedSince) return false;
+
+  const since = Date.parse(ifModifiedSince);
+  if (Number.isNaN(since)) return false;
+
+  const modified = new Date(getMediaTimestamp(media)).getTime();
+  return Math.floor(modified / 1000) <= Math.floor(since / 1000);
+}
+
+function matchesMediaEtag(header: string, etag: string): boolean {
+  return header
+    .split(",")
+    .map((value) => value.trim())
+    .some((value) => {
+      if (value === "*") return true;
+      return stripWeakEtagPrefix(value) === stripWeakEtagPrefix(etag);
+    });
+}
+
+function stripWeakEtagPrefix(value: string): string {
+  return value.startsWith("W/") ? value.slice(2) : value;
+}
+
+function mediaEtag(media: CurrentMedia | MediaRevision): string {
+  return `"${media.contentHash}"`;
+}
+
+function logMediaFetchMetric(
+  startedAt: number,
+  id: string,
+  media: CurrentMedia | MediaRevision,
+  revision: boolean,
+  details: { delivery: "body" | "headers" | "not_modified"; r2Operations: number }
+): void {
+  logMetric("media_metric", {
+    operation: "fetch",
+    namespace: mediaNamespace(id) || null,
+    revision,
+    mimeType: media.mimeType,
+    byteLength: media.byteLength,
+    ...details,
+    durationMs: elapsedSince(startedAt)
+  });
 }
 
 async function renderMediaDetailPage(
