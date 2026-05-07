@@ -11,6 +11,7 @@ import { cleanPageId } from "./wiki/page-id";
 import {
   getCurrentPage,
   getPageRevision,
+  listAllPages,
   listBacklinks,
   listNamespacePages,
   listOrphanPages,
@@ -58,6 +59,38 @@ export async function handleRequest(
 
   if (url.pathname === "/orphans") {
     return htmlResponse(await renderOrphanPage(env));
+  }
+
+  if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap") {
+    return xmlResponse(await renderSitemap(env, url));
+  }
+
+  if (url.pathname === "/feed.php" || url.pathname === "/feed" || url.pathname === "/feed.xml") {
+    return xmlResponse(await renderRssFeed(env, url), "application/rss+xml; charset=utf-8");
+  }
+
+  if (url.pathname === "/atom.xml") {
+    return xmlResponse(await renderAtomFeed(env, url), "application/atom+xml; charset=utf-8");
+  }
+
+  if (url.pathname === "/lib/exe/opensearch.php" || url.pathname === "/opensearch.xml") {
+    return xmlResponse(renderOpenSearch(env, url));
+  }
+
+  if (url.pathname === "/lib/exe/manifest.php" || url.pathname === "/manifest.webmanifest") {
+    return manifestResponse(renderWebManifest(env));
+  }
+
+  if (url.pathname === "/robots.txt") {
+    return new Response(
+      `User-agent: *\nAllow: /\nSitemap: ${new URL("/sitemap.xml", url).href}\n`,
+      {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "x-content-type-options": "nosniff"
+        }
+      }
+    );
   }
 
   if (url.pathname === "/api/pages" && request.method === "POST") {
@@ -325,6 +358,101 @@ function renderPageReferenceList(
     .join("");
 }
 
+async function renderSitemap(env: Env, url: URL): Promise<string> {
+  const pages = await listAllPages(env.DB);
+  const urls = pages
+    .map(
+      (page) => `<url>
+  <loc>${escapeXml(new URL(pagePath(page.id), url).href)}</loc>
+  <lastmod>${escapeXml(page.updatedAt)}</lastmod>
+</url>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`;
+}
+
+async function renderRssFeed(env: Env, url: URL): Promise<string> {
+  const changes = await listRecentChanges(env.DB);
+  const title = env.SITE_NAME ?? "DokuWiki Pages";
+  const items = changes
+    .map(
+      (change) => `<item>
+  <title>${escapeXml(`${change.changeType}: ${change.subjectId}`)}</title>
+  <link>${escapeXml(new URL(pagePath(change.subjectId), url).href)}</link>
+  <guid>${escapeXml(change.id)}</guid>
+  <pubDate>${escapeXml(new Date(change.createdAt).toUTCString())}</pubDate>
+  <description>${escapeXml(change.summary || change.changeType)}</description>
+</item>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>${escapeXml(title)}</title>
+  <link>${escapeXml(new URL("/", url).href)}</link>
+  <description>${escapeXml(`${title} recent changes`)}</description>
+${items}
+</channel>
+</rss>`;
+}
+
+async function renderAtomFeed(env: Env, url: URL): Promise<string> {
+  const changes = await listRecentChanges(env.DB);
+  const title = env.SITE_NAME ?? "DokuWiki Pages";
+  const updated = changes[0]?.createdAt ?? new Date(0).toISOString();
+  const entries = changes
+    .map(
+      (change) => `<entry>
+  <title>${escapeXml(`${change.changeType}: ${change.subjectId}`)}</title>
+  <link href="${escapeXml(new URL(pagePath(change.subjectId), url).href)}"/>
+  <id>${escapeXml(change.id)}</id>
+  <updated>${escapeXml(change.createdAt)}</updated>
+  <summary>${escapeXml(change.summary || change.changeType)}</summary>
+</entry>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>${escapeXml(title)}</title>
+  <link href="${escapeXml(new URL("/", url).href)}"/>
+  <updated>${escapeXml(updated)}</updated>
+  <id>${escapeXml(new URL("/", url).href)}</id>
+${entries}
+</feed>`;
+}
+
+function renderOpenSearch(env: Env, url: URL): string {
+  const title = env.SITE_NAME ?? "DokuWiki Pages";
+  const searchTemplate = `${new URL("/search", url).href}?q={searchTerms}`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>${escapeXml(title)}</ShortName>
+  <Description>${escapeXml(`Search ${title}`)}</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Url type="text/html" template="${escapeXml(searchTemplate)}"/>
+</OpenSearchDescription>`;
+}
+
+function renderWebManifest(env: Env): Record<string, unknown> {
+  const name = env.SITE_NAME ?? "DokuWiki Pages";
+
+  return {
+    name,
+    short_name: name.slice(0, 24),
+    start_url: "/",
+    display: "minimal-ui",
+    background_color: "#ffffff",
+    theme_color: "#0f172a"
+  };
+}
+
 function namespaceForIndex(id: string): string {
   return id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : id;
 }
@@ -366,6 +494,24 @@ function htmlShell(env: Env, title: string, body: string): string {
   <main>${body}</main>
 </body>
 </html>`;
+}
+
+function xmlResponse(body: string, contentType = "application/xml; charset=utf-8"): Response {
+  return new Response(body, {
+    headers: {
+      "content-type": contentType,
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
+function manifestResponse(body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body, null, 2), {
+    headers: {
+      "content-type": "application/manifest+json; charset=utf-8",
+      "x-content-type-options": "nosniff"
+    }
+  });
 }
 
 async function handleSave(request: Request, env: Env): Promise<Response> {
@@ -442,4 +588,8 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeXml(value: string): string {
+  return escapeHtml(value);
 }

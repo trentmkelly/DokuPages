@@ -182,9 +182,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement route handling for media details.
 - [ ] Implement route handling for media manager.
 - [ ] Implement route handling for uploads.
-- [ ] Implement route handling for feeds.
-- [ ] Implement route handling for sitemap.
-- [ ] Implement route handling for manifest and opensearch.
+- [x] Implement route handling for feeds.
+- [x] Implement route handling for sitemap.
+- [x] Implement route handling for manifest and opensearch.
 - [ ] Implement route handling for CSS and JavaScript assets.
 - [ ] Implement route handling for AJAX endpoints.
 - [ ] Implement route handling for login and logout.
@@ -432,7 +432,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Map smiley configuration.
 - [ ] Map wordblock configuration.
 - [ ] Map license configuration.
-- [ ] Map manifest configuration.
+- [x] Map manifest configuration.
 - [ ] Map language configuration.
 - [ ] Implement environment-specific config.
 - [ ] Implement secret-specific config.
@@ -489,18 +489,18 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Feeds, Sitemap, And Discovery
 
-- [ ] Implement RSS feed.
-- [ ] Implement Atom feed if supported.
+- [x] Implement RSS feed.
+- [x] Implement Atom feed if supported.
 - [ ] Implement feed ACL filtering.
 - [ ] Implement feed cache.
-- [ ] Implement sitemap generation.
+- [x] Implement sitemap generation.
 - [ ] Implement sitemap cache.
-- [ ] Implement `robots.txt` behavior.
-- [ ] Implement OpenSearch document.
-- [ ] Implement web app manifest.
+- [x] Implement `robots.txt` behavior.
+- [x] Implement OpenSearch document.
+- [x] Implement web app manifest.
 - [ ] Implement favicon behavior.
-- [ ] Preserve existing feed URLs if required.
-- [ ] Preserve existing sitemap URLs if required.
+- [x] Preserve existing feed URLs if required.
+- [x] Preserve existing sitemap URLs if required.
 
 ## Remote APIs
 
@@ -599,8 +599,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Preserve `doku.php?id=...` routes if required.
 - [ ] Preserve nice URL routes if required.
 - [ ] Preserve media fetch URLs if required.
-- [ ] Preserve feed URLs if required.
-- [ ] Preserve sitemap URLs if required.
+- [x] Preserve feed URLs if required.
+- [x] Preserve sitemap URLs if required.
 - [ ] Preserve revision URLs if required.
 - [ ] Preserve diff URLs if required.
 - [ ] Preserve admin URLs where possible.

@@ -272,6 +272,25 @@ export async function listNamespacePages(
   }));
 }
 
+export async function listAllPages(db: D1Database, limit = 500): Promise<PageLinkReference[]> {
+  const result = await db
+    .prepare(
+      `select id, title, updated_at
+       from pages
+       where is_deleted = 0
+       order by id
+       limit ?`
+    )
+    .bind(Math.max(1, Math.min(limit, 1000)))
+    .all<Pick<NamespacePageRow, "id" | "title" | "updated_at">>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    title: row.title,
+    updatedAt: row.updated_at
+  }));
+}
+
 export async function listBacklinks(
   db: D1Database,
   targetPageId: string,

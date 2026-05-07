@@ -199,6 +199,34 @@ describe("handleRequest", () => {
     await expect(orphans.text()).resolves.toContain("/wiki/wiki/guide");
   });
 
+  it("renders sitemap, feeds, OpenSearch, manifest, and robots routes", async () => {
+    const sitemap = await handleRequest(new Request("https://example.com/sitemap.xml"), env);
+    const rss = await handleRequest(new Request("https://example.com/feed.php"), env);
+    const atom = await handleRequest(new Request("https://example.com/atom.xml"), env);
+    const opensearch = await handleRequest(
+      new Request("https://example.com/lib/exe/opensearch.php"),
+      env
+    );
+    const manifest = await handleRequest(
+      new Request("https://example.com/lib/exe/manifest.php"),
+      env
+    );
+    const robots = await handleRequest(new Request("https://example.com/robots.txt"), env);
+
+    expect(sitemap.status).toBe(200);
+    expect(rss.status).toBe(200);
+    expect(atom.status).toBe(200);
+    expect(opensearch.status).toBe(200);
+    expect(manifest.status).toBe(200);
+    expect(robots.status).toBe(200);
+    await expect(sitemap.text()).resolves.toContain("https://example.com/wiki/wiki/welcome");
+    await expect(rss.text()).resolves.toContain('<rss version="2.0">');
+    await expect(atom.text()).resolves.toContain("http://www.w3.org/2005/Atom");
+    await expect(opensearch.text()).resolves.toContain("OpenSearchDescription");
+    await expect(manifest.json()).resolves.toMatchObject({ name: "Test Wiki" });
+    await expect(robots.text()).resolves.toContain("Sitemap: https://example.com/sitemap.xml");
+  });
+
   it("previews submitted wiki text", async () => {
     const form = new FormData();
     form.set("content", "====== Preview ======\n\n**Text**");
@@ -366,6 +394,18 @@ function createD1Stub(state: D1StubState): D1Database {
               results: currentPageSourceRows(state)
                 .filter((page) => page.namespace === idOrLimit)
                 .slice(0, Number.isFinite(limit) ? limit : 200)
+            };
+          }
+
+          if (sql.includes("from pages") && sql.includes("where is_deleted = 0")) {
+            return {
+              results: currentPageSourceRows(state)
+                .map((page) => ({
+                  id: page.id,
+                  title: page.title,
+                  updated_at: page.updated_at
+                }))
+                .slice(0, Number.isFinite(limit) ? limit : 500)
             };
           }
 

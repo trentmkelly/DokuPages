@@ -16,6 +16,7 @@ The port is a native TypeScript implementation on Cloudflare Pages Functions. Th
 - `/recent` recent page changes backed by the D1 changelog
 - `/search` and `/wiki/:id?do=search` page search backed by D1 search postings
 - `/index`, `/wiki/:id?do=index`, `/wanted`, `/orphans`, and `/wiki/:id?do=backlink` page relationship views backed by current D1 page source
+- `/feed.php`, `/feed.xml`, `/atom.xml`, `/sitemap.xml`, `/robots.txt`, `/opensearch.xml`, and `/manifest.webmanifest` compatibility documents
 - `POST /api/pages` page create, edit, and delete saves
 - `POST /api/pages/preview` rendered preview responses
 - all other paths to static asset fallback
