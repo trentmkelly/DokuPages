@@ -184,7 +184,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 8,
+        rendererVersion: 9,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",

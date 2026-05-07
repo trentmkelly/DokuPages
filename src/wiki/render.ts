@@ -20,6 +20,42 @@ export interface RenderWikiTextOptions {
   pageId?: string;
 }
 
+const SMILEY_IMAGE_BASE = "/images/smileys";
+// Default mapping from DokuWiki's conf/smileys.conf.
+const DEFAULT_SMILEYS: Record<string, string> = {
+  "8-)": "cool.svg",
+  "8-O": "eek.svg",
+  "8-o": "eek.svg",
+  ":-(": "sad.svg",
+  ":-)": "smile.svg",
+  "=)": "smile2.svg",
+  ":-/": "doubt.svg",
+  ":-\\": "doubt2.svg",
+  ":-?": "confused.svg",
+  ":-D": "biggrin.svg",
+  ":-P": "razz.svg",
+  ":-o": "surprised.svg",
+  ":-O": "surprised.svg",
+  ":-x": "silenced.svg",
+  ":-X": "silenced.svg",
+  ":-|": "neutral.svg",
+  ";-)": "wink.svg",
+  "m(": "facepalm.svg",
+  "^_^": "fun.svg",
+  ":?:": "question.svg",
+  ":!:": "exclaim.svg",
+  LOL: "lol.svg",
+  FIXME: "fixme.svg",
+  DELETEME: "deleteme.svg"
+};
+const SMILEY_PATTERN = new RegExp(
+  `(^|[^A-Za-z0-9_])(${Object.keys(DEFAULT_SMILEYS)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join("|")})(?=$|[^A-Za-z0-9_])`,
+  "g"
+);
+
 export function renderWikiText(
   source: string,
   options: RenderWikiTextOptions = {}
@@ -308,6 +344,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderLinks(rendered, context, protectHtml);
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
+  rendered = renderSmileys(rendered, protectHtml);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\/\/([^/]+)\/\//g, "<em>$1</em>")
@@ -351,6 +388,16 @@ function renderTypography(source: string): string {
     .replace(/\.\.\./g, "&hellip;")
     .replace(/---/g, "&mdash;")
     .replace(/--/g, "&ndash;");
+}
+
+function renderSmileys(source: string, protectHtml: (html: string) => string): string {
+  return source.replace(SMILEY_PATTERN, (_match, prefix: string, smiley: string) => {
+    const filename = DEFAULT_SMILEYS[smiley];
+
+    return `${prefix}${protectHtml(
+      `<img src="${SMILEY_IMAGE_BASE}/${filename}" class="icon smiley" alt="${escapeAttribute(smiley)}">`
+    )}`;
+  });
 }
 
 function renderMedia(source: string, protectHtml: (html: string) => string): string {
@@ -499,4 +546,8 @@ function decodeHtmlEntities(value: string): string {
     .replaceAll("&amp;", "&")
     .replaceAll("&quot;", '"')
     .replaceAll("&#39;", "'");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

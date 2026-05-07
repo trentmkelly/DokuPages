@@ -51,6 +51,21 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain("&ndash;");
   });
 
+  it("renders default DokuWiki smileys", () => {
+    const rendered = renderWikiText("Hello :-) LOL wordLOL [[wiki:syntax|LOL]]");
+    const literal = renderWikiText("%%:-)%%");
+
+    expect(rendered.html).toContain(
+      '<img src="/images/smileys/smile.svg" class="icon smiley" alt=":-)">'
+    );
+    expect(rendered.html).toContain(
+      '<img src="/images/smileys/lol.svg" class="icon smiley" alt="LOL">'
+    );
+    expect(rendered.html).toContain("wordLOL");
+    expect(rendered.html).toContain('<a href="/wiki/wiki/syntax">LOL</a>');
+    expect(literal.html).toBe("<p>:-)</p>");
+  });
+
   it("renders internal links, external links, and media embeds", () => {
     const rendered = renderWikiText(
       "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}"

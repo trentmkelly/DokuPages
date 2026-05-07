@@ -221,7 +221,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement footnotes.
 - [ ] Implement acronym replacement.
 - [x] Implement entity replacement.
-- [ ] Implement smileys.
+- [x] Implement smileys.
 - [x] Implement typography replacements.
 - [x] Implement table of contents extraction.
 - [x] Implement control macros.
@@ -430,7 +430,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Map interwiki configuration.
 - [ ] Map acronym configuration.
 - [ ] Map entity configuration.
-- [ ] Map smiley configuration.
+- [x] Map smiley configuration.
 - [ ] Map wordblock configuration.
 - [ ] Map license configuration.
 - [x] Map manifest configuration.

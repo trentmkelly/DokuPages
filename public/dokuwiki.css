@@ -75,6 +75,10 @@ img {
   font-style: italic;
 }
 
+img.icon.smiley {
+  height: 1.2em;
+}
+
 table {
   border-spacing: 0;
   border-collapse: collapse;
