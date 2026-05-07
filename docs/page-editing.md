@@ -32,6 +32,7 @@ The save path:
 - reads the current revision from D1
 - checks `baseRevisionId` against the current revision ID
 - returns HTTP 409 on conflicts
+- applies the page edit rate limit before saving
 - creates a page when no current revision exists
 - edits a page when content is non-empty
 - deletes a page when content is empty
@@ -44,6 +45,8 @@ The save path:
 - updates search postings
 - purges page-related KV cache keys
 - redirects back to the page with HTTP 303
+
+Authorized page save and revert submissions are rate limited in KV by client IP and actor. Thirty attempts in a 15 minute window block additional attempts for that pair and return `429` with `Retry-After: 900`.
 
 ## Edit Locks
 

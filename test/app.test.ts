@@ -1259,6 +1259,38 @@ describe("handleRequest", () => {
     expect(purgedKeys).toContain("discovery:atom:https://example.com");
   });
 
+  it("rate limits repeated page edit attempts before saving", async () => {
+    async function save(id: string): Promise<Response> {
+      const form = new FormData();
+      form.set("id", id);
+      form.set("content", `====== ${id} ======\n\nChanged.`);
+      form.set("summary", "Rate limit check");
+
+      return handleRequest(
+        new Request("https://example.com/api/pages", {
+          method: "POST",
+          body: form,
+          headers: csrfHeaders({ "cf-connecting-ip": "203.0.113.70" })
+        }),
+        env
+      );
+    }
+
+    for (let index = 0; index < 30; index += 1) {
+      const response = await save(`wiki:rate-${index}`);
+      expect(response.status).toBe(303);
+    }
+
+    const limited = await save("wiki:rate-limited");
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("900");
+    await expect(limited.text()).resolves.toContain(
+      "Too many page edit attempts. Try again later."
+    );
+    expect(state.row?.id).not.toBe("wiki:rate-limited");
+  });
+
   it("rejects state-changing page and media posts without CSRF tokens", async () => {
     const pageForm = new FormData();
     pageForm.set("id", "wiki:welcome");

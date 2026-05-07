@@ -106,6 +106,8 @@ const CSRF_TOKEN_BYTES = 32;
 const CSRF_TTL_SECONDS = 60 * 60 * 24;
 const LOGIN_RATE_LIMIT_ATTEMPTS = 5;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+const EDIT_RATE_LIMIT_ATTEMPTS = 30;
+const EDIT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const UPLOAD_RATE_LIMIT_ATTEMPTS = 20;
 const UPLOAD_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
@@ -2076,6 +2078,62 @@ function loginRateLimitKey(request: Request, username: string): string {
   return `auth:login:${client}:${encodeURIComponent(username.toLowerCase()).slice(0, 128)}`;
 }
 
+async function editRateLimitResponse(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response | null> {
+  const attempts = await readEditAttemptCount(request, env, principal);
+  if (attempts < EDIT_RATE_LIMIT_ATTEMPTS) return null;
+
+  const message = "Too many page edit attempts. Try again later.";
+
+  if (acceptsJson(request)) {
+    return jsonResponse(
+      { error: message },
+      {
+        status: 429,
+        headers: { "retry-after": String(EDIT_RATE_LIMIT_WINDOW_SECONDS) }
+      }
+    );
+  }
+
+  return htmlResponse(htmlShell(env, "Page edit limited", `<p>${escapeHtml(message)}</p>`), {
+    status: 429,
+    headers: { "retry-after": String(EDIT_RATE_LIMIT_WINDOW_SECONDS) }
+  });
+}
+
+async function readEditAttemptCount(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<number> {
+  const raw = await env.RENDER_CACHE.get(editRateLimitKey(request, principal));
+  if (!raw) return 0;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function recordEditAttempt(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<void> {
+  const key = editRateLimitKey(request, principal);
+  const attempts = (await readEditAttemptCount(request, env, principal)) + 1;
+  await env.RENDER_CACHE.put(key, String(attempts), {
+    expirationTtl: EDIT_RATE_LIMIT_WINDOW_SECONDS
+  });
+}
+
+function editRateLimitKey(request: Request, principal: AuthPrincipal): string {
+  const client = getClientIp(request) ?? "unknown";
+  const actor = principal.type === "user" ? `user:${principal.id}` : "anonymous";
+  return `page:edit:${client}:${encodeURIComponent(actor).slice(0, 160)}`;
+}
+
 async function uploadRateLimitResponse(
   request: Request,
   env: Env,
@@ -2518,6 +2576,11 @@ async function handleSave(request: Request, env: Env, principal: AuthPrincipal):
   );
   if (denied) return denied;
 
+  const rateLimited = await editRateLimitResponse(request, env, principal);
+  if (rateLimited) return rateLimited;
+
+  await recordEditAttempt(request, env, principal);
+
   const blocked = findWordblockMatch(`${content}\n${summary}`);
   if (blocked) {
     return wordblockResponse(request, env, id, content, blocked);
@@ -2764,6 +2827,11 @@ async function handleRevert(
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_EDIT);
   if (denied) return denied;
+
+  const rateLimited = await editRateLimitResponse(request, env, principal);
+  if (rateLimited) return rateLimited;
+
+  await recordEditAttempt(request, env, principal);
 
   const revision = await getPageRevision(env.DB, revisionId);
   if (!revision || revision.pageId !== id) {
