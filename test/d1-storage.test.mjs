@@ -186,6 +186,9 @@ describe("D1 storage adapters", () => {
     await expect(acl.listRules("wiki:*")).resolves.toEqual([
       expect.objectContaining({ principalType: "group", principal: "user", permission: 8 })
     ]);
+    await expect(acl.listAllRules()).resolves.toEqual([
+      expect.objectContaining({ scope: "wiki:*", principalType: "group", principal: "user" })
+    ]);
     await expect(users.getUserByUsername("alice")).resolves.toMatchObject({
       id: "user-1",
       isDisabled: false

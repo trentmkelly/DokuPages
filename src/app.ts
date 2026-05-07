@@ -28,6 +28,7 @@ import {
   redirectResponse,
   securityHeaders
 } from "./http/responses";
+import { D1AclStore } from "./storage/d1";
 import {
   refreshPageLock,
   releasePageLock,
@@ -52,6 +53,15 @@ import {
 } from "./wiki/media-service";
 import { validateMediaUpload } from "./wiki/media-validation";
 import { cleanPageId } from "./wiki/page-id";
+import {
+  ACL_CREATE,
+  ACL_DELETE,
+  ACL_EDIT,
+  ACL_READ,
+  ACL_UPLOAD,
+  hasAclPermission,
+  resolveAclPermission
+} from "./wiki/acl";
 import {
   getCurrentPage,
   getPageDraft,
@@ -133,17 +143,19 @@ export async function handleRequest(
   }
 
   if (url.pathname.startsWith("/media/")) {
-    return handleMediaFetch(env, url);
+    return handleMediaFetch(request, env, url, principal);
   }
 
   if (url.pathname.startsWith("/media-detail/")) {
     const csrf = csrfContext(request);
-    return htmlResponseWithCsrf(request, await renderMediaDetailPage(env, url, csrf.token), csrf);
+    const detail = await renderMediaDetailPage(request, env, url, principal, csrf.token);
+    return detail instanceof Response ? detail : htmlResponseWithCsrf(request, detail, csrf);
   }
 
   if (url.pathname === "/media-manager") {
     const csrf = csrfContext(request);
-    return htmlResponseWithCsrf(request, await renderMediaManagerPage(env, url, csrf.token), csrf);
+    const manager = await renderMediaManagerPage(request, env, url, principal, csrf.token);
+    return manager instanceof Response ? manager : htmlResponseWithCsrf(request, manager, csrf);
   }
 
   if (url.pathname === "/api/health") {
@@ -305,10 +317,14 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "revisions") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       return htmlResponse(await renderRevisionsPage(env, id, url));
     }
 
     if (url.searchParams.get("do") === "diff") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       return htmlResponse(await renderDiffPage(env, id, url));
     }
 
@@ -333,6 +349,8 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       return htmlResponse(await renderBacklinksPage(env, id));
     }
 
@@ -345,11 +363,15 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "revert") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_EDIT);
+      if (denied) return denied;
       const csrf = csrfContext(request);
       return htmlResponseWithCsrf(request, await renderRevertPage(env, id, url, csrf.token), csrf);
     }
 
     if (url.searchParams.get("do") === "purge") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       const page = await getCurrentPage(env.DB, id);
       if (!page) {
         return notFoundResponse(`Wiki page '${id}' was not found.`);
@@ -362,6 +384,8 @@ export async function handleRequest(
     const revisionId = url.searchParams.get("rev");
 
     if (exportMode) {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       const exportPage = revisionId
         ? await getPageRevision(env.DB, revisionId)
         : await getCurrentPage(env.DB, id);
@@ -378,6 +402,8 @@ export async function handleRequest(
     }
 
     if (revisionId) {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       const revision = await getPageRevision(env.DB, revisionId);
       if (!revision || revision.pageId !== id) {
         return notFoundResponse(`Revision '${revisionId}' was not found.`);
@@ -400,6 +426,14 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "draft") {
+      const denied = await requireAclPermission(
+        request,
+        env,
+        principal,
+        id,
+        page ? ACL_EDIT : ACL_CREATE
+      );
+      if (denied) return denied;
       const draft = await getPageDraft(env.DB, id);
       if (!draft) {
         return notFoundResponse(`Draft for '${id}' was not found.`);
@@ -408,6 +442,8 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "source") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       if (!page) {
         return notFoundResponse(`Wiki page '${id}' was not found.`);
       }
@@ -420,8 +456,13 @@ export async function handleRequest(
     }
 
     if (!page) {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
       return htmlResponse(renderMissingPage(env, id), { status: 404 });
     }
+
+    const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+    if (denied) return denied;
 
     return htmlResponse(
       await renderPageHtml(env, id, page.content, page.revisionId, undefined, page)
@@ -488,12 +529,20 @@ function redirectLegacyMediaDetail(url: URL): Response {
   return redirectResponse(mediaDetailPath(id), 301);
 }
 
-async function handleMediaFetch(env: Env, url: URL): Promise<Response> {
+async function handleMediaFetch(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
   const id = mediaIdFromPath(url, "/media/");
 
   if (!id) {
     return notFoundResponse("Missing media id.");
   }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
 
   const revisionId = url.searchParams.get("rev");
   const media = revisionId
@@ -541,13 +590,22 @@ async function handleMediaFetch(env: Env, url: URL): Promise<Response> {
   return new Response(object.body, { headers });
 }
 
-async function renderMediaDetailPage(env: Env, url: URL, csrfToken: string): Promise<string> {
+async function renderMediaDetailPage(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  csrfToken: string
+): Promise<string | Response> {
   const id = mediaIdFromPath(url, "/media-detail/");
   const media = id ? await getCurrentMedia(env.DB, id) : null;
 
   if (!id || !media) {
     return htmlShell(env, "Media not found", "<p>Media not found.</p>");
   }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
 
   const preview = media.mimeType.startsWith("image/")
     ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}" loading="lazy" decoding="async"></a></p>`
@@ -590,8 +648,23 @@ async function renderMediaDetailPage(env: Env, url: URL, csrfToken: string): Pro
   );
 }
 
-async function renderMediaManagerPage(env: Env, url: URL, csrfToken: string): Promise<string> {
+async function renderMediaManagerPage(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  csrfToken: string
+): Promise<string | Response> {
   const namespace = cleanMediaId(url.searchParams.get("ns") ?? "");
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    namespace ? `${namespace}:*` : "*",
+    ACL_READ
+  );
+  if (denied) return denied;
+
   const query = (url.searchParams.get("q") ?? "").trim();
   const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
   const media = query
@@ -1801,6 +1874,15 @@ async function handleEditPage(
   id: string,
   page: CurrentPage | null
 ): Promise<Response> {
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    page ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
+
   const draft = await getPageDraft(env.DB, id);
   const templateContent = !page && !draft ? await resolvePageTemplate(env.DB, id) : null;
   const cookieName = pageLockCookieName(id);
@@ -1836,6 +1918,16 @@ async function handleSave(request: Request, env: Env, principal: AuthPrincipal):
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
   }
+
+  const currentPage = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    currentPage ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
 
   const blocked = findWordblockMatch(`${content}\n${summary}`);
   if (blocked) {
@@ -1903,6 +1995,9 @@ async function handleMediaUpload(
   if (!id) {
     return jsonResponse({ error: "Missing media id." }, { status: 400 });
   }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
+  if (denied) return denied;
 
   const body = await file.arrayBuffer();
   const validation = validateMediaUpload({
@@ -1973,6 +2068,9 @@ async function handleMediaDelete(
     return jsonResponse({ error: "Missing media id." }, { status: 400 });
   }
 
+  const denied = await requireAclPermission(request, env, principal, id, ACL_DELETE);
+  if (denied) return denied;
+
   const author = principalAuthor(principal);
   const result = await deleteMedia(env.DB, {
     id,
@@ -2014,6 +2112,9 @@ async function handleMediaRevert(
   if (!id || !revisionId) {
     return jsonResponse({ error: "Missing media id or revision id." }, { status: 400 });
   }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
+  if (denied) return denied;
 
   const author = principalAuthor(principal);
   const result = await revertMedia(env.DB, {
@@ -2066,6 +2167,9 @@ async function handleRevert(
   if (!id || !revisionId) {
     return jsonResponse({ error: "Missing page id or revision id." }, { status: 400 });
   }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_EDIT);
+  if (denied) return denied;
 
   const revision = await getPageRevision(env.DB, revisionId);
   if (!revision || revision.pageId !== id) {
@@ -2127,6 +2231,16 @@ async function handleRefreshPageLock(
     return jsonResponse({ error: "Missing page id or lock token." }, { status: 400 });
   }
 
+  const page = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    page ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
+
   const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
 
   if (!lock.ok) {
@@ -2156,6 +2270,16 @@ async function handleReleasePageLock(
   if (!id || !lockToken) {
     return jsonResponse({ error: "Missing page id or lock token." }, { status: 400 });
   }
+
+  const page = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    page ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
 
   await releaseHeldPageLock(env, principal, id, lockToken);
   const response = jsonResponse({ ok: true });
@@ -2285,6 +2409,16 @@ async function handleSaveDraft(
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
   }
 
+  const page = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    page ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
+
   if (lockToken) {
     const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
 
@@ -2332,6 +2466,63 @@ function acceptsJson(request: Request): boolean {
   return accept.includes("application/json") || requestedWith.toLowerCase() === "xmlhttprequest";
 }
 
+async function requireAclPermission(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  subjectId: string,
+  requiredPermission: number
+): Promise<Response | null> {
+  const permission = await resolveRequestAclPermission(env, subjectId, principal);
+
+  if (hasAclPermission(permission, requiredPermission)) {
+    return null;
+  }
+
+  return aclDeniedResponse(request, env, subjectId, permission, requiredPermission);
+}
+
+async function resolveRequestAclPermission(
+  env: Env,
+  subjectId: string,
+  principal: AuthPrincipal
+): Promise<number> {
+  const rules = await new D1AclStore(env.DB).listAllRules();
+  return resolveAclPermission(rules, subjectId, principal);
+}
+
+function aclDeniedResponse(
+  request: Request,
+  env: Env,
+  subjectId: string,
+  permission: number,
+  requiredPermission: number
+): Response {
+  const message = `Permission denied for '${subjectId}'.`;
+
+  if (acceptsJson(request)) {
+    return jsonResponse(
+      {
+        error: message,
+        permission,
+        requiredPermission
+      },
+      { status: 403 }
+    );
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Permission denied",
+      `<h1>Permission denied</h1>
+      <p>${escapeHtml(message)}</p>
+      <p>Required permission: ${requiredPermission}. Current permission: ${permission}.</p>`
+    ),
+    { status: 403 }
+  );
+}
+
 function isUploadFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
@@ -2351,6 +2542,16 @@ async function handleDeleteDraft(
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
   }
+
+  const page = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    page ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
 
   await deletePageDraft(env.DB, id);
   await releaseHeldPageLock(env, principal, id, lockToken);

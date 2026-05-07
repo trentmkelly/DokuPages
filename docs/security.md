@@ -18,4 +18,8 @@ then the root `*` rule. If multiple rules match within the same scope, the highe
 applicable permission wins. `%USER%` and `%GROUP%` rules are expanded for the
 active principal before matching.
 
-Route enforcement is tracked separately from this matcher baseline.
+Route enforcement applies the matcher to page reads, page edit/create saves, page
+revision/diff/source/revert actions, drafts, edit locks, media reads, media
+manager access, media uploads, media deletes, and media reverts. Hidden page
+behavior, sneaky index behavior, and ACL-filtered aggregate search/list results
+are tracked separately.

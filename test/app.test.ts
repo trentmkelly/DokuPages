@@ -13,6 +13,7 @@ interface D1StubState {
   mediaRevisions: Record<string, unknown>[];
   metadata: Record<string, unknown>[];
   drafts: Record<string, unknown>[];
+  aclRules: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
 }
@@ -26,6 +27,7 @@ const state: D1StubState = {
   mediaRevisions: seedMediaRevisions(),
   metadata: [],
   drafts: [],
+  aclRules: seedAclRules(),
   deleted: false,
   batches: []
 };
@@ -68,6 +70,7 @@ describe("handleRequest", () => {
     state.mediaRevisions = seedMediaRevisions();
     state.metadata = [];
     state.drafts = [];
+    state.aclRules = seedAclRules();
     state.deleted = false;
     state.batches = [];
     purgedKeys.length = 0;
@@ -464,6 +467,49 @@ describe("handleRequest", () => {
     await expect(oldRevision.text()).resolves.toBe("<svg>old</svg>");
   });
 
+  it("enforces media upload and delete ACLs", async () => {
+    state.aclRules = [aclRule("*", "all", "@ALL", 1)];
+
+    const fetch = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
+
+    const deleteForm = new FormData();
+    deleteForm.set("id", "wiki:logo.svg");
+    const deniedDelete = await handleRequest(
+      new Request("https://example.com/api/media/delete", {
+        method: "POST",
+        body: deleteForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    const uploadForm = new FormData();
+    uploadForm.set("ns", "wiki");
+    uploadForm.set("file", new File(["upload"], "upload.txt", { type: "text/plain" }));
+    const deniedUpload = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: uploadForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(fetch.status).toBe(200);
+    expect(deniedDelete.status).toBe(403);
+    await expect(deniedDelete.json()).resolves.toMatchObject({
+      error: "Permission denied for 'wiki:logo.svg'.",
+      requiredPermission: 16
+    });
+    expect(deniedUpload.status).toBe(403);
+    await expect(deniedUpload.json()).resolves.toMatchObject({
+      error: "Permission denied for 'wiki:upload.txt'.",
+      requiredPermission: 8
+    });
+    expect(state.media).toHaveLength(1);
+    expect(state.mediaRevisions).toHaveLength(1);
+  });
+
   it("reverts current media to an immutable media revision", async () => {
     const form = new FormData();
     form.set("id", "wiki:logo.svg");
@@ -617,6 +663,47 @@ describe("handleRequest", () => {
     expect(html).toContain('data-draft-url="/api/pages/draft"');
     expect(html).toContain('data-lock-url="/api/pages/lock"');
     expect(html).toContain('name="minor" type="checkbox"');
+  });
+
+  it("enforces page read ACLs before rendering content", async () => {
+    state.aclRules = [aclRule("*", "all", "@ALL", 16), aclRule("wiki:welcome", "all", "@ALL", 0)];
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toContain("Permission denied");
+    expect(cachePuts).toHaveLength(0);
+  });
+
+  it("enforces page edit ACLs before locking or saving", async () => {
+    state.aclRules = [aclRule("*", "all", "@ALL", 1)];
+
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Denied ======");
+
+    const save = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(edit.status).toBe(403);
+    expect(save.status).toBe(403);
+    await expect(save.json()).resolves.toMatchObject({
+      error: "Permission denied for 'wiki:welcome'.",
+      requiredPermission: 2
+    });
+    expect(state.batches).toHaveLength(0);
   });
 
   it("blocks concurrent page edits until the current edit lock is released", async () => {
@@ -1414,6 +1501,14 @@ function createD1Stub(state: D1StubState): D1Database {
             };
           }
 
+          if (sql.includes("from acl_rules")) {
+            return {
+              results: sql.includes("where scope = ?")
+                ? state.aclRules.filter((rule) => rule.scope === idOrLimit)
+                : [...state.aclRules]
+            };
+          }
+
           if (sql.includes("from schema_versions")) {
             return {
               results: [{ version: 1, applied_at: "2026-05-07T00:00:00.000Z" }]
@@ -1965,4 +2060,24 @@ function seedMediaRevisions(): Record<string, unknown>[] {
       created_at: "2026-05-06T00:00:00.000Z"
     }
   ];
+}
+
+function seedAclRules(): Record<string, unknown>[] {
+  return [aclRule("*", "all", "@ALL", 16)];
+}
+
+function aclRule(
+  scope: string,
+  principalType: "all" | "group" | "user",
+  principal: string,
+  permission: number
+): Record<string, unknown> {
+  return {
+    id: `acl:${scope}:${principal}`,
+    scope,
+    principal_type: principalType,
+    principal,
+    permission,
+    created_at: "2026-05-07T00:00:00.000Z"
+  };
 }

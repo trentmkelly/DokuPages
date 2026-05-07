@@ -370,6 +370,19 @@ export class D1MetadataStore implements MetadataStore {
 export class D1AclStore implements AclStore {
   constructor(private readonly db: D1Database) {}
 
+  async listAllRules(): Promise<AclRuleRecord[]> {
+    const result = await this.db
+      .prepare(
+        `select id, scope, principal_type, principal, permission, created_at
+         from acl_rules
+         order by scope asc, principal_type asc, principal asc`
+      )
+      .bind()
+      .all<AclRuleRow>();
+
+    return result.results.map(mapAclRule);
+  }
+
   async listRules(scope: string): Promise<AclRuleRecord[]> {
     const result = await this.db
       .prepare(

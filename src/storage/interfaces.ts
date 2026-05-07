@@ -152,6 +152,7 @@ export interface MetadataStore {
 }
 
 export interface AclStore {
+  listAllRules(): Promise<AclRuleRecord[]>;
   listRules(scope: string): Promise<AclRuleRecord[]>;
   putRule(rule: AclRuleRecord): Promise<void>;
 }
