@@ -147,11 +147,11 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/lib/exe/css.php") {
-    return redirectResponse("/dokuwiki.css", 301);
+    return redirectResponse(versionedAssetPath("/dokuwiki.css", env), 301);
   }
 
   if (url.pathname === "/lib/exe/js.php" || url.pathname === "/lib/exe/jquery.php") {
-    return redirectResponse("/dokuwiki.js", 301);
+    return redirectResponse(versionedAssetPath("/dokuwiki.js", env), 301);
   }
 
   if (url.pathname === "/lib/exe/fetch.php") {
@@ -1111,6 +1111,8 @@ function renderPageExport(
   }
 
   const revisionComment = revisionId ? `<!-- revision: ${escapeHtml(revisionId)} -->\n` : "";
+  const stylesheetUrl = new URL(versionedAssetPath("/dokuwiki.css", env), url);
+  const stylesheetPath = `${stylesheetUrl.pathname}${stylesheetUrl.search}`;
 
   return new Response(
     `<!DOCTYPE html>
@@ -1118,7 +1120,7 @@ function renderPageExport(
 <head>
   <meta charset="utf-8">
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="${escapeAttribute(new URL("/dokuwiki.css", url).pathname)}">
+  <link rel="stylesheet" href="${escapeAttribute(stylesheetPath)}">
 </head>
 <body>
 <div class="dokuwiki export">
@@ -1134,6 +1136,10 @@ ${rendered.html}
 function exportFileName(id: string): string {
   const name = id.split(":").filter(Boolean).at(-1) || "page";
   return name.replace(/[^a-z0-9._-]+/gi, "_");
+}
+
+function versionedAssetPath(assetPath: string, env: Env): string {
+  return `${assetPath}?v=${encodeURIComponent(getRuntimeConfig(env).appVersion)}`;
 }
 
 function renderMissingPage(env: Env, id: string): string {
@@ -2503,6 +2509,11 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
     ? `<div class="docInfo">Last modified: ${escapeHtml(options.updatedAt)}</div>`
     : "";
   const pageTools = pageId ? renderPageTools(pageId) : "";
+  const stylesheetPath = versionedAssetPath("/dokuwiki.css", env);
+  const scriptPath = versionedAssetPath("/dokuwiki.js", env);
+  const faviconPath = versionedAssetPath("/images/favicon.ico", env);
+  const appleTouchIconPath = versionedAssetPath("/images/apple-touch-icon.png", env);
+  const logoPath = versionedAssetPath("/dokuwiki-logo.png", env);
 
   return `<!doctype html>
 <html lang="${escapeAttribute(config.language)}">
@@ -2510,11 +2521,11 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} - ${escapeHtml(siteName)}</title>
-  <link rel="icon" href="/images/favicon.ico">
-  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+  <link rel="icon" href="${faviconPath}">
+  <link rel="apple-touch-icon" href="${appleTouchIconPath}">
   ${canonicalLink}
-  <link rel="stylesheet" href="/dokuwiki.css">
-  <script src="/dokuwiki.js" defer></script>
+  <link rel="stylesheet" href="${stylesheetPath}">
+  <script src="${scriptPath}" defer></script>
 </head>
 <body class="dokuwiki">
   <div id="dokuwiki__site">
@@ -2522,7 +2533,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       <header id="dokuwiki__header">
         <div class="pad group">
         <div class="headings">
-          <h1 class="logo"><a href="${startPath}"><img src="/dokuwiki-logo.png" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
+          <h1 class="logo"><a href="${startPath}"><img src="${logoPath}" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">

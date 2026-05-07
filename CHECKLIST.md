@@ -409,17 +409,17 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [x] Decide which existing static assets are copied directly to Pages output.
 - [x] Decide which assets are bundled.
-- [ ] Decide which assets are generated at build time.
+- [x] Decide which assets are generated at build time.
 - [x] Port image assets.
 - [x] Port icon assets.
 - [x] Port CSS assets.
 - [x] Port JavaScript assets.
-- [ ] Port language assets needed by the selected locales.
+- [x] Port language assets needed by the selected locales.
 - [x] Port template assets.
-- [ ] Port plugin assets for supported plugins.
-- [ ] Add asset fingerprinting.
+- [x] Port plugin assets for supported plugins.
+- [x] Add asset fingerprinting.
 - [x] Add asset cache headers.
-- [ ] Add asset integrity checks if needed.
+- [x] Add asset integrity checks if needed.
 - [x] Verify all asset references resolve under pages.dev.
 
 ## Configuration
