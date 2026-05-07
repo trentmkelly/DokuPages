@@ -8,9 +8,13 @@ Launch auth will be a native D1-backed replacement for DokuWiki's `authplain` us
 
 ## Anonymous Requests
 
-Requests currently resolve to an anonymous principal until session cookies are implemented. Anonymous principals have no username, no user groups, and no revision author identity. ACL evaluation should still include DokuWiki's special `@ALL` subject for anonymous visitors.
+Requests without a valid session resolve to an anonymous principal. Anonymous principals have no username, no user groups, and no revision author identity. ACL evaluation should still include DokuWiki's special `@ALL` subject for anonymous visitors.
 
 `/api/auth/session` exposes the current public principal shape for runtime checks.
+
+## Login Sessions
+
+Native login uses D1-backed users with the native password hash format. Successful logins create a random session token, store only its SHA-256 hash in D1, and issue an HTTP-only `SameSite=Lax` session cookie. Logout deletes the session row and clears the cookie.
 
 ## Password Hashing
 

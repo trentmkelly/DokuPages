@@ -1,5 +1,13 @@
 import { principalAuthor, publicPrincipal, type AuthPrincipal } from "./auth/principal";
 import { resolveRequestPrincipal } from "./auth/request";
+import {
+  authenticateUser,
+  clearSessionCookieHeader,
+  createLoginSession,
+  deleteLoginSession,
+  readCookie,
+  sessionCookieHeader
+} from "./auth/session";
 import { getRuntimeConfig, type ConfigValidation } from "./config";
 import type { Env } from "./env";
 import {
@@ -130,6 +138,22 @@ export async function handleRequest(
     return jsonResponse({ principal: publicPrincipal(principal) });
   }
 
+  if (url.pathname === "/login" && request.method === "GET") {
+    return htmlResponse(renderLoginPage(env, url));
+  }
+
+  if (url.pathname === "/logout" && request.method === "GET") {
+    return htmlResponse(renderLogoutPage(env, url));
+  }
+
+  if (url.pathname === "/api/auth/login" && request.method === "POST") {
+    return handleLogin(request, env);
+  }
+
+  if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+    return handleLogout(request, env);
+  }
+
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
     return htmlResponse(await renderDiagnosticsPage(env));
   }
@@ -252,6 +276,14 @@ export async function handleRequest(
 
     if (url.searchParams.get("do") === "index") {
       return htmlResponse(await renderNamespaceIndexPage(env, namespaceForIndex(id), url));
+    }
+
+    if (url.searchParams.get("do") === "login") {
+      return htmlResponse(renderLoginPage(env, url, null, pagePath(id)));
+    }
+
+    if (url.searchParams.get("do") === "logout") {
+      return htmlResponse(renderLogoutPage(env, url, pagePath(id)));
     }
 
     if (url.searchParams.get("do") === "backlink" || url.searchParams.get("do") === "backlinks") {
@@ -552,6 +584,8 @@ function normalizeLegacyAction(action: string | null): string | null {
     case "revert":
     case "draft":
     case "diff":
+    case "login":
+    case "logout":
     case "export_raw":
     case "export_xhtml":
     case "export_xhtmlbody":
@@ -1297,6 +1331,108 @@ function renderWebManifest(env: Env): Record<string, unknown> {
     background_color: "#ffffff",
     theme_color: "#0f172a"
   };
+}
+
+async function handleLogin(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const username = String(form.get("username") ?? form.get("u") ?? "").trim();
+  const password = String(form.get("password") ?? form.get("p") ?? "");
+  const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
+  const url = new URL(request.url);
+
+  if (!username || !password) {
+    return htmlResponse(renderLoginPage(env, url, "Missing username or password.", returnTo), {
+      status: 400
+    });
+  }
+
+  const user = await authenticateUser(env.DB, username, password);
+  if (!user) {
+    return htmlResponse(renderLoginPage(env, url, "Invalid username or password.", returnTo), {
+      status: 401
+    });
+  }
+
+  const session = await createLoginSession(env.DB, user.id);
+  return new Response(null, {
+    status: 303,
+    headers: securityHeaders({
+      location: returnTo,
+      "set-cookie": sessionCookieHeader(getRuntimeConfig(env).sessionCookieName, session, request)
+    })
+  });
+}
+
+async function handleLogout(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
+  const cookieName = getRuntimeConfig(env).sessionCookieName;
+
+  await deleteLoginSession(env.DB, readCookie(request, cookieName));
+
+  return new Response(null, {
+    status: 303,
+    headers: securityHeaders({
+      location: returnTo,
+      "set-cookie": clearSessionCookieHeader(cookieName, request)
+    })
+  });
+}
+
+function renderLoginPage(
+  env: Env,
+  url: URL,
+  error: string | null = null,
+  returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env)
+): string {
+  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+
+  return htmlShell(
+    env,
+    "Login",
+    `<h1>Login</h1>
+    ${message}
+    <form id="dw__login" method="post" action="/api/auth/login">
+      <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
+      <fieldset>
+        <legend>Login</legend>
+        <label for="login__user">Username</label>
+        <input id="login__user" name="username" class="edit" type="text" autocomplete="username" required autofocus>
+        <label for="login__pass">Password</label>
+        <input id="login__pass" name="password" class="edit" type="password" autocomplete="current-password" required>
+        <button type="submit">Login</button>
+      </fieldset>
+    </form>`
+  );
+}
+
+function renderLogoutPage(
+  env: Env,
+  url: URL,
+  returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env)
+): string {
+  return htmlShell(
+    env,
+    "Logout",
+    `<h1>Logout</h1>
+    <form method="post" action="/api/auth/logout">
+      <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
+      <button type="submit">Logout</button>
+    </form>`
+  );
+}
+
+function safeReturnPath(value: string, env: Env): string {
+  if (!value) return pagePath(startPageId(env));
+
+  try {
+    const parsed = new URL(value, "https://example.invalid");
+    if (parsed.origin !== "https://example.invalid") return pagePath(startPageId(env));
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return pagePath(startPageId(env));
+  }
 }
 
 function namespaceForIndex(id: string): string {

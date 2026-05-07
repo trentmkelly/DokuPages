@@ -187,7 +187,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for manifest and opensearch.
 - [x] Implement route handling for CSS and JavaScript assets.
 - [ ] Implement route handling for AJAX endpoints.
-- [ ] Implement route handling for login and logout.
+- [x] Implement route handling for login and logout.
 - [ ] Implement route handling for registration if supported.
 - [ ] Implement route handling for profile updates if supported.
 - [ ] Implement route handling for admin pages.
@@ -297,15 +297,15 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 - [x] Decide which DokuWiki auth backends will be supported.
 - [x] Implement anonymous user behavior.
-- [ ] Implement login.
-- [ ] Implement logout.
+- [x] Implement login.
+- [x] Implement logout.
 - [x] Implement password hashing.
 - [x] Implement password verification.
 - [ ] Implement password reset if supported.
 - [ ] Implement registration if supported.
 - [ ] Implement profile update if supported.
 - [ ] Implement remember-me behavior or a secure replacement.
-- [ ] Implement session cookie behavior.
+- [x] Implement session cookie behavior.
 - [ ] Implement CSRF tokens.
 - [ ] Implement bearer token auth if remote APIs are supported.
 - [ ] Implement admin and manager role checks.
@@ -393,7 +393,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port search UI.
 - [ ] Port media manager UI.
 - [ ] Port admin UI.
-- [ ] Port login UI.
+- [x] Port login UI.
 - [ ] Port profile UI if supported.
 - [ ] Port user manager UI if supported.
 - [ ] Port styling plugin behavior if supported.

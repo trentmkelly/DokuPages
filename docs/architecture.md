@@ -37,7 +37,7 @@ Current rendered page HTML is cached in KV under `page:{id}` with revision IDs s
 
 ## Auth And Sessions
 
-The schema supports native users, groups, sessions, password hashes, and ACLs. The scaffold does not yet implement login or cookie handling.
+The schema supports native users, groups, sessions, password hashes, and ACLs. Native login and logout routes issue and clear D1-backed session cookies; ACL enforcement is still tracked separately.
 
 ## Lock And Conflict Model
 
