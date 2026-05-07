@@ -224,13 +224,13 @@ export function renderWikiText(
       continue;
     }
 
-    const quote = line.match(/^>\s?(.*)$/);
+    const quote = line.match(/^(>+)\s?(.*)$/);
     if (quote) {
       flushParagraph(blocks, state, context);
       flushList(blocks, state, context);
       flushCode(blocks, state);
       flushTable(blocks, state, context);
-      state.quote.push(quote[1]);
+      state.quote.push({ level: quote[1].length, content: quote[2] });
       continue;
     }
 
@@ -281,13 +281,18 @@ interface ParserState {
   list: ListItem[];
   code: string[];
   table: string[];
-  quote: string[];
+  quote: QuoteItem[];
   specialBlock: SpecialBlock | null;
 }
 
 interface ListItem {
   level: number;
   type: ListType;
+  content: string;
+}
+
+interface QuoteItem {
+  level: number;
   content: string;
 }
 
@@ -482,8 +487,45 @@ function renderTableCell(cell: TableCell, context: RenderContext): string {
 function flushQuote(blocks: string[], state: ParserState, context: RenderContext): void {
   if (state.quote.length === 0) return;
 
-  blocks.push(`<blockquote><p>${renderInline(state.quote.join(" "), context)}</p></blockquote>`);
+  blocks.push(renderQuotes(state.quote, context));
   state.quote = [];
+}
+
+function renderQuotes(items: QuoteItem[], context: RenderContext): string {
+  let depth = 0;
+  let paragraphOpen = false;
+  let html = "";
+
+  for (const item of items) {
+    if (paragraphOpen) {
+      html += "</p>";
+      paragraphOpen = false;
+    }
+
+    while (depth > item.level) {
+      html += "</blockquote>";
+      depth -= 1;
+    }
+
+    while (depth < item.level) {
+      html += "<blockquote>";
+      depth += 1;
+    }
+
+    html += `<p>${renderInline(item.content, context)}`;
+    paragraphOpen = true;
+  }
+
+  if (paragraphOpen) {
+    html += "</p>";
+  }
+
+  while (depth > 0) {
+    html += "</blockquote>";
+    depth -= 1;
+  }
+
+  return html;
 }
 
 function flushSpecialBlock(blocks: string[], state: ParserState): void {

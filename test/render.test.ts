@@ -209,6 +209,14 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain("foot <strong>note</strong>");
   });
 
+  it("renders nested DokuWiki quotes", () => {
+    const rendered = renderWikiText("> No\n>> Yes\n>>> Then\n> Really?");
+
+    expect(rendered.html).toBe(
+      "<blockquote><p>No</p><blockquote><p>Yes</p><blockquote><p>Then</p></blockquote></blockquote><p>Really?</p></blockquote>"
+    );
+  });
+
   it("renders simple DokuWiki tables", () => {
     const rendered = renderWikiText("^ Head ^\n| Cell |");
 
