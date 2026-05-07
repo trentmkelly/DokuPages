@@ -56,6 +56,11 @@ export function formatCommand(command, args) {
   return [command, ...args].map(shellQuote).join(" ");
 }
 
+export function wranglerR2ObjectPath(bucket, objectKey) {
+  const encodedKey = objectKey.split("/").map(encodeURIComponent).join("/");
+  return `${bucket}/${encodedKey}`;
+}
+
 function shellQuote(value) {
   if (/^[a-zA-Z0-9_./:=@%-]+$/.test(value)) return value;
   return `'${value.replaceAll("'", "'\\''")}'`;

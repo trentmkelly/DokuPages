@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { wranglerR2ObjectPath } from "./backup-utils.mjs";
 
 const DEFAULT_MANIFEST = ".wrangler/dokuwiki-media-manifest.json";
 
@@ -23,7 +24,7 @@ async function main() {
       "r2",
       "object",
       "put",
-      `${args.bucket}/${object.objectKey}`,
+      wranglerR2ObjectPath(args.bucket, object.objectKey),
       "--file",
       object.sourcePath,
       "--content-type",

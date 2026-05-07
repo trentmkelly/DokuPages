@@ -2,7 +2,7 @@
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { requireTargetMode, run } from "./backup-utils.mjs";
+import { requireTargetMode, run, wranglerR2ObjectPath } from "./backup-utils.mjs";
 
 const DEFAULT_DATABASE = "dokuwiki_pages_dev";
 const DEFAULT_BUCKET = "dokuwiki-pages-dev-media";
@@ -49,7 +49,7 @@ async function main() {
         "r2",
         "object",
         "put",
-        `${bucket}/${object.objectKey}`,
+        wranglerR2ObjectPath(bucket, object.objectKey),
         "--file",
         path.join(args.backup, object.path),
         "--force",
