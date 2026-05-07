@@ -1,6 +1,12 @@
 import type { Env } from "./env";
 import { healthResponse } from "./http/health";
-import { htmlResponse, jsonResponse, notFoundResponse, redirectResponse } from "./http/responses";
+import {
+  htmlResponse,
+  jsonResponse,
+  notFoundResponse,
+  redirectResponse,
+  securityHeaders
+} from "./http/responses";
 import {
   cleanMediaId,
   getCurrentMedia,
@@ -137,10 +143,10 @@ export async function handleRequest(
     return new Response(
       `User-agent: *\nAllow: /\nSitemap: ${new URL("/sitemap.xml", url).href}\n`,
       {
-        headers: {
+        headers: securityHeaders({
           "content-type": "text/plain; charset=utf-8",
           "x-content-type-options": "nosniff"
-        }
+        })
       }
     );
   }
@@ -252,10 +258,10 @@ export async function handleRequest(
         return notFoundResponse(`Wiki page '${id}' was not found.`);
       }
       return new Response(page.content, {
-        headers: {
+        headers: securityHeaders({
           "content-type": "text/plain; charset=utf-8",
           "x-content-type-options": "nosniff"
-        }
+        })
       });
     }
 
@@ -354,7 +360,7 @@ async function handleMediaFetch(env: Env, url: URL): Promise<Response> {
     return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
   }
 
-  const headers = new Headers();
+  const headers = securityHeaders();
   headers.set("content-type", media.mimeType);
   headers.set("content-length", String(media.byteLength));
   headers.set("etag", `"${media.contentHash}"`);
@@ -1025,19 +1031,19 @@ function renderPageTools(pageId: string): string {
 
 function xmlResponse(body: string, contentType = "application/xml; charset=utf-8"): Response {
   return new Response(body, {
-    headers: {
+    headers: securityHeaders({
       "content-type": contentType,
       "x-content-type-options": "nosniff"
-    }
+    })
   });
 }
 
 function manifestResponse(body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body, null, 2), {
-    headers: {
+    headers: securityHeaders({
       "content-type": "application/manifest+json; charset=utf-8",
       "x-content-type-options": "nosniff"
-    }
+    })
   });
 }
 

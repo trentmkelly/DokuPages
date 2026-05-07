@@ -541,7 +541,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement XSS protections for rendered wiki syntax.
 - [ ] Implement SVG safety policy.
 - [ ] Implement HTML embedding policy.
-- [ ] Implement external link rel policy.
+- [x] Implement external link rel policy.
 - [ ] Implement wordblock checks.
 - [ ] Implement IP extraction through Cloudflare headers.
 - [ ] Implement trusted proxy behavior appropriate for Cloudflare.
@@ -549,7 +549,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement rate limits for edits.
 - [ ] Implement rate limits for uploads.
 - [ ] Implement audit logging for admin actions.
-- [ ] Implement security headers.
+- [x] Implement security headers.
 - [ ] Implement cookie security flags.
 - [ ] Implement dependency vulnerability scanning.
 - [ ] Implement secret scanning.
@@ -625,7 +625,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Configure secrets.
 - [ ] Configure custom domain if used.
 - [ ] Configure cache rules if needed.
-- [ ] Configure security headers.
+- [x] Configure security headers.
 - [ ] Configure redirects.
 - [x] Configure preview deployments.
 - [x] Configure production deployments.

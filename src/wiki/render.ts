@@ -324,8 +324,9 @@ function renderLinks(source: string): string {
     const href = external
       ? target
       : `/wiki/${encodeURIComponent(cleanPageId(target).replaceAll(":", "/"))}`;
+    const rel = external ? ' rel="nofollow noopener noreferrer"' : "";
 
-    return `<a href="${escapeAttribute(href)}">${escapeHtml(label)}</a>`;
+    return `<a href="${escapeAttribute(href)}"${rel}>${escapeHtml(label)}</a>`;
   });
 }
 

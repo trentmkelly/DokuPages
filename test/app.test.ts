@@ -87,6 +87,8 @@ describe("handleRequest", () => {
     const response = await handleRequest(new Request("https://example.com/wiki/Wiki/Welcome"), env);
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
     const html = await response.text();
     expect(html).toContain('<nav aria-label="Breadcrumb">');
     expect(html).toContain('<a href="/index?ns=wiki">wiki</a> / <span>welcome</span>');
@@ -114,6 +116,7 @@ describe("handleRequest", () => {
     const start = await handleRequest(new Request("https://example.com/wiki/"), env);
 
     expect(page.status).toBe(301);
+    expect(page.headers.get("content-security-policy")).toContain("default-src 'self'");
     expect(page.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(edit.status).toBe(301);
     expect(edit.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");

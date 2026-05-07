@@ -1,7 +1,14 @@
+const SECURITY_HEADERS = {
+  "content-security-policy":
+    "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY"
+};
+
 export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
-  const headers = new Headers(init.headers);
+  const headers = securityHeaders(init.headers);
   headers.set("content-type", "application/json; charset=utf-8");
-  headers.set("x-content-type-options", "nosniff");
 
   return new Response(JSON.stringify(body, null, 2), {
     ...init,
@@ -10,9 +17,8 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 }
 
 export function htmlResponse(body: string, init: ResponseInit = {}): Response {
-  const headers = new Headers(init.headers);
+  const headers = securityHeaders(init.headers);
   headers.set("content-type", "text/html; charset=utf-8");
-  headers.set("x-content-type-options", "nosniff");
 
   return new Response(body, {
     ...init,
@@ -31,8 +37,16 @@ export function conflictResponse(message: string): Response {
 export function redirectResponse(location: string, status = 303): Response {
   return new Response(null, {
     status,
-    headers: {
-      location
-    }
+    headers: securityHeaders({ location })
   });
+}
+
+export function securityHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+
+  return headers;
 }

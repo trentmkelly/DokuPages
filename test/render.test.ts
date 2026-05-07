@@ -46,7 +46,9 @@ describe("renderWikiText", () => {
     );
 
     expect(rendered.html).toContain('<a href="/wiki/wiki%2Fsyntax">Syntax</a>');
-    expect(rendered.html).toContain('<a href="https://example.test">Example</a>');
+    expect(rendered.html).toContain(
+      '<a href="https://example.test" rel="nofollow noopener noreferrer">Example</a>'
+    );
     expect(rendered.html).toContain('<img src="/media/wiki/dokuwiki.svg" alt="Logo">');
   });
 
