@@ -233,6 +233,26 @@ describe("auth routes", () => {
     await expect(response.text()).resolves.toContain("Invalid username or password.");
   });
 
+  it("rate limits repeated invalid login attempts", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await postLogin(env, "alice", "wrong", {
+        "cf-connecting-ip": "203.0.113.55"
+      });
+      expect(response.status).toBe(401);
+    }
+
+    const limited = await postLogin(env, "alice", "wrong", {
+      "cf-connecting-ip": "203.0.113.55"
+    });
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("900");
+    await expect(limited.text()).resolves.toContain("Too many failed login attempts.");
+  });
+
   it("rejects disabled users during login and session resolution", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -296,11 +316,7 @@ describe("auth routes", () => {
 
     return {
       DB: new SqliteD1(db),
-      RENDER_CACHE: {
-        get: async () => null,
-        put: async () => undefined,
-        delete: async () => undefined
-      },
+      RENDER_CACHE: new MemoryKv(),
       SITE_NAME: "Test Wiki"
     };
   }
@@ -364,20 +380,23 @@ async function loginAsAlice(env) {
 }
 
 async function loginAs(env, username, password) {
+  const response = await postLogin(env, username, password);
+  return response.headers.get("set-cookie") ?? "";
+}
+
+async function postLogin(env, username, password, headers = {}) {
   const login = new FormData();
   login.set("username", username);
   login.set("password", password);
 
-  const response = await handleRequest(
+  return handleRequest(
     new Request("https://example.com/api/auth/login", {
       method: "POST",
       body: login,
-      headers: csrfHeaders()
+      headers: csrfHeaders(headers)
     }),
     env
   );
-
-  return response.headers.get("set-cookie") ?? "";
 }
 
 class SqliteD1 {
@@ -430,5 +449,34 @@ class SqliteD1PreparedStatement {
   async run() {
     this.database.prepare(this.sql).run(...this.values);
     return { success: true };
+  }
+}
+
+class MemoryKv {
+  constructor() {
+    this.values = new Map();
+  }
+
+  async get(key) {
+    const entry = this.values.get(key);
+    if (!entry) return null;
+
+    if (entry.expiresAt && entry.expiresAt <= Date.now()) {
+      this.values.delete(key);
+      return null;
+    }
+
+    return entry.value;
+  }
+
+  async put(key, value, options = {}) {
+    this.values.set(key, {
+      value,
+      expiresAt: options.expirationTtl ? Date.now() + options.expirationTtl * 1000 : null
+    });
+  }
+
+  async delete(key) {
+    this.values.delete(key);
   }
 }

@@ -103,6 +103,8 @@ const PAGE_LOCK_TOKEN_BYTES = 24;
 const CSRF_COOKIE_NAME = "DW_CSRF_TOKEN";
 const CSRF_TOKEN_BYTES = 32;
 const CSRF_TTL_SECONDS = 60 * 60 * 24;
+const LOGIN_RATE_LIMIT_ATTEMPTS = 5;
+const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 
@@ -1781,8 +1783,12 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     );
   }
 
+  const rateLimited = await loginRateLimitResponse(request, env, username, returnTo, csrf);
+  if (rateLimited) return rateLimited;
+
   const user = await authenticateUser(env.DB, username, password);
   if (!user) {
+    await recordLoginFailure(request, env, username);
     return htmlResponseWithCsrf(
       request,
       renderLoginPage(env, url, "Invalid username or password.", returnTo, csrf.token),
@@ -1791,6 +1797,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     );
   }
 
+  await clearLoginFailures(request, env, username);
   const session = await createLoginSession(env.DB, user.id);
   return new Response(null, {
     status: 303,
@@ -1799,6 +1806,72 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       "set-cookie": sessionCookieHeader(getRuntimeConfig(env).sessionCookieName, session, request)
     })
   });
+}
+
+async function loginRateLimitResponse(
+  request: Request,
+  env: Env,
+  username: string,
+  returnTo: string,
+  csrf: CsrfContext
+): Promise<Response | null> {
+  const attempts = await readLoginFailureCount(request, env, username);
+  if (attempts < LOGIN_RATE_LIMIT_ATTEMPTS) return null;
+
+  if (acceptsJson(request)) {
+    return jsonResponse(
+      { error: "Too many failed login attempts. Try again later." },
+      {
+        status: 429,
+        headers: { "retry-after": String(LOGIN_RATE_LIMIT_WINDOW_SECONDS) }
+      }
+    );
+  }
+
+  return htmlResponseWithCsrf(
+    request,
+    renderLoginPage(
+      env,
+      new URL(request.url),
+      "Too many failed login attempts. Try again later.",
+      returnTo,
+      csrf.token
+    ),
+    csrf,
+    {
+      status: 429,
+      headers: { "retry-after": String(LOGIN_RATE_LIMIT_WINDOW_SECONDS) }
+    }
+  );
+}
+
+async function readLoginFailureCount(
+  request: Request,
+  env: Env,
+  username: string
+): Promise<number> {
+  const raw = await env.RENDER_CACHE.get(loginRateLimitKey(request, username));
+  if (!raw) return 0;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function recordLoginFailure(request: Request, env: Env, username: string): Promise<void> {
+  const key = loginRateLimitKey(request, username);
+  const attempts = (await readLoginFailureCount(request, env, username)) + 1;
+  await env.RENDER_CACHE.put(key, String(attempts), {
+    expirationTtl: LOGIN_RATE_LIMIT_WINDOW_SECONDS
+  });
+}
+
+async function clearLoginFailures(request: Request, env: Env, username: string): Promise<void> {
+  await env.RENDER_CACHE.delete(loginRateLimitKey(request, username));
+}
+
+function loginRateLimitKey(request: Request, username: string): string {
+  const client = getClientIp(request) ?? "unknown";
+  return `auth:login:${client}:${encodeURIComponent(username.toLowerCase()).slice(0, 128)}`;
 }
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {

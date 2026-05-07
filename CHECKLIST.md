@@ -314,8 +314,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement account disable behavior if supported.
 - [x] Implement auth migration from `users.auth.php`.
 - [ ] Implement auth event hooks or replacement extension points.
-- [ ] Add auth rate limiting.
-- [ ] Add brute force protection.
+- [x] Add auth rate limiting.
+- [x] Add brute force protection.
 
 ## ACL
 

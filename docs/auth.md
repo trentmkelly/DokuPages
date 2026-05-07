@@ -18,6 +18,8 @@ Native admin-only routes require membership in the `admin` group. Manager-level 
 
 Native login uses D1-backed users with the native password hash format. Successful logins create a random session token, store only its SHA-256 hash in D1, and issue an HTTP-only `SameSite=Lax` session cookie with `Secure` on HTTPS. Logout deletes the session row and clears the cookie. Page edit lock cookies use the same `HttpOnly`, `SameSite=Lax`, and HTTPS `Secure` flags. Disabled user rows are rejected during login and when existing session cookies are resolved.
 
+Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
+
 ## Password Hashing
 
 New native accounts use PBKDF2-HMAC-SHA-256 through Web Crypto. Encoded hashes use:
