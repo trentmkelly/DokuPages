@@ -273,6 +273,98 @@ describe("handleRequest", () => {
     expect(legacyDetail.headers.get("location")).toBe("/media-detail/wiki/logo.svg");
   });
 
+  it("uploads media to R2 and records D1 media revision metadata", async () => {
+    const form = new FormData();
+    form.set("ns", "wiki");
+    form.set("summary", "Upload logo");
+    form.set("file", new File(["uploaded media"], "upload.txt", { type: "text/plain" }));
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form,
+        headers: { "cf-connecting-ip": "203.0.113.20" }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/media-detail/wiki/upload.txt");
+    expect(state.media[0]).toMatchObject({
+      id: "wiki:upload.txt",
+      namespace: "wiki",
+      mime_type: "text/plain",
+      byte_length: 14,
+      is_deleted: 0
+    });
+    expect(state.mediaRevisions[0]).toMatchObject({
+      media_id: "wiki:upload.txt",
+      mime_type: "text/plain",
+      byte_length: 14,
+      summary: "Upload logo",
+      change_type: "create"
+    });
+    expect(state.changelog[0]).toMatchObject({
+      subject_type: "media",
+      subject_id: "wiki:upload.txt",
+      ip: "203.0.113.20",
+      change_type: "create"
+    });
+    expect(state.metadata).toContainEqual(
+      expect.objectContaining({
+        subject_type: "media",
+        subject_id: "wiki:upload.txt",
+        key: "contentHash"
+      })
+    );
+
+    const fetch = await handleRequest(
+      new Request("https://example.com/media/wiki/upload.txt"),
+      env
+    );
+    expect(fetch.status).toBe(200);
+    await expect(fetch.text()).resolves.toBe("uploaded media");
+  });
+
+  it("rejects media uploads that would overwrite existing media unless requested", async () => {
+    const form = new FormData();
+    form.set("ns", "wiki");
+    form.set("file", new File(["replacement"], "logo.svg", { type: "image/svg+xml" }));
+
+    const conflict = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({
+      error: "Media 'wiki:logo.svg' already exists."
+    });
+
+    form.set("overwrite", "1");
+    const overwrite = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form
+      }),
+      env
+    );
+
+    expect(overwrite.status).toBe(303);
+    expect(state.media[0]).toMatchObject({
+      id: "wiki:logo.svg",
+      byte_length: 11
+    });
+    expect(state.mediaRevisions[0]).toMatchObject({
+      media_id: "wiki:logo.svg",
+      change_type: "edit"
+    });
+  });
+
   it("uses matching rendered page cache entries", async () => {
     renderCache.set(
       "page:wiki:welcome",
@@ -1185,6 +1277,12 @@ function createD1Stub(state: D1StubState): D1Database {
       const changelogStatement = statements.find((statement) =>
         statement.sql.includes("insert into changelog")
       );
+      const mediaStatement = statements.find((statement) =>
+        statement.sql.includes("insert into media (")
+      );
+      const mediaRevisionStatement = statements.find((statement) =>
+        statement.sql.includes("insert into media_revisions")
+      );
 
       if (pagesStatement && revisionStatement) {
         const [id, namespace, title, revisionId, isDeleted, , updatedAt] = pagesStatement.values;
@@ -1224,10 +1322,11 @@ function createD1Stub(state: D1StubState): D1Database {
           sizeChange,
           createdAt
         ] = changelogStatement.values;
+        const subjectType = changelogStatement.sql.includes("'media'") ? "media" : "page";
 
         state.changelog.unshift({
           id: changelogId,
-          subject_type: "page",
+          subject_type: subjectType,
           subject_id: subjectId,
           revision_id: revisionId,
           user_name: userName,
@@ -1236,6 +1335,70 @@ function createD1Stub(state: D1StubState): D1Database {
           summary,
           size_change: sizeChange,
           created_at: createdAt
+        });
+      }
+
+      if (mediaStatement && mediaRevisionStatement) {
+        const [
+          id,
+          namespace,
+          objectKey,
+          mimeType,
+          byteLength,
+          contentHash,
+          currentRevisionId,
+          createdAt,
+          updatedAt
+        ] = mediaStatement.values;
+        const [
+          revisionId,
+          mediaId,
+          revisionObjectKey,
+          revisionMimeType,
+          revisionByteLength,
+          revisionContentHash,
+          authorId,
+          summary,
+          changeType,
+          revisionCreatedAt
+        ] = mediaRevisionStatement.values;
+        const existingMedia = state.media.find((media) => media.id === id);
+
+        if (existingMedia) {
+          existingMedia.namespace = namespace;
+          existingMedia.object_key = objectKey;
+          existingMedia.mime_type = mimeType;
+          existingMedia.byte_length = byteLength;
+          existingMedia.content_hash = contentHash;
+          existingMedia.current_revision_id = currentRevisionId;
+          existingMedia.is_deleted = 0;
+          existingMedia.updated_at = updatedAt;
+        } else {
+          state.media.unshift({
+            id,
+            namespace,
+            object_key: objectKey,
+            mime_type: mimeType,
+            byte_length: byteLength,
+            content_hash: contentHash,
+            current_revision_id: currentRevisionId,
+            is_deleted: 0,
+            created_at: createdAt,
+            updated_at: updatedAt
+          });
+        }
+
+        state.mediaRevisions.unshift({
+          id: revisionId,
+          media_id: mediaId,
+          object_key: revisionObjectKey,
+          mime_type: revisionMimeType,
+          byte_length: revisionByteLength,
+          content_hash: revisionContentHash,
+          author_id: authorId,
+          summary,
+          change_type: changeType,
+          created_at: revisionCreatedAt
         });
       }
 
@@ -1268,9 +1431,10 @@ function createD1Stub(state: D1StubState): D1Database {
 
         if (statement.sql.includes("insert into metadata")) {
           const [subjectId, key, valueJson, updatedAt] = statement.values;
+          const subjectType = statement.sql.includes("'media'") ? "media" : "page";
           const existing = state.metadata.find(
             (record) =>
-              record.subject_type === "page" &&
+              record.subject_type === subjectType &&
               record.subject_id === subjectId &&
               record.key === key
           );
@@ -1280,7 +1444,7 @@ function createD1Stub(state: D1StubState): D1Database {
             existing.updated_at = updatedAt;
           } else {
             state.metadata.push({
-              subject_type: "page",
+              subject_type: subjectType,
               subject_id: subjectId,
               key,
               value_json: valueJson,
@@ -1296,7 +1460,7 @@ function createD1Stub(state: D1StubState): D1Database {
 }
 
 function createR2Stub(): R2Bucket {
-  const objects = new Map([
+  const objects = new Map<string, BodyInit>([
     ["media/current/wiki/logo.svg", "<svg>current</svg>"],
     ["media/revisions/wiki/logo.svg/20260506000000", "<svg>old</svg>"]
   ]);
@@ -1312,6 +1476,13 @@ function createR2Stub(): R2Bucket {
       return {
         body: new Response(value).body
       };
+    },
+    put: async (key: string, value: BodyInit) => {
+      objects.set(key, value);
+      return {} as R2Object;
+    },
+    delete: async (key: string) => {
+      objects.delete(key);
     }
   } as unknown as R2Bucket;
 }

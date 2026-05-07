@@ -36,6 +36,7 @@ import {
   mediaDetailPath,
   mediaName,
   mediaPath,
+  saveMediaUpload,
   type CurrentMedia,
   type MediaRevision
 } from "./wiki/media-service";
@@ -232,6 +233,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/pages/draft/delete" && request.method === "POST") {
     return handleDeleteDraft(request, env);
+  }
+
+  if (url.pathname === "/api/media/upload" && request.method === "POST") {
+    return handleMediaUpload(request, env, principal);
   }
 
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
@@ -545,6 +550,23 @@ async function renderMediaManagerPage(env: Env, url: URL): Promise<string> {
       <label for="media__ns">Namespace</label>
       <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
       <button type="submit">Browse</button>
+    </form>
+    <form class="upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
+      <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
+      <fieldset>
+        <legend>Upload</legend>
+        <label for="media__file">File</label>
+        <input id="media__file" name="file" type="file" required>
+        <label for="media__id">Media ID</label>
+        <input id="media__id" name="id" type="text" placeholder="${escapeAttribute(namespace ? `${namespace}:example.png` : "example.png")}">
+        <label for="media__summary">Summary</label>
+        <input id="media__summary" name="summary" type="text">
+        <label for="media__overwrite">
+          <input id="media__overwrite" name="overwrite" type="checkbox" value="1">
+          Overwrite existing media
+        </label>
+        <button type="submit">Upload</button>
+      </fieldset>
     </form>
     ${emptyState}
     <ul class="idx media__manager">${items}</ul>
@@ -1652,6 +1674,66 @@ async function handleSave(request: Request, env: Env, principal: AuthPrincipal):
   return redirectResponse(pagePath(id));
 }
 
+async function handleMediaUpload(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  if (!env.MEDIA_BUCKET) {
+    return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
+  }
+
+  const form = await request.formData();
+  const file = form.get("file");
+
+  if (!isUploadFile(file)) {
+    return jsonResponse({ error: "Missing upload file." }, { status: 400 });
+  }
+
+  const namespace = cleanMediaId(String(form.get("ns") ?? ""));
+  const requestedId = cleanMediaId(String(form.get("id") ?? ""));
+  const id = requestedId || cleanMediaId([namespace, file.name].filter(Boolean).join(":"));
+
+  if (!id) {
+    return jsonResponse({ error: "Missing media id." }, { status: 400 });
+  }
+
+  const author = principalAuthor(principal);
+  const result = await saveMediaUpload(env.DB, env.MEDIA_BUCKET, {
+    id,
+    body: await file.arrayBuffer(),
+    mimeType: file.type || null,
+    summary: String(form.get("summary") ?? ""),
+    overwrite: Boolean(form.get("overwrite")),
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: getClientIp(request)
+  });
+
+  if (!result.ok) {
+    const message = `Media '${id}' already exists.`;
+    if (acceptsJson(request)) {
+      return jsonResponse({ error: message }, { status: 409 });
+    }
+    return htmlResponse(
+      htmlShell(
+        env,
+        "Media upload conflict",
+        `<h1>Media upload conflict</h1>
+        <p>${escapeHtml(message)}</p>
+        <p><a href="/media-manager?ns=${encodeURIComponent(namespace)}">Back to media manager</a></p>`
+      ),
+      { status: 409 }
+    );
+  }
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, id, revisionId: result.revision.id });
+  }
+
+  return redirectResponse(mediaDetailPath(id));
+}
+
 async function handleRevert(
   request: Request,
   env: Env,
@@ -1770,6 +1852,10 @@ function acceptsJson(request: Request): boolean {
   const accept = request.headers.get("accept") ?? "";
   const requestedWith = request.headers.get("x-requested-with") ?? "";
   return accept.includes("application/json") || requestedWith.toLowerCase() === "xmlhttprequest";
+}
+
+function isUploadFile(value: FormDataEntryValue | null): value is File {
+  return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
 
 async function handleDeleteDraft(request: Request, env: Env): Promise<Response> {

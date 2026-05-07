@@ -25,6 +25,30 @@ export interface MediaRevision {
   createdAt: string;
 }
 
+export interface SaveMediaUploadInput {
+  id: string;
+  body: ArrayBuffer;
+  mimeType?: string | null;
+  summary: string;
+  overwrite?: boolean;
+  authorId?: string | null;
+  authorName?: string | null;
+  ip?: string | null;
+  now?: Date;
+}
+
+export type SaveMediaUploadResult =
+  | {
+      ok: true;
+      media: CurrentMedia;
+      revision: MediaRevision;
+      changeType: "create" | "edit";
+    }
+  | {
+      ok: false;
+      reason: "exists";
+    };
+
 interface CurrentMediaRow {
   id: string;
   namespace: string;
@@ -136,6 +160,139 @@ export async function listNamespaceMedia(
   return result.results.map(mapCurrentMedia);
 }
 
+export async function saveMediaUpload(
+  db: D1Database,
+  bucket: R2Bucket,
+  input: SaveMediaUploadInput
+): Promise<SaveMediaUploadResult> {
+  const id = cleanMediaId(input.id);
+  const current = await getCurrentMedia(db, id);
+
+  if (current && !input.overwrite) {
+    return { ok: false, reason: "exists" };
+  }
+
+  const now = (input.now ?? new Date()).toISOString();
+  const namespace = mediaNamespace(id);
+  const revisionId = `${id}@${now}`;
+  const objectKey = mediaRevisionObjectKey(id, revisionId);
+  const mimeType = input.mimeType || detectMimeType(id);
+  const byteLength = input.body.byteLength;
+  const contentHash = await sha256(input.body);
+  const changeType = current ? "edit" : "create";
+  const summary = input.summary;
+  const sizeChange = byteLength - (current?.byteLength ?? 0);
+
+  await bucket.put(objectKey, input.body, {
+    httpMetadata: {
+      contentType: mimeType
+    },
+    customMetadata: {
+      mediaId: id,
+      revisionId,
+      contentHash
+    }
+  });
+
+  try {
+    await db.batch([
+      db
+        .prepare(
+          `insert into media (
+             id, namespace, object_key, mime_type, byte_length, content_hash,
+             current_revision_id, is_deleted, created_at, updated_at
+           ) values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+           on conflict(id) do update set
+             namespace = excluded.namespace,
+             object_key = excluded.object_key,
+             mime_type = excluded.mime_type,
+             byte_length = excluded.byte_length,
+             content_hash = excluded.content_hash,
+             current_revision_id = excluded.current_revision_id,
+             is_deleted = 0,
+             updated_at = excluded.updated_at`
+        )
+        .bind(id, namespace, objectKey, mimeType, byteLength, contentHash, revisionId, now, now),
+      db
+        .prepare(
+          `insert into media_revisions (
+             id, media_id, object_key, mime_type, byte_length, content_hash,
+             author_id, summary, change_type, created_at
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          revisionId,
+          id,
+          objectKey,
+          mimeType,
+          byteLength,
+          contentHash,
+          input.authorId ?? null,
+          summary,
+          changeType,
+          now
+        ),
+      db
+        .prepare(
+          `insert into changelog (
+             id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+             change_type, summary, size_change, created_at
+           ) values (?, 'media', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          `media:${revisionId}`,
+          id,
+          revisionId,
+          input.authorId ?? null,
+          input.authorName ?? null,
+          input.ip ?? null,
+          changeType,
+          summary,
+          sizeChange,
+          now
+        ),
+      ...buildMediaMetadataStatements(db, id, now, {
+        namespace,
+        revisionId,
+        objectKey,
+        mimeType,
+        contentHash,
+        size: byteLength
+      })
+    ]);
+  } catch (error) {
+    await bucket.delete(objectKey).catch(() => undefined);
+    throw error;
+  }
+
+  return {
+    ok: true,
+    changeType,
+    media: {
+      id,
+      namespace,
+      objectKey,
+      mimeType,
+      byteLength,
+      contentHash,
+      currentRevisionId: revisionId,
+      createdAt: current?.createdAt ?? now,
+      updatedAt: now
+    },
+    revision: {
+      id: revisionId,
+      mediaId: id,
+      objectKey,
+      mimeType,
+      byteLength,
+      contentHash,
+      changeType,
+      summary,
+      createdAt: now
+    }
+  };
+}
+
 function mapCurrentMedia(row: CurrentMediaRow): CurrentMedia {
   return {
     id: row.id,
@@ -162,4 +319,37 @@ function mapMediaRevision(row: MediaRevisionRow): MediaRevision {
     summary: row.summary,
     createdAt: row.created_at
   };
+}
+
+function mediaRevisionObjectKey(id: string, revisionId: string): string {
+  const path = id
+    .split(":")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `media/revisions/${path}/${encodeURIComponent(revisionId)}`;
+}
+
+function buildMediaMetadataStatements(
+  db: D1Database,
+  id: string,
+  updatedAt: string,
+  metadata: Record<string, unknown>
+): D1PreparedStatement[] {
+  return Object.entries(metadata).map(([key, value]) =>
+    db
+      .prepare(
+        `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+         values ('media', ?, ?, ?, ?)
+         on conflict(subject_type, subject_id, key) do update set
+           value_json = excluded.value_json,
+           updated_at = excluded.updated_at`
+      )
+      .bind(id, key, JSON.stringify(value), updatedAt)
+  );
+}
+
+async function sha256(value: ArrayBuffer): Promise<string> {
+  const buffer = await crypto.subtle.digest("SHA-256", value);
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }

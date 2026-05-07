@@ -181,7 +181,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement route handling for media fetches.
 - [x] Implement route handling for media details.
 - [x] Implement route handling for media manager.
-- [ ] Implement route handling for uploads.
+- [x] Implement route handling for uploads.
 - [x] Implement route handling for feeds.
 - [x] Implement route handling for sitemap.
 - [x] Implement route handling for manifest and opensearch.
@@ -273,13 +273,13 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement media namespace resolution.
 - [x] Implement media MIME detection.
 - [ ] Implement media ACL checks.
-- [ ] Implement media upload.
-- [ ] Implement media overwrite rules.
+- [x] Implement media upload.
+- [x] Implement media overwrite rules.
 - [ ] Implement media deletion.
-- [ ] Implement media revisions.
+- [x] Implement media revisions.
 - [ ] Implement media revert.
-- [ ] Implement media changelog.
-- [ ] Implement media metadata.
+- [x] Implement media changelog.
+- [x] Implement media metadata.
 - [x] Implement media detail pages.
 - [x] Implement media manager browsing.
 - [ ] Implement media search.
