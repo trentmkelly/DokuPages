@@ -209,7 +209,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement namespace-relative links.
 - [x] Implement media links.
 - [x] Implement external links.
-- [ ] Implement interwiki links.
+- [x] Implement interwiki links.
 - [ ] Implement Windows share links if supported.
 - [ ] Implement email links and mailguard behavior.
 - [x] Implement lists.
@@ -426,7 +426,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Map `conf/local.php` overrides to the new configuration model.
 - [ ] Map plugin configuration to the new configuration model.
 - [ ] Map MIME configuration.
-- [ ] Map interwiki configuration.
+- [x] Map interwiki configuration.
 - [ ] Map acronym configuration.
 - [ ] Map entity configuration.
 - [ ] Map smiley configuration.

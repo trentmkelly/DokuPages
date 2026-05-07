@@ -65,6 +65,23 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<a href="#local-section">Local</a>');
   });
 
+  it("renders interwiki links from the default DokuWiki map", () => {
+    const rendered = renderWikiText(
+      "[[doku>newsletter]] [[doku>faq:sidebar|FAQ]] [[wp>Wiki|Wiki]] [[this>doku.php?do=admin&page=config|config]]"
+    );
+
+    expect(rendered.html).toContain(
+      '<a href="https://www.dokuwiki.org/newsletter" rel="nofollow noopener noreferrer">doku&gt;newsletter</a>'
+    );
+    expect(rendered.html).toContain(
+      '<a href="https://www.dokuwiki.org/faq:sidebar" rel="nofollow noopener noreferrer">FAQ</a>'
+    );
+    expect(rendered.html).toContain(
+      '<a href="https://en.wikipedia.org/wiki/Wiki" rel="nofollow noopener noreferrer">Wiki</a>'
+    );
+    expect(rendered.html).toContain('<a href="/doku.php?do=admin&amp;page=config">config</a>');
+  });
+
   it("renders lists, code blocks, and nowiki spans", () => {
     const rendered = renderWikiText("  * first\n  * **second**\n\n  <unsafe>\n\n%%**literal**%%");
 

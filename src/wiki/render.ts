@@ -1,3 +1,4 @@
+import { resolveInterwikiLink } from "./interwiki";
 import { cleanPageId, pageIdToRoutePath, resolvePageLinkId } from "./page-id";
 import { mediaPath } from "./media-service";
 
@@ -327,11 +328,16 @@ function renderMedia(source: string): string {
 
 function renderLinks(source: string, context: RenderContext): string {
   return source.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, rawTarget, rawLabel) => {
-    const target = rawTarget.trim();
-    const label = rawLabel?.trim() || target;
+    const target = decodeHtmlEntities(rawTarget.trim());
+    const label = decodeHtmlEntities(rawLabel?.trim() || target);
     const external = /^https?:\/\//i.test(target);
-    const href = external ? target : internalLinkPath(target, context.pageId);
-    const rel = external ? ' rel="nofollow noopener noreferrer"' : "";
+    const interwiki = external ? null : resolveInterwikiLink(target);
+    const href = external
+      ? target
+      : interwiki
+        ? interwiki.href
+        : internalLinkPath(target, context.pageId);
+    const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
 
     return `<a href="${escapeAttribute(href)}"${rel}>${escapeHtml(label)}</a>`;
   });
@@ -375,4 +381,13 @@ function escapeHtml(value: string): string {
 
 function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replaceAll("&gt;", ">")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'");
 }
