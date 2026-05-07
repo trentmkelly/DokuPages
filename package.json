@@ -7,6 +7,7 @@
     "dev": "wrangler pages dev public",
     "deploy": "wrangler pages deploy public --project-name dokutest --branch main",
     "deploy:preview": "wrangler pages deploy public --project-name dokutest --branch preview",
+    "audit": "npm audit --audit-level=high",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "import:dry-run": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run",

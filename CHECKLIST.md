@@ -553,7 +553,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Implement audit logging for admin actions.
 - [x] Implement security headers.
 - [ ] Implement cookie security flags.
-- [ ] Implement dependency vulnerability scanning.
+- [x] Implement dependency vulnerability scanning.
 - [ ] Implement secret scanning.
 - [ ] Perform threat model review.
 - [ ] Perform permissions review.
