@@ -41,3 +41,7 @@ other state-changing routes.
 Admin ACL changes and search index rebuilds are recorded in D1 `audit_log` rows.
 The admin-only `/admin/audit` page exposes the recent entries for operational
 review.
+
+The repository includes a tracked-file secret scanner at `scripts/secret-scan.mjs`.
+CI runs it on every push and pull request to catch high-signal private keys and
+service tokens before deployment.
