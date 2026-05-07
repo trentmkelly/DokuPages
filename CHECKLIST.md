@@ -219,7 +219,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement nowiki blocks.
 - [x] Implement quotes.
 - [x] Implement footnotes.
-- [ ] Implement acronym replacement.
+- [x] Implement acronym replacement.
 - [x] Implement entity replacement.
 - [x] Implement smileys.
 - [x] Implement typography replacements.
@@ -428,7 +428,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Map plugin configuration to the new configuration model.
 - [ ] Map MIME configuration.
 - [x] Map interwiki configuration.
-- [ ] Map acronym configuration.
+- [x] Map acronym configuration.
 - [ ] Map entity configuration.
 - [x] Map smiley configuration.
 - [ ] Map wordblock configuration.

@@ -66,6 +66,19 @@ describe("renderWikiText", () => {
     expect(literal.html).toBe("<p>:-)</p>");
   });
 
+  it("renders default DokuWiki acronyms after smileys", () => {
+    const rendered = renderWikiText("HTML FOSS TL;DR specification spec LOL wordHTML %%HTML%%");
+
+    expect(rendered.html).toContain('<abbr title="HyperText Markup Language">HTML</abbr>');
+    expect(rendered.html).toContain('<abbr title="Free &amp; Open-Source Software">FOSS</abbr>');
+    expect(rendered.html).toContain('<abbr title="Too long; didn&#39;t read">TL;DR</abbr>');
+    expect(rendered.html).toContain("specification");
+    expect(rendered.html).toContain('<abbr title="specification">spec</abbr>');
+    expect(rendered.html).toContain('<img src="/images/smileys/lol.svg"');
+    expect(rendered.html).toContain("wordHTML");
+    expect(rendered.html).toContain("HTML</p>");
+  });
+
   it("renders internal links, external links, and media embeds", () => {
     const rendered = renderWikiText(
       "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}"

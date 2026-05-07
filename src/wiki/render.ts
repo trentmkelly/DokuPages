@@ -55,6 +55,77 @@ const SMILEY_PATTERN = new RegExp(
     .join("|")})(?=$|[^A-Za-z0-9_])`,
   "g"
 );
+// Default mapping from DokuWiki's conf/acronyms.conf.
+const DEFAULT_ACRONYMS: Record<string, string> = {
+  ACL: "Access Control List",
+  AFAICS: "As far as I can see",
+  AFAIK: "As far as I know",
+  AFAIR: "As far as I remember",
+  API: "Application Programming Interface",
+  ASAP: "As soon as possible",
+  ASCII: "American Standard Code for Information Interchange",
+  BTW: "By the way",
+  CMS: "Content Management System",
+  CSS: "Cascading Style Sheets",
+  DNS: "Domain Name System",
+  EOF: "End of file",
+  EOL: "End of line",
+  EOM: "End of message",
+  EOT: "End of text",
+  FAQ: "Frequently Asked Questions",
+  FTP: "File Transfer Protocol",
+  FOSS: "Free & Open-Source Software",
+  FLOSS: "Free/Libre and Open Source Software",
+  FUD: "Fear, Uncertainty, and Doubt",
+  FYI: "For your information",
+  GB: "Gigabyte",
+  GHz: "Gigahertz",
+  GPL: "GNU General Public License",
+  GUI: "Graphical User Interface",
+  HTML: "HyperText Markup Language",
+  IANAL: "I am not a lawyer (but)",
+  IE: "Internet Explorer",
+  IIRC: "If I remember correctly",
+  IMHO: "In my humble opinion",
+  IMO: "In my opinion",
+  IOW: "In other words",
+  IRC: "Internet Relay Chat",
+  IRL: "In real life",
+  KISS: "Keep it simple stupid",
+  LAN: "Local Area Network",
+  LGPL: "GNU Lesser General Public License",
+  LOL: "Laughing out loud",
+  MathML: "Mathematical Markup Language",
+  MB: "Megabyte",
+  MHz: "Megahertz",
+  MSIE: "Microsoft Internet Explorer",
+  OMG: "Oh my God",
+  OS: "Operating System",
+  OSS: "Open Source Software",
+  OTOH: "On the other hand",
+  PITA: "Pain in the Ass",
+  RFC: "Request for Comments",
+  ROTFL: "Rolling on the floor laughing",
+  RTFM: "Read The Fine Manual",
+  spec: "specification",
+  TIA: "Thanks in advance",
+  "TL;DR": "Too long; didn't read",
+  TOC: "Table of Contents",
+  URI: "Uniform Resource Identifier",
+  URL: "Uniform Resource Locator",
+  W3C: "World Wide Web Consortium",
+  "WTF?": "What the f***",
+  WYSIWYG: "What You See Is What You Get",
+  YMMV: "Your mileage may vary"
+};
+const ACRONYM_BOUNDARY = "[\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7f]";
+const ACRONYM_PATTERN = new RegExp(
+  `(^|${ACRONYM_BOUNDARY})(${Object.keys(DEFAULT_ACRONYMS)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join("|")})(?=$|${ACRONYM_BOUNDARY})`,
+  "g"
+);
 
 export function renderWikiText(
   source: string,
@@ -345,6 +416,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = renderSmileys(rendered, protectHtml);
+  rendered = renderAcronyms(rendered, protectHtml);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\/\/([^/]+)\/\//g, "<em>$1</em>")
@@ -396,6 +468,16 @@ function renderSmileys(source: string, protectHtml: (html: string) => string): s
 
     return `${prefix}${protectHtml(
       `<img src="${SMILEY_IMAGE_BASE}/${filename}" class="icon smiley" alt="${escapeAttribute(smiley)}">`
+    )}`;
+  });
+}
+
+function renderAcronyms(source: string, protectHtml: (html: string) => string): string {
+  return source.replace(ACRONYM_PATTERN, (_match, prefix: string, acronym: string) => {
+    const title = DEFAULT_ACRONYMS[acronym];
+
+    return `${prefix}${protectHtml(
+      `<abbr title="${escapeAttribute(title)}">${escapeHtml(acronym)}</abbr>`
     )}`;
   });
 }
