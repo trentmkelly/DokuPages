@@ -20,6 +20,10 @@ export async function buildImportPlan(sourceRoot) {
   const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
+  const mimeTypes = await discoverMimeTypes([
+    path.join(confRoot, "mime.conf"),
+    path.join(confRoot, "mime.local.conf")
+  ]);
   const wordblockPatterns = await discoverWordblockPatterns(path.join(confRoot, "wordblock.conf"));
 
   return {
@@ -32,6 +36,7 @@ export async function buildImportPlan(sourceRoot) {
       mediaRevisions: mediaRevisions.length,
       aclRules: aclRules.length,
       users: users.length,
+      mimeTypes: mimeTypes.length,
       wordblockPatterns: wordblockPatterns.length
     },
     pages,
@@ -40,6 +45,7 @@ export async function buildImportPlan(sourceRoot) {
     mediaRevisions,
     aclRules,
     users,
+    mimeTypes,
     wordblockPatterns
   };
 }
@@ -254,6 +260,34 @@ export async function discoverUsers(file) {
         groups: groups.split(",").filter(Boolean)
       };
     });
+}
+
+export async function discoverMimeTypes(files) {
+  const entries = new Map();
+
+  for (const file of files) {
+    const text = await readTextIfExists(file);
+    if (!text) continue;
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const [rawExtension, rawMimeType] = line.split(/\s+/);
+      if (!rawExtension || !rawMimeType) continue;
+
+      const forceDownload = rawMimeType.startsWith("!");
+      const mimeType = forceDownload ? rawMimeType.slice(1) : rawMimeType;
+      const extension = rawExtension.toLowerCase();
+      entries.set(extension, {
+        extension,
+        mimeType,
+        forceDownload
+      });
+    }
+  }
+
+  return [...entries.values()].sort((a, b) => a.extension.localeCompare(b.extension));
 }
 
 export async function discoverWordblockPatterns(file) {

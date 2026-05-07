@@ -427,7 +427,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Map `conf/dokuwiki.php` defaults to the new configuration model.
 - [ ] Map `conf/local.php` overrides to the new configuration model.
 - [ ] Map plugin configuration to the new configuration model.
-- [ ] Map MIME configuration.
+- [x] Map MIME configuration.
 - [x] Map interwiki configuration.
 - [x] Map acronym configuration.
 - [x] Map entity configuration.
@@ -573,7 +573,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Write importer for `conf/users.auth.php`.
 - [ ] Write importer for plugin settings.
 - [ ] Write importer for interwiki configuration.
-- [ ] Write importer for MIME configuration.
+- [x] Write importer for MIME configuration.
 - [x] Write importer for wordblock configuration.
 - [ ] Write importer for custom language files if present.
 - [ ] Write importer for custom template files if present.

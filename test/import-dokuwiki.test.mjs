@@ -19,6 +19,8 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
+    await writeFile(path.join(root, "conf/mime.conf"), "jpg image/jpeg\nzip !application/zip\n");
+    await writeFile(path.join(root, "conf/mime.local.conf"), "zip application/x-custom-zip\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
 
     const plan = await buildImportPlan(root);
@@ -28,12 +30,23 @@ describe("DokuWiki import planner", () => {
       media: 1,
       aclRules: 2,
       users: 1,
+      mimeTypes: 2,
       wordblockPatterns: 2
     });
     expect(plan.pages[0]).toMatchObject({ id: "wiki:welcome" });
     expect(plan.media[0]).toMatchObject({ id: "wiki:logo.svg" });
     expect(plan.aclRules[1]).toMatchObject({ scope: "wiki:*", principal: "@user", permission: 8 });
     expect(plan.users[0]).toMatchObject({ username: "alice", groups: ["user", "admin"] });
+    expect(plan.mimeTypes).toContainEqual({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      forceDownload: false
+    });
+    expect(plan.mimeTypes).toContainEqual({
+      extension: "zip",
+      mimeType: "application/x-custom-zip",
+      forceDownload: false
+    });
     expect(plan.wordblockPatterns).toEqual([
       { id: "wordblock:1", pattern: "zoosex" },
       { id: "wordblock:2", pattern: "wow gold" }

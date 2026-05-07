@@ -1,4 +1,5 @@
 import { cleanPageId } from "./page-id";
+import { getMimeTypeForExtension } from "./mime";
 
 export interface CurrentMedia {
   id: string;
@@ -48,20 +49,6 @@ interface MediaRevisionRow {
   created_at: string;
 }
 
-const MIME_TYPES = new Map([
-  ["gif", "image/gif"],
-  ["jpg", "image/jpeg"],
-  ["jpeg", "image/jpeg"],
-  ["png", "image/png"],
-  ["svg", "image/svg+xml"],
-  ["webp", "image/webp"],
-  ["avif", "image/avif"],
-  ["txt", "text/plain; charset=utf-8"],
-  ["pdf", "application/pdf"],
-  ["zip", "application/zip"],
-  ["json", "application/json; charset=utf-8"]
-]);
-
 export function cleanMediaId(rawId: string): string {
   return cleanPageId(rawId);
 }
@@ -92,7 +79,7 @@ export function mediaDetailPath(id: string): string {
 
 export function detectMimeType(id: string): string {
   const extension = mediaName(id).split(".").pop()?.toLowerCase() ?? "";
-  return MIME_TYPES.get(extension) ?? "application/octet-stream";
+  return getMimeTypeForExtension(extension) ?? "application/octet-stream";
 }
 
 export async function getCurrentMedia(db: D1Database, id: string): Promise<CurrentMedia | null> {
