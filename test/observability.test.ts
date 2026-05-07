@@ -91,10 +91,24 @@ describe("withRequestObservability", () => {
         retryable: true,
         requestId: "request-789"
       });
+      expect(error).toHaveBeenCalledTimes(2);
       expect(JSON.parse(String(error.mock.calls[0][0]))).toMatchObject({
         storage: {
           code: "storage_unavailable",
           service: "d1",
+          retryable: true
+        }
+      });
+      expect(JSON.parse(String(error.mock.calls[1][0]))).toMatchObject({
+        level: "error",
+        event: "storage_error",
+        requestId: "request-789",
+        method: "GET",
+        path: "/wiki/start",
+        storage: {
+          code: "storage_unavailable",
+          service: "d1",
+          status: 503,
           retryable: true
         }
       });

@@ -59,7 +59,7 @@ Wrangler is the deployment tool. Static assets are in `public/`, Functions are i
 
 ## Observability
 
-The app emits structured request logs with request IDs and maps known D1, KV, R2, and Durable Object failures into stable JSON responses with a storage code, service name, retry hint, and request ID.
+The app emits structured request logs with request IDs and maps known D1, KV, R2, and Durable Object failures into stable JSON responses with a storage code, service name, retry hint, and request ID. Storage failures also emit a dedicated structured `storage_error` event so Cloudflare logs can be filtered by storage service and error code.
 
 ## Migration And Rollback
 

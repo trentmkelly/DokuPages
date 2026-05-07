@@ -703,7 +703,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Define structured log format.
 - [x] Add request IDs.
 - [x] Add error logging.
-- [ ] Add storage error logging.
+- [x] Add storage error logging.
 - [ ] Add auth event logging.
 - [x] Add admin action logging.
 - [ ] Add migration logging.

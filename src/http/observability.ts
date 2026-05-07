@@ -1,5 +1,5 @@
 import { jsonResponse } from "./responses";
-import { mapStorageError } from "../storage/errors";
+import { mapStorageError, type MappedStorageError } from "../storage/errors";
 
 type RequestHandler = () => Promise<Response>;
 
@@ -16,8 +16,7 @@ export async function withRequestObservability(
     logRequest(request, requestId, response.status, Date.now() - startedAt);
     return response;
   } catch (error) {
-    logError(request, requestId, Date.now() - startedAt, error);
-    const storageError = mapStorageError(error);
+    const storageError = logError(request, requestId, Date.now() - startedAt, error);
     if (storageError) {
       const response = jsonResponse(
         {
@@ -69,7 +68,12 @@ function logRequest(request: Request, requestId: string, status: number, duratio
   );
 }
 
-function logError(request: Request, requestId: string, durationMs: number, error: unknown): void {
+function logError(
+  request: Request,
+  requestId: string,
+  durationMs: number,
+  error: unknown
+): MappedStorageError | null {
   const url = new URL(request.url);
   const exception = error instanceof Error ? error : new Error(String(error));
   const storageError = mapStorageError(exception);
@@ -94,6 +98,38 @@ function logError(request: Request, requestId: string, durationMs: number, error
             retryable: storageError.retryable
           }
         : undefined
+    })
+  );
+
+  if (storageError) {
+    logStorageError(request, requestId, durationMs, storageError);
+  }
+
+  return storageError;
+}
+
+function logStorageError(
+  request: Request,
+  requestId: string,
+  durationMs: number,
+  storageError: MappedStorageError
+): void {
+  const url = new URL(request.url);
+
+  console.error(
+    JSON.stringify({
+      level: "error",
+      event: "storage_error",
+      requestId,
+      method: request.method,
+      path: url.pathname,
+      durationMs,
+      storage: {
+        code: storageError.code,
+        service: storageError.service,
+        status: storageError.status,
+        retryable: storageError.retryable
+      }
     })
   );
 }
