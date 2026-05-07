@@ -1,5 +1,8 @@
 node_modules/
 dist/
 .wrangler/
+.mf/
+.env
 .dev.vars
+coverage/
 *.log

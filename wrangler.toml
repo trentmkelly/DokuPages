@@ -1,0 +1,18 @@
+name = "dokutest"
+pages_build_output_dir = "public"
+compatibility_date = "2026-05-07"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dokuwiki_pages_dev"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "dokuwiki-pages-dev-media"
+
+[[kv_namespaces]]
+binding = "RENDER_CACHE"
+id = "00000000000000000000000000000000"
