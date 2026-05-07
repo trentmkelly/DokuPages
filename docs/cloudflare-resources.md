@@ -25,13 +25,12 @@ Provisioned resources for the `dokutest` Pages project.
 
 ## R2
 
-R2 is not enabled for the Cloudflare account. Wrangler returned Cloudflare API error code `10042` when listing buckets:
-
-```text
-Please enable R2 through the Cloudflare Dashboard.
-```
-
-Media object storage and the `MEDIA_BUCKET` binding are blocked until R2 is enabled.
+- Binding: `MEDIA_BUCKET`
+- Bucket name: `dokuwiki-pages-dev-media`
+- Created: `2026-05-07T18:11:44.584Z`
+- Location: `EEUR`
+- Default storage class: `Standard`
+- Lifecycle policy: Cloudflare default multipart abort rule, aborting incomplete multipart uploads after 7 days.
 
 ## Durable Objects
 

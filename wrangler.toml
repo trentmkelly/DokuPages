@@ -12,3 +12,7 @@ migrations_dir = "migrations"
 [[kv_namespaces]]
 binding = "RENDER_CACHE"
 id = "ecc7148dc3264d2cb4d9e67283c6fbfd"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "dokuwiki-pages-dev-media"

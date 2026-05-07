@@ -36,7 +36,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Confirm production deployment workflow.
 - [x] Confirm environment variable and secret management.
 - [x] Confirm database migration workflow for D1.
-- [ ] Confirm R2 bucket creation and lifecycle policy workflow.
+- [x] Confirm R2 bucket creation and lifecycle policy workflow.
 
 ## Repository Orientation
 
@@ -102,7 +102,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add CI workflow.
 - [x] Add environment configuration templates.
 - [x] Add D1 migration directory.
-- [ ] Add R2 bucket binding configuration.
+- [x] Add R2 bucket binding configuration.
 - [x] Add KV namespace binding configuration if used.
 - [ ] Add Durable Object binding configuration if used.
 - [x] Add local seed data for development.
