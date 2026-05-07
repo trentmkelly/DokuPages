@@ -20,7 +20,7 @@ Native login uses D1-backed users with the native password hash format. Successf
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
 
-Login success, login failure, login rate-limit, logout, and profile update events emit structured `auth_event` logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
+Login success, login failure, login rate-limit, logout, and profile update events emit typed `auth_event` records through the native auth event handler boundary in `src/auth/events.ts`. The default handler writes structured logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
 
 ## Profile Updates
 

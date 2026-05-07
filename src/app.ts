@@ -14,6 +14,7 @@ import {
   sessionCookieHeader
 } from "./auth/session";
 import { hashPassword } from "./auth/password";
+import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import {
   createConfigExport,
   getRuntimeConfig,
@@ -4071,23 +4072,21 @@ function sessionIdFromCookie(value: string | null): string | null {
 
 function logAuthEvent(
   request: Request,
-  authEvent: "login_success" | "login_failure" | "login_rate_limited" | "logout" | "profile_update",
+  authEvent: AuthEventName,
   details: Record<string, unknown>
 ): void {
   const url = new URL(request.url);
 
-  console.log(
-    JSON.stringify({
-      level: "info",
-      event: "auth_event",
-      authEvent,
-      requestId: request.headers.get("cf-ray") ?? request.headers.get("x-request-id") ?? null,
-      method: request.method,
-      path: url.pathname,
-      ip: getClientIp(request),
-      ...details
-    })
-  );
+  emitAuthEvent({
+    level: "info",
+    event: "auth_event",
+    authEvent,
+    requestId: request.headers.get("cf-ray") ?? request.headers.get("x-request-id") ?? null,
+    method: request.method,
+    path: url.pathname,
+    ip: getClientIp(request),
+    ...details
+  });
 }
 
 function logMetric(

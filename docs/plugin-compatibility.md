@@ -34,7 +34,7 @@ Supported hook categories for launch:
 - Action hooks: none at runtime.
 - Syntax hooks: none at runtime; supported syntax is implemented in `src/wiki/render.ts`.
 - Renderer hooks: none at runtime.
-- Auth hooks: none at runtime; auth integrations must be native modules or external identity bridges.
+- Auth hooks: native `auth_event` handlers in `src/auth/events.ts`; external auth integrations must still be native modules or external identity bridges.
 - Admin hooks: none at runtime; admin features must be native routes.
 
 Future native extension modules need explicit packaging rules:

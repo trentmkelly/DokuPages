@@ -27,6 +27,9 @@ Plugin compatibility tests cover legacy bundled plugin admin URLs that redirect
 to native replacements, plus explicit removal responses for unsupported bundled
 plugins.
 
+Auth event tests cover the native replacement hook boundary used by login,
+logout, rate-limit, and profile-update flows.
+
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
 sizes, and R2 media operation counts.
