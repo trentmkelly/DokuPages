@@ -698,9 +698,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Observability
 
-- [ ] Define structured log format.
-- [ ] Add request IDs.
-- [ ] Add error logging.
+- [x] Define structured log format.
+- [x] Add request IDs.
+- [x] Add error logging.
 - [ ] Add storage error logging.
 - [ ] Add auth event logging.
 - [ ] Add admin action logging.
