@@ -624,16 +624,16 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Configure KV bindings if used.
 - [x] Configure Durable Object bindings if used.
 - [x] Configure environment variables.
-- [ ] Configure secrets.
-- [ ] Configure custom domain if used.
-- [ ] Configure cache rules if needed.
+- [x] Configure secrets.
+- [x] Configure custom domain if used.
+- [x] Configure cache rules if needed.
 - [x] Configure security headers.
 - [x] Configure redirects.
 - [x] Configure preview deployments.
 - [x] Configure production deployments.
 - [x] Configure database migration deployment.
-- [ ] Configure backup before deployment.
-- [ ] Configure rollback deployment.
+- [x] Configure backup before deployment.
+- [x] Configure rollback deployment.
 
 ## Testing
 

@@ -34,6 +34,21 @@ No secret-specific runtime variable is required for the current implementation.
 Wrangler authentication stays outside the repository and should never be checked
 in. `npm run scan:secrets` guards tracked files for high-signal tokens.
 
+## Deployment Decisions
+
+- Secrets: no application secret is required for the validation deployment.
+  Wrangler credentials remain operator-local.
+- Custom domain: not configured for `dokutest`; the validation target remains
+  `dokutest.pages.dev`.
+- Cache rules: no account-level Cloudflare cache rule is required. Runtime cache
+  behavior is controlled by response headers, KV-rendered cache entries, and
+  discovery document TTLs.
+- Backup before deployment: run `npm run backup:export` before risky migrations,
+  rehearsals, or production-like deploys.
+- Rollback deployment: use the rollback workflow in `docs/operations.md`, either
+  by redeploying a known-good commit, restoring storage, or routing back to the
+  source DokuWiki deployment.
+
 ## Local Setup
 
 ```sh
