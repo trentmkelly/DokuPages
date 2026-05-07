@@ -183,9 +183,13 @@ describe("renderWikiText", () => {
   });
 
   it("renders lists, code blocks, and nowiki spans", () => {
-    const rendered = renderWikiText("  * first\n  * **second**\n\n  <unsafe>\n\n%%**literal**%%");
+    const rendered = renderWikiText(
+      "  * first\n  * **second**\n    * nested\n  - ordered\n\n  <unsafe>\n\n%%**literal**%%"
+    );
 
-    expect(rendered.html).toContain("<ul><li>first</li><li><strong>second</strong></li></ul>");
+    expect(rendered.html).toContain(
+      "<ul><li>first</li><li><strong>second</strong><ul><li>nested</li></ul></li></ul><ol><li>ordered</li></ol>"
+    );
     expect(rendered.html).toContain("<pre><code>&lt;unsafe&gt;</code></pre>");
     expect(rendered.html).toContain("<p>**literal**</p>");
   });

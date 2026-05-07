@@ -127,6 +127,7 @@ const ACRONYM_PATTERN = new RegExp(
   "g"
 );
 const IMAGE_MEDIA_EXTENSIONS = new Set(["gif", "jpg", "jpeg", "png", "svg", "webp", "avif"]);
+type ListType = "ul" | "ol";
 
 export function renderWikiText(
   source: string,
@@ -191,13 +192,17 @@ export function renderWikiText(
       continue;
     }
 
-    const listItem = line.match(/^\s{2,}[*-]\s+(.*)$/);
+    const listItem = line.match(/^(\s{2,})([*-])\s+(.*)$/);
     if (listItem) {
       flushParagraph(blocks, state, context);
       flushCode(blocks, state);
       flushTable(blocks, state, context);
       flushQuote(blocks, state, context);
-      state.list.push(listItem[1]);
+      state.list.push({
+        level: Math.max(1, Math.floor(listItem[1].length / 2)),
+        type: listItem[2] === "-" ? "ol" : "ul",
+        content: listItem[3]
+      });
       continue;
     }
 
@@ -273,11 +278,17 @@ function isRenderDirectiveLine(line: string): boolean {
 
 interface ParserState {
   paragraph: string[];
-  list: string[];
+  list: ListItem[];
   code: string[];
   table: string[];
   quote: string[];
   specialBlock: SpecialBlock | null;
+}
+
+interface ListItem {
+  level: number;
+  type: ListType;
+  content: string;
 }
 
 interface SpecialBlock {
@@ -319,9 +330,44 @@ function flushParagraph(blocks: string[], state: ParserState, context: RenderCon
 function flushList(blocks: string[], state: ParserState, context: RenderContext): void {
   if (state.list.length === 0) return;
 
-  const items = state.list.map((item) => `<li>${renderInline(item, context)}</li>`).join("");
-  blocks.push(`<ul>${items}</ul>`);
+  blocks.push(renderList(state.list, context));
   state.list = [];
+}
+
+function renderList(items: ListItem[], context: RenderContext): string {
+  const stack: ListType[] = [];
+  let html = "";
+
+  for (const item of items) {
+    while (stack.length > item.level) {
+      const type = stack.pop()!;
+      html += `</li></${type}>`;
+    }
+
+    if (stack.length === item.level) {
+      const currentType = stack.at(-1);
+      if (currentType === item.type) {
+        html += "</li>";
+      } else {
+        const type = stack.pop()!;
+        html += `</li></${type}>`;
+      }
+    }
+
+    while (stack.length < item.level) {
+      html += `<${item.type}>`;
+      stack.push(item.type);
+    }
+
+    html += `<li>${renderInline(item.content, context)}`;
+  }
+
+  while (stack.length > 0) {
+    const type = stack.pop()!;
+    html += `</li></${type}>`;
+  }
+
+  return html;
 }
 
 function flushCode(blocks: string[], state: ParserState): void {
