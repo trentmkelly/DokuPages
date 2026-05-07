@@ -456,6 +456,57 @@ form.search button {
   border: 1px solid var(--dw-border);
 }
 
+.dokuwiki dl.code dt,
+.dokuwiki dl.file dt {
+  float: left;
+  margin-bottom: -1px;
+  padding: 0.3em 0.6em 0.1em;
+  border: 1px solid var(--dw-border);
+  border-bottom-color: var(--dw-background-site);
+  border-top-left-radius: 0.3em;
+  border-top-right-radius: 0.3em;
+  background: linear-gradient(
+    to bottom,
+    var(--dw-background-alt) 0%,
+    var(--dw-background-site) 100%
+  );
+  color: inherit;
+}
+
+.dokuwiki dl.code dd,
+.dokuwiki dl.file dd {
+  clear: left;
+  margin: 0;
+}
+
+.dokuwiki dl.file dt,
+.dokuwiki dl.file pre {
+  border-style: dashed;
+}
+
+.dokuwiki dl.file dt {
+  border-bottom-style: solid;
+}
+
+.dokuwiki blockquote {
+  margin-left: 1.5em;
+  padding-left: 1em;
+  border-left: 0.25em solid var(--dw-background-alt);
+  color: var(--dw-text-neutral);
+}
+
+.dokuwiki div.footnotes {
+  clear: both;
+  margin-top: 1.4em;
+  padding-top: 0.7em;
+  border-top: 1px solid var(--dw-border);
+  font-size: 0.875em;
+}
+
+.dokuwiki div.footnotes div.fn {
+  margin-bottom: 0.35em;
+}
+
 .dokuwiki .page nav[aria-label="Breadcrumb"] {
   margin: 0 0 1.4em;
   padding: 0.1em 0.35em;

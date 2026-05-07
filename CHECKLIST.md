@@ -203,7 +203,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Inventory DokuWiki syntax features used by current content.
 - [x] Decide whether to port DokuWiki's parser or implement a compatible parser.
 - [x] Implement headings.
-- [ ] Implement paragraphs and line breaks.
+- [x] Implement paragraphs and line breaks.
 - [x] Implement bold, italic, underline, monospace, subscript, superscript, and deleted text.
 - [x] Implement internal links.
 - [ ] Implement namespace-relative links.
@@ -215,14 +215,14 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement lists.
 - [x] Implement tables.
 - [x] Implement code blocks.
-- [ ] Implement file blocks.
+- [x] Implement file blocks.
 - [x] Implement nowiki blocks.
-- [ ] Implement quotes.
-- [ ] Implement footnotes.
+- [x] Implement quotes.
+- [x] Implement footnotes.
 - [ ] Implement acronym replacement.
-- [ ] Implement entity replacement.
+- [x] Implement entity replacement.
 - [ ] Implement smileys.
-- [ ] Implement typography replacements.
+- [x] Implement typography replacements.
 - [x] Implement table of contents extraction.
 - [ ] Implement section edit anchors.
 - [x] Implement metadata extraction.
