@@ -36,6 +36,12 @@ The seed file is `seed/local.sql`. It is idempotent and creates a welcome page, 
 
 ## Deploy
 
+Deploy the companion Durable Object Worker when lock code or its Wrangler config changes:
+
+```sh
+npm run deploy:locks
+```
+
 Preview:
 
 ```sh

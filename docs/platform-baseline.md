@@ -19,7 +19,7 @@ Primary references:
 - D1 stores relational wiki data: page records, revisions, users, ACLs, metadata, search postings, imports, and audit logs.
 - R2 is the target for media bodies, old media revisions, and large exported archives.
 - KV stores rendered cache entries that can be invalidated by key.
-- Durable Objects are the planned mechanism for page and media locks where concurrent writes need coordination. The binding is not active in `wrangler.toml` until the Pages Functions entrypoint export is finalized.
+- Durable Objects coordinate page edit locks where concurrent writes need coordination. Pages binds to the external `dokutest-page-locks` Worker because Pages Functions cannot define Durable Object classes directly.
 - The Cache API remains available for public rendered pages and immutable derived assets once cache policy is implemented.
 
 ## Development And Deployment Workflow
@@ -30,7 +30,7 @@ Primary references:
 - D1 migrations live under `migrations/` and are referenced from `wrangler.toml`.
 - D1 and KV bindings are declared in `wrangler.toml` with provisioned resource IDs.
 - R2 bucket binding is declared as `MEDIA_BUCKET`.
-- Durable Object configuration remains pending because the local Pages Functions compile rejected the first binding attempt.
+- Durable Object configuration uses `wrangler.page-locks.toml` for the companion Worker and `PAGE_LOCKS` in the Pages `wrangler.toml`.
 
 ## Security And Anti-Abuse
 

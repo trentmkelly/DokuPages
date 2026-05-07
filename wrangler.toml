@@ -16,3 +16,8 @@ id = "ecc7148dc3264d2cb4d9e67283c6fbfd"
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
 bucket_name = "dokuwiki-pages-dev-media"
+
+[[durable_objects.bindings]]
+name = "PAGE_LOCKS"
+class_name = "PageLockObject"
+script_name = "dokutest-page-locks"

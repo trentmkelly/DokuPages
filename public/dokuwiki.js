@@ -4,7 +4,7 @@
  * This is a small native replacement for the default template/editor
  * JavaScript paths that cannot run directly in Workers.
  */
-/* global document, Event, fetch, FormData, window */
+/* global document, Event, fetch, FormData, navigator, window */
 (function () {
   function ready(callback) {
     if (document.readyState === "loading") {
@@ -175,11 +175,16 @@
     var url = textarea.dataset.draftUrl;
     var id = form.querySelector('input[name="id"]');
     var baseRevisionId = form.querySelector('input[name="baseRevisionId"]');
+    var lockToken = form.querySelector('input[name="lockToken"]');
     var formData = new FormData();
 
     formData.set("id", id ? id.value : "");
     formData.set("baseRevisionId", baseRevisionId ? baseRevisionId.value : "");
     formData.set("content", textarea.value);
+
+    if (lockToken) {
+      formData.set("lockToken", lockToken.value);
+    }
 
     setStatus(status, "Saving draft...");
 
@@ -224,6 +229,71 @@
     });
   }
 
+  function pageLockFormData(form) {
+    var id = form.querySelector('input[name="id"]');
+    var lockToken = form.querySelector('input[name="lockToken"]');
+    var formData = new FormData();
+
+    formData.set("id", id ? id.value : "");
+    formData.set("lockToken", lockToken ? lockToken.value : "");
+
+    return formData;
+  }
+
+  async function refreshPageLock(form, status) {
+    var url = form.dataset.lockUrl;
+
+    if (!url) {
+      return;
+    }
+
+    var response = await fetch(url, {
+      method: "POST",
+      body: pageLockFormData(form),
+      headers: {
+        accept: "application/json",
+        "x-requested-with": "XMLHttpRequest"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Page lock refresh failed.");
+    }
+
+    setStatus(status, "Page lock refreshed.");
+  }
+
+  function bindPageLock(form, status) {
+    var token = form.querySelector('input[name="lockToken"]');
+
+    if (!token || !token.value || !form.dataset.lockUrl) {
+      return;
+    }
+
+    var submitting = false;
+
+    form.addEventListener("submit", function () {
+      submitting = true;
+    });
+
+    window.setInterval(
+      function () {
+        refreshPageLock(form, status).catch(function () {
+          setStatus(status, "Page lock refresh failed.");
+        });
+      },
+      5 * 60 * 1000
+    );
+
+    window.addEventListener("pagehide", function () {
+      if (submitting || !form.dataset.lockReleaseUrl || !navigator.sendBeacon) {
+        return;
+      }
+
+      navigator.sendBeacon(form.dataset.lockReleaseUrl, pageLockFormData(form));
+    });
+  }
+
   function bindEditor() {
     var form = document.querySelector("#dw__editform");
 
@@ -241,6 +311,7 @@
     bindToolbar(form, textarea);
     bindPreview(form, textarea, status);
     bindDraftAutosave(form, textarea, status);
+    bindPageLock(form, status);
   }
 
   ready(function () {

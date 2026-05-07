@@ -22,7 +22,9 @@ npm run typecheck
 npm test
 npm run lint
 npm run dev
+npm run deploy:locks
 npm run deploy
 ```
 
 `npm run deploy` currently targets the `dokutest` Pages project that was created for deployment validation.
+`npm run deploy:locks` publishes the companion Durable Object Worker used by Pages edit locks.

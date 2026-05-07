@@ -11,6 +11,8 @@ The first page editing implementation is intentionally small but exercises the r
 - `POST /api/pages` saves page content.
 - `POST /api/pages/draft` stores the current edit form as an anonymous draft.
 - `POST /api/pages/draft/delete` deletes the anonymous draft.
+- `POST /api/pages/lock` refreshes the current edit lock.
+- `POST /api/pages/lock/release` releases the current edit lock.
 - `POST /api/pages/revert` restores an old revision through the save path.
 - `POST /api/pages/preview` returns rendered preview JSON.
 
@@ -36,11 +38,16 @@ The save path:
 - reverts a page by copying an old revision into a new `revert` revision
 - recovers existing anonymous drafts into the edit form
 - deletes anonymous drafts after successful saves
+- releases the edit lock after successful saves
 - records immutable page revisions
 - appends changelog rows
 - updates search postings
 - purges page-related KV cache keys
 - redirects back to the page with HTTP 303
+
+## Edit Locks
+
+`GET /wiki/:id?do=edit` acquires a 15-minute Durable Object-backed page lock and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`, and successful saves or draft deletion release it.
 
 ## Section Edit Anchors
 

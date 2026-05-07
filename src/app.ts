@@ -29,6 +29,12 @@ import {
   securityHeaders
 } from "./http/responses";
 import {
+  refreshPageLock,
+  releasePageLock,
+  type PageLockInfo,
+  type PageLockRequest
+} from "./storage/page-lock-client";
+import {
   cleanMediaId,
   getCurrentMedia,
   getMediaRevision,
@@ -69,6 +75,8 @@ type ExportMode = "raw" | "xhtml" | "xhtmlbody";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 16;
+const PAGE_LOCK_TTL_SECONDS = 15 * 60;
+const PAGE_LOCK_TOKEN_BYTES = 24;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 
@@ -232,7 +240,15 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/api/pages/draft/delete" && request.method === "POST") {
-    return handleDeleteDraft(request, env);
+    return handleDeleteDraft(request, env, principal);
+  }
+
+  if (url.pathname === "/api/pages/lock" && request.method === "POST") {
+    return handleRefreshPageLock(request, env, principal);
+  }
+
+  if (url.pathname === "/api/pages/lock/release" && request.method === "POST") {
+    return handleReleasePageLock(request, env, principal);
   }
 
   if (url.pathname === "/api/media/upload" && request.method === "POST") {
@@ -354,9 +370,7 @@ export async function handleRequest(
     const page = await getCurrentPage(env.DB, id);
 
     if (url.searchParams.get("do") === "edit") {
-      const draft = await getPageDraft(env.DB, id);
-      const templateContent = !page && !draft ? await resolvePageTemplate(env.DB, id) : null;
-      return htmlResponse(renderEditPage(id, page, draft, env, templateContent));
+      return handleEditPage(request, env, principal, id, page);
     }
 
     if (url.searchParams.get("do") === "draft") {
@@ -1636,11 +1650,36 @@ function manifestResponse(body: Record<string, unknown>): Response {
   });
 }
 
+async function handleEditPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  id: string,
+  page: CurrentPage | null
+): Promise<Response> {
+  const draft = await getPageDraft(env.DB, id);
+  const templateContent = !page && !draft ? await resolvePageTemplate(env.DB, id) : null;
+  const cookieName = pageLockCookieName(id);
+  const lockToken = readCookie(request, cookieName) || randomPageLockToken();
+  const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+
+  if (!lock.ok) {
+    return lockedResponse(request, env, id, lock.lock);
+  }
+
+  const response = htmlResponse(renderEditPage(id, page, draft, env, templateContent, lockToken));
+  response.headers.append("set-cookie", pageLockCookieHeader(cookieName, lockToken, request));
+
+  return response;
+}
+
 async function handleSave(request: Request, env: Env, principal: AuthPrincipal): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
   const content = String(form.get("content") ?? "");
   const summary = String(form.get("summary") ?? "");
+  const submittedLockToken = String(form.get("lockToken") ?? "");
+  const lockToken = submittedLockToken || randomPageLockToken();
   const author = principalAuthor(principal);
 
   if (!id) {
@@ -1650,6 +1689,12 @@ async function handleSave(request: Request, env: Env, principal: AuthPrincipal):
   const blocked = findWordblockMatch(`${content}\n${summary}`);
   if (blocked) {
     return wordblockResponse(request, env, id, content, blocked);
+  }
+
+  const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+
+  if (!lock.ok) {
+    return lockedResponse(request, env, id, lock.lock);
   }
 
   const result = await savePage(env.DB, {
@@ -1664,14 +1709,21 @@ async function handleSave(request: Request, env: Env, principal: AuthPrincipal):
   });
 
   if (!result.ok) {
+    if (!submittedLockToken) {
+      await releaseHeldPageLock(env, principal, id, lockToken);
+    }
+
     const current = await getCurrentPage(env.DB, id);
     return htmlResponse(renderConflictPage(env, id, content, current), { status: 409 });
   }
 
   await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
   await deletePageDraft(env.DB, id);
+  await releaseHeldPageLock(env, principal, id, lockToken);
 
-  return redirectResponse(pagePath(id));
+  const response = redirectResponse(pagePath(id));
+  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  return response;
 }
 
 async function handleMediaUpload(
@@ -1742,6 +1794,8 @@ async function handleRevert(
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
   const revisionId = String(form.get("revisionId") ?? "");
+  const submittedLockToken = String(form.get("lockToken") ?? "");
+  const lockToken = submittedLockToken || randomPageLockToken();
   const author = principalAuthor(principal);
 
   if (!id || !revisionId) {
@@ -1758,6 +1812,12 @@ async function handleRevert(
     return wordblockResponse(request, env, id, revision.content, blocked);
   }
 
+  const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+
+  if (!lock.ok) {
+    return lockedResponse(request, env, id, lock.lock);
+  }
+
   const result = await savePage(env.DB, {
     id,
     content: revision.content,
@@ -1770,13 +1830,122 @@ async function handleRevert(
   });
 
   if (!result.ok) {
+    if (!submittedLockToken) {
+      await releaseHeldPageLock(env, principal, id, lockToken);
+    }
+
     const current = await getCurrentPage(env.DB, id);
     return htmlResponse(renderConflictPage(env, id, revision.content, current), { status: 409 });
   }
 
   await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
+  await releaseHeldPageLock(env, principal, id, lockToken);
 
-  return redirectResponse(pagePath(id));
+  const response = redirectResponse(pagePath(id));
+  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  return response;
+}
+
+async function handleRefreshPageLock(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanPageId(String(form.get("id") ?? ""));
+  const lockToken = String(form.get("lockToken") ?? "");
+
+  if (!id || !lockToken) {
+    return jsonResponse({ error: "Missing page id or lock token." }, { status: 400 });
+  }
+
+  const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+
+  if (!lock.ok) {
+    return jsonResponse({ error: "Page is locked.", lock: lock.lock }, { status: 423 });
+  }
+
+  const response = jsonResponse({ ok: true, lock: lock.lock });
+  response.headers.append(
+    "set-cookie",
+    pageLockCookieHeader(pageLockCookieName(id), lockToken, request)
+  );
+  return response;
+}
+
+async function handleReleasePageLock(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const id = cleanPageId(String(form.get("id") ?? ""));
+  const lockToken = String(form.get("lockToken") ?? "");
+
+  if (!id || !lockToken) {
+    return jsonResponse({ error: "Missing page id or lock token." }, { status: 400 });
+  }
+
+  await releaseHeldPageLock(env, principal, id, lockToken);
+  const response = jsonResponse({ ok: true });
+  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  return response;
+}
+
+async function ensurePageEditLock(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  id: string,
+  token: string
+): Promise<{ ok: true; lock: PageLockInfo | null } | { ok: false; lock: PageLockInfo | null }> {
+  if (!env.PAGE_LOCKS) {
+    return { ok: true, lock: null };
+  }
+
+  const owner = pageLockOwner(principal, request);
+  const lockRequest: PageLockRequest = {
+    subjectType: "page",
+    subjectId: id,
+    ownerId: owner.ownerId,
+    ownerName: owner.ownerName,
+    token,
+    ttlSeconds: PAGE_LOCK_TTL_SECONDS
+  };
+
+  return refreshPageLock(env.PAGE_LOCKS, lockRequest);
+}
+
+async function releaseHeldPageLock(
+  env: Env,
+  principal: AuthPrincipal,
+  id: string,
+  token: string
+): Promise<void> {
+  if (!env.PAGE_LOCKS || !token) return;
+
+  const owner = pageLockOwner(principal);
+  await releasePageLock(env.PAGE_LOCKS, {
+    subjectType: "page",
+    subjectId: id,
+    ownerId: owner.ownerId,
+    ownerName: owner.ownerName,
+    token,
+    ttlSeconds: PAGE_LOCK_TTL_SECONDS
+  });
+}
+
+function lockedResponse(
+  request: Request,
+  env: Env,
+  id: string,
+  lock: PageLockInfo | null
+): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: "Page is locked.", lock }, { status: 423 });
+  }
+
+  return htmlResponse(renderLockedPage(env, id, lock), { status: 423 });
 }
 
 function wordblockResponse(
@@ -1827,10 +1996,19 @@ async function handleSaveDraft(
 ): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
+  const lockToken = String(form.get("lockToken") ?? "");
   const author = principalAuthor(principal);
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  if (lockToken) {
+    const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+
+    if (!lock.ok) {
+      return lockedResponse(request, env, id, lock.lock);
+    }
   }
 
   await savePageDraft(
@@ -1842,10 +2020,28 @@ async function handleSaveDraft(
   );
 
   if (acceptsJson(request)) {
-    return jsonResponse({ ok: true, id });
+    const response = jsonResponse({ ok: true, id });
+
+    if (lockToken) {
+      response.headers.append(
+        "set-cookie",
+        pageLockCookieHeader(pageLockCookieName(id), lockToken, request)
+      );
+    }
+
+    return response;
   }
 
-  return redirectResponse(`${pagePath(id)}?do=edit`);
+  const response = redirectResponse(`${pagePath(id)}?do=edit`);
+
+  if (lockToken) {
+    response.headers.append(
+      "set-cookie",
+      pageLockCookieHeader(pageLockCookieName(id), lockToken, request)
+    );
+  }
+
+  return response;
 }
 
 function acceptsJson(request: Request): boolean {
@@ -1858,17 +2054,102 @@ function isUploadFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
 
-async function handleDeleteDraft(request: Request, env: Env): Promise<Response> {
+async function handleDeleteDraft(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
   const form = await request.formData();
   const id = cleanPageId(String(form.get("id") ?? ""));
+  const lockToken = String(form.get("lockToken") ?? "");
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
   }
 
   await deletePageDraft(env.DB, id);
+  await releaseHeldPageLock(env, principal, id, lockToken);
 
-  return redirectResponse(`${pagePath(id)}?do=edit`);
+  const response = redirectResponse(`${pagePath(id)}?do=edit`);
+  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  return response;
+}
+
+function renderLockedPage(env: Env, id: string, lock: PageLockInfo | null): string {
+  const owner = lock?.ownerName || "another editor";
+  const expiresAt = lock?.expiresAt
+    ? `<p>The current lock expires at ${escapeHtml(lock.expiresAt)}.</p>`
+    : "";
+
+  return htmlShell(
+    env,
+    `Page locked for ${id}`,
+    `<h1>Page locked</h1>
+    <p>${escapeHtml(id)} is currently being edited by ${escapeHtml(owner)}.</p>
+    ${expiresAt}
+    <p><a href="${pagePath(id)}">View current page</a></p>`,
+    { pageId: id }
+  );
+}
+
+function pageLockOwner(
+  principal: AuthPrincipal,
+  request?: Request
+): { ownerId: string; ownerName: string } {
+  if (principal.type === "user") {
+    return {
+      ownerId: principal.id,
+      ownerName: principal.displayName || principal.username
+    };
+  }
+
+  const ip = request ? getClientIp(request) : null;
+
+  return {
+    ownerId: ip ? `anonymous:${ip}` : "anonymous",
+    ownerName: "Anonymous"
+  };
+}
+
+function pageLockCookieName(id: string): string {
+  return `DW_LOCK_${fnv1a(id)}`;
+}
+
+function pageLockCookieHeader(name: string, token: string, request: Request): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${PAGE_LOCK_TTL_SECONDS}${secure}`;
+}
+
+function clearPageLockCookieHeader(name: string, request: Request): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+function randomPageLockToken(): string {
+  const bytes = new Uint8Array(PAGE_LOCK_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function fnv1a(value: string): string {
+  let hash = 0x811c9dc5;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(36);
 }
 
 function renderEditPage(
@@ -1876,7 +2157,8 @@ function renderEditPage(
   page: Awaited<ReturnType<typeof getCurrentPage>>,
   draft: PageDraft | null,
   env: Env,
-  templateContent: string | null = null
+  templateContent: string | null = null,
+  lockToken = ""
 ): string {
   const title = page?.title ?? id;
   const content = draft?.content ?? page?.content ?? templateContent ?? "";
@@ -1891,9 +2173,10 @@ function renderEditPage(
     `<h1>Edit ${escapeHtml(title)}</h1>
     ${draftNotice}
     <div class="editBox">
-    <form id="dw__editform" class="edit" method="post" action="/api/pages">
+    <form id="dw__editform" class="edit" method="post" action="/api/pages" data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <input type="hidden" name="baseRevisionId" value="${escapeHtml(baseRevisionId)}">
+      <input type="hidden" name="lockToken" value="${escapeHtml(lockToken)}">
       <div class="toolbar group">
         <div id="tool__bar" role="toolbar" aria-label="Editor toolbar">
           <button class="toolbutton" type="button" data-wrap-before="**" data-wrap-after="**" data-placeholder="strong text" title="Bold"><strong>B</strong></button>

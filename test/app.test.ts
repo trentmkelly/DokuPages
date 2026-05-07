@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { handleRequest } from "../src/app";
 import type { Env } from "../src/env";
+import { PageLockObject } from "../src/storage/page-lock-object";
 import { WORD_BLOCK_MESSAGE } from "../src/wiki/wordblock";
 
 interface D1StubState {
@@ -32,6 +33,7 @@ const state: D1StubState = {
 const purgedKeys: string[] = [];
 const cachePuts: string[] = [];
 const renderCache = new Map<string, string>();
+const pageLocks = createPageLockNamespaceStub();
 
 const env = {
   DB: createD1Stub(state),
@@ -51,7 +53,7 @@ const env = {
       renderCache.delete(key);
     }
   } as unknown as KVNamespace,
-  PAGE_LOCKS: {} as DurableObjectNamespace,
+  PAGE_LOCKS: pageLocks.namespace,
   SITE_NAME: "Test Wiki"
 } satisfies Env;
 
@@ -70,6 +72,7 @@ describe("handleRequest", () => {
     purgedKeys.length = 0;
     cachePuts.length = 0;
     renderCache.clear();
+    pageLocks.reset();
   });
 
   it("returns health information for the API health route", async () => {
@@ -456,13 +459,53 @@ describe("handleRequest", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain("DW_LOCK_");
     const html = await response.text();
     expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
+    expect(html).toContain('name="lockToken" value="');
     expect(html).toContain('id="dw__editform"');
     expect(html).toContain('id="tool__bar"');
     expect(html).toContain('id="edbtn__preview"');
     expect(html).toContain('data-draft-url="/api/pages/draft"');
+    expect(html).toContain('data-lock-url="/api/pages/lock"');
     expect(html).toContain('name="minor" type="checkbox"');
+  });
+
+  it("blocks concurrent page edits until the current edit lock is released", async () => {
+    const first = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+    const locked = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+
+    expect(first.status).toBe(200);
+    expect(locked.status).toBe(423);
+    await expect(locked.text()).resolves.toContain("Page locked");
+
+    const html = await first.text();
+    const token = html.match(/name="lockToken" value="([^"]+)"/)?.[1] ?? "";
+    const release = new FormData();
+    release.set("id", "wiki:welcome");
+    release.set("lockToken", token);
+
+    const released = await handleRequest(
+      new Request("https://example.com/api/pages/lock/release", {
+        method: "POST",
+        body: release,
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+    const reopened = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+
+    expect(released.status).toBe(200);
+    expect(reopened.status).toBe(200);
   });
 
   it("prefills missing page edits from namespace page templates", async () => {
@@ -1074,6 +1117,49 @@ describe("handleRequest", () => {
     await expect(response.text()).resolves.toBe("static asset");
   });
 });
+
+function createPageLockNamespaceStub(): {
+  namespace: DurableObjectNamespace;
+  reset: () => void;
+} {
+  const states = new Map<string, DurableObjectState>();
+
+  return {
+    namespace: {
+      idFromName: (name: string) => ({ name }) as unknown as DurableObjectId,
+      get: (id: DurableObjectId) => {
+        const name = (id as unknown as { name: string }).name;
+        let state = states.get(name);
+
+        if (!state) {
+          state = createDurableObjectStateStub();
+          states.set(name, state);
+        }
+
+        const object = new PageLockObject(state);
+        return {
+          fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+            object.fetch(new Request(input, init))
+        } as unknown as DurableObjectStub;
+      }
+    } as unknown as DurableObjectNamespace,
+    reset: () => states.clear()
+  };
+}
+
+function createDurableObjectStateStub(): DurableObjectState {
+  const values = new Map<string, unknown>();
+
+  return {
+    storage: {
+      get: async (key: string) => values.get(key),
+      put: async (key: string, value: unknown) => {
+        values.set(key, value);
+      },
+      delete: async (key: string) => values.delete(key)
+    }
+  } as unknown as DurableObjectState;
+}
 
 function createD1Stub(state: D1StubState): D1Database {
   return {

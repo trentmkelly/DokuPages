@@ -1,0 +1,12 @@
+name = "dokutest-page-locks"
+main = "src/storage/page-lock-worker.ts"
+compatibility_date = "2026-05-07"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "PAGE_LOCKS"
+class_name = "PageLockObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PageLockObject"]

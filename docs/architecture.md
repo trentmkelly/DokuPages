@@ -43,7 +43,7 @@ The schema supports native users, groups, sessions, password hashes, and ACLs. N
 
 ## Lock And Conflict Model
 
-Durable Objects are reserved for edit locks and write serialization. `src/storage/page-lock-object.ts` contains the first object class stub.
+Durable Objects back edit locks. `src/storage/page-lock-object.ts` stores one expiring lock per page or media subject, `src/storage/page-lock-client.ts` talks to the namespace binding from Pages Functions, and `src/storage/page-lock-worker.ts` exports the `PageLockObject` class from the companion Worker required by Cloudflare Pages.
 
 ## Plugin Model
 

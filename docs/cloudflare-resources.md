@@ -34,4 +34,9 @@ Provisioned resources for the `dokutest` Pages project.
 
 ## Durable Objects
 
-Durable Object binding is planned for page locks, but the first Pages Functions binding attempt failed local compile validation. The implementation class remains in `src/storage/page-lock-object.ts`; active binding configuration is pending.
+- Pages binding: `PAGE_LOCKS`
+- Durable Object Worker: `dokutest-page-locks`
+- Class: `PageLockObject`
+- Config: `wrangler.page-locks.toml`
+
+Cloudflare Pages binds to the Durable Object class through the companion Worker because Pages Functions cannot define Durable Object classes directly.

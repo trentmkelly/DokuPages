@@ -104,7 +104,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add D1 migration directory.
 - [x] Add R2 bucket binding configuration.
 - [x] Add KV namespace binding configuration if used.
-- [ ] Add Durable Object binding configuration if used.
+- [x] Add Durable Object binding configuration if used.
 - [x] Add local seed data for development.
 - [x] Add local fixture data migrated from current `data/`.
 
@@ -158,7 +158,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement D1-backed adapters.
 - [x] Implement R2-backed adapters.
 - [x] Implement KV-backed adapters if used.
-- [ ] Implement Durable Object-backed locking if used.
+- [x] Implement Durable Object-backed locking if used.
 - [x] Implement transactional page save behavior.
 - [x] Implement optimistic concurrency checks.
 - [ ] Implement rollback behavior for partially failed writes.
@@ -248,7 +248,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement edit summaries.
 - [x] Implement minor edits.
 - [x] Implement conflict detection.
-- [ ] Implement edit locks.
+- [x] Implement edit locks.
 - [x] Implement draft autosave.
 - [x] Implement draft recovery.
 - [x] Implement page templates.
@@ -620,9 +620,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Configure Pages build command.
 - [x] Configure Pages Functions output.
 - [x] Configure D1 bindings.
-- [ ] Configure R2 bindings.
+- [x] Configure R2 bindings.
 - [x] Configure KV bindings if used.
-- [ ] Configure Durable Object bindings if used.
+- [x] Configure Durable Object bindings if used.
 - [x] Configure environment variables.
 - [ ] Configure secrets.
 - [ ] Configure custom domain if used.
