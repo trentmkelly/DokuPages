@@ -1,18 +1,16 @@
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { inventorySyntax, renderSyntaxInventoryMarkdown } from "../scripts/inventory-syntax.mjs";
 
+const fixturePages = fileURLToPath(new URL("../fixtures/dokuwiki-data/pages", import.meta.url));
+
 describe("DokuWiki syntax inventory", () => {
   it("detects syntax features used by the current DokuWiki content", () => {
-    const inventory = inventorySyntax("../dokuwiki/data/pages");
+    const inventory = inventorySyntax(fixturePages);
     const features = new Map(inventory.features.map((feature) => [feature.id, feature]));
 
-    expect(inventory.pageCount).toBe(4);
-    expect(inventory.pages.map((page) => page.id)).toEqual([
-      "playground:playground",
-      "wiki:dokuwiki",
-      "wiki:syntax",
-      "wiki:welcome"
-    ]);
+    expect(inventory.pageCount).toBe(2);
+    expect(inventory.pages.map((page) => page.id)).toEqual(["wiki:syntax", "wiki:welcome"]);
     expect(features.get("headings")).toMatchObject({
       status: "supported",
       pages: expect.arrayContaining(["wiki:syntax", "wiki:welcome"])
@@ -23,7 +21,7 @@ describe("DokuWiki syntax inventory", () => {
     });
     expect(features.get("unordered_lists")).toMatchObject({
       status: "supported",
-      pages: expect.arrayContaining(["wiki:dokuwiki", "wiki:syntax"])
+      pages: ["wiki:syntax"]
     });
     expect(features.get("rss_feed_aggregation")).toMatchObject({
       status: "unsupported",
@@ -39,7 +37,7 @@ describe("DokuWiki syntax inventory", () => {
   });
 
   it("renders a deterministic markdown report", () => {
-    const markdown = renderSyntaxInventoryMarkdown(inventorySyntax("../dokuwiki/data/pages"));
+    const markdown = renderSyntaxInventoryMarkdown(inventorySyntax(fixturePages));
 
     expect(markdown).toContain("# DokuWiki Syntax Inventory");
     expect(markdown).toContain("| `wiki:syntax` | `wiki/syntax.txt` |");
