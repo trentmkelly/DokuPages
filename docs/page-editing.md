@@ -56,7 +56,7 @@ Authorized page save and revert submissions are rate limited in KV by client IP 
 
 ## Section Edit Anchors
 
-Rendered headings include DokuWiki-style section edit anchors when the renderer has a page ID. The links target the page editor with `section=N` so templates have stable section affordances while section-scoped save behavior is implemented separately.
+Rendered headings include DokuWiki-style section edit anchors when the renderer has a page ID. `GET /wiki/:id?do=edit&section=N` loads only the selected heading section into the editor. Saves recombine that submitted section with the unchanged prefix and suffix on the current base revision, then redirect back to the edited heading fragment.
 
 ## Page Templates
 

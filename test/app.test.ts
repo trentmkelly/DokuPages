@@ -1723,6 +1723,48 @@ describe("handleRequest", () => {
     expect(html).toContain('data-lock-refresh-delay="60000"');
   });
 
+  it("edits and saves only the requested page section", async () => {
+    env.LOCKTIME = "0";
+    state.row = {
+      ...currentPageRow(),
+      content:
+        "====== Welcome ======\n\nIntro text.\n\n===== Target =====\n\nOld target.\n\n===== Other =====\n\nKeep me."
+    };
+
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit&section=2"),
+      env
+    );
+
+    expect(edit.status).toBe(200);
+    const editHtml = await edit.text();
+    expect(editHtml).toContain('name="section" value="2"');
+    expect(editHtml).toContain("[Target] ");
+    expect(editHtml).toContain("Old target.");
+
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("section", "2");
+    form.set("content", "===== Target =====\n\nNew target.");
+    form.set("summary", "[Target] Updated section");
+
+    const save = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(save.status).toBe(303);
+    expect(save.headers.get("location")).toBe("/wiki/wiki/welcome#target");
+    expect(String(state.row?.content).replace(/\r\n/g, "\n")).toBe(
+      "====== Welcome ======\n\nIntro text.\n\n===== Target =====\n\nNew target.\n===== Other =====\n\nKeep me."
+    );
+  });
+
   it("disables edit locks when LOCKTIME is zero", async () => {
     env.LOCKTIME = "0";
 

@@ -827,7 +827,15 @@ export async function handleRequest(
     const page = await getCurrentPage(env.DB, id);
 
     if (url.searchParams.get("do") === "edit") {
-      return handleEditPage(request, env, principal, id, page);
+      return handleEditPage(
+        request,
+        env,
+        principal,
+        id,
+        page,
+        null,
+        parseSectionNumber(url.searchParams.get("section"))
+      );
     }
 
     if (url.searchParams.get("do") === "draft") {
@@ -1113,6 +1121,98 @@ function firstHeadingFragment(content: string): string | null {
   const match = content.match(/^\s*={2,6}\s*([^=\n]+?)\s*=*\s*$/m);
   if (!match) return null;
   return cleanPageId(match[1]).replaceAll(":", "-").replaceAll("_", "-") || null;
+}
+
+interface SectionEditSlice {
+  number: number;
+  title: string;
+  anchor: string | null;
+  content: string;
+  prefix: string;
+  suffix: string;
+}
+
+function parseSectionNumber(value: string | null): number | null {
+  const section = Number(value);
+  return Number.isInteger(section) && section > 0 ? section : null;
+}
+
+function pageSectionSlice(
+  content: string,
+  sectionNumber: number,
+  maxSectionEditLevel: number
+): SectionEditSlice | null {
+  const headings: Array<{ number: number; start: number; level: number; title: string }> = [];
+  const linePattern = /.*(?:\n|$)/g;
+  let match: RegExpExecArray | null;
+  let headingNumber = 0;
+
+  while ((match = linePattern.exec(content)) !== null) {
+    const line = match[0];
+    if (!line) break;
+
+    const heading = parseWikiHeadingLine(line);
+    if (heading) {
+      headingNumber += 1;
+      headings.push({
+        number: headingNumber,
+        start: match.index,
+        level: heading.level,
+        title: heading.title
+      });
+    }
+
+    if (linePattern.lastIndex >= content.length) break;
+  }
+
+  const selected = headings.find(
+    (heading) => heading.number === sectionNumber && heading.level <= maxSectionEditLevel
+  );
+  if (!selected) return null;
+
+  const next = headings.find(
+    (heading) => heading.start > selected.start && heading.level <= maxSectionEditLevel
+  );
+  const end = next?.start ?? content.length;
+  const sectionContent = content.slice(selected.start, end);
+
+  return {
+    number: selected.number,
+    title: selected.title,
+    anchor: firstHeadingFragment(sectionContent),
+    content: sectionContent,
+    prefix: content.slice(0, selected.start),
+    suffix: content.slice(end)
+  };
+}
+
+function parseWikiHeadingLine(line: string): { level: number; title: string } | null {
+  const match = line.replace(/\r?\n$/, "").match(/^(={2,6})\s*(.*?)\s*\1\s*$/);
+  if (!match) return null;
+
+  return {
+    level: 7 - match[1].length,
+    title: match[2].trim()
+  };
+}
+
+function joinWikiSlices(prefix: string, text: string, suffix: string): string {
+  let joinedPrefix = prefix;
+  let joinedText = text;
+
+  if (joinedPrefix && !joinedPrefix.endsWith("\n") && !joinedText.startsWith("\n")) {
+    joinedPrefix += "\n";
+  }
+
+  if (suffix && !joinedText.endsWith("\n") && !suffix.startsWith("\n")) {
+    joinedText += "\n";
+  }
+
+  return `${joinedPrefix}${joinedText}${suffix}`;
+}
+
+function normalizeWikiTextInput(value: string): string {
+  return value.replace(/\r\n?/g, "\n");
 }
 
 function cleanFragment(value: string | null): string | null {
@@ -7055,7 +7155,8 @@ async function handleEditPage(
   principal: AuthPrincipal,
   id: string,
   page: CurrentPage | null,
-  recoverDraft: PageDraft | null = null
+  recoverDraft: PageDraft | null = null,
+  sectionNumber: number | null = null
 ): Promise<Response> {
   const config = getRuntimeConfig(env);
 
@@ -7078,6 +7179,14 @@ async function handleEditPage(
   }
 
   const draft = recoverDraft;
+  const section =
+    !draft && page && sectionNumber
+      ? pageSectionSlice(page.content, sectionNumber, config.maxSectionEditLevel)
+      : null;
+  const notice =
+    !draft && sectionNumber && !section
+      ? "The page was changed in the meantime, section info was out of date loaded full page instead."
+      : "";
   const templateContent =
     !page && !draft ? await resolvePageTemplate(env.DB, id, config, principal) : null;
   const cookieName = pageLockCookieName(id);
@@ -7092,7 +7201,7 @@ async function handleEditPage(
   }
 
   const response = htmlResponse(
-    renderEditPage(id, page, draft, env, templateContent, lockToken, csrf.token)
+    renderEditPage(id, page, draft, env, templateContent, lockToken, csrf.token, section, notice)
   );
   if (config.lockTime > 0) {
     response.headers.append(
@@ -7116,8 +7225,11 @@ async function handleSave(
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") || overrideId || ""));
-  const content = String(form.get("content") ?? "");
+  let content = normalizeWikiTextInput(String(form.get("content") ?? ""));
   const summary = String(form.get("summary") ?? "");
+  const baseRevisionId = String(form.get("baseRevisionId") || "") || null;
+  const sectionNumber = parseSectionNumber(String(form.get("section") ?? ""));
+  let redirectFragment: string | null = null;
   const submittedLockToken = String(form.get("lockToken") ?? "");
   const lockToken = submittedLockToken || randomPageLockToken();
   const author = principalAuthor(principal);
@@ -7151,6 +7263,32 @@ async function handleSave(
 
   await recordEditAttempt(request, env, principal);
 
+  if (sectionNumber) {
+    const section = currentPage
+      ? pageSectionSlice(
+          currentPage.content,
+          sectionNumber,
+          getRuntimeConfig(env).maxSectionEditLevel
+        )
+      : null;
+
+    if (!section || currentPage?.revisionId !== baseRevisionId) {
+      return htmlResponse(
+        renderConflictPage(env, id, {
+          current: currentPage,
+          csrfToken: csrfContext(request).token,
+          lockToken,
+          submittedContent: content,
+          summary
+        }),
+        { status: 409 }
+      );
+    }
+
+    redirectFragment = firstHeadingFragment(content) ?? section.anchor;
+    content = joinWikiSlices(section.prefix, content, section.suffix);
+  }
+
   const blocked = findWordblockMatch(`${content}\n${summary}`);
   if (blocked) {
     return wordblockResponse(request, env, id, content, blocked);
@@ -7166,7 +7304,7 @@ async function handleSave(
     id,
     content,
     summary,
-    baseRevisionId: String(form.get("baseRevisionId") || "") || null,
+    baseRevisionId,
     changeType: form.get("minor") ? "minor" : undefined,
     authorId: author.authorId,
     authorName: author.authorName,
@@ -7203,7 +7341,7 @@ async function handleSave(
     author
   );
 
-  const response = redirectResponse(pagePath(id));
+  const response = redirectResponse(redirectTargetForAction(id, redirectFragment));
   response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
   return response;
 }
@@ -7737,13 +7875,28 @@ async function handleSaveDraft(
     }
   }
 
-  const draft = await savePageDraft(
-    env.DB,
-    id,
-    String(form.get("content") ?? ""),
-    String(form.get("baseRevisionId") || "") || null,
-    author.authorId
-  );
+  const baseRevisionId = String(form.get("baseRevisionId") || "") || null;
+  const sectionNumber = parseSectionNumber(String(form.get("section") ?? ""));
+  let content = normalizeWikiTextInput(String(form.get("content") ?? ""));
+
+  if (sectionNumber) {
+    const prefix = String(form.get("prefix") ?? "");
+    const suffix = String(form.get("suffix") ?? "");
+    if (prefix || suffix) {
+      content = joinWikiSlices(prefix, content, suffix);
+    } else if (page && page.revisionId === baseRevisionId) {
+      const section = pageSectionSlice(
+        page.content,
+        sectionNumber,
+        getRuntimeConfig(env).maxSectionEditLevel
+      );
+      if (section) {
+        content = joinWikiSlices(section.prefix, content, section.suffix);
+      }
+    }
+  }
+
+  const draft = await savePageDraft(env.DB, id, content, baseRevisionId, author.authorId);
 
   if (acceptsJson(request)) {
     const response = jsonResponse({ ok: true, id, draft: draftMessage(draft, env) });
@@ -8254,14 +8407,23 @@ function renderEditPage(
   env: Env,
   templateContent: string | null = null,
   lockToken = "",
-  csrfToken = ""
+  csrfToken = "",
+  section: SectionEditSlice | null = null,
+  notice = ""
 ): string {
-  const title = page?.title ?? id;
-  const content = draft?.content ?? page?.content ?? templateContent ?? "";
+  const title = section?.title ?? page?.title ?? id;
+  const content = section?.content ?? draft?.content ?? page?.content ?? templateContent ?? "";
   const baseRevisionId = draft?.baseRevisionId ?? page?.revisionId ?? "";
+  const sectionFields = section
+    ? `<input type="hidden" name="section" value="${section.number}">
+      <input type="hidden" name="prefix" value="${escapeAttribute(section.prefix)}">
+      <input type="hidden" name="suffix" value="${escapeAttribute(section.suffix)}">`
+    : "";
   const draftNotice = draft
     ? `<p><strong>${escapeHtml(draftMessage(draft, env))}</strong></p>`
     : "";
+  const editNotice = notice ? `<p class="msg">${escapeHtml(notice)}</p>` : "";
+  const summaryValue = section ? `[${section.title}] ` : "";
   const config = getRuntimeConfig(env);
   const draftAttributes = config.useDraft
     ? ` data-draft-url="/api/pages/draft" data-draft-refresh-interval="30000"`
@@ -8282,6 +8444,7 @@ function renderEditPage(
     env,
     `Edit ${title}`,
     `<h1>Edit ${escapeHtml(title)}</h1>
+    ${editNotice}
     ${draftNotice}
     <div class="editBox">
     <form id="dw__editform" class="edit" method="post" action="/api/pages"${lockAttributes}>
@@ -8289,6 +8452,7 @@ function renderEditPage(
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <input type="hidden" name="baseRevisionId" value="${escapeHtml(baseRevisionId)}">
       <input type="hidden" name="lockToken" value="${escapeHtml(lockToken)}">
+      ${sectionFields}
       <div class="toolbar group">
         <div id="tool__bar" role="toolbar" aria-label="Editor toolbar">
           <button class="toolbutton" type="button" data-wrap-before="**" data-wrap-after="**" data-placeholder="strong text" title="Bold"><strong>B</strong></button>
@@ -8311,7 +8475,7 @@ function renderEditPage(
         </div>
         <div class="summary">
           <label for="summary"><span>Summary</span></label>
-          <input id="summary" name="summary" type="text" value="">
+          <input id="summary" name="summary" type="text" value="${escapeAttribute(summaryValue)}">
           <label class="minor"><input name="minor" type="checkbox" value="1"> Minor edit</label>
         </div>
       </div>
