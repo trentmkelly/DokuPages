@@ -4366,11 +4366,11 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
 function renderUserTools(principal?: AuthPrincipal): string {
   const accountItems =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal) ? '<li class="admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
-        <li class="profile"><a href="/profile" rel="nofollow">Update Profile</a></li>
-        <li class="logout"><a href="/logout" rel="nofollow">Logout</a></li>`
-      : `<li class="login"><a href="/login" rel="nofollow">Login</a></li>
-        <li class="register"><a href="/register" rel="nofollow">Register</a></li>`;
+      ? `${isManagerPrincipal(principal) ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
+        <li class="action profile"><a href="/profile" rel="nofollow">Update Profile</a></li>
+        <li class="action logout"><a href="/logout" rel="nofollow">Log Out</a></li>`
+      : `<li class="action login"><a href="/login" rel="nofollow">Log In</a></li>
+        <li class="action register"><a href="/register" rel="nofollow">Register</a></li>`;
 
   return `<nav id="dokuwiki__usertools" aria-label="User tools">
             <h3 class="a11y">User tools</h3>
@@ -4389,8 +4389,8 @@ function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
     principal?.type === "user"
       ? `${isManagerPrincipal(principal) ? '<option value="/admin">Admin</option>' : ""}
         <option value="/profile">Update Profile</option>
-        <option value="/logout">Logout</option>`
-      : `<option value="/login">Login</option>
+        <option value="/logout">Log Out</option>`
+      : `<option value="/login">Log In</option>
         <option value="/register">Register</option>`;
 
   return `<div class="mobileTools">

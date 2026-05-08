@@ -86,9 +86,13 @@ describe("auth routes", () => {
     expect(html).toContain('id="dw__profile"');
     expect(html).toContain("Alice Example");
     expect(html).toContain('id="dokuwiki__usertools"');
-    expect(html).toContain('<a href="/profile" rel="nofollow">Update Profile</a>');
-    expect(html).toContain('<a href="/logout" rel="nofollow">Logout</a>');
-    expect(html).not.toContain('<a href="/login" rel="nofollow">Login</a>');
+    expect(html).toContain(
+      '<li class="action profile"><a href="/profile" rel="nofollow">Update Profile</a></li>'
+    );
+    expect(html).toContain(
+      '<li class="action logout"><a href="/logout" rel="nofollow">Log Out</a></li>'
+    );
+    expect(html).not.toContain('<a href="/login" rel="nofollow">Log In</a>');
 
     const invalid = new FormData();
     invalid.set("displayName", "Alice Updated");

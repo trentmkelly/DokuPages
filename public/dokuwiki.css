@@ -284,12 +284,28 @@ kbd {
   padding-left: 0;
 }
 
+#dokuwiki__usertools ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 1em;
+}
+
 #dokuwiki__header .tools li {
   display: inline;
   margin-left: 1em;
   list-style: none;
   font-size: 0.875em;
   vertical-align: top;
+}
+
+#dokuwiki__usertools li {
+  margin-left: 0;
+}
+
+#dokuwiki__usertools li.action a {
+  display: inline-flex;
+  align-items: center;
 }
 
 #dokuwiki__sitetools {
@@ -1138,6 +1154,10 @@ form.search button {
     text-align: left;
   }
 
+  #dokuwiki__usertools ul {
+    justify-content: flex-start;
+  }
+
   #dw__toc {
     float: none;
     width: auto;
@@ -1164,11 +1184,23 @@ form.search button {
     padding: 0.5em 0;
   }
 
-  #dokuwiki__usertools,
   #dokuwiki__sitetools ul,
   .dokuwiki div.breadcrumbs,
   .dokuwiki .pageId {
     display: none;
+  }
+
+  #dokuwiki__usertools {
+    display: block;
+    margin-bottom: 0.5em;
+  }
+
+  #dokuwiki__usertools ul {
+    margin-bottom: 0;
+  }
+
+  #dokuwiki__usertools li {
+    margin: 0 1em 0 0;
   }
 
   #dokuwiki__sitetools form.search {
