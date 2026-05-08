@@ -442,6 +442,42 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain("<script>");
   });
 
+  it("covers parser parity edge cases for nested and punctuation-heavy syntax", () => {
+    const malformed = renderWikiText("**bold //italic** still// __under **bold__");
+    const nestedList = renderWikiText("  * alpha\n    * beta\n      - gamma\n  * delta");
+    const nestedQuote = renderWikiText("> one\n>> two\n> three");
+    const mixedTable = renderWikiText("^ Head ^ Head 2 ^\n| **bold** | [[wiki:syntax|Syntax]] |");
+    const mediaLabel = renderWikiText("[[wiki:syntax|{{wiki:dokuwiki.svg|Logo}}]]");
+    const autolinks = renderWikiText(
+      "See http://example.test/a,b;c?x=1! Then www.example.org/path; and ftp.example.org/file)."
+    );
+
+    expect(malformed.html).toContain("<strong>bold //italic</strong> still//");
+    expect(malformed.html).toContain("<u>under **bold</u>");
+    expect(nestedList.html).toContain(
+      "<ul><li>alpha<ul><li>beta<ol><li>gamma</li></ol></li></ul></li><li>delta</li></ul>"
+    );
+    expect(nestedQuote.html).toContain(
+      "<blockquote><p>one</p><blockquote><p>two</p></blockquote><p>three</p></blockquote>"
+    );
+    expect(mixedTable.html).toContain("<td><strong>bold</strong></td>");
+    expect(mixedTable.html).toContain(
+      '<td><a href="/wiki/wiki/syntax" class="wikilink1">Syntax</a></td>'
+    );
+    expect(mediaLabel.html).toContain(
+      '<a href="/wiki/wiki/syntax" class="wikilink1"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+    );
+    expect(autolinks.html).toContain(
+      '<a href="http://example.test/a,b;c?x=1" class="urlextern" rel="ugc nofollow">http://example.test/a,b;c?x=1</a>!'
+    );
+    expect(autolinks.html).toContain(
+      '<a href="http://www.example.org/path" class="urlextern" rel="ugc nofollow">www.example.org/path</a>;'
+    );
+    expect(autolinks.html).toContain(
+      '<a href="ftp://ftp.example.org/file" class="urlextern" rel="ugc nofollow">ftp.example.org/file</a>).'
+    );
+  });
+
   it("escapes XSS payloads in rendered wiki syntax", () => {
     const rendered = renderWikiText(
       '====== <script>alert(1)</script> ======\n\n[[https://example.test|<script>alert(2)</script>]] [[javascript:alert(3)|Jump]]\n\n{{wiki:logo.svg|"><svg onload=alert(4)>}}\n\n| <iframe src=x></iframe> |'

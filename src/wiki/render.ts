@@ -554,8 +554,30 @@ function parseTableRow(row: string): TableCell[] {
   const cells: TableCell[] = [];
   let separator = row[0];
   let raw = "";
+  let protectedEnd: string | null = null;
 
-  for (const char of row.slice(1)) {
+  for (let index = 1; index < row.length; index += 1) {
+    const char = row[index];
+    const pair = row.slice(index, index + 2);
+
+    if (protectedEnd) {
+      if (pair === protectedEnd) {
+        raw += pair;
+        index += 1;
+        protectedEnd = null;
+      } else {
+        raw += char;
+      }
+      continue;
+    }
+
+    if (pair === "[[" || pair === "{{" || pair === "%%") {
+      protectedEnd = pair === "[[" ? "]]" : pair === "{{" ? "}}" : "%%";
+      raw += pair;
+      index += 1;
+      continue;
+    }
+
     if (char === "|" || char === "^") {
       const content = raw.trim();
 
