@@ -48,6 +48,7 @@ export interface RuntimeConfig {
   mediaRevisions: boolean;
   ieXssProtect: boolean;
   fetchSize: number;
+  rssMedia: "pages" | "media" | "both";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
@@ -137,6 +138,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
     ieXssProtect: booleanConfig(env.IEXSSPROTECT, true),
     fetchSize: integerConfig(env.FETCHSIZE, 0, 0, 100 * 1024 * 1024),
+    rssMedia: rssMediaConfig(env.RSS_MEDIA),
     pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
@@ -170,6 +172,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateIntegerRange("FETCHSIZE", env.FETCHSIZE, 0, 100 * 1024 * 1024, issues);
+  validateRssMedia(env.RSS_MEDIA, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
   validateFnEncode(env.FNENCODE, issues);
   validateSepchar(env.SEPCHAR, issues);
@@ -234,6 +237,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
     configEntry("IEXSSPROTECT", env.IEXSSPROTECT, String(config.ieXssProtect), "true"),
     configEntry("FETCHSIZE", env.FETCHSIZE, String(config.fetchSize), "0"),
+    configEntry("RSS_MEDIA", env.RSS_MEDIA, config.rssMedia, "both"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
     configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
     configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),
@@ -556,6 +560,19 @@ function validateSepchar(value: string | undefined, issues: ConfigValidationIssu
   }
 }
 
+function validateRssMedia(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  if (!["pages", "media", "both"].includes(raw)) {
+    issues.push({
+      key: "RSS_MEDIA",
+      severity: "error",
+      message: "RSS_MEDIA must be one of 'pages', 'media', or 'both'."
+    });
+  }
+}
+
 function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
@@ -775,6 +792,11 @@ function fnencodeConfig(value: string | undefined): DokuWikiFnEncode {
 function sepcharConfig(value: string | undefined): string {
   const raw = nonEmpty(value);
   return raw && /^[A-Za-z0-9_.-]$/.test(raw) ? raw : "_";
+}
+
+function rssMediaConfig(value: string | undefined): RuntimeConfig["rssMedia"] {
+  const raw = nonEmpty(value);
+  return raw === "pages" || raw === "media" || raw === "both" ? raw : "both";
 }
 
 function integerConfig(

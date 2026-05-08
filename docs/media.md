@@ -144,6 +144,17 @@ parameter matches active media IDs, MIME types, and stored media metadata JSON
 such as imported DokuWiki metadata rows or parsed JPEG title/caption fields.
 Deleted media rows are excluded.
 
+## Changelog And Feeds
+
+Recent changes support the upstream page/media selector. `show_changes=pages`
+lists page changelog rows, `show_changes=mediafiles` lists media changelog rows,
+and `show_changes=both` merges both streams while preserving ACL checks and
+namespace filtering.
+
+RSS and Atom recent-change feeds honor DokuWiki's media inclusion behavior with
+the `view=pages|media|both` query parameter and the `RSS_MEDIA` runtime default.
+Media feed items link to the native media detail route for the changed media ID.
+
 ## Delivery Semantics
 
 Media fetches support `GET` and `HEAD`. Current media responses and old media

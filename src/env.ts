@@ -35,6 +35,7 @@ export interface Env {
   MEDIAREVISIONS?: string;
   IEXSSPROTECT?: string;
   FETCHSIZE?: string;
+  RSS_MEDIA?: string;
   DEACCENT?: string;
   FNENCODE?: string;
   SEPCHAR?: string;

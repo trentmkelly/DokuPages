@@ -24,6 +24,7 @@ export interface PageRevision {
 
 export interface RecentChange {
   id: string;
+  subjectType: "page" | "media";
   subjectId: string;
   revisionId: string | null;
   userName: string | null;
@@ -79,6 +80,7 @@ export interface RecentChangeListOptions {
   groupBySubject?: boolean;
   includeMinor?: boolean;
   onlyCreates?: boolean;
+  subjectType?: "pages" | "media" | "both";
 }
 
 export interface SavePageInput {
@@ -125,6 +127,7 @@ interface PageRevisionRow {
 
 interface RecentChangeRow {
   id: string;
+  subject_type: "page" | "media";
   subject_id: string;
   revision_id: string | null;
   user_name: string | null;
@@ -252,9 +255,17 @@ export async function listRecentChanges(
 ): Promise<RecentChange[]> {
   const safeLimit = Math.max(1, Math.min(limit, 100));
   const safeOffset = Math.max(0, offset);
-  const where = ["subject_type = 'page'"];
+  const where: string[] = [];
   const values: unknown[] = [];
   const namespace = cleanPageId(options.namespace ?? "");
+  const subjectType = options.subjectType ?? "pages";
+
+  if (subjectType === "both") {
+    where.push("subject_type in ('page', 'media')");
+  } else {
+    where.push("subject_type = ?");
+    values.push(subjectType === "media" ? "media" : "page");
+  }
 
   if (namespace) {
     where.push("subject_id like ?");
@@ -271,17 +282,17 @@ export async function listRecentChanges(
 
   const whereSql = where.join(" and ");
   const sql = options.groupBySubject
-    ? `select id, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
+    ? `select id, subject_type, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
        from (
-         select id, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at,
-                row_number() over (partition by subject_id order by created_at desc, id desc) as recent_rank
+         select id, subject_type, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at,
+                row_number() over (partition by subject_type, subject_id order by created_at desc, id desc) as recent_rank
          from changelog
          where ${whereSql}
        )
        where recent_rank = 1
        order by created_at desc, id desc
        limit ? offset ?`
-    : `select id, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
+    : `select id, subject_type, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
        from changelog
        where ${whereSql}
        order by created_at desc, id desc
@@ -293,6 +304,7 @@ export async function listRecentChanges(
 
   return result.results.map((row) => ({
     id: row.id,
+    subjectType: row.subject_type,
     subjectId: row.subject_id,
     revisionId: row.revision_id,
     userName: row.user_name,

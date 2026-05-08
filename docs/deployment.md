@@ -77,6 +77,8 @@ Optional Pages environment variables:
 - `FETCHSIZE`: maximum bytes `lib/exe/fetch.php` may download for external
   image media. Default: `0`, which disables proxy downloads and redirects to the
   original URL like upstream DokuWiki.
+- `RSS_MEDIA`: controls whether recent-change feeds include `pages`, `media`,
+  or `both`, matching DokuWiki's `rss_media` setting. Default: `both`.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.

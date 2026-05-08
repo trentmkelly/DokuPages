@@ -4749,7 +4749,8 @@ async function renderRecentPage(
 ): Promise<string> {
   const pagination = recentPaginationFromUrl(url);
   const namespace = cleanPageId(url.searchParams.get("ns") ?? defaultNamespace);
-  const showChanges = recentShowChanges(url);
+  const config = getRuntimeConfig(env);
+  const showChanges = recentShowChanges(url, config.mediaRevisions ? "both" : "pages");
   const includeMinor = url.searchParams.get("show_minor") !== "0";
   const { changes, hasNext } = await collectReadableRecentChanges(env, principal, {
     pagination,
@@ -4770,7 +4771,7 @@ async function renderRecentPage(
     ${namespaceNotice}
     <form id="dw__recent" class="changes" method="get" action="/recent">
       <div class="no">
-        ${renderRecentFilters(namespace, showChanges, includeMinor, pagination.limit)}
+        ${renderRecentFilters(env, namespace, showChanges, includeMinor, pagination.limit)}
         ${emptyState}
         <ul>${items}</ul>
       </div>
@@ -4792,7 +4793,8 @@ async function collectReadableRecentChanges(
   principal: AuthPrincipal,
   options: RecentPageOptions
 ): Promise<{ changes: RecentChange[]; hasNext: boolean }> {
-  if (options.showChanges === "mediafiles") {
+  const config = getRuntimeConfig(env);
+  if (options.showChanges === "mediafiles" && !config.mediaRevisions) {
     return { changes: [], hasNext: false };
   }
 
@@ -4806,12 +4808,13 @@ async function collectReadableRecentChanges(
     const batch = await listRecentChanges(env.DB, batchSize, scanOffset, {
       namespace: options.namespace,
       groupBySubject: true,
-      includeMinor: options.includeMinor
+      includeMinor: options.includeMinor,
+      subjectType: recentSubjectType(options.showChanges, config)
     });
     if (batch.length === 0) break;
 
     for (const change of batch) {
-      if (!isReadablePageId(env, rules, principal, change.subjectId)) continue;
+      if (!isReadableChange(env, rules, principal, change)) continue;
       if (visibleOffset < options.pagination.offset) {
         visibleOffset += 1;
         continue;
@@ -4858,26 +4861,42 @@ function nonNegativeIntegerSearchParam(url: URL, key: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-function recentShowChanges(url: URL): "pages" | "mediafiles" | "both" {
+function recentShowChanges(
+  url: URL,
+  fallback: "pages" | "mediafiles" | "both"
+): "pages" | "mediafiles" | "both" {
   const value = url.searchParams.get("show_changes");
-  return value === "mediafiles" || value === "both" ? value : "pages";
+  return value === "pages" || value === "mediafiles" || value === "both" ? value : fallback;
+}
+
+function recentSubjectType(
+  showChanges: "pages" | "mediafiles" | "both",
+  config: RuntimeConfig
+): "pages" | "media" | "both" {
+  if (!config.mediaRevisions) return "pages";
+  if (showChanges === "mediafiles") return "media";
+  return showChanges;
 }
 
 function renderRecentFilters(
+  env: Env,
   namespace: string,
   showChanges: "pages" | "mediafiles" | "both",
   includeMinor: boolean,
   limit: number
 ): string {
   const showMinorValue = includeMinor ? "1" : "0";
-
-  return `<div class="changeType">
-    <label for="recent__show_changes">View changes of</label>
+  const mediaSelector = getRuntimeConfig(env).mediaRevisions
+    ? `<label for="recent__show_changes">View changes of</label>
     <select id="recent__show_changes" name="show_changes" class="quickselect">
       <option value="pages"${showChanges === "pages" ? " selected" : ""}>Pages</option>
       <option value="mediafiles"${showChanges === "mediafiles" ? " selected" : ""}>Media files</option>
       <option value="both"${showChanges === "both" ? " selected" : ""}>Both pages and media files</option>
-    </select>
+    </select>`
+    : "";
+
+  return `<div class="changeType">
+    ${mediaSelector}
     <label for="recent__show_minor">Minor edits</label>
     <select id="recent__show_minor" name="show_minor" class="quickselect">
       <option value="1"${showMinorValue === "1" ? " selected" : ""}>Show</option>
@@ -4907,27 +4926,46 @@ function renderRecentNavigation(pagination: Pagination, hasNext: boolean): strin
 }
 
 function renderRecentChangeItem(env: Env, change: RecentChange): string {
-  const pageUrl = pagePath(change.subjectId);
+  const pageUrl = recentChangeUrl(change);
   const isDelete = change.changeType === "delete";
   const isCreate = change.changeType === "create";
   const itemClass = change.changeType === "minor" ? ' class="minor"' : "";
   const diffLink = isCreate
     ? '<span class="diff_link" aria-hidden="true"></span>'
-    : `<a class="diff_link" href="${pageUrl}?do=diff">diff</a>`;
+    : `<a class="diff_link" href="${recentChangeDiffUrl(change)}">diff</a>`;
   const summary = change.summary ? `<span class="sum"> - ${escapeHtml(change.summary)}</span>` : "";
   const editor = change.userName || change.ip;
   const editorHtml = editor ? `<span class="user"><bdi>${escapeHtml(editor)}</bdi></span>` : "";
+  const revisionsUrl =
+    change.subjectType === "media" ? `${pageUrl}?tab_details=history` : `${pageUrl}?do=revisions`;
+  const linkClass = isDelete ? "wikilink2" : "wikilink1";
 
   return `<li${itemClass}><div class="li">
     <span class="date"><time datetime="${escapeAttribute(change.createdAt)}">${escapeHtml(formatRecentDate(env, change.createdAt))}</time></span>
     ${diffLink}
-    <a class="revisions_link" href="${pageUrl}?do=revisions">revisions</a>
-    <a href="${pageUrl}" class="${isDelete ? "wikilink2" : "wikilink1"}">${escapeHtml(change.subjectId)}</a>
+    <a class="revisions_link" href="${revisionsUrl}">revisions</a>
+    <a href="${pageUrl}" class="${linkClass}">${escapeHtml(change.subjectId)}</a>
+    ${change.subjectType === "media" ? '<span class="media-marker">media</span>' : ""}
     <span class="changeType">${escapeHtml(change.changeType)}</span>
     ${summary}
     ${editorHtml}
     ${renderRecentSizeChange(change.sizeChange)}
   </div></li>`;
+}
+
+function recentChangeUrl(change: RecentChange): string {
+  return change.subjectType === "media"
+    ? mediaDetailPath(change.subjectId)
+    : pagePath(change.subjectId);
+}
+
+function recentChangeDiffUrl(change: RecentChange): string {
+  if (change.subjectType === "media") {
+    const params = new URLSearchParams({ mediado: "diff" });
+    if (change.revisionId) params.set("rev", change.revisionId);
+    return `${mediaDetailPath(change.subjectId)}?${params.toString()}`;
+  }
+  return `${pagePath(change.subjectId)}?do=diff`;
 }
 
 function formatRecentDate(env: Env, value: string): string {
@@ -5898,13 +5936,22 @@ ${urls}
 }
 
 async function renderRssFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
-  const changes = await filterReadableChanges(env, principal, await listRecentChanges(env.DB));
+  const changes = await filterReadableChanges(
+    env,
+    principal,
+    await listRecentChanges(env.DB, feedItemLimit(url), 0, {
+      includeMinor: url.searchParams.get("minor") === "1",
+      onlyCreates: url.searchParams.get("onlynewpages") === "1",
+      namespace: cleanPageId(url.searchParams.get("ns") ?? ""),
+      subjectType: feedSubjectType(env, url)
+    })
+  );
   const title = getRuntimeConfig(env).siteName;
   const items = changes
     .map(
       (change) => `<item>
   <title>${escapeXml(`${change.changeType}: ${change.subjectId}`)}</title>
-  <link>${escapeXml(new URL(pagePath(change.subjectId), url).href)}</link>
+  <link>${escapeXml(new URL(feedChangeLink(change), url).href)}</link>
   <guid>${escapeXml(change.id)}</guid>
   <pubDate>${escapeXml(new Date(change.createdAt).toUTCString())}</pubDate>
   <description>${escapeXml(change.summary || change.changeType)}</description>
@@ -5924,14 +5971,23 @@ ${items}
 }
 
 async function renderAtomFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
-  const changes = await filterReadableChanges(env, principal, await listRecentChanges(env.DB));
+  const changes = await filterReadableChanges(
+    env,
+    principal,
+    await listRecentChanges(env.DB, feedItemLimit(url), 0, {
+      includeMinor: url.searchParams.get("minor") === "1",
+      onlyCreates: url.searchParams.get("onlynewpages") === "1",
+      namespace: cleanPageId(url.searchParams.get("ns") ?? ""),
+      subjectType: feedSubjectType(env, url)
+    })
+  );
   const title = getRuntimeConfig(env).siteName;
   const updated = changes[0]?.createdAt ?? new Date(0).toISOString();
   const entries = changes
     .map(
       (change) => `<entry>
   <title>${escapeXml(`${change.changeType}: ${change.subjectId}`)}</title>
-  <link href="${escapeXml(new URL(pagePath(change.subjectId), url).href)}"/>
+  <link href="${escapeXml(new URL(feedChangeLink(change), url).href)}"/>
   <id>${escapeXml(change.id)}</id>
   <updated>${escapeXml(change.createdAt)}</updated>
   <summary>${escapeXml(change.summary || change.changeType)}</summary>
@@ -5947,6 +6003,26 @@ async function renderAtomFeed(env: Env, url: URL, principal: AuthPrincipal): Pro
   <id>${escapeXml(new URL("/", url).href)}</id>
 ${entries}
 </feed>`;
+}
+
+function feedSubjectType(env: Env, url: URL): "pages" | "media" | "both" {
+  const config = getRuntimeConfig(env);
+  if (!config.mediaRevisions) return "pages";
+
+  const view = url.searchParams.get("view");
+  if (view === "pages" || view === "media" || view === "both") return view;
+  return config.rssMedia;
+}
+
+function feedItemLimit(url: URL): number {
+  const raw = Number.parseInt(url.searchParams.get("num") ?? "", 10);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 50;
+}
+
+function feedChangeLink(change: RecentChange): string {
+  return change.subjectType === "media"
+    ? mediaDetailPath(change.subjectId)
+    : pagePath(change.subjectId);
 }
 
 function renderOpenSearch(env: Env, url: URL): string {
@@ -9957,13 +10033,29 @@ async function filterReadablePageItems<T extends { id: string }>(
   return filterReadablePageItemsWithRules(env, await listAclRules(env), principal, items);
 }
 
-async function filterReadableChanges<T extends { subjectId: string }>(
-  env: Env,
-  principal: AuthPrincipal,
-  changes: T[]
-): Promise<T[]> {
+async function filterReadableChanges<
+  T extends { subjectId: string; subjectType?: "page" | "media" }
+>(env: Env, principal: AuthPrincipal, changes: T[]): Promise<T[]> {
   const rules = await listAclRules(env);
-  return changes.filter((change) => isReadablePageId(env, rules, principal, change.subjectId));
+  return changes.filter((change) =>
+    isReadableChange(env, rules, principal, {
+      subjectType: change.subjectType ?? "page",
+      subjectId: change.subjectId
+    })
+  );
+}
+
+function isReadableChange(
+  env: Env,
+  rules: Awaited<ReturnType<typeof listAclRules>>,
+  principal: AuthPrincipal,
+  change: { subjectType: "page" | "media"; subjectId: string }
+): boolean {
+  if (change.subjectType === "media") {
+    return hasAclPermission(resolveAclPermission(rules, change.subjectId, principal), ACL_READ);
+  }
+
+  return isReadablePageId(env, rules, principal, change.subjectId);
 }
 
 function filterReadablePageItemsWithRules<T extends { id: string }>(
@@ -10364,8 +10456,8 @@ async function purgePageCache(
   }
 
   if (origin) {
-    for (const kind of DISCOVERY_CACHE_KINDS) {
-      keys.add(discoveryCacheKey(kind, origin));
+    for (const key of await discoveryCacheKeysForOrigin(env, origin)) {
+      keys.add(key);
     }
   }
 
@@ -10454,7 +10546,7 @@ async function cachedXmlResponse(
   render: () => Promise<string>
 ): Promise<Response> {
   const startedAt = Date.now();
-  const cacheKey = discoveryCacheKey(kind, url.origin);
+  const cacheKey = discoveryCacheKey(kind, url);
   const cached = await readTextCache(env, cacheKey);
   const cacheHeaders = { "cache-control": `public, max-age=${DISCOVERY_CACHE_TTL_SECONDS}` };
 
@@ -10488,8 +10580,41 @@ async function cachedXmlResponse(
   return xmlResponse(body, contentType, cacheHeaders);
 }
 
-function discoveryCacheKey(kind: DiscoveryCacheKind, origin: string): string {
-  return `discovery:${kind}:${origin}`;
+function discoveryCacheKey(kind: DiscoveryCacheKind, url: URL): string {
+  return `discovery:${kind}:${url.origin}${url.pathname}${url.search}`;
+}
+
+async function discoveryCacheKeysForOrigin(env: Env, origin: string): Promise<string[]> {
+  const keys = new Set(discoveryCacheFallbackKeys(origin));
+
+  for (const kind of DISCOVERY_CACHE_KINDS) {
+    const prefix = `discovery:${kind}:${origin}`;
+    let cursor: string | undefined;
+
+    try {
+      do {
+        const listed = await env.RENDER_CACHE.list({ prefix, cursor });
+        for (const key of listed.keys) {
+          keys.add(key.name);
+        }
+        cursor = listed.list_complete ? undefined : listed.cursor;
+      } while (cursor);
+    } catch {
+      // Direct fallback keys above cover the common discovery documents.
+    }
+  }
+
+  return [...keys];
+}
+
+function discoveryCacheFallbackKeys(origin: string): string[] {
+  return [
+    discoveryCacheKey("sitemap", new URL("/sitemap.xml", origin)),
+    discoveryCacheKey("rss", new URL("/feed.php", origin)),
+    discoveryCacheKey("rss", new URL("/feed", origin)),
+    discoveryCacheKey("rss", new URL("/feed.xml", origin)),
+    discoveryCacheKey("atom", new URL("/atom.xml", origin))
+  ];
 }
 
 async function readTextCache(env: Env, cacheKey: string): Promise<string | null> {

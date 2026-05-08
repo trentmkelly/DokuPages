@@ -29,9 +29,9 @@ R2 operation counts:
 | conditional `/media/<id>`   | `304 Not Modified` |             0 |
 | `GET /media-manager?ns=...` | manager browse     |             0 |
 
-Current media responses use one-hour caching for mutable media IDs and one-year
-immutable caching for revision URLs. ETags are content hashes, so conditional
-requests can be resolved from D1 metadata before opening the R2 object body.
+Current media and revision responses use DokuWiki-style `CACHETIME` cache
+headers. ETags are derived from `Last-Modified`, so conditional requests can be
+resolved from D1 metadata before opening the R2 object body.
 
 ## Storage Query Guardrails
 

@@ -62,7 +62,14 @@ const env: Env = {
     delete: async (key: string) => {
       purgedKeys.push(key);
       renderCache.delete(key);
-    }
+    },
+    list: async (options?: { prefix?: string }) => ({
+      keys: [...renderCache.keys()]
+        .filter((key) => !options?.prefix || key.startsWith(options.prefix))
+        .map((name) => ({ name })),
+      list_complete: true,
+      cursor: undefined
+    })
   } as unknown as KVNamespace,
   PAGE_LOCKS: pageLocks.namespace,
   SITE_NAME: "Test Wiki",
@@ -2905,6 +2912,70 @@ describe("handleRequest", () => {
     expect(sneakyHtml).not.toContain("<small>wiki:guide");
   });
 
+  it("renders media changelog entries in recent changes and feeds", async () => {
+    state.changelog.push({
+      id: "media:wiki:logo.svg@2026-05-08T00:00:00.000Z",
+      subject_type: "media",
+      subject_id: "wiki:logo.svg",
+      revision_id: "media-rev-current",
+      user_name: "kiwi",
+      ip: "203.0.113.20",
+      change_type: "edit",
+      summary: "Uploaded replacement logo",
+      size_change: 18,
+      created_at: "2026-05-08T00:00:00.000Z"
+    });
+
+    const mediaRecent = await handleRequest(
+      new Request("https://example.com/recent?show_changes=mediafiles"),
+      env
+    );
+    const pageRecent = await handleRequest(
+      new Request("https://example.com/recent?show_changes=pages"),
+      env
+    );
+    const mixedRecent = await handleRequest(
+      new Request("https://example.com/recent?show_changes=both"),
+      env
+    );
+    const mediaFeed = await handleRequest(
+      new Request("https://example.com/feed.php?view=media"),
+      env
+    );
+    const pageFeed = await handleRequest(
+      new Request("https://example.com/feed.php?view=pages"),
+      env
+    );
+    const mixedFeed = await handleRequest(
+      new Request("https://example.com/feed.php?view=both"),
+      env
+    );
+
+    const mediaRecentHtml = await mediaRecent.text();
+    const pageRecentHtml = await pageRecent.text();
+    const mixedRecentHtml = await mixedRecent.text();
+    const mediaFeedXml = await mediaFeed.text();
+    const pageFeedXml = await pageFeed.text();
+    const mixedFeedXml = await mixedFeed.text();
+
+    expect(mediaRecentHtml).toContain("/media-detail/wiki/logo.svg");
+    expect(mediaRecentHtml).toContain("Uploaded replacement logo");
+    expect(mediaRecentHtml).toContain('<span class="media-marker">media</span>');
+    expect(mediaRecentHtml).not.toContain("wiki:welcome");
+    expect(pageRecentHtml).toContain("wiki:welcome");
+    expect(pageRecentHtml).not.toContain("/media-detail/wiki/logo.svg");
+    expect(mixedRecentHtml).toContain("wiki:welcome");
+    expect(mixedRecentHtml).toContain("/media-detail/wiki/logo.svg");
+
+    expect(mediaFeedXml).toContain("<title>edit: wiki:logo.svg</title>");
+    expect(mediaFeedXml).toContain("https://example.com/media-detail/wiki/logo.svg");
+    expect(mediaFeedXml).not.toContain("wiki:welcome");
+    expect(pageFeedXml).toContain("wiki:welcome");
+    expect(pageFeedXml).not.toContain("wiki:logo.svg");
+    expect(mixedFeedXml).toContain("wiki:welcome");
+    expect(mixedFeedXml).toContain("wiki:logo.svg");
+  });
+
   it("renders backlinks for a page", async () => {
     const response = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=backlink"),
@@ -2969,9 +3040,9 @@ describe("handleRequest", () => {
     expect(atom.headers.get("cache-control")).toBe("public, max-age=300");
     expect(cachePuts).toEqual(
       expect.arrayContaining([
-        "discovery:sitemap:https://example.com",
-        "discovery:rss:https://example.com",
-        "discovery:atom:https://example.com"
+        "discovery:sitemap:https://example.com/sitemap.xml",
+        "discovery:rss:https://example.com/feed.php",
+        "discovery:atom:https://example.com/atom.xml"
       ])
     );
 
@@ -3026,9 +3097,9 @@ describe("handleRequest", () => {
     form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
     form.set("content", "====== Updated ======\n\nChanged.");
     form.set("summary", "Updated page");
-    renderCache.set("discovery:sitemap:https://example.com", "stale sitemap");
-    renderCache.set("discovery:rss:https://example.com", "stale rss");
-    renderCache.set("discovery:atom:https://example.com", "stale atom");
+    renderCache.set("discovery:sitemap:https://example.com/sitemap.xml", "stale sitemap");
+    renderCache.set("discovery:rss:https://example.com/feed.php?view=media", "stale rss");
+    renderCache.set("discovery:atom:https://example.com/atom.xml", "stale atom");
 
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
@@ -3073,9 +3144,9 @@ describe("handleRequest", () => {
       })
     );
     expect(purgedKeys).toContain("page:wiki:welcome");
-    expect(purgedKeys).toContain("discovery:sitemap:https://example.com");
-    expect(purgedKeys).toContain("discovery:rss:https://example.com");
-    expect(purgedKeys).toContain("discovery:atom:https://example.com");
+    expect(purgedKeys).toContain("discovery:sitemap:https://example.com/sitemap.xml");
+    expect(purgedKeys).toContain("discovery:rss:https://example.com/feed.php?view=media");
+    expect(purgedKeys).toContain("discovery:atom:https://example.com/atom.xml");
   });
 
   it("rate limits repeated page edit attempts before saving", async () => {
@@ -3918,8 +3989,47 @@ function createD1Stub(state: D1StubState): D1Database {
           }
 
           if (sql.includes("from changelog")) {
+            const subjectType = sql.includes("subject_type in")
+              ? "both"
+              : values.includes("media")
+                ? "media"
+                : "page";
+            const namespacePattern = values.find(
+              (value): value is string => typeof value === "string" && value.endsWith(":%")
+            );
+            const namespace = namespacePattern?.slice(0, -2);
+            const groupBySubject = sql.includes("recent_rank = 1");
+            const rows = state.changelog
+              .filter((change) => {
+                if (subjectType !== "both" && change.subject_type !== subjectType) return false;
+                if (namespace && !String(change.subject_id).startsWith(`${namespace}:`)) {
+                  return false;
+                }
+                if (sql.includes("change_type <> 'minor'") && change.change_type === "minor") {
+                  return false;
+                }
+                if (sql.includes("change_type = 'create'") && change.change_type !== "create") {
+                  return false;
+                }
+                return true;
+              })
+              .sort(
+                (left, right) =>
+                  String(right.created_at).localeCompare(String(left.created_at)) ||
+                  String(right.id).localeCompare(String(left.id))
+              );
+            const groupedRows = groupBySubject
+              ? rows.filter(
+                  (change, index, all) =>
+                    all.findIndex(
+                      (candidate) =>
+                        candidate.subject_type === change.subject_type &&
+                        candidate.subject_id === change.subject_id
+                    ) === index
+                )
+              : rows;
             return {
-              results: applyPagination(state.changelog, 50)
+              results: applyPagination(groupedRows, 50)
             };
           }
 

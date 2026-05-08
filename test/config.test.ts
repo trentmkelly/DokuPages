@@ -43,6 +43,7 @@ describe("runtime config", () => {
       mediaRevisions: true,
       ieXssProtect: true,
       fetchSize: 0,
+      rssMedia: "both",
       pageIdCleanOptions: {
         deaccent: 1,
         fnencode: "url",
@@ -96,6 +97,7 @@ describe("runtime config", () => {
       MEDIAREVISIONS: "0",
       IEXSSPROTECT: "0",
       FETCHSIZE: "65536",
+      RSS_MEDIA: "media",
       DEACCENT: "2",
       FNENCODE: "safe",
       SEPCHAR: "-",
@@ -137,6 +139,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).mediaRevisions).toBe(false);
     expect(getRuntimeConfig(env).ieXssProtect).toBe(false);
     expect(getRuntimeConfig(env).fetchSize).toBe(65536);
+    expect(getRuntimeConfig(env).rssMedia).toBe("media");
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
       deaccent: 2,
       fnencode: "safe",
@@ -278,6 +281,10 @@ describe("runtime config", () => {
           effectiveValue: "0"
         }),
         expect.objectContaining({
+          key: "RSS_MEDIA",
+          effectiveValue: "both"
+        }),
+        expect.objectContaining({
           key: "DEACCENT",
           effectiveValue: "1"
         }),
@@ -384,6 +391,7 @@ describe("runtime config", () => {
       CACHETIME: "-1",
       LOCKTIME: "-1",
       TYPOGRAPHY: "3",
+      RSS_MEDIA: "files",
       DEACCENT: "3",
       FNENCODE: "base64",
       SEPCHAR: "/",
@@ -408,6 +416,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "CACHETIME", severity: "error" }),
         expect.objectContaining({ key: "LOCKTIME", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
+        expect.objectContaining({ key: "RSS_MEDIA", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
         expect.objectContaining({ key: "FNENCODE", severity: "error" }),
         expect.objectContaining({ key: "SEPCHAR", severity: "error" }),
