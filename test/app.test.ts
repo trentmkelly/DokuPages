@@ -3060,6 +3060,14 @@ function createD1Stub(state: D1StubState): D1Database {
             };
           }
 
+          if (sql.includes("from media") && sql.includes("id in")) {
+            return {
+              results: state.media
+                .filter((media) => media.is_deleted === 0 && values.includes(media.id))
+                .map((media) => ({ id: media.id }))
+            };
+          }
+
           if (sql.includes("from media_revisions")) {
             return {
               results: applyPagination(

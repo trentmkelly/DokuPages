@@ -35,6 +35,14 @@ Namespaces are stored as colon-separated IDs in page and media records. They can
 
 `metadata` stores JSON metadata for pages, media, config, and plugin subjects. This replaces `.meta` files, media metadata files, custom language/template preservation records, and imported DokuWiki `$conf` values that are not first-class runtime environment variables.
 
+Page saves write both compatibility helper keys and a DokuWiki-shaped `dokuwiki`
+metadata value with `current` and `persistent` sections. Current page metadata
+includes title, abstract, table of contents, relation references with existence
+booleans, media references, first image, internal render flags, and created /
+modified date values. Persistent metadata preserves creator/user fields,
+contributors, and the last change record. Saves also refresh `backlinks`
+metadata for the saved page and link targets touched by the edit.
+
 ## Changelogs
 
 `changelog` stores both page and media change events with subject type, subject ID, revision ID, user, IP, summary, change type, size change, and timestamp.

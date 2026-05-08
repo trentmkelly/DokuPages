@@ -92,7 +92,7 @@ replacement surface, or explicit unsupported status.
 | `PAGEUTILS_ID_HIDEPAGE`        | Native hidden-page filtering.                                              |
 | `PARSER_HANDLER_DONE`          | Native renderer; no PHP instruction handler hook.                          |
 | `PARSER_LOCALE_XHTML`          | Deferred with localization parity.                                         |
-| `PARSER_METADATA_RENDER`       | Deferred with metadata-render parity.                                      |
+| `PARSER_METADATA_RENDER`       | Native metadata rows cover core page metadata; renderer hooks unsupported. |
 | `PARSER_WIKITEXT_PREPROCESS`   | Native renderer input; generic preprocessing hook unsupported.             |
 | `PLUGIN_CONFIG_PLUGINLIST`     | Native plugin compatibility report; no runtime plugin loading.             |
 | `PLUGIN_POPULARITY_DATA_SETUP` | Removed; popularity phone-home is unsupported.                             |
@@ -151,7 +151,7 @@ is a future architecture extension, not a hidden filesystem compatibility mode.
 | `data/attic`             | D1 `page_revisions`, including imported compressed revisions after decompression.     |
 | `data/media`             | R2 media objects plus D1 current media metadata.                                      |
 | `data/media_attic`       | R2 old media objects plus D1 `media_revisions`.                                       |
-| `data/meta`              | D1 metadata rows; exact parser metadata parity remains separate.                      |
+| `data/meta`              | D1 metadata rows with DokuWiki-shaped page metadata plus compatibility helper keys.   |
 | `data/media_meta`        | D1 metadata rows; EXIF/IPTC display remains separate.                                 |
 | `data/cache`             | KV rendered payloads, Cache API candidates, and D1 cache dependency rows.             |
 | `data/index`             | D1 search postings and term tables.                                                   |

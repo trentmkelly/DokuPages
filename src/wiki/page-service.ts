@@ -1,5 +1,7 @@
 import { cleanPageId, pageIdToRoutePath } from "./page-id";
 import { extractInternalPageLinks } from "./page-links";
+import { cleanMediaId, mediaName } from "./media-service";
+import { renderWikiText, type TocItem } from "./render";
 import { buildSearchTermFrequencies, makeSearchSnippet, parseSearchQuery } from "./search";
 
 export interface CurrentPage {
@@ -492,7 +494,45 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   const searchTerms = isDelete
     ? new Map<string, number>()
     : buildSearchTermFrequencies(input.content, title);
-  const outgoingLinks = isDelete ? [] : extractInternalPageLinks(input.content);
+  const renderedMetadata = isDelete
+    ? null
+    : renderWikiText(input.content, { pageId: input.id, sectionEdit: false });
+  const outgoingLinks = renderedMetadata ? pageDependencies(renderedMetadata.dependencies) : [];
+  const mediaLinks = renderedMetadata ? mediaDependencies(renderedMetadata.dependencies) : [];
+  const existingLinkIds = await listExistingPageIds(db, outgoingLinks);
+  if (!isDelete) existingLinkIds.add(input.id);
+  const existingMediaIds = await listExistingMediaIds(db, mediaLinks);
+  const previousMetadata = await readDokuWikiPageMetadata(db, input.id);
+  const pageCreatedAt = current ? ((await getPageCreatedAt(db, input.id)) ?? now) : now;
+  const previousOutgoingLinks = current ? extractInternalPageLinks(current.content, input.id) : [];
+  const backlinkTargets = [...new Set([...previousOutgoingLinks, ...outgoingLinks, input.id])];
+  const backlinkMetadata = await buildBacklinkMetadata(
+    db,
+    input.id,
+    isDelete ? null : input.content,
+    backlinkTargets
+  );
+  const pageMetadata = buildPageMetadata({
+    title,
+    revisionId,
+    namespace,
+    contentHash,
+    content: input.content,
+    isDelete,
+    renderedMetadata,
+    outgoingLinks,
+    existingLinkIds,
+    mediaLinks,
+    existingMediaIds,
+    previousMetadata,
+    pageCreatedAt,
+    modifiedAt: now,
+    changeType,
+    summary,
+    authorId: input.authorId ?? null,
+    authorName: input.authorName ?? null,
+    ip: input.ip ?? null
+  });
 
   await db.batch([
     db
@@ -546,16 +586,8 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
         now
       ),
     ...buildSearchIndexStatements(db, input.id, searchTerms, indexedTerms, now),
-    ...buildPageMetadataStatements(db, input.id, now, {
-      title,
-      revisionId,
-      namespace,
-      contentHash,
-      outgoingLinks,
-      isDeleted: isDelete,
-      size: input.content.length,
-      wordCount: countWords(input.content)
-    })
+    ...buildPageMetadataStatements(db, input.id, now, pageMetadata),
+    ...buildBacklinkMetadataStatements(db, backlinkMetadata, now)
   ]);
 
   return {
@@ -627,15 +659,61 @@ export async function rebuildSearchIndex(
   };
 }
 
+interface DokuWikiPageMetadata {
+  current?: Record<string, unknown>;
+  persistent?: Record<string, unknown>;
+}
+
+interface PageMetadataBuildInput {
+  title: string;
+  revisionId: string;
+  namespace: string;
+  contentHash: string;
+  content: string;
+  isDelete: boolean;
+  renderedMetadata: ReturnType<typeof renderWikiText> | null;
+  outgoingLinks: string[];
+  existingLinkIds: ReadonlySet<string>;
+  mediaLinks: string[];
+  existingMediaIds: ReadonlySet<string>;
+  previousMetadata: DokuWikiPageMetadata | null;
+  pageCreatedAt: string;
+  modifiedAt: string;
+  changeType: SavePageInput["changeType"];
+  summary: string;
+  authorId: string | null;
+  authorName: string | null;
+  ip: string | null;
+}
+
 interface PageMetadataInput {
   title: string;
   revisionId: string;
   namespace: string;
   contentHash: string;
   outgoingLinks: string[];
+  mediaLinks: string[];
   isDeleted: boolean;
   size: number;
   wordCount: number;
+  description: {
+    abstract: string;
+    tableofcontents: Array<{ hid: string; title: string; type: "ul"; level: number }>;
+  };
+  relation: {
+    references: Record<string, boolean>;
+    media: Record<string, boolean>;
+    firstimage: string;
+  };
+  date: {
+    created: number;
+    modified: number;
+  };
+  contributor: Record<string, string | null>;
+  dokuwiki: {
+    current: Record<string, unknown>;
+    persistent: Record<string, unknown>;
+  };
 }
 
 function buildPageMetadataStatements(
@@ -655,6 +733,327 @@ function buildPageMetadataStatements(
       )
       .bind(pageId, key, JSON.stringify(value), updatedAt)
   );
+}
+
+function buildBacklinkMetadataStatements(
+  db: D1Database,
+  backlinks: ReadonlyMap<string, string[]>,
+  updatedAt: string
+): D1PreparedStatement[] {
+  return [...backlinks.entries()].map(([pageId, referrers]) =>
+    db
+      .prepare(
+        `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+         values ('page', ?, 'backlinks', ?, ?)
+         on conflict(subject_type, subject_id, key) do update set
+           value_json = excluded.value_json,
+           updated_at = excluded.updated_at`
+      )
+      .bind(pageId, JSON.stringify(referrers), updatedAt)
+  );
+}
+
+function buildPageMetadata(input: PageMetadataBuildInput): PageMetadataInput {
+  const previousPersistent = objectValue(input.previousMetadata?.persistent);
+  const previousDate = objectValue(previousPersistent.date);
+  const created = numericValue(previousDate.created) ?? unixSeconds(input.pageCreatedAt);
+  const modified = unixSeconds(input.modifiedAt);
+  const contributor = {
+    ...recordValue(previousPersistent.contributor)
+  } as Record<string, string | null>;
+  const isMinorEdit = input.changeType === "minor";
+
+  if (input.authorId && !input.isDelete && input.changeType !== "create" && !isMinorEdit) {
+    contributor[input.authorId] = input.authorName;
+  }
+
+  const persistent: Record<string, unknown> = {
+    ...previousPersistent,
+    date: {
+      ...previousDate,
+      created,
+      modified
+    },
+    user:
+      stringValue(previousPersistent.user) ||
+      (input.changeType === "create" ? (input.authorId ?? "") : ""),
+    creator:
+      stringValue(previousPersistent.creator) ||
+      (input.changeType === "create" ? (input.authorName ?? "") : ""),
+    contributor,
+    last_change: {
+      date: modified,
+      type: input.changeType ?? (input.isDelete ? "delete" : "edit"),
+      user: input.authorId ?? "",
+      sum: input.summary,
+      ip: input.ip
+    }
+  };
+
+  const description = input.isDelete
+    ? { abstract: "", tableofcontents: [] }
+    : {
+        abstract: pageAbstract(input.renderedMetadata?.html ?? ""),
+        tableofcontents: tableOfContentsMetadata(input.renderedMetadata?.toc ?? [])
+      };
+  const relation = {
+    references: Object.fromEntries(
+      input.outgoingLinks.map((pageId) => [pageId, input.existingLinkIds.has(pageId)])
+    ),
+    media: Object.fromEntries(
+      input.mediaLinks.map((mediaId) => [mediaId, input.existingMediaIds.has(mediaId)])
+    ),
+    firstimage: input.isDelete ? "" : firstImageFromContent(input.content)
+  };
+  const current: Record<string, unknown> = {
+    ...persistent,
+    title: input.title,
+    description,
+    relation,
+    date: {
+      ...objectValue(persistent.date),
+      modified
+    },
+    internal: {
+      cache: !input.renderedMetadata?.noCache,
+      toc: !input.renderedMetadata?.noToc,
+      noCache: Boolean(input.renderedMetadata?.noCache),
+      noToc: Boolean(input.renderedMetadata?.noToc)
+    }
+  };
+
+  return {
+    title: input.title,
+    revisionId: input.revisionId,
+    namespace: input.namespace,
+    contentHash: input.contentHash,
+    outgoingLinks: input.outgoingLinks,
+    mediaLinks: input.mediaLinks,
+    isDeleted: input.isDelete,
+    size: input.content.length,
+    wordCount: countWords(input.content),
+    description,
+    relation,
+    date: {
+      created,
+      modified
+    },
+    contributor,
+    dokuwiki: {
+      current,
+      persistent
+    }
+  };
+}
+
+async function getPageCreatedAt(db: D1Database, pageId: string): Promise<string | null> {
+  const row = await db
+    .prepare("select created_at from pages where id = ?")
+    .bind(pageId)
+    .first<{ created_at: string }>();
+
+  return row?.created_at ?? null;
+}
+
+async function readDokuWikiPageMetadata(
+  db: D1Database,
+  pageId: string
+): Promise<DokuWikiPageMetadata | null> {
+  const row = await db
+    .prepare(
+      `select value_json
+       from metadata
+       where subject_type = 'page'
+         and subject_id = ?
+         and key = 'dokuwiki'`
+    )
+    .bind(pageId)
+    .first<{ value_json: string }>();
+
+  if (!row) return null;
+
+  try {
+    const parsed = JSON.parse(row.value_json);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as DokuWikiPageMetadata;
+  } catch {
+    return null;
+  }
+}
+
+async function listExistingMediaIds(
+  db: D1Database,
+  mediaIds: readonly string[]
+): Promise<Set<string>> {
+  const ids = [...new Set(mediaIds.map((mediaId) => cleanMediaId(mediaId)).filter(Boolean))];
+  if (ids.length === 0) return new Set();
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `select id
+       from media
+       where is_deleted = 0 and id in (${placeholders})`
+    )
+    .bind(...ids)
+    .all<{ id: string }>();
+
+  return new Set(result.results.map((row) => row.id));
+}
+
+async function buildBacklinkMetadata(
+  db: D1Database,
+  sourcePageId: string,
+  sourceContent: string | null,
+  targetPageIds: readonly string[]
+): Promise<Map<string, string[]>> {
+  const targets = new Set(targetPageIds.map((id) => cleanPageId(id)).filter(Boolean));
+  const backlinks = new Map([...targets].map((id) => [id, [] as string[]]));
+  if (targets.size === 0) return backlinks;
+
+  const sources = await listCurrentPageSources(db, 500);
+  const sawSource = sources.some((source) => source.id === sourcePageId);
+  const effectiveSources =
+    sourceContent === null
+      ? sources.filter((source) => source.id !== sourcePageId)
+      : [
+          ...sources.map((source) =>
+            source.id === sourcePageId ? { ...source, content: sourceContent } : source
+          ),
+          ...(sawSource
+            ? []
+            : [
+                {
+                  id: sourcePageId,
+                  title: null,
+                  content: sourceContent,
+                  updated_at: new Date(0).toISOString()
+                }
+              ])
+        ];
+
+  for (const source of effectiveSources) {
+    for (const linkedPageId of extractInternalPageLinks(source.content, source.id)) {
+      if (linkedPageId === source.id || !targets.has(linkedPageId)) continue;
+      backlinks.get(linkedPageId)?.push(source.id);
+    }
+  }
+
+  for (const [target, referrers] of backlinks) {
+    backlinks.set(
+      target,
+      [...new Set(referrers)].sort((a, b) => a.localeCompare(b))
+    );
+  }
+
+  return backlinks;
+}
+
+function pageDependencies(
+  dependencies: ReturnType<typeof renderWikiText>["dependencies"]
+): string[] {
+  return dependencies
+    .filter((dependency) => dependency.subjectType === "page")
+    .map((dependency) => dependency.subjectId);
+}
+
+function mediaDependencies(
+  dependencies: ReturnType<typeof renderWikiText>["dependencies"]
+): string[] {
+  return dependencies
+    .filter((dependency) => dependency.subjectType === "media")
+    .map((dependency) => dependency.subjectId);
+}
+
+function tableOfContentsMetadata(
+  toc: readonly TocItem[]
+): Array<{ hid: string; title: string; type: "ul"; level: number }> {
+  return toc.map((item) => ({
+    hid: item.id,
+    title: item.title,
+    type: "ul",
+    level: item.level
+  }));
+}
+
+function pageAbstract(html: string): string {
+  const withImageText = html.replace(/<img\b[^>]*\balt="([^"]*)"[^>]*>/gi, (_match, alt) =>
+    alt ? `[${decodeHtmlEntities(String(alt))}]` : ""
+  );
+  const withoutFootnotes = withImageText.replace(/<div class="footnotes">[\s\S]*?<\/div>\s*$/i, "");
+  const text = decodeHtmlEntities(
+    withoutFootnotes
+      .replace(/<(h[1-6]|p|div|li|tr|pre|blockquote)\b[^>]*>/gi, "\n")
+      .replace(/<(br|hr)\b[^>]*>/gi, "\n")
+      .replace(/<(td|th)\b[^>]*>/gi, " ")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return text.length > 500 ? `${text.slice(0, 500)}...` : text;
+}
+
+function firstImageFromContent(content: string): string {
+  for (const match of content.matchAll(/\{\{([^}|?]+)(?:\?[^}|]*)?(?:\|[^}]*)?\}\}/g)) {
+    const raw = match[1].trim();
+    const id = isExternalMediaId(raw) ? raw : cleanMediaId(raw);
+    if (isImageId(id)) return id;
+  }
+
+  return "";
+}
+
+function isExternalMediaId(value: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
+}
+
+function isImageId(id: string): boolean {
+  return /\.(?:jpe?g|gif|png|webp|svg)$/i.test(mediaName(id));
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function recordValue(value: unknown): Record<string, string | null> {
+  const object = objectValue(value);
+  return Object.fromEntries(
+    Object.entries(object).filter((entry): entry is [string, string | null] => {
+      const value = entry[1];
+      return typeof value === "string" || value === null;
+    })
+  );
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function numericValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function unixSeconds(value: string): number {
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds) ? Math.floor(milliseconds / 1000) : 0;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_match, codePoint) => String.fromCodePoint(Number(codePoint)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, codePoint) =>
+      String.fromCodePoint(Number.parseInt(codePoint, 16))
+    )
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 function countWords(content: string): number {

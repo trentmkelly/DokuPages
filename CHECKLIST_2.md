@@ -94,7 +94,7 @@ are not fixed by this checklist.
 - [x] Match upstream old revision notices, deleted-page notices, and once-existed pages from language files such as `newpage.txt`, `norev.txt`, and `onceexisted.txt`.
 - [x] Match upstream page deletion behavior and delete summaries, including attic/changelog representation.
 - [x] Match upstream revert plugin behavior, messages, and revision selection edge cases.
-- [ ] Match upstream page metadata generation from `inc/parser/metadata.php`, including relations, contributors, date metadata, description abstracts, and backlinks.
+- [x] Match upstream page metadata generation from `inc/parser/metadata.php`, including relations, contributors, date metadata, description abstracts, and backlinks.
 - [ ] Match upstream backlink, wanted, and orphan calculations against metadata/index behavior rather than only current D1 source scans.
 - [ ] Match upstream recent changes filters, grouping, date labels, pagination, and hidden-page handling.
 - [ ] Match upstream diff options, side-by-side output, inline output, media diff pages, and revision comparison edge cases.

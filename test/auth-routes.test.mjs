@@ -1143,6 +1143,90 @@ describe("auth routes", () => {
     });
   });
 
+  it("writes DokuWiki-shaped page metadata for saved pages", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nExisting page."
+    });
+    await seedPage(env.DB, {
+      id: "wiki:meta",
+      title: "Old Metadata",
+      content: "====== Old Metadata ======\n\nOld content.",
+      revisionId: "wiki:meta@2026-05-07T00:00:00.000Z",
+      createdAt: "2026-05-07T00:00:00.000Z"
+    });
+    await seedMediaObjectReferences(env.DB);
+    const cookie = await loginAsAlice(env);
+    const form = new FormData();
+    form.set("id", "wiki:meta");
+    form.set("baseRevisionId", "wiki:meta@2026-05-07T00:00:00.000Z");
+    form.set(
+      "content",
+      [
+        "====== Metadata Page ======",
+        "",
+        "Intro paragraph with [[wiki:welcome|Welcome]] and [[wiki:missing|Missing]].",
+        "",
+        "{{wiki:logo.svg|Logo}}"
+      ].join("\n")
+    );
+    form.set("summary", "Create metadata page");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+    const metadata = await pageMetadata(env.DB, "wiki:meta");
+    const targetMetadata = await pageMetadata(env.DB, "wiki:welcome");
+
+    expect(response.status).toBe(303);
+    expect(metadata.relation).toMatchObject({
+      references: {
+        "wiki:missing": false,
+        "wiki:welcome": true
+      },
+      media: {
+        "wiki:logo.svg": true
+      },
+      firstimage: "wiki:logo.svg"
+    });
+    expect(metadata.description).toMatchObject({
+      abstract: expect.stringContaining("Metadata Page"),
+      tableofcontents: [{ hid: "metadata-page", title: "Metadata Page", type: "ul", level: 1 }]
+    });
+    expect(metadata.date).toMatchObject({
+      created: expect.any(Number),
+      modified: expect.any(Number)
+    });
+    expect(metadata.contributor).toMatchObject({
+      "user-1": "Alice Example"
+    });
+    expect(metadata.dokuwiki).toMatchObject({
+      current: {
+        title: "Metadata Page",
+        relation: {
+          references: {
+            "wiki:welcome": true,
+            "wiki:missing": false
+          }
+        }
+      },
+      persistent: {
+        contributor: {
+          "user-1": "Alice Example"
+        }
+      }
+    });
+    expect(targetMetadata.backlinks).toEqual(["wiki:meta"]);
+  });
+
   it("allows admin users to purge global render and discovery caches", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -1677,6 +1761,20 @@ async function currentPageRevision(d1, id) {
     )
     .bind(id)
     .first();
+}
+
+async function pageMetadata(d1, id) {
+  const rows = await d1
+    .prepare(
+      `select key, value_json
+       from metadata
+       where subject_type = 'page'
+         and subject_id = ?`
+    )
+    .bind(id)
+    .all();
+
+  return Object.fromEntries(rows.results.map((row) => [row.key, JSON.parse(row.value_json)]));
 }
 
 async function seedMediaObjectReferences(d1) {
