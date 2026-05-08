@@ -49,11 +49,9 @@ post-launch monitoring.
 
 ## P2
 
-- Server-side thumbnail generation: current media strategy serves originals and
-  documents derivative policy headers. Add a Worker-compatible derivative
-  pipeline only if production media volume and layout require thumbnails.
-- Thumbnail cache and stale fallback: intentionally deferred until there is
-  measured demand for generated derivatives.
+- Thumbnail cache and stale fallback: generated PNG/JPEG/WebP derivatives are
+  served on demand. Persistent derivative caching remains intentionally deferred
+  until measured media volume requires it.
 - XML-RPC, JSON-RPC, and OpenAPI method compatibility: endpoints return explicit
   unsupported responses. Implement only if current clients require legacy remote
   method compatibility.

@@ -41,6 +41,9 @@ const renderCache = new Map<string, string>();
 const pageLocks = createPageLockNamespaceStub();
 const TEST_CSRF_TOKEN = "test-csrf-token";
 const TEST_DOKUWIKI_COOKIE_SALT = "test-dokuwiki-cookie-salt";
+const TEST_PIXEL_PNG = base64Bytes(
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP4z8DwH4QZYAwAR8oH+WdZbrcAAAAASUVORK5CYII="
+);
 
 const env: Env = {
   DB: createD1Stub(state),
@@ -1044,6 +1047,18 @@ describe("handleRequest", () => {
       new Request("https://example.com/media/wiki/logo.svg?download=1"),
       env
     );
+    const noCache = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?cache=nocache"),
+      env
+    );
+    const noCacheConditional = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?cache=nocache", {
+        headers: {
+          "if-none-match": '"current-media-hash"'
+        }
+      }),
+      env
+    );
     const resizedToken = mediaToken(
       "wiki:logo.svg",
       requestedMediaSize("80", null),
@@ -1055,6 +1070,27 @@ describe("handleRequest", () => {
     );
     const invalidResized = await handleRequest(
       new Request("https://example.com/media/wiki/logo.svg?w=80&tok=bad"),
+      env
+    );
+    state.media.push({
+      id: "wiki:pixel.png",
+      namespace: "wiki",
+      object_key: "media/current/wiki/pixel.png",
+      mime_type: "image/png",
+      byte_length: TEST_PIXEL_PNG.byteLength,
+      content_hash: "pixel-media-hash",
+      current_revision_id: "pixel-media-rev",
+      is_deleted: 0,
+      created_at: "2026-05-08T00:00:00.000Z",
+      updated_at: "2026-05-08T00:00:00.000Z"
+    });
+    const pixelResizedToken = mediaToken(
+      "wiki:pixel.png",
+      requestedMediaSize("4", null),
+      TEST_DOKUWIKI_COOKIE_SALT
+    );
+    const pixelResized = await handleRequest(
+      new Request(`https://example.com/media/wiki/pixel.png?w=4&tok=${pixelResizedToken}`),
       env
     );
     const revision = await handleRequest(
@@ -1098,14 +1134,22 @@ describe("handleRequest", () => {
     expect(fetch.headers.get("content-type")).toBe("image/svg+xml");
     expect(fetch.headers.get("cache-control")).toBe("public, max-age=3600");
     expect(fetch.headers.get("x-dokuwiki-thumbnail-policy")).toBe("original");
-    expect(resized.headers.get("x-dokuwiki-resize-policy")).toBe("browser-constrained-original");
+    expect(resized.headers.get("x-dokuwiki-resize-policy")).toBe("unsupported");
     expect(invalidResized.status).toBe(412);
     await expect(invalidResized.text()).resolves.toBe("Precondition Failed");
+    expect(pixelResized.status).toBe(200);
+    expect(pixelResized.headers.get("content-type")).toBe("image/png");
+    expect(pixelResized.headers.get("x-dokuwiki-resize-policy")).toBe("generated");
+    const pixelBytes = new Uint8Array(await pixelResized.arrayBuffer());
+    expect(pngDimensions(pixelBytes)).toEqual({ width: 4, height: 4 });
     await expect(fetch.text()).resolves.toBe("<svg>current</svg>");
     expect(head.status).toBe(200);
     expect(head.headers.get("content-length")).toBe("18");
     await expect(head.text()).resolves.toBe("");
     expect(download.headers.get("content-disposition")).toBe('attachment; filename="logo.svg"');
+    expect(noCache.headers.get("cache-control")).toBe("no-cache, no-store, must-revalidate");
+    expect(noCache.headers.get("pragma")).toBe("no-cache");
+    expect(noCacheConditional.status).toBe(200);
     expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
     await expect(detail.text()).resolves.toContain("Media detail");
@@ -3689,6 +3733,7 @@ type R2OperationCounters = Record<"head" | "get" | "put" | "delete", number>;
 function createR2Stub(counters?: R2OperationCounters): R2Bucket {
   const objects = new Map<string, BodyInit>([
     ["media/current/wiki/logo.svg", "<svg>current</svg>"],
+    ["media/current/wiki/pixel.png", uint8ArrayToArrayBuffer(TEST_PIXEL_PNG)],
     ["media/revisions/wiki/logo.svg/20260506000000", "<svg>old</svg>"]
   ]);
 
@@ -3862,6 +3907,24 @@ function seedMediaRevisions(): Record<string, unknown>[] {
 
 function seedAclRules(): Record<string, unknown>[] {
   return [aclRule("*", "all", "@ALL", 16)];
+}
+
+function base64Bytes(value: string): Uint8Array {
+  return Uint8Array.from(globalThis.atob(value), (character) => character.charCodeAt(0));
+}
+
+function uint8ArrayToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
+function pngDimensions(bytes: Uint8Array): { width: number; height: number } {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return {
+    width: view.getUint32(16),
+    height: view.getUint32(20)
+  };
 }
 
 function aclRule(

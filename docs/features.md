@@ -48,7 +48,7 @@ of full PHP DokuWiki runtime compatibility.
 - Production extension-manager installs and plugin code uploads.
 - LDAP, Active Directory, and PDO auth backends at runtime.
 - XML-RPC, JSON-RPC, and OpenAPI method compatibility.
-- Server-side ImageMagick/GD thumbnail generation. The current media strategy serves originals and documents derivative policy headers.
+- Full ImageMagick/GD feature parity beyond Photon-backed PNG/JPEG/WebP resize and crop derivatives.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
 - Thumbnail cache and stale fallback.
 - Scheduled production backup automation and final launch rehearsal verification.

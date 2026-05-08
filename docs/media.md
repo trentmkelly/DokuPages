@@ -96,13 +96,20 @@ the upstream `media_get_token()` HMAC-MD5 signature over the cleaned media ID an
 requested dimensions, using the `DOKUWIKI_COOKIE_SALT` Pages secret. Missing or
 invalid tokens fail with `412 Precondition Failed`, matching
 `lib/exe/fetch.php` anti-hotlink behavior. Legacy `lib/exe/fetch.php` redirects
-preserve `w`, `h`, `tok`, and `cache` parameters.
+preserve `w`, `h`, `tok`, and `cache` parameters. `cache=nocache` disables
+client caching and bypasses conditional `304 Not Modified` responses for that
+request, matching DokuWiki's explicit cache-busting path.
 
 ## Derivative Strategy
 
-The Pages port does not yet generate thumbnail or resized image bytes inside
-Workers. Tokenized resized-media requests currently return the original R2
-object and include `x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`,
-and `x-dokuwiki-exif-policy` headers documenting the replacement strategy. Image
-previews use browser-constrained originals with lazy decoding. JPEG EXIF
-metadata is not parsed in the request path.
+The Pages port generates DokuWiki-style resized media inside Workers with
+`@cf-wasm/photon`, a WASM image pipeline. PNG, JPEG, and WebP requests with a
+valid `w` or `h` token are resized server-side; requests with both dimensions
+use a center crop, matching DokuWiki's `media_crop_image()` path. Requested
+dimensions above DokuWiki's 2000 pixel guardrail return the original object.
+
+SVG and unsupported image formats are served as originals because upstream
+`lib/exe/fetch.php` also skips SVG modification. Responses include
+`x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`, and
+`x-dokuwiki-exif-policy` headers so generated, unsupported, failed, and original
+paths remain observable. JPEG EXIF metadata is not parsed in the request path.

@@ -136,8 +136,20 @@ import {
   type TocItem
 } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
-import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
-import { requestedMediaSizeFromUrl, validMediaToken } from "./wiki/media-token";
+import {
+  expectedMediaDerivativeStatus,
+  generateMediaDerivative,
+  hasRequestedMediaSize,
+  mediaDerivativeCacheKey,
+  mediaDerivativeHeaders,
+  type MediaDerivativeStatus
+} from "./wiki/media-derivatives";
+import {
+  mediaSizeQuery,
+  requestedMediaSize,
+  requestedMediaSizeFromUrl,
+  validMediaToken
+} from "./wiki/media-token";
 import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
@@ -2239,7 +2251,16 @@ async function handleMediaFetch(
     return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
   }
 
-  const headers = mediaFetchHeaders(url, media, Boolean(revisionId));
+  const requestedSize = requestedMediaSizeFromUrl(url);
+  const expectedDerivativeStatus = expectedMediaDerivativeStatus(media, requestedSize);
+  const expectedEtag =
+    expectedDerivativeStatus === "generated"
+      ? mediaEtag(media, mediaDerivativeCacheKey(requestedSize))
+      : mediaEtag(media);
+  const headers = mediaFetchHeaders(url, media, Boolean(revisionId), {
+    derivativeStatus: expectedDerivativeStatus,
+    etag: expectedEtag
+  });
 
   if (url.searchParams.get("download") === "1") {
     headers.set(
@@ -2248,7 +2269,7 @@ async function handleMediaFetch(
     );
   }
 
-  if (isMediaNotModified(request, media)) {
+  if (!bypassesMediaClientCache(url) && isMediaNotModified(request, media, expectedEtag)) {
     headers.delete("content-length");
     logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
       delivery: "not_modified",
@@ -2257,7 +2278,7 @@ async function handleMediaFetch(
     return new Response(null, { status: 304, headers });
   }
 
-  if (request.method === "HEAD") {
+  if (request.method === "HEAD" && !requestedSize.requested) {
     const object = await env.MEDIA_BUCKET.head(media.objectKey);
 
     if (!object) {
@@ -2275,6 +2296,35 @@ async function handleMediaFetch(
 
   if (!object) {
     return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
+  }
+
+  if (requestedSize.requested) {
+    const originalBody = await new Response(object.body).arrayBuffer();
+    const derivative = await generateMediaDerivative(media, originalBody, requestedSize);
+    const derivativeBody =
+      derivative.status === "generated" && derivative.body
+        ? uint8ArrayToArrayBuffer(derivative.body)
+        : originalBody;
+    const derivativeHeaders = mediaFetchHeaders(url, media, Boolean(revisionId), {
+      byteLength: derivativeBody.byteLength,
+      contentType: derivative.mimeType,
+      derivativeStatus: derivative.status,
+      etag:
+        derivative.status === "generated"
+          ? mediaEtag(media, mediaDerivativeCacheKey(requestedSize))
+          : mediaEtag(media)
+    });
+
+    copyDownloadHeader(headers, derivativeHeaders);
+
+    logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+      delivery: request.method === "HEAD" ? "headers" : "body",
+      r2Operations: 1
+    });
+
+    return new Response(request.method === "HEAD" ? null : derivativeBody, {
+      headers: derivativeHeaders
+    });
   }
 
   logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
@@ -2307,21 +2357,27 @@ function mediaTokenSecret(env: Env): string | null {
 function mediaFetchHeaders(
   url: URL,
   media: CurrentMedia | MediaRevision,
-  revision: boolean
+  revision: boolean,
+  options: {
+    byteLength?: number;
+    contentType?: string;
+    derivativeStatus?: MediaDerivativeStatus;
+    etag?: string;
+  } = {}
 ): Headers {
   const headers = securityHeaders();
-  headers.set("content-type", media.mimeType);
-  headers.set("content-length", String(media.byteLength));
-  headers.set("etag", mediaEtag(media));
+  headers.set("content-type", options.contentType ?? media.mimeType);
+  headers.set("content-length", String(options.byteLength ?? media.byteLength));
+  headers.set("etag", options.etag ?? mediaEtag(media));
   headers.set("last-modified", new Date(getMediaTimestamp(media)).toUTCString());
   headers.set("x-content-type-options", "nosniff");
-  headers.set(
-    "cache-control",
-    revision ? "public, max-age=31536000, immutable" : "public, max-age=3600"
-  );
+  applyMediaCacheHeaders(headers, url, revision);
 
   for (const [name, value] of Object.entries(
-    mediaDerivativeHeaders(media, hasRequestedMediaSize(url))
+    mediaDerivativeHeaders(
+      media,
+      options.derivativeStatus ?? (hasRequestedMediaSize(url) ? "original" : "not-requested")
+    )
   )) {
     headers.set(name, value);
   }
@@ -2329,11 +2385,44 @@ function mediaFetchHeaders(
   return headers;
 }
 
-function isMediaNotModified(request: Request, media: CurrentMedia | MediaRevision): boolean {
+function applyMediaCacheHeaders(headers: Headers, url: URL, revision: boolean): void {
+  if (bypassesMediaClientCache(url)) {
+    headers.set("cache-control", "no-cache, no-store, must-revalidate");
+    headers.set("pragma", "no-cache");
+    headers.set("expires", "0");
+    return;
+  }
+
+  headers.set(
+    "cache-control",
+    revision ? "public, max-age=31536000, immutable" : "public, max-age=3600"
+  );
+}
+
+function bypassesMediaClientCache(url: URL): boolean {
+  return url.searchParams.get("cache")?.toLowerCase() === "nocache";
+}
+
+function copyDownloadHeader(source: Headers, target: Headers): void {
+  const contentDisposition = source.get("content-disposition");
+  if (contentDisposition) target.set("content-disposition", contentDisposition);
+}
+
+function uint8ArrayToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
+function isMediaNotModified(
+  request: Request,
+  media: CurrentMedia | MediaRevision,
+  etag = mediaEtag(media)
+): boolean {
   const ifNoneMatch = request.headers.get("if-none-match");
 
   if (ifNoneMatch) {
-    return matchesMediaEtag(ifNoneMatch, mediaEtag(media));
+    return matchesMediaEtag(ifNoneMatch, etag);
   }
 
   const ifModifiedSince = request.headers.get("if-modified-since");
@@ -2360,8 +2449,8 @@ function stripWeakEtagPrefix(value: string): string {
   return value.startsWith("W/") ? value.slice(2) : value;
 }
 
-function mediaEtag(media: CurrentMedia | MediaRevision): string {
-  return `"${media.contentHash}"`;
+function mediaEtag(media: CurrentMedia | MediaRevision, derivativeKey = ""): string {
+  return derivativeKey ? `"${media.contentHash}:${derivativeKey}"` : `"${media.contentHash}"`;
 }
 
 function logMediaFetchMetric(
@@ -2685,7 +2774,7 @@ async function renderMediaManagerPage(
   const mediaItems =
     media.length === 0
       ? `<p class="media-manager__empty">No media found.</p>`
-      : renderMediaManagerItems(media, viewMode);
+      : renderMediaManagerItems(env, media, viewMode);
   const uploadPanel = canUpload
     ? `<form id="media__upload" class="media-manager__upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
         ${csrfInput(csrfToken)}
@@ -2857,17 +2946,22 @@ function renderMediaManagerToolbarLink(
   return `<a class="${active ? "media-manager__view-active" : ""}" href="${escapeAttribute(`${next.pathname}${next.search}`)}">${escapeHtml(label)}</a>`;
 }
 
-function renderMediaManagerItems(items: CurrentMedia[], viewMode: "thumbs" | "rows"): string {
+function renderMediaManagerItems(
+  env: Env,
+  items: CurrentMedia[],
+  viewMode: "thumbs" | "rows"
+): string {
   return viewMode === "rows"
-    ? `<ul class="idx media__manager media-rows">${items.map(renderMediaManagerRow).join("")}</ul>`
-    : `<ul class="idx media__manager media-grid">${items.map(renderMediaManagerTile).join("")}</ul>`;
+    ? `<ul class="idx media__manager media-rows">${items.map((item) => renderMediaManagerRow(env, item)).join("")}</ul>`
+    : `<ul class="idx media__manager media-grid">${items.map((item) => renderMediaManagerTile(env, item)).join("")}</ul>`;
 }
 
-function renderMediaManagerTile(item: CurrentMedia): string {
+function renderMediaManagerTile(env: Env, item: CurrentMedia): string {
   const name = mediaName(item.id);
   const detailPath = mediaDetailPath(item.id);
+  const thumbPath = mediaThumbnailPath(env, item.id, 120);
   const preview = isPreviewableImage(item)
-    ? `<a class="media-tile__thumb" href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(mediaPath(item.id))}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a>`
+    ? `<a class="media-tile__thumb" href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(thumbPath)}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a>`
     : `<a class="media-tile__thumb media-tile__thumb--file" href="${escapeAttribute(detailPath)}"><span>${escapeHtml(mediaFileExtension(name))}</span></a>`;
 
   return `<li class="media-tile">
@@ -2879,17 +2973,18 @@ function renderMediaManagerTile(item: CurrentMedia): string {
   </li>`;
 }
 
-function renderMediaManagerRow(item: CurrentMedia): string {
+function renderMediaManagerRow(env: Env, item: CurrentMedia): string {
   const name = mediaName(item.id);
   const detailPath = mediaDetailPath(item.id);
   const mediaUrl = mediaPath(item.id);
+  const thumbPath = mediaThumbnailPath(env, item.id, 160);
   const info = [
     item.mimeType,
     formatMediaDate(item.updatedAt),
     formatMediaByteLength(item.byteLength)
   ].join(" ");
   const preview = isPreviewableImage(item)
-    ? `<div class="detail"><div class="thumb"><a href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(mediaUrl)}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a></div></div>`
+    ? `<div class="detail"><div class="thumb"><a href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(thumbPath)}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a></div></div>`
     : "";
 
   return `<li class="media-row" title="${escapeAttribute(item.id)}">
@@ -2903,6 +2998,11 @@ function renderMediaManagerRow(item: CurrentMedia): string {
     ${preview}
     <div class="clearer"></div>
   </li>`;
+}
+
+function mediaThumbnailPath(env: Env, id: string, width: number): string {
+  const query = mediaSizeQuery(id, requestedMediaSize(width, null), mediaTokenSecret(env));
+  return query ? `${mediaPath(id)}?${query}` : mediaPath(id);
 }
 
 function isPreviewableImage(item: CurrentMedia): boolean {

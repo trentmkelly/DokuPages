@@ -42,5 +42,8 @@
     "typescript-eslint": "^8.49.0",
     "vitest": "^4.0.15",
     "wrangler": "^4.88.0"
+  },
+  "dependencies": {
+    "@cf-wasm/photon": "^0.3.5"
   }
 }
