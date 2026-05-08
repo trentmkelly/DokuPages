@@ -18,6 +18,11 @@ describe("runtime config", () => {
       hidePages: null,
       sneakyIndex: false,
       maintenanceMode: false,
+      disabledActions: [],
+      send404: true,
+      canonicalUrls: false,
+      baseUrl: null,
+      baseDir: "",
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -32,7 +37,12 @@ describe("runtime config", () => {
       WIKI_LANG: "pt_BR",
       HIDE_PAGES: ":hidden:",
       SNEAKY_INDEX: "1",
-      MAINTENANCE_MODE: "true"
+      MAINTENANCE_MODE: "true",
+      DISABLE_ACTIONS: "edit, Revisions,edit",
+      SEND404: "0",
+      CANONICAL_URLS: "true",
+      BASE_URL: "https://wiki.example.test/",
+      BASE_DIR: "/docs/"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
@@ -40,6 +50,11 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).hidePages).toBe(":hidden:");
     expect(getRuntimeConfig(env).sneakyIndex).toBe(true);
     expect(getRuntimeConfig(env).maintenanceMode).toBe(true);
+    expect(getRuntimeConfig(env).disabledActions).toEqual(["edit", "revisions"]);
+    expect(getRuntimeConfig(env).send404).toBe(false);
+    expect(getRuntimeConfig(env).canonicalUrls).toBe(true);
+    expect(getRuntimeConfig(env).baseUrl).toBe("https://wiki.example.test");
+    expect(getRuntimeConfig(env).baseDir).toBe("/docs");
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -84,6 +99,18 @@ describe("runtime config", () => {
         }),
         expect.objectContaining({
           key: "MAINTENANCE_MODE",
+          effectiveValue: "false"
+        }),
+        expect.objectContaining({
+          key: "DISABLE_ACTIONS",
+          effectiveValue: ""
+        }),
+        expect.objectContaining({
+          key: "SEND404",
+          effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "CANONICAL_URLS",
           effectiveValue: "false"
         }),
         expect.objectContaining({
@@ -156,6 +183,9 @@ describe("runtime config", () => {
       WIKI_LANG: "zz",
       SESSION_COOKIE_NAME: "bad cookie",
       HIDE_PAGES: "[",
+      DISABLE_ACTIONS: "edit,bad action,$",
+      BASE_URL: "ftp://example.test",
+      BASE_DIR: "../wiki",
       API_BEARER_TOKEN: " "
     } as Env);
 
@@ -166,6 +196,9 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "WIKI_LANG", severity: "error" }),
         expect.objectContaining({ key: "SESSION_COOKIE_NAME", severity: "error" }),
         expect.objectContaining({ key: "HIDE_PAGES", severity: "error" }),
+        expect.objectContaining({ key: "DISABLE_ACTIONS", severity: "error" }),
+        expect.objectContaining({ key: "BASE_URL", severity: "error" }),
+        expect.objectContaining({ key: "BASE_DIR", severity: "error" }),
         expect.objectContaining({ key: "API_BEARER_TOKEN", severity: "warning" })
       ])
     );

@@ -147,6 +147,15 @@ const EDIT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const UPLOAD_RATE_LIMIT_ATTEMPTS = 20;
 const UPLOAD_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
+const EDIT_DERIVED_ACTIONS = new Set([
+  "save",
+  "preview",
+  "draft",
+  "draftdel",
+  "cancel",
+  "recover",
+  "conflict"
+]);
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 
 interface RenderCacheEntry {
@@ -554,6 +563,11 @@ export async function handleRequest(
       return redirectResponse(`${canonicalPath}${url.search}`, 301);
     }
 
+    const action = url.searchParams.get("do")?.toLowerCase() ?? "";
+    if (isActionDisabled(env, action)) {
+      return disabledActionResponse(env, id, action);
+    }
+
     if (url.searchParams.get("do") === "check") {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
@@ -802,7 +816,9 @@ export async function handleRequest(
     if (!page) {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
-      return htmlResponse(renderMissingPage(env, id, principal), { status: 404 });
+      return htmlResponse(renderMissingPage(env, id, principal), {
+        status: getRuntimeConfig(env).send404 ? 404 : 200
+      });
     }
 
     const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
@@ -954,6 +970,27 @@ function legacyActionNotAvailableResponse(env: Env, actionName: string, pageId: 
   );
 }
 
+function isActionDisabled(env: Env, action: string): boolean {
+  if (!action || action === "show") return false;
+  const disabled = new Set(getRuntimeConfig(env).disabledActions);
+  const normalized = action.toLowerCase();
+  return disabled.has(normalized) || (disabled.has("edit") && EDIT_DERIVED_ACTIONS.has(normalized));
+}
+
+function disabledActionResponse(env: Env, pageId: string, action: string): Response {
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Action disabled",
+      `<h1>Action disabled</h1>
+      <p>The action <code>${escapeHtml(action)}</code> has been disabled for this wiki.</p>
+      <p><a href="${pagePath(pageId)}">Back to ${escapeHtml(pageId)}</a></p>`,
+      { pageId }
+    ),
+    { status: 403 }
+  );
+}
+
 async function handleWikiPostAction(
   request: Request,
   env: Env,
@@ -961,7 +998,12 @@ async function handleWikiPostAction(
   principal: AuthPrincipal,
   id: string
 ): Promise<Response | null> {
-  switch (url.searchParams.get("do")) {
+  const action = url.searchParams.get("do")?.toLowerCase() ?? "";
+  if (isActionDisabled(env, action)) {
+    return disabledActionResponse(env, id, action);
+  }
+
+  switch (action) {
     case "save":
       return handleSave(request, env, principal, id);
     case "preview":
@@ -2410,11 +2452,14 @@ async function renderPageHtml(
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
   const privateCache = options.cacheMode === "private";
   const directives = getWikiRenderDirectives(content);
+  const sectionEdit = !isActionDisabled(env, "edit");
   const revisionNotice = revisionDate
     ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
     : "";
   const cached =
-    directives.noCache || privateCache ? null : await readRenderCache(env, cacheKey, revisionId);
+    directives.noCache || privateCache || !sectionEdit
+      ? null
+      : await readRenderCache(env, cacheKey, revisionId);
 
   if (directives.noCache) {
     logMetric("cache_metric", {
@@ -2461,10 +2506,15 @@ async function renderPageHtml(
   }
 
   const existingPageIds = await existingPageIdsForContent(env, content, id);
-  const rendered = renderWikiText(content, { pageId: id, directives, existingPageIds });
+  const rendered = renderWikiText(content, {
+    pageId: id,
+    directives,
+    existingPageIds,
+    sectionEdit
+  });
   const title = rendered.title ?? page?.title ?? id;
 
-  if (!rendered.noCache && !privateCache) {
+  if (!rendered.noCache && !privateCache && sectionEdit) {
     await writeRenderCache(env, cacheKey, {
       rendererVersion: RENDER_CACHE_VERSION,
       revisionId,
@@ -6074,6 +6124,18 @@ interface HtmlShellOptions {
   updatedAt?: string;
 }
 
+function canonicalPageHref(env: Env, pageId: string): string {
+  const config = getRuntimeConfig(env);
+  const path = `${config.baseDir}${pagePath(pageId)}` || pagePath(pageId);
+
+  if (!config.canonicalUrls) {
+    return path;
+  }
+
+  const origin = config.baseUrl ?? env.CF_PAGES_URL ?? "https://example.invalid";
+  return new URL(path, origin).href;
+}
+
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
   const config = getRuntimeConfig(env);
   const siteName = config.siteName;
@@ -6083,12 +6145,13 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const pageId = options.pageId;
   const pageIdHtml = pageId ? `<div class="pageId"><span>${escapeHtml(pageId)}</span></div>` : "";
   const canonicalLink = pageId
-    ? `<link rel="canonical" href="${escapeAttribute(pagePath(pageId))}">`
+    ? `<link rel="canonical" href="${escapeAttribute(canonicalPageHref(env, pageId))}">`
     : "";
   const docInfo = options.updatedAt
     ? `<div class="docInfo">Last modified: ${escapeHtml(options.updatedAt)}</div>`
     : "";
-  const pageTools = pageId ? renderPageTools(pageId) : "";
+  const disabledActions = new Set(config.disabledActions);
+  const pageTools = pageId ? renderPageTools(pageId, disabledActions) : "";
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : namespaceForIndex(startId);
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
@@ -6123,7 +6186,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">
-          ${renderUserTools(options.principal, pageId)}
+          ${renderUserTools(options.principal, pageId, disabledActions)}
           <nav id="dokuwiki__sitetools" aria-label="Site tools">
             <h3 class="a11y">Site tools</h3>
             <form class="search" method="get" action="/search">
@@ -6131,11 +6194,11 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
               <input id="qsearch__in" name="q" type="search" placeholder="Search">
               <button type="submit">Search</button>
             </form>
-            ${renderMobileTools(pageId, options.principal)}
+            ${renderMobileTools(pageId, options.principal, disabledActions)}
             <ul>
-              <li><a href="/recent">Recent changes</a></li>
-              <li><a href="${mediaManagerPath}">Media Manager</a></li>
-              <li><a href="${siteIndexPath}">Sitemap</a></li>
+              ${disabledActions.has("recent") ? "" : '<li><a href="/recent">Recent changes</a></li>'}
+              ${disabledActions.has("media") ? "" : `<li><a href="${mediaManagerPath}">Media Manager</a></li>`}
+              ${disabledActions.has("index") ? "" : `<li><a href="${siteIndexPath}">Sitemap</a></li>`}
               <li><a href="/diagnostics">Diagnostics</a></li>
             </ul>
           </nav>
@@ -6172,15 +6235,19 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
 </html>`;
 }
 
-function renderUserTools(principal?: AuthPrincipal, pageId?: string): string {
+function renderUserTools(
+  principal?: AuthPrincipal,
+  pageId?: string,
+  disabledActions = new Set<string>()
+): string {
   const actionLinks = accountActionLinks(pageId);
   const accountItems =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal) ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
-        <li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">Update Profile</a></li>
-        <li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">Log Out</a></li>`
-      : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">Log In</a></li>
-        <li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">Register</a></li>`;
+      ? `${isManagerPrincipal(principal) && !disabledActions.has("admin") ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
+        ${disabledActions.has("profile") ? "" : `<li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">Update Profile</a></li>`}
+        ${disabledActions.has("logout") ? "" : `<li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">Log Out</a></li>`}`
+      : `${disabledActions.has("login") ? "" : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">Log In</a></li>`}
+        ${disabledActions.has("register") ? "" : `<li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">Register</a></li>`}`;
 
   return `<nav id="dokuwiki__usertools" aria-label="User tools">
             <h3 class="a11y">User tools</h3>
@@ -6188,35 +6255,39 @@ function renderUserTools(principal?: AuthPrincipal, pageId?: string): string {
           </nav>`;
 }
 
-function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
+function renderMobileTools(
+  pageId?: string,
+  principal?: AuthPrincipal,
+  disabledActions = new Set<string>()
+): string {
   const actionLinks = accountActionLinks(pageId);
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : "wiki";
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
   const pageOptions = pageId
-    ? `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>
-      <option value="${pagePath(pageId)}?do=source">Show source</option>
-      <option value="${pagePath(pageId)}?do=revisions">Old revisions</option>
-      <option value="${pagePath(pageId)}?do=backlink">Backlinks</option>
-      <option value="${pagePath(pageId)}?do=subscribe">Subscribe</option>`
+    ? `${disabledActions.has("edit") ? "" : `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>`}
+      ${disabledActions.has("source") ? "" : `<option value="${pagePath(pageId)}?do=source">Show source</option>`}
+      ${disabledActions.has("revisions") ? "" : `<option value="${pagePath(pageId)}?do=revisions">Old revisions</option>`}
+      ${disabledActions.has("backlink") ? "" : `<option value="${pagePath(pageId)}?do=backlink">Backlinks</option>`}
+      ${disabledActions.has("subscribe") ? "" : `<option value="${pagePath(pageId)}?do=subscribe">Subscribe</option>`}`
     : "";
   const accountOptions =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal) ? '<option value="/admin">Admin</option>' : ""}
-        <option value="${escapeAttribute(actionLinks.profile)}">Update Profile</option>
-        <option value="${escapeAttribute(actionLinks.logout)}">Log Out</option>`
-      : `<option value="${escapeAttribute(actionLinks.login)}">Log In</option>
-        <option value="${escapeAttribute(actionLinks.register)}">Register</option>`;
+      ? `${isManagerPrincipal(principal) && !disabledActions.has("admin") ? '<option value="/admin">Admin</option>' : ""}
+        ${disabledActions.has("profile") ? "" : `<option value="${escapeAttribute(actionLinks.profile)}">Update Profile</option>`}
+        ${disabledActions.has("logout") ? "" : `<option value="${escapeAttribute(actionLinks.logout)}">Log Out</option>`}`
+      : `${disabledActions.has("login") ? "" : `<option value="${escapeAttribute(actionLinks.login)}">Log In</option>`}
+        ${disabledActions.has("register") ? "" : `<option value="${escapeAttribute(actionLinks.register)}">Register</option>`}`;
 
   return `<div class="mobileTools">
       <label class="a11y" for="mobile__tools">Tools</label>
       <select id="mobile__tools">
         <option value="">Tools</option>
         ${pageOptions}
-        <option value="/recent">Recent changes</option>
-        <option value="${mediaManagerPath}">Media Manager</option>
-        <option value="${siteIndexPath}">Sitemap</option>
-        <option value="/search">Search</option>
+        ${disabledActions.has("recent") ? "" : '<option value="/recent">Recent changes</option>'}
+        ${disabledActions.has("media") ? "" : `<option value="${mediaManagerPath}">Media Manager</option>`}
+        ${disabledActions.has("index") ? "" : `<option value="${siteIndexPath}">Sitemap</option>`}
+        ${disabledActions.has("search") ? "" : '<option value="/search">Search</option>'}
         <option value="/diagnostics">Diagnostics</option>
         ${accountOptions}
       </select>
@@ -6247,17 +6318,17 @@ function accountActionLinks(pageId?: string): {
   };
 }
 
-function renderPageTools(pageId: string): string {
+function renderPageTools(pageId: string, disabledActions = new Set<string>()): string {
   return `<nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">
     <h3 class="a11y" id="dokuwiki__pagetools__heading">Page tools</h3>
     <div class="tools">
       <ul>
-        <li class="edit"><a href="${pagePath(pageId)}?do=edit" aria-label="Edit this page"><span class="label">Edit</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="source"><a href="${pagePath(pageId)}?do=source" aria-label="Show page source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="Old revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="Backlinks"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="purge"><a href="${pagePath(pageId)}?do=purge" aria-label="Purge cache"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="subscribe"><a href="${pagePath(pageId)}?do=subscribe" aria-label="Manage subscriptions"><span class="label">Subscribe</span><span class="icon" aria-hidden="true"></span></a></li>
+        ${disabledActions.has("edit") ? "" : `<li class="edit"><a href="${pagePath(pageId)}?do=edit" aria-label="Edit this page"><span class="label">Edit</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("source") ? "" : `<li class="source"><a href="${pagePath(pageId)}?do=source" aria-label="Show page source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("revisions") ? "" : `<li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="Old revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("backlink") ? "" : `<li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="Backlinks"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("purge") ? "" : `<li class="purge"><a href="${pagePath(pageId)}?do=purge" aria-label="Purge cache"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("subscribe") ? "" : `<li class="subscribe"><a href="${pagePath(pageId)}?do=subscribe" aria-label="Manage subscriptions"><span class="label">Subscribe</span><span class="icon" aria-hidden="true"></span></a></li>`}
         <li class="top"><a href="#dokuwiki__top" aria-label="Back to top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
       </ul>
     </div>

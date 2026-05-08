@@ -22,6 +22,11 @@ export interface RuntimeConfig {
   hidePages: string | null;
   sneakyIndex: boolean;
   maintenanceMode: boolean;
+  disabledActions: string[];
+  send404: boolean;
+  canonicalUrls: boolean;
+  baseUrl: string | null;
+  baseDir: string;
   appVersion: string;
 }
 
@@ -67,6 +72,11 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     hidePages: nonEmpty(env.HIDE_PAGES) ?? null,
     sneakyIndex: truthy(env.SNEAKY_INDEX),
     maintenanceMode: truthy(env.MAINTENANCE_MODE),
+    disabledActions: parseActionList(env.DISABLE_ACTIONS),
+    send404: booleanConfig(env.SEND404, true),
+    canonicalUrls: truthy(env.CANONICAL_URLS),
+    baseUrl: normalizedBaseUrl(env.BASE_URL),
+    baseDir: normalizedBaseDir(env.BASE_DIR),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -79,6 +89,9 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateLanguage(env.WIKI_LANG, issues);
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
   validateHidePages(env.HIDE_PAGES, issues);
+  validateActionList(env.DISABLE_ACTIONS, issues);
+  validateBaseUrl(env.BASE_URL, issues);
+  validateBaseDir(env.BASE_DIR, issues);
   validateAppVersion(env.APP_VERSION, issues);
   validateApiBearerToken(env.API_BEARER_TOKEN, issues);
   validateEmailProvider(env.EMAIL_PROVIDER, issues);
@@ -110,6 +123,11 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("HIDE_PAGES", env.HIDE_PAGES, config.hidePages, null),
     configEntry("SNEAKY_INDEX", env.SNEAKY_INDEX, String(config.sneakyIndex), "false"),
     configEntry("MAINTENANCE_MODE", env.MAINTENANCE_MODE, String(config.maintenanceMode), "false"),
+    configEntry("DISABLE_ACTIONS", env.DISABLE_ACTIONS, config.disabledActions.join(","), ""),
+    configEntry("SEND404", env.SEND404, String(config.send404), "true"),
+    configEntry("CANONICAL_URLS", env.CANONICAL_URLS, String(config.canonicalUrls), "false"),
+    configEntry("BASE_URL", env.BASE_URL, config.baseUrl, null),
+    configEntry("BASE_DIR", env.BASE_DIR, config.baseDir, ""),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",
@@ -316,6 +334,56 @@ function validateHidePages(value: string | undefined, issues: ConfigValidationIs
   }
 }
 
+function validateActionList(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  const invalid = raw
+    .split(",")
+    .map((action) => action.trim())
+    .filter(Boolean)
+    .filter((action) => !/^[a-z][a-z0-9_]*$/i.test(action));
+
+  if (invalid.length > 0) {
+    issues.push({
+      key: "DISABLE_ACTIONS",
+      severity: "error",
+      message: `DISABLE_ACTIONS contains invalid action names: ${invalid.join(", ")}.`
+    });
+  }
+}
+
+function validateBaseUrl(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const baseUrl = nonEmpty(value);
+  if (!baseUrl) return;
+
+  try {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Unsupported protocol");
+    }
+  } catch {
+    issues.push({
+      key: "BASE_URL",
+      severity: "error",
+      message: "BASE_URL must be an absolute http(s) URL."
+    });
+  }
+}
+
+function validateBaseDir(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const baseDir = nonEmpty(value);
+  if (!baseDir) return;
+
+  if (!baseDir.startsWith("/") || baseDir.includes("..")) {
+    issues.push({
+      key: "BASE_DIR",
+      severity: "error",
+      message: "BASE_DIR must be an absolute path prefix without '..'."
+    });
+  }
+}
+
 function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
@@ -456,6 +524,38 @@ function normalizedSessionCookieName(value: string | undefined): string {
   return value && validCookieName(value) ? value : DEFAULT_SESSION_COOKIE_NAME;
 }
 
+function parseActionList(value: string | undefined): string[] {
+  return [
+    ...new Set(
+      (nonEmpty(value) ?? "")
+        .split(",")
+        .map((action) => action.trim().toLowerCase())
+        .filter((action) => /^[a-z][a-z0-9_]*$/i.test(action))
+    )
+  ].sort();
+}
+
+function normalizedBaseUrl(value: string | undefined): string | null {
+  const baseUrl = nonEmpty(value);
+  if (!baseUrl) return null;
+
+  try {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    parsed.hash = "";
+    parsed.search = "";
+    return parsed.href.replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function normalizedBaseDir(value: string | undefined): string {
+  const baseDir = nonEmpty(value);
+  if (!baseDir || !baseDir.startsWith("/") || baseDir.includes("..")) return "";
+  return `/${baseDir.split("/").filter(Boolean).join("/")}`;
+}
+
 function validCookieName(value: string): boolean {
   return COOKIE_TOKEN.test(value);
 }
@@ -467,4 +567,14 @@ function nonEmpty(value: string | undefined): string | undefined {
 
 function truthy(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true";
+}
+
+function booleanConfig(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (truthy(value)) return true;
+  const normalized = value.toLowerCase();
+  if (normalized === "0" || normalized === "false" || normalized === "off" || normalized === "no") {
+    return false;
+  }
+  return fallback;
 }

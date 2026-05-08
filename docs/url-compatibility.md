@@ -13,6 +13,19 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?id=<page>&do=backlink`                   | Redirects to the page backlinks view.                               |
 | `/doku.php?id=<page>&do=source`                     | Redirects to the page source view.                                  |
 | `/doku.php?id=<page>&do=subscribe`                  | Redirects to the page subscription view.                            |
+| `/doku.php?id=<page>&do=check`                      | Redirects to the native diagnostics-backed check action.            |
+| `/doku.php?id=<page>&do=denied`                     | Redirects to the native denied-page action.                         |
+| `/doku.php?id=<page>&do=locked`                     | Redirects to the native lock-status action.                         |
+| `/doku.php?id=<page>&do=conflict`                   | Redirects to the native conflict action.                            |
+| `/doku.php?id=<page>&do=cancel`                     | Redirects to the native cancel action.                              |
+| `/doku.php?id=<page>&do=recover`                    | Redirects to the native draft recovery action.                      |
+| `/doku.php?id=<page>&do=draftdel`                   | Redirects to the native draft deletion action.                      |
+| `/doku.php?id=<page>&do=authtoken`                  | Redirects to the native unsupported auth-token action.              |
+| `/doku.php?id=<page>&do=plugin`                     | Redirects to the native unsupported plugin action.                  |
+| `/doku.php?id=<page>&do=media`                      | Redirects to the native media-manager action.                       |
+| `POST /doku.php?id=<page>&do=save`                  | Saves through the native page save handler.                         |
+| `POST /doku.php?id=<page>&do=preview`               | Renders through the native preview handler.                         |
+| `POST /doku.php?id=<page>&do=draft`                 | Saves through the native draft handler.                             |
 | `/doku.php?id=<page>&do=export_raw`                 | Redirects to the raw export route.                                  |
 | `/doku.php?id=<page>&do=export_xhtml`               | Redirects to the XHTML export route.                                |
 | `/doku.php?do=admin`                                | Redirects to `/admin`.                                              |

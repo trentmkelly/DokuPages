@@ -343,6 +343,47 @@ describe("handleRequest", () => {
     expect(media.headers.get("location")).toBe("/media-manager?ns=wiki");
   });
 
+  it("hides and rejects actions listed in DISABLE_ACTIONS", async () => {
+    const disabledEnv = {
+      ...env,
+      DISABLE_ACTIONS: "edit,revisions,media,login,register"
+    } satisfies Env;
+
+    const view = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome"),
+      disabledEnv
+    );
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      disabledEnv
+    );
+
+    const saveForm = new FormData();
+    saveForm.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    saveForm.set("content", "====== Disabled edit ======");
+
+    const save = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=save", {
+        method: "POST",
+        body: saveForm,
+        headers: csrfHeaders()
+      }),
+      disabledEnv
+    );
+
+    expect(view.status).toBe(200);
+    const html = await view.text();
+    expect(html).not.toContain("/wiki/wiki/welcome?do=edit");
+    expect(html).not.toContain("/wiki/wiki/welcome?do=revisions");
+    expect(html).not.toContain("Media Manager");
+    expect(html).not.toContain("Log In");
+    expect(html).not.toContain("Register");
+    expect(edit.status).toBe(403);
+    await expect(edit.text()).resolves.toContain("<h1>Action disabled</h1>");
+    expect(save.status).toBe(403);
+    expect(state.row?.content).not.toContain("Disabled edit");
+  });
+
   it("accepts legacy POST action routing for save, preview, draft, and cancel", async () => {
     const saveForm = new FormData();
     saveForm.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
@@ -1247,6 +1288,27 @@ describe("handleRequest", () => {
     );
     expect(html).not.toContain('class="wikilink2" href="/wiki/missing/page?do=edit"');
     expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');
+  });
+
+  it("honors SEND404 and canonical URL settings for missing pages", async () => {
+    const configuredEnv = {
+      ...env,
+      SEND404: "0",
+      CANONICAL_URLS: "1",
+      BASE_URL: "https://wiki.example.test/",
+      BASE_DIR: "/docs"
+    } satisfies Env;
+
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/missing/page"),
+      configuredEnv
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<link rel="canonical" href="https://wiki.example.test/docs/wiki/missing/page">'
+    );
   });
 
   it("renders an edit form for existing pages", async () => {

@@ -10,6 +10,11 @@ export interface Env {
   HIDE_PAGES?: string;
   SNEAKY_INDEX?: string;
   MAINTENANCE_MODE?: string;
+  DISABLE_ACTIONS?: string;
+  SEND404?: string;
+  CANONICAL_URLS?: string;
+  BASE_URL?: string;
+  BASE_DIR?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

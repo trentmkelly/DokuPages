@@ -25,6 +25,7 @@ export interface RenderedWikiText {
 export interface RenderWikiTextOptions {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
+  sectionEdit?: boolean;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -152,6 +153,7 @@ export function renderWikiText(
     dependencies: new Map(),
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
     existingPageIds: options.existingPageIds,
+    sectionEdit: options.sectionEdit ?? true,
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -333,6 +335,7 @@ interface RenderContext {
   dependencies: Map<string, CacheDependency>;
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
+  sectionEdit: boolean;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -348,7 +351,7 @@ function parseHeading(line: string): { level: number; title: string } | null {
 }
 
 function renderSectionEditLink(title: string, context: RenderContext): string {
-  if (!context.pageId) return "";
+  if (!context.pageId || !context.sectionEdit) return "";
 
   const href = `${pageIdToRoutePath(context.pageId)}?do=edit&section=${context.sectionIndex}`;
 
@@ -597,6 +600,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             footnotes: [],
             dependencies: context.dependencies,
             pageId: context.pageId,
+            sectionEdit: context.sectionEdit,
             sectionIndex: context.sectionIndex,
             anchorIds: context.anchorIds
           }
