@@ -1,4 +1,4 @@
-import { resolvePageLinkId } from "./page-id";
+import { resolvePageLinkId, type PageIdCleanOptions } from "./page-id";
 
 const LINK_PATTERN = /\[\[([^|\]#?]+)(?:[#?][^|\]]*)?(?:\|[^\]]+)?\]\]/g;
 const CAMEL_CASE_LINK_PATTERN = /\b[A-Z]+[a-z]+[A-Z][A-Za-z]*\b/g;
@@ -7,6 +7,7 @@ const URI_SCHEME_TARGET = /^(?:mailto|tel|urn):/i;
 
 export interface ExtractInternalPageLinksOptions {
   camelCaseLinks?: boolean;
+  pageIdCleanOptions?: PageIdCleanOptions;
 }
 
 export function extractInternalPageLinks(
@@ -20,13 +21,13 @@ export function extractInternalPageLinks(
     const target = match[1].trim();
     if (isExternalOrInterwiki(target)) continue;
 
-    const clean = resolvePageLinkId(target, sourcePageId);
+    const clean = resolvePageLinkId(target, sourcePageId, options.pageIdCleanOptions);
     if (clean) links.add(clean);
   }
 
   if (options.camelCaseLinks) {
     for (const match of maskExplicitSyntax(content).matchAll(CAMEL_CASE_LINK_PATTERN)) {
-      const clean = resolvePageLinkId(match[0], sourcePageId);
+      const clean = resolvePageLinkId(match[0], sourcePageId, options.pageIdCleanOptions);
       if (clean) links.add(clean);
     }
   }

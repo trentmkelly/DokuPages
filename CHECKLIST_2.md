@@ -81,7 +81,7 @@ are not fixed by this checklist.
 
 ## Page Semantics
 
-- [ ] Match DokuWiki's page ID cleaning for `deaccent`, `sepchar`, `fnencode`, and `useslash` instead of the current fixed lowercase underscore normalization.
+- [x] Match DokuWiki's page ID cleaning for `deaccent`, `sepchar`, `fnencode`, and `useslash` instead of the current fixed lowercase underscore normalization.
 - [ ] Match DokuWiki's SafeFN behavior for URL, safe, and UTF-8 filename modes during import and routing.
 - [ ] Support upstream `breadcrumbs` recent-page trail behavior, not only static "You are here" breadcrumbs.
 - [ ] Make `youarehere` configurable like upstream instead of always rendering the current breadcrumb style.

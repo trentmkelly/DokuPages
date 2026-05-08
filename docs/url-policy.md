@@ -28,7 +28,10 @@ The compatibility decision is fixed:
 | `useslash = 1` externally | Routes expose slash path segments for Pages and browser URLs.                       |
 
 This means the port intentionally has one public URL style and preserves legacy
-DokuWiki URLs with redirects rather than switching URL mode at runtime.
+DokuWiki URLs with redirects rather than switching URL mode at runtime. The
+runtime `USESLASH` variable applies to DokuWiki-style page ID cleaning for
+submitted IDs and parser links; public `/wiki/<namespace>/<page>` route parsing
+still treats path slashes as namespace boundaries.
 
 ## `canonical`, `baseurl`, And `basedir`
 

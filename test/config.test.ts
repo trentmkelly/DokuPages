@@ -32,6 +32,12 @@ describe("runtime config", () => {
       typographyMode: 1,
       autoPluralLinks: false,
       relNofollow: true,
+      pageIdCleanOptions: {
+        deaccent: 1,
+        fnencode: "url",
+        sepchar: "_",
+        useslash: false
+      },
       linkTargets: {
         wiki: null,
         interwiki: null,
@@ -68,6 +74,10 @@ describe("runtime config", () => {
       TYPOGRAPHY: "2",
       AUTOPLURAL: "1",
       REL_NOFOLLOW: "0",
+      DEACCENT: "2",
+      FNENCODE: "safe",
+      SEPCHAR: "-",
+      USESLASH: "1",
       TARGET_WIKI: "_self",
       TARGET_INTERWIKI: "_blank",
       TARGET_EXTERN: "_blank",
@@ -94,6 +104,12 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
     expect(getRuntimeConfig(env).autoPluralLinks).toBe(true);
     expect(getRuntimeConfig(env).relNofollow).toBe(false);
+    expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
+      deaccent: 2,
+      fnencode: "safe",
+      sepchar: "-",
+      useslash: true
+    });
     expect(getRuntimeConfig(env).linkTargets).toEqual({
       wiki: "_self",
       interwiki: "_blank",
@@ -184,6 +200,22 @@ describe("runtime config", () => {
           effectiveValue: "true"
         }),
         expect.objectContaining({
+          key: "DEACCENT",
+          effectiveValue: "1"
+        }),
+        expect.objectContaining({
+          key: "FNENCODE",
+          effectiveValue: "url"
+        }),
+        expect.objectContaining({
+          key: "SEPCHAR",
+          effectiveValue: "_"
+        }),
+        expect.objectContaining({
+          key: "USESLASH",
+          effectiveValue: "false"
+        }),
+        expect.objectContaining({
           key: "TARGET_EXTERN",
           effectiveValue: null
         }),
@@ -265,6 +297,9 @@ describe("runtime config", () => {
       MAX_TOC_LEVEL: "9",
       MAX_SECTION_EDIT_LEVEL: "-1",
       TYPOGRAPHY: "3",
+      DEACCENT: "3",
+      FNENCODE: "base64",
+      SEPCHAR: "/",
       API_BEARER_TOKEN: " "
     } as Env);
 
@@ -283,6 +318,9 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "MAX_TOC_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "MAX_SECTION_EDIT_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
+        expect.objectContaining({ key: "DEACCENT", severity: "error" }),
+        expect.objectContaining({ key: "FNENCODE", severity: "error" }),
+        expect.objectContaining({ key: "SEPCHAR", severity: "error" }),
         expect.objectContaining({ key: "API_BEARER_TOKEN", severity: "warning" })
       ])
     );

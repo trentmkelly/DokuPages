@@ -6,7 +6,7 @@ import {
   resolveLanguage,
   type SupportedLanguage
 } from "./wiki/language";
-import { cleanPageId } from "./wiki/page-id";
+import { cleanPageId, type DokuWikiFnEncode, type PageIdCleanOptions } from "./wiki/page-id";
 
 const DEFAULT_SITE_NAME = "DokuWiki Pages";
 const DEFAULT_START_PAGE = "wiki:welcome";
@@ -36,8 +36,16 @@ export interface RuntimeConfig {
   typographyMode: number;
   autoPluralLinks: boolean;
   relNofollow: boolean;
+  pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
+}
+
+export interface RuntimePageIdCleanOptions extends PageIdCleanOptions {
+  deaccent: 0 | 1 | 2;
+  fnencode: DokuWikiFnEncode;
+  sepchar: string;
+  useslash: boolean;
 }
 
 export interface RuntimeLinkTargets {
@@ -82,9 +90,11 @@ export interface ConfigValidationIssue {
 }
 
 export function getRuntimeConfig(env: Env): RuntimeConfig {
+  const pageIdCleanOptions = runtimePageIdCleanOptions(env);
+
   return {
     siteName: nonEmpty(env.SITE_NAME) ?? DEFAULT_SITE_NAME,
-    startPage: normalizedStartPage(env.START_PAGE),
+    startPage: normalizedStartPage(env.START_PAGE, pageIdCleanOptions),
     language: resolveLanguage(env.WIKI_LANG),
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
     hidePages: nonEmpty(env.HIDE_PAGES) ?? null,
@@ -104,6 +114,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
     autoPluralLinks: truthy(env.AUTOPLURAL),
     relNofollow: booleanConfig(env.REL_NOFOLLOW, true),
+    pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
       interwiki: normalizedLinkTarget(env.TARGET_INTERWIKI),
@@ -117,9 +128,10 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
 
 export function validateRuntimeConfig(env: Env): ConfigValidation {
   const issues: ConfigValidationIssue[] = [];
+  const pageIdCleanOptions = runtimePageIdCleanOptions(env);
 
   validateSiteName(env.SITE_NAME, issues);
-  validateStartPage(env.START_PAGE, issues);
+  validateStartPage(env.START_PAGE, pageIdCleanOptions, issues);
   validateLanguage(env.WIKI_LANG, issues);
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
   validateHidePages(env.HIDE_PAGES, issues);
@@ -131,6 +143,9 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("MAX_SECTION_EDIT_LEVEL", env.MAX_SECTION_EDIT_LEVEL, 0, 5, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
+  validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
+  validateFnEncode(env.FNENCODE, issues);
+  validateSepchar(env.SEPCHAR, issues);
   validateAppVersion(env.APP_VERSION, issues);
   validateApiBearerToken(env.API_BEARER_TOKEN, issues);
   validateEmailProvider(env.EMAIL_PROVIDER, issues);
@@ -181,6 +196,10 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),
     configEntry("AUTOPLURAL", env.AUTOPLURAL, String(config.autoPluralLinks), "false"),
     configEntry("REL_NOFOLLOW", env.REL_NOFOLLOW, String(config.relNofollow), "true"),
+    configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
+    configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
+    configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),
+    configEntry("USESLASH", env.USESLASH, String(config.pageIdCleanOptions.useslash), "false"),
     configEntry("TARGET_WIKI", env.TARGET_WIKI, config.linkTargets.wiki, null),
     configEntry("TARGET_INTERWIKI", env.TARGET_INTERWIKI, config.linkTargets.interwiki, null),
     configEntry("TARGET_EXTERN", env.TARGET_EXTERN, config.linkTargets.extern, null),
@@ -288,10 +307,14 @@ function validateSiteName(value: string | undefined, issues: ConfigValidationIss
   }
 }
 
-function validateStartPage(value: string | undefined, issues: ConfigValidationIssue[]): void {
+function validateStartPage(
+  value: string | undefined,
+  pageIdCleanOptions: RuntimePageIdCleanOptions,
+  issues: ConfigValidationIssue[]
+): void {
   if (value === undefined) return;
 
-  const normalized = cleanPageId(value);
+  const normalized = cleanPageId(value, pageIdCleanOptions);
 
   if (!normalized) {
     issues.push({
@@ -462,6 +485,32 @@ function validateIntegerRange(
   }
 }
 
+function validateFnEncode(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  if (!["url", "safe", "utf-8"].includes(raw)) {
+    issues.push({
+      key: "FNENCODE",
+      severity: "error",
+      message: "FNENCODE must be one of 'url', 'safe', or 'utf-8'."
+    });
+  }
+}
+
+function validateSepchar(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  if (!/^[A-Za-z0-9_.-]$/.test(raw)) {
+    issues.push({
+      key: "SEPCHAR",
+      severity: "error",
+      message: "SEPCHAR must be a single letter, digit, underscore, dash, or dot."
+    });
+  }
+}
+
 function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
@@ -593,8 +642,11 @@ function cloudflareEntry(key: string, value: string | undefined): RuntimeConfigE
   };
 }
 
-function normalizedStartPage(value: string | undefined): string {
-  const normalized = cleanPageId(value ?? DEFAULT_START_PAGE);
+function normalizedStartPage(
+  value: string | undefined,
+  pageIdCleanOptions: RuntimePageIdCleanOptions
+): string {
+  const normalized = cleanPageId(value ?? DEFAULT_START_PAGE, pageIdCleanOptions);
   return normalized || DEFAULT_START_PAGE;
 }
 
@@ -659,6 +711,25 @@ function booleanConfig(value: string | undefined, fallback: boolean): boolean {
     return false;
   }
   return fallback;
+}
+
+function runtimePageIdCleanOptions(env: Env): RuntimePageIdCleanOptions {
+  return {
+    deaccent: integerConfig(env.DEACCENT, 1, 0, 2) as 0 | 1 | 2,
+    fnencode: fnencodeConfig(env.FNENCODE),
+    sepchar: sepcharConfig(env.SEPCHAR),
+    useslash: booleanConfig(env.USESLASH, false)
+  };
+}
+
+function fnencodeConfig(value: string | undefined): DokuWikiFnEncode {
+  const raw = nonEmpty(value);
+  return raw === "safe" || raw === "utf-8" ? raw : "url";
+}
+
+function sepcharConfig(value: string | undefined): string {
+  const raw = nonEmpty(value);
+  return raw && /^[A-Za-z0-9_.-]$/.test(raw) ? raw : "_";
 }
 
 function integerConfig(

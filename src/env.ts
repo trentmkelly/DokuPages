@@ -24,6 +24,10 @@ export interface Env {
   TYPOGRAPHY?: string;
   AUTOPLURAL?: string;
   REL_NOFOLLOW?: string;
+  DEACCENT?: string;
+  FNENCODE?: string;
+  SEPCHAR?: string;
+  USESLASH?: string;
   TARGET_WIKI?: string;
   TARGET_INTERWIKI?: string;
   TARGET_EXTERN?: string;

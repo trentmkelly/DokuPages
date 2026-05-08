@@ -333,7 +333,7 @@ export async function listExistingPageIds(
   db: D1Database,
   pageIds: readonly string[]
 ): Promise<Set<string>> {
-  const ids = [...new Set(pageIds.map(cleanPageId).filter(Boolean))];
+  const ids = [...new Set(pageIds.map((pageId) => cleanPageId(pageId)).filter(Boolean))];
   if (ids.length === 0) return new Set();
 
   const placeholders = ids.map(() => "?").join(", ");

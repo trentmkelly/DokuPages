@@ -21,6 +21,15 @@ Optional Pages environment variables:
 
 - `SITE_NAME`: wiki display name. Default: `DokuWiki Pages`.
 - `START_PAGE`: start page ID. Default: `wiki:welcome`.
+- `DEACCENT`: DokuWiki-compatible page ID accent handling. `0` keeps accented
+  letters, `1` deaccents, and `2` romanizes before deaccenting. Default: `1`.
+- `SEPCHAR`: DokuWiki-compatible word separator for cleaned page IDs. Default:
+  `_`.
+- `USESLASH`: truthy value makes DokuWiki-style ID cleaning treat `/` as a
+  namespace separator. Public Pages routes always use slash path segments at the
+  route boundary.
+- `FNENCODE`: DokuWiki-compatible filename encoding for page path helpers:
+  `url`, `safe`, or `utf-8`. Default: `url`.
 - `WIKI_LANG`: supported language tag. Defaults to English fallback.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.

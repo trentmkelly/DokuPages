@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { cleanPageId, pageIdToRoutePath, resolvePageLinkId } from "../src/wiki/page-id";
+import {
+  cleanPageId,
+  cleanRoutePageId,
+  pageIdToRoutePath,
+  resolvePageLinkId
+} from "../src/wiki/page-id";
 
 describe("namespace handling", () => {
   it("normalizes root and nested namespace ids consistently", () => {
     expect(cleanPageId("Start")).toBe("start");
     expect(cleanPageId(":Wiki:Guide:Start:")).toBe("wiki:guide:start");
-    expect(cleanPageId("Wiki//Guide///Start")).toBe("wiki:guide:start");
+    expect(cleanPageId("Wiki//Guide///Start")).toBe("wiki_guide_start");
+    expect(cleanRoutePageId("Wiki//Guide///Start")).toBe("wiki:guide:start");
   });
 
   it("builds canonical routes from namespace segments", () => {

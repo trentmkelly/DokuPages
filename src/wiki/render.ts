@@ -1,5 +1,10 @@
 import { resolveInterwikiLink, type InterwikiTemplates } from "./interwiki";
-import { cleanPageId, pageIdToRoutePath, resolvePageLinkId } from "./page-id";
+import {
+  cleanPageId,
+  pageIdToRoutePath,
+  resolvePageLinkId,
+  type PageIdCleanOptions
+} from "./page-id";
 import { cleanMediaId, mediaDetailPath, mediaName, mediaPath } from "./media-service";
 
 export interface TocItem {
@@ -50,6 +55,7 @@ export interface RenderWikiTextOptions {
   maxSectionEditLevel?: number;
   camelCaseLinks?: boolean;
   typographyMode?: number;
+  pageIdCleanOptions?: PageIdCleanOptions;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -188,7 +194,7 @@ export function renderWikiText(
   const context: RenderContext = {
     footnotes: [],
     dependencies: new Map(),
-    pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
+    pageId: options.pageId ? cleanPageId(options.pageId, options.pageIdCleanOptions) : undefined,
     existingPageIds: options.existingPageIds,
     entityReplacements: options.entityReplacements ?? DEFAULT_ENTITY_REPLACEMENTS,
     smileys: options.smileys ?? DEFAULT_SMILEYS,
@@ -204,6 +210,7 @@ export function renderWikiText(
     maxSectionEditLevel: clampHeadingLevel(options.maxSectionEditLevel, 5, 0),
     camelCaseLinks: options.camelCaseLinks ?? false,
     typographyMode: clampTypographyMode(options.typographyMode),
+    pageIdCleanOptions: options.pageIdCleanOptions,
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -443,6 +450,7 @@ interface RenderContext {
   maxSectionEditLevel: number;
   camelCaseLinks: boolean;
   typographyMode: number;
+  pageIdCleanOptions?: PageIdCleanOptions;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -460,7 +468,7 @@ function parseHeading(line: string): { level: number; title: string } | null {
 function renderSectionEditLink(title: string, level: number, context: RenderContext): string {
   if (!context.pageId || !context.sectionEdit || level > context.maxSectionEditLevel) return "";
 
-  const href = `${pageIdToRoutePath(context.pageId)}?do=edit&section=${context.sectionIndex}`;
+  const href = `${pageIdToRoutePath(context.pageId, context.pageIdCleanOptions)}?do=edit&section=${context.sectionIndex}`;
 
   return `<a class="secedit" href="${escapeAttribute(href)}" aria-label="Edit section ${escapeAttribute(title)}">Edit</a>`;
 }
@@ -706,7 +714,7 @@ function flushSpecialBlock(blocks: string[], state: ParserState, context: Render
 
   if (block.filename) {
     const href = context.pageId
-      ? `${pageIdToRoutePath(context.pageId)}?do=export_code&codeblock=${block.index}`
+      ? `${pageIdToRoutePath(context.pageId, context.pageIdCleanOptions)}?do=export_code&codeblock=${block.index}`
       : null;
     const title = escapeHtml(block.filename);
     const label = href
@@ -793,6 +801,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             maxSectionEditLevel: context.maxSectionEditLevel,
             camelCaseLinks: context.camelCaseLinks,
             typographyMode: context.typographyMode,
+            pageIdCleanOptions: context.pageIdCleanOptions,
             sectionIndex: context.sectionIndex,
             anchorIds: context.anchorIds
           }
@@ -1084,7 +1093,7 @@ function renderLinks(
     const windowsShare = external || interwiki ? null : windowsSharePath(target);
     const internal = !external && !interwiki && !windowsShare;
     const internalLink = internal
-      ? resolveAutoPluralInternalLink(resolveInternalLink(target, context.pageId), context)
+      ? resolveAutoPluralInternalLink(resolveInternalLink(target, context), context)
       : null;
 
     if (internalLink?.pageId) {
@@ -1174,7 +1183,7 @@ function resolveAutoPluralInternalLink(
   if (!context.existingPageIds.has(alternatePageId)) return link;
 
   return {
-    href: `${pageIdToRoutePath(alternatePageId)}${link.fragment}`,
+    href: `${pageIdToRoutePath(alternatePageId, context.pageIdCleanOptions)}${link.fragment}`,
     pageId: alternatePageId,
     fragment: link.fragment
   };
@@ -1235,7 +1244,7 @@ function renderCamelCaseLinks(
 
   return source.replace(/\b[A-Z]+[a-z]+[A-Z][A-Za-z]*\b/g, (linkText: string) => {
     const internalLink = resolveAutoPluralInternalLink(
-      resolveInternalLink(linkText, context.pageId),
+      resolveInternalLink(linkText, context),
       context
     );
 
@@ -1357,7 +1366,7 @@ function windowsSharePath(target: string): string | null {
 
 function resolveInternalLink(
   target: string,
-  currentPageId: string | undefined
+  context: RenderContext
 ): { href: string; pageId: string | null; fragment: string } {
   const [rawPageId = "", rawFragment] = target.split("#", 2);
   const fragment = rawFragment ? `#${slugify(rawFragment)}` : "";
@@ -1365,15 +1374,15 @@ function resolveInternalLink(
   if (!rawPageId) {
     return {
       href: fragment || "#",
-      pageId: currentPageId ? cleanPageId(currentPageId) : null,
+      pageId: context.pageId ? cleanPageId(context.pageId, context.pageIdCleanOptions) : null,
       fragment
     };
   }
 
-  const pageId = resolvePageLinkId(rawPageId, currentPageId);
+  const pageId = resolvePageLinkId(rawPageId, context.pageId, context.pageIdCleanOptions);
 
   return {
-    href: `${pageIdToRoutePath(pageId)}${fragment}`,
+    href: `${pageIdToRoutePath(pageId, context.pageIdCleanOptions)}${fragment}`,
     pageId,
     fragment
   };

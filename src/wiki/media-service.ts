@@ -1,4 +1,4 @@
-import { cleanPageId } from "./page-id";
+import { cleanPageId, cleanRoutePageId } from "./page-id";
 import { getMimeTypeForExtension } from "./mime";
 
 export interface CurrentMedia {
@@ -123,6 +123,10 @@ interface MediaRevisionRow {
 
 export function cleanMediaId(rawId: string): string {
   return cleanPageId(rawId);
+}
+
+export function cleanMediaRouteId(rawPath: string): string {
+  return cleanRoutePageId(rawPath);
 }
 
 export function mediaNamespace(id: string): string {

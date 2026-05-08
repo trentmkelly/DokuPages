@@ -69,6 +69,7 @@ import {
   getMediaRevision,
   listMediaRevisions,
   listNamespaceMedia,
+  cleanMediaRouteId,
   mediaDetailPath,
   mediaName,
   mediaNamespace,
@@ -80,7 +81,7 @@ import {
   type MediaRevision
 } from "./wiki/media-service";
 import { validateMediaUpload } from "./wiki/media-validation";
-import { cleanPageId } from "./wiki/page-id";
+import { cleanPageId, cleanRoutePageId, type PageIdCleanOptions } from "./wiki/page-id";
 import {
   ACL_CREATE,
   ACL_DELETE,
@@ -131,7 +132,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 28;
+const RENDER_CACHE_VERSION = 29;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -194,7 +195,10 @@ export async function handleRequest(
 
   if (url.pathname === "/doku.php") {
     if (request.method === "POST") {
-      const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
+      const id = cleanPageId(
+        url.searchParams.get("id") ?? startPageId(env),
+        getRuntimeConfig(env).pageIdCleanOptions
+      );
       const response = await handleWikiPostAction(request, env, url, principal, id);
       if (response) return response;
     }
@@ -219,10 +223,11 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/lib/exe/mediamanager.php") {
-    return redirectResponse(
-      `/media-manager?ns=${encodeURIComponent(cleanPageId(url.searchParams.get("ns") ?? ""))}`,
-      301
+    const namespace = cleanPageId(
+      url.searchParams.get("ns") ?? "",
+      getRuntimeConfig(env).pageIdCleanOptions
     );
+    return redirectResponse(`/media-manager?ns=${encodeURIComponent(namespace)}`, 301);
   }
 
   if (url.pathname === "/lib/exe/xmlrpc.php") {
@@ -544,7 +549,7 @@ export async function handleRequest(
 
   if (url.pathname.startsWith("/wiki/")) {
     const rawId = decodeURIComponent(url.pathname.slice("/wiki/".length));
-    const id = cleanPageId(rawId);
+    const id = cleanRoutePageId(rawId, getRuntimeConfig(env).pageIdCleanOptions);
 
     if (!id) {
       return notFoundResponse("Missing wiki page id.");
@@ -867,7 +872,10 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
     return authFeatureNotSupportedResponse(request, env, unsupportedAccountAction);
   }
 
-  const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
+  const id = cleanPageId(
+    url.searchParams.get("id") ?? startPageId(env),
+    getRuntimeConfig(env).pageIdCleanOptions
+  );
   const target = new URL(pagePath(id || startPageId(env)), url);
   const action = normalizeLegacyAction(url.searchParams.get("do"));
   const revisionId = url.searchParams.get("rev");
@@ -1064,8 +1072,8 @@ async function handlePagePreview(
 ): Promise<Response> {
   const form = await request.formData();
   const content = String(form.get("content") ?? "");
-  const pageId = cleanPageId(String(form.get("id") || overrideId || ""));
   const config = getRuntimeConfig(env);
+  const pageId = cleanPageId(String(form.get("id") || overrideId || ""), config.pageIdCleanOptions);
   const entityReplacements = await entityReplacementsForRender(env);
   const smileys = await smileysForRender(env);
   const acronyms = await acronymsForRender(env);
@@ -1079,7 +1087,8 @@ async function handlePagePreview(
     content,
     pageId || undefined,
     config.camelCaseLinks,
-    autoPluralLinks
+    autoPluralLinks,
+    config.pageIdCleanOptions
   );
   const rendered = renderWikiText(content, {
     pageId: pageId || undefined,
@@ -1093,7 +1102,8 @@ async function handlePagePreview(
     linkTargets,
     autoPluralLinks,
     camelCaseLinks: config.camelCaseLinks,
-    typographyMode: config.typographyMode
+    typographyMode: config.typographyMode,
+    pageIdCleanOptions: config.pageIdCleanOptions
   });
 
   if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
@@ -1199,7 +1209,10 @@ async function handleNativeApiPageRead(
   url: URL,
   principal: AuthPrincipal
 ): Promise<Response> {
-  const id = cleanPageId(url.searchParams.get("id") ?? "");
+  const id = cleanPageId(
+    url.searchParams.get("id") ?? "",
+    getRuntimeConfig(env).pageIdCleanOptions
+  );
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
@@ -1222,7 +1235,10 @@ async function handleNativeApiPageRevisions(
   url: URL,
   principal: AuthPrincipal
 ): Promise<Response> {
-  const id = cleanPageId(url.searchParams.get("id") ?? "");
+  const id = cleanPageId(
+    url.searchParams.get("id") ?? "",
+    getRuntimeConfig(env).pageIdCleanOptions
+  );
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
@@ -1268,7 +1284,7 @@ async function handleNativeApiPageWrite(
   const body = await readJsonObject(request);
   if (!body.ok) return body.response;
 
-  const id = cleanPageId(String(body.value.id ?? ""));
+  const id = cleanPageId(String(body.value.id ?? ""), getRuntimeConfig(env).pageIdCleanOptions);
   const content = String(body.value.content ?? "");
   const summary = String(body.value.summary ?? "");
 
@@ -1335,7 +1351,7 @@ async function handleNativeApiPageRevert(
   const body = await readJsonObject(request);
   if (!body.ok) return body.response;
 
-  const id = cleanPageId(String(body.value.id ?? ""));
+  const id = cleanPageId(String(body.value.id ?? ""), getRuntimeConfig(env).pageIdCleanOptions);
   const revisionId = String(body.value.revisionId ?? "");
 
   if (!id || !revisionId) {
@@ -2443,7 +2459,7 @@ function formatMediaByteLength(byteLength: number): string {
 }
 
 function mediaIdFromPath(url: URL, prefix: string): string {
-  return cleanMediaId(decodeURIComponent(url.pathname.slice(prefix.length)));
+  return cleanMediaRouteId(decodeURIComponent(url.pathname.slice(prefix.length)));
 }
 
 function getComparableMediaId(media: CurrentMedia | MediaRevision): string {
@@ -2632,7 +2648,8 @@ async function renderPageHtml(
     content,
     id,
     config.camelCaseLinks,
-    autoPluralLinks
+    autoPluralLinks,
+    config.pageIdCleanOptions
   );
   const rendered = renderWikiText(content, {
     pageId: id,
@@ -2646,6 +2663,7 @@ async function renderPageHtml(
     relNofollow,
     linkTargets,
     autoPluralLinks,
+    pageIdCleanOptions: config.pageIdCleanOptions,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2715,7 +2733,8 @@ async function renderPageExport(
     content,
     id,
     config.camelCaseLinks,
-    autoPluralLinks
+    autoPluralLinks,
+    config.pageIdCleanOptions
   );
   const rendered = renderWikiText(content, {
     pageId: id,
@@ -2728,6 +2747,7 @@ async function renderPageExport(
     relNofollow,
     linkTargets,
     autoPluralLinks,
+    pageIdCleanOptions: config.pageIdCleanOptions,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -3042,11 +3062,13 @@ async function existingPageIdsForContent(
   content: string,
   sourcePageId?: string,
   camelCaseLinks = false,
-  autoPluralLinks = false
+  autoPluralLinks = false,
+  pageIdCleanOptions?: PageIdCleanOptions
 ): Promise<Set<string>> {
-  const sourceId = sourcePageId ? cleanPageId(sourcePageId) : "";
+  const sourceId = sourcePageId ? cleanPageId(sourcePageId, pageIdCleanOptions) : "";
   const linkedPageIds = extractInternalPageLinks(content, sourceId || undefined, {
-    camelCaseLinks
+    camelCaseLinks,
+    pageIdCleanOptions
   });
   const candidatePageIds = autoPluralLinks
     ? [...new Set([...linkedPageIds, ...linkedPageIds.map(autoPluralPageId)])]
