@@ -974,6 +974,12 @@ describe("auth routes", () => {
       }),
       env
     );
+    const revert = await handleRequest(
+      new Request("https://example.com/admin/revert", {
+        headers: { cookie }
+      }),
+      env
+    );
     const config = await handleRequest(
       new Request("https://example.com/admin/config", {
         headers: { cookie }
@@ -1015,10 +1021,126 @@ describe("auth routes", () => {
     expect(audit.status).toBe(403);
     expect(users.status).toBe(403);
     expect(mediaCleanup.status).toBe(403);
+    expect(revert.status).toBe(200);
+    await expect(revert.text()).resolves.toContain("Revert Manager");
     expect(config.status).toBe(403);
     expect(configExport.status).toBe(403);
     expect(cachePurge.status).toBe(403);
     expect(mediaCleanupPost.status).toBe(403);
+  });
+
+  it("allows manager users to search and batch-revert spam pages", async () => {
+    env = createEnv();
+    await seedUser(env.DB, {
+      userId: "user-2",
+      username: "mona",
+      password: "manager password",
+      displayName: "Mona Manager",
+      email: "mona@example.test",
+      groups: ["manager", "user"]
+    });
+    await seedPageHistory(env.DB, {
+      id: "wiki:spam",
+      title: "Spam",
+      revisions: [
+        {
+          id: "wiki:spam@2026-05-07T00:00:00.000Z",
+          content: "Clean body",
+          summary: "Clean revision",
+          changeType: "create",
+          createdAt: "2026-05-07T00:00:00.000Z"
+        },
+        {
+          id: "wiki:spam@2026-05-07T01:00:00.000Z",
+          content: "Buy http://spam.example now",
+          summary: "Spam edit",
+          changeType: "edit",
+          createdAt: "2026-05-07T01:00:00.000Z"
+        }
+      ]
+    });
+    await seedPageHistory(env.DB, {
+      id: "wiki:badonly",
+      title: "Bad Only",
+      revisions: [
+        {
+          id: "wiki:badonly@2026-05-07T01:05:00.000Z",
+          content: "Only http://spam.example here",
+          summary: "Spam create",
+          changeType: "create",
+          createdAt: "2026-05-07T01:05:00.000Z"
+        }
+      ]
+    });
+    await seedPageHistory(env.DB, {
+      id: "wiki:clean",
+      title: "Clean",
+      revisions: [
+        {
+          id: "wiki:clean@2026-05-07T01:10:00.000Z",
+          content: "Nothing suspicious",
+          summary: "Clean create",
+          changeType: "create",
+          createdAt: "2026-05-07T01:10:00.000Z"
+        }
+      ]
+    });
+    const cookie = await loginAs(env, "mona", "manager password");
+
+    const search = await handleRequest(
+      new Request("https://example.com/admin/revert?filter=http://spam.example", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const searchHtml = await search.text();
+
+    expect(search.status).toBe(200);
+    expect(searchHtml).toContain("Search spammy pages");
+    expect(searchHtml).toContain("Note: this search is case sensitive");
+    expect(searchHtml).toContain("wiki:spam");
+    expect(searchHtml).toContain("wiki:badonly");
+    expect(searchHtml).not.toContain("wiki:clean");
+
+    const form = new FormData();
+    form.set("filter", "http://spam.example");
+    form.append("revert", "wiki:spam");
+    form.append("revert", "wiki:badonly");
+    const reverted = await handleRequest(
+      new Request("https://example.com/admin/revert", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+    const revertedHtml = await reverted.text();
+
+    expect(reverted.status).toBe(200);
+    expect(revertedHtml).toContain("Reversion process started");
+    expect(revertedHtml).toContain("wiki:spam reverted to revision 2026-05-07T00:00:00.000Z");
+    expect(revertedHtml).toContain("wiki:badonly removed");
+    expect(revertedHtml).toContain("Reversion process finished successfully.");
+
+    await expect(currentPageRevision(env.DB, "wiki:spam")).resolves.toMatchObject({
+      is_deleted: 0,
+      content: "Clean body",
+      summary: "old revision restored",
+      change_type: "revert"
+    });
+    await expect(currentPageRevision(env.DB, "wiki:badonly")).resolves.toMatchObject({
+      is_deleted: 1,
+      content: "Only http://spam.example here",
+      summary: "removed",
+      change_type: "delete"
+    });
+    await expect(
+      env.DB.prepare("select action, target_type from audit_log where action = ?")
+        .bind("revert_manager_run")
+        .all()
+    ).resolves.toMatchObject({
+      results: [{ action: "revert_manager_run", target_type: "page" }]
+    });
   });
 
   it("allows admin users to purge global render and discovery caches", async () => {
@@ -1221,6 +1343,7 @@ describe("auth routes", () => {
       ["config", "/admin/config", "Configuration manager"],
       ["info", "/diagnostics", "Diagnostics"],
       ["logviewer", "/admin/audit", "Audit log"],
+      ["revert", "/admin/revert", "Revert Manager"],
       ["usermanager", "/admin/users", "User manager"]
     ];
 
@@ -1480,6 +1603,80 @@ async function seedPage(
       createdAt
     )
     .run();
+}
+
+async function seedPageHistory(d1, { id, title, revisions }) {
+  const namespace = id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
+  const current = revisions.at(-1);
+  if (!current) throw new Error("seedPageHistory requires at least one revision");
+
+  await d1
+    .prepare(
+      `insert into pages (
+         id, namespace, title, current_revision_id, is_deleted, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, namespace, title, current.id, 0, revisions[0].createdAt, current.createdAt)
+    .run();
+
+  let previousLength = 0;
+  for (const revision of revisions) {
+    await d1
+      .prepare(
+        `insert into page_revisions (
+           id, page_id, content, content_hash, author_id, author_name, summary,
+           change_type, size_change, created_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        revision.id,
+        id,
+        revision.content,
+        `hash:${revision.id}`,
+        null,
+        "Seeder",
+        revision.summary,
+        revision.changeType,
+        revision.content.length - previousLength,
+        revision.createdAt
+      )
+      .run();
+
+    await d1
+      .prepare(
+        `insert into changelog (
+           id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+           change_type, summary, size_change, created_at
+         ) values (?, 'page', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        `page:${revision.id}`,
+        id,
+        revision.id,
+        null,
+        "Seeder",
+        "127.0.0.1",
+        revision.changeType,
+        revision.summary,
+        revision.content.length - previousLength,
+        revision.createdAt
+      )
+      .run();
+
+    previousLength = revision.content.length;
+  }
+}
+
+async function currentPageRevision(d1, id) {
+  return d1
+    .prepare(
+      `select p.is_deleted, r.content, r.summary, r.change_type
+       from pages p
+       join page_revisions r on r.id = p.current_revision_id
+       where p.id = ?`
+    )
+    .bind(id)
+    .first();
 }
 
 async function seedMediaObjectReferences(d1) {

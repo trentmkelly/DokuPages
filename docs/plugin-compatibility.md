@@ -15,7 +15,7 @@ path.
 | `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, and `/api/health`.                                |
 | `logviewer`    | Replaced by Cloudflare logs plus native admin audit log records.                                  |
 | `popularity`   | Removed. The port does not phone home usage statistics.                                           |
-| `revert`       | Replaced by native page and media revision revert routes.                                         |
+| `revert`       | Replaced by native page/media revert routes and manager-level `/admin/revert` batch reversion.    |
 | `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                          |
 | `styling`      | Replaced by build-time theme assets and checked-in CSS; no runtime styling popup is loaded.       |
 | `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.            |

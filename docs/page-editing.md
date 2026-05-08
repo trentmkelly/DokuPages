@@ -9,12 +9,14 @@ The first page editing implementation is intentionally small but exercises the r
   when one exists.
 - `GET /wiki/:id?do=source` returns raw wiki text.
 - `GET /wiki/:id?do=revert&rev=:revisionId` renders a revert confirmation form.
+- `GET /admin/revert` renders the manager-level DokuWiki-style Revert Manager.
 - `POST /api/pages` saves page content.
 - `POST /api/pages/draft` stores the current edit form as an anonymous draft.
 - `POST /api/pages/draft/delete` deletes the anonymous draft.
 - `POST /api/pages/lock` refreshes the current edit lock.
 - `POST /api/pages/lock/release` releases the current edit lock.
 - `POST /api/pages/revert` restores an old revision through the save path.
+- `POST /admin/revert` searches spammy pages or batch-reverts selected pages.
 - `POST /api/pages/preview` returns rendered preview JSON.
 
 ## Save Semantics

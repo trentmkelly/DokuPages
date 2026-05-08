@@ -20,7 +20,8 @@ of full PHP DokuWiki runtime compatibility.
 - KV-backed rendered page cache with D1 dependency tracking, rate-limit counters, and discovery cache.
 - Durable Object-backed page edit locks.
 - Native admin dashboard, ACL manager, configuration manager, user manager,
-  audit log view, diagnostics, cache purge, and search index rebuild action.
+  Revert Manager, audit log view, diagnostics, cache purge, and search index
+  rebuild action.
 - Resend-compatible outbound email adapter with fixed sender configuration,
   escaped native templates, D1 delivery logging, registration notifications,
   password resets, page-change notifications, subscriptions, and scheduled
@@ -56,7 +57,8 @@ PHP modules to execute. Current decisions:
 - `info`: partially replaced by diagnostics and health endpoints.
 - `logviewer`: replaced by Cloudflare logs plus native admin audit log.
 - `popularity`: unsupported.
-- `revert`: replaced by native page/media revert routes.
+- `revert`: replaced by native page/media revert routes plus `/admin/revert`
+  for DokuWiki-style spam search and batch reversion.
 - `safefnrecode`: migration-only if needed.
 - `styling`: build-time checked-in theme CSS; runtime styling editor is not
   loaded on Pages.

@@ -118,7 +118,8 @@ import {
   deletePageDraft,
   type CurrentPage,
   type PageDraft,
-  type PageRevision
+  type PageRevision,
+  type RecentChange
 } from "./wiki/page-service";
 import { extractInternalPageLinks } from "./wiki/page-links";
 import {
@@ -431,6 +432,16 @@ export async function handleRequest(
     const csrf = csrfContext(request);
     const page = await renderMediaCleanupPage(request, env, principal, url, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
+  if (url.pathname === "/admin/revert" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    const page = await renderRevertManagerPage(request, env, principal, url, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
+  if (url.pathname === "/admin/revert" && request.method === "POST") {
+    return handleRevertManager(request, env, principal);
   }
 
   if (url.pathname === "/api/admin/acl" && request.method === "POST") {
@@ -975,6 +986,8 @@ function redirectLegacyAdminPage(request: Request, env: Env, page: string | null
       return redirectResponse("/diagnostics", 301);
     case "logviewer":
       return redirectResponse("/admin/audit", 301);
+    case "revert":
+      return redirectResponse("/admin/revert", 301);
     case "usermanager":
       return redirectResponse("/admin/users", 301);
     case "extension":
@@ -3836,11 +3849,158 @@ function renderAdminDashboardPage(
         ${userTool}
         ${configTool}
         ${mediaCleanupTool}
+        <li><a href="/admin/revert">Revert Manager</a></li>
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`,
     { principal }
   );
+}
+
+interface RevertManagerCandidate {
+  id: string;
+  change: RecentChange;
+}
+
+interface RevertManagerResult {
+  id: string;
+  message: string;
+  status: "reverted" | "removed" | "skipped";
+}
+
+async function renderRevertManagerPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  url: URL,
+  csrfToken: string,
+  results: readonly RevertManagerResult[] = []
+): Promise<string | Response> {
+  if (!isManagerPrincipal(principal)) {
+    return managerDeniedResponse(request, env);
+  }
+
+  const filter = url.searchParams.has("filter") ? (url.searchParams.get("filter") ?? "") : null;
+  const candidates = filter === null ? [] : await listRevertManagerCandidates(env, filter);
+
+  return htmlShell(
+    env,
+    "Revert Manager",
+    `${renderRevertManagerIntro()}
+    ${renderRevertManagerSearchForm(filter ?? "", csrfToken)}
+    ${results.length > 0 ? renderRevertManagerResults(results) : ""}
+    ${
+      filter === null || results.length > 0
+        ? ""
+        : renderRevertManagerCandidateList(env, candidates, filter, csrfToken)
+    }`,
+    { principal }
+  );
+}
+
+function renderRevertManagerIntro(): string {
+  return `<h1>Revert Manager</h1>
+    <p>This page helps you with the automatic reversion of a spam attack. To find a list of spammy pages first enter a search string (eg. a spam URL), then confirm that the found pages are really spam and revert the edits.</p>`;
+}
+
+function renderRevertManagerSearchForm(filter: string, csrfToken: string): string {
+  return `<form action="/admin/revert" method="post"><div class="no">
+      ${csrfInput(csrfToken)}
+      <label for="revert__filter">Search spammy pages: </label>
+      <input id="revert__filter" type="text" name="filter" class="edit" value="${escapeAttribute(filter)}">
+      <button type="submit">Search</button>
+      <span>Note: this search is case sensitive</span>
+    </div></form><br><br>`;
+}
+
+function renderRevertManagerCandidateList(
+  env: Env,
+  candidates: readonly RevertManagerCandidate[],
+  filter: string,
+  csrfToken: string
+): string {
+  const items = candidates
+    .map((candidate, index) => renderRevertManagerCandidate(env, candidate, index + 1))
+    .join("");
+  const list = items || '<li><div class="li">No matching pages found.</div></li>';
+
+  return `<hr><br>
+    <form action="/admin/revert" method="post"><div class="no">
+      ${csrfInput(csrfToken)}
+      <input type="hidden" name="filter" value="${escapeAttribute(filter)}">
+      <ul>${list}</ul>
+      <p>
+        <button type="submit">Revert selected pages</button>
+        Note: the page will be reverted to the last version not containing the given spam term <i>${escapeHtml(filter)}</i>.
+      </p>
+    </div></form>`;
+}
+
+function renderRevertManagerCandidate(
+  env: Env,
+  candidate: RevertManagerCandidate,
+  index: number
+): string {
+  const checkboxId = `revert__${index}`;
+  const date = renderDokuWikiDateFormat(
+    getRuntimeConfig(env).dateFormat,
+    new Date(candidate.change.createdAt)
+  );
+  const summary = candidate.change.summary ? ` - ${escapeHtml(candidate.change.summary)}` : "";
+  const user = candidate.change.userName
+    ? ` <span class="user">${escapeHtml(candidate.change.userName)}</span>`
+    : "";
+  const itemClass = candidate.change.changeType === "minor" ? ' class="minor"' : "";
+
+  return `<li${itemClass}><div class="li">
+      <input type="checkbox" name="revert" value="${escapeAttribute(candidate.id)}" checked id="${checkboxId}">
+      <label for="${checkboxId}">${escapeHtml(date)}</label>
+      <a href="${pagePath(candidate.id)}?do=diff">diff</a>
+      <a href="${pagePath(candidate.id)}?do=revisions">old revisions</a>
+      <a href="${pagePath(candidate.id)}">${escapeHtml(candidate.id)}</a>${summary}${user}
+    </div></li>`;
+}
+
+function renderRevertManagerResults(results: readonly RevertManagerResult[]): string {
+  const items = results
+    .map((result) => `<li><div class="li">${escapeHtml(result.message)}</div></li>`)
+    .join("");
+
+  return `<hr><br>
+    <p>Reversion process started. This can take a long time. If the script times out before finishing, you need to revert in smaller chunks.</p>
+    <ul>${items}</ul>
+    <p>Reversion process finished successfully.</p>`;
+}
+
+async function listRevertManagerCandidates(
+  env: Env,
+  filter: string
+): Promise<RevertManagerCandidate[]> {
+  const candidates: RevertManagerCandidate[] = [];
+  const seen = new Set<string>();
+  const maxLines = 800;
+  const pageSize = 100;
+
+  for (let offset = 0; offset < maxLines; offset += pageSize) {
+    const changes = await listRecentChanges(env.DB, Math.min(pageSize, maxLines - offset), offset);
+    if (changes.length === 0) break;
+
+    for (const change of changes) {
+      const id = cleanPageId(change.subjectId);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+
+      const page = await getCurrentPage(env.DB, id);
+      if (!page) continue;
+      if (filter && !page.content.includes(filter)) continue;
+
+      candidates.push({ id, change });
+    }
+
+    if (changes.length < pageSize) break;
+  }
+
+  return candidates;
 }
 
 function renderConfigAdminPage(
@@ -4800,6 +4960,142 @@ async function readFormDataOrEmpty(request: Request): Promise<FormData> {
   } catch {
     return new FormData();
   }
+}
+
+async function handleRevertManager(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isManagerPrincipal(principal)) {
+    return managerDeniedResponse(request, env);
+  }
+
+  const filter = String(form.get("filter") ?? "");
+  const selectedIds = form
+    .getAll("revert")
+    .map((value) => cleanPageId(String(value)))
+    .filter((id): id is string => Boolean(id));
+  const csrf = csrfContext(request);
+  const url = new URL(request.url);
+  url.searchParams.set("filter", filter);
+
+  if (selectedIds.length === 0) {
+    const page = await renderRevertManagerPage(request, env, principal, url, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
+  const results = await executeRevertManagerBatch(request, env, principal, selectedIds, filter);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "revert_manager_run",
+    targetType: "page",
+    targetId: null,
+    details: {
+      filter,
+      selectedCount: selectedIds.length,
+      revertedCount: results.filter((result) => result.status === "reverted").length,
+      removedCount: results.filter((result) => result.status === "removed").length,
+      skippedCount: results.filter((result) => result.status === "skipped").length
+    }
+  });
+
+  const page = await renderRevertManagerPage(request, env, principal, url, csrf.token, results);
+  return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+}
+
+async function executeRevertManagerBatch(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  selectedIds: readonly string[],
+  filter: string
+): Promise<RevertManagerResult[]> {
+  const author = principalAuthor(principal);
+  const origin = new URL(request.url).origin;
+  const results: RevertManagerResult[] = [];
+  const seen = new Set<string>();
+
+  for (const id of selectedIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+
+    const current = await getCurrentPage(env.DB, id);
+    if (!current) {
+      results.push({
+        id,
+        status: "skipped",
+        message: `${id} skipped: current page does not exist`
+      });
+      continue;
+    }
+
+    const targetRevision = await findRevertManagerTargetRevision(env, current, filter);
+    const restoreRevision = targetRevision?.content ? targetRevision : null;
+    const content = restoreRevision?.content ?? "";
+    const summary = restoreRevision ? "old revision restored" : "";
+    const result = await savePage(env.DB, {
+      id,
+      content,
+      summary,
+      baseRevisionId: current.revisionId,
+      changeType: restoreRevision ? "revert" : "delete",
+      authorId: author.authorId,
+      authorName: author.authorName,
+      ip: getClientIp(request)
+    });
+
+    if (!result.ok) {
+      results.push({
+        id,
+        status: "skipped",
+        message: `${id} skipped: current revision changed`
+      });
+      continue;
+    }
+
+    await purgePageCache(env, id, result.page.revisionId, origin);
+    await recordAndSendPageChangeNotifications(
+      request,
+      env,
+      result.page,
+      result.changeType,
+      restoreRevision ? "old revision restored" : "removed",
+      author
+    );
+
+    results.push(
+      restoreRevision
+        ? {
+            id,
+            status: "reverted",
+            message: `${id} reverted to revision ${restoreRevision.createdAt}`
+          }
+        : {
+            id,
+            status: "removed",
+            message: `${id} removed`
+          }
+    );
+  }
+
+  return results;
+}
+
+async function findRevertManagerTargetRevision(
+  env: Env,
+  current: CurrentPage,
+  filter: string
+): Promise<PageRevision | null> {
+  const revisions = await listPageRevisions(env.DB, current.id, 20, 0);
+  return (
+    revisions.find(
+      (revision) => revision.id !== current.revisionId && !revision.content.includes(filter)
+    ) ?? null
+  );
 }
 
 async function handleSearchIndexRebuild(
