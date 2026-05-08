@@ -17,7 +17,7 @@ npm run import:sql
 npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-import.sql
 ```
 
-The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships.
+The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships. Interrupted D1 imports can be rerun with the same generated SQL after fixing the underlying failure.
 
 Legacy `data/index` files are not migrated directly. The importer rebuilds
 search postings from canonical page source during import, which avoids carrying
@@ -34,6 +34,8 @@ npm run import:media-upload
 
 The manifest maps each `data/media` and `data/media_attic` file to the R2 object key stored in D1. The upload script requires either `--remote` or `--local`; the package script targets the remote `dokuwiki-pages-dev-media` bucket.
 
+Media uploads are resumable. Successful uploads are written to `.wrangler/dokuwiki-media-upload-state.json` with object key, source path, byte length, and content hash. Rerunning `npm run import:media-upload` skips matching completed objects and continues with pending media. Use `-- --state <file>` for a custom journal path or `-- --no-resume` to ignore an existing journal while writing a fresh one.
+
 ## Hash Manifest
 
 ```sh
@@ -41,8 +43,9 @@ npm run import:hash-manifest
 ```
 
 The hash manifest records expected SHA-256 hashes for current pages, attic page
-revisions, current media, and media attic objects. Use it after import to compare
-D1 `page_revisions.content_hash`, D1 media hash columns, and downloaded R2 object
+revisions, page/media metadata files, custom language/template files, current
+media, and media attic objects. Use it after import to compare D1
+`page_revisions.content_hash`, D1 media hash columns, and downloaded R2 object
 hashes against the source flat-file hashes.
 
 Verify a completed import:

@@ -591,7 +591,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Validate content hashes before and after import.
 - [x] Produce migration report.
 - [x] Make migration idempotent.
-- [ ] Make migration resumable.
+- [x] Make migration resumable.
 - [x] Add dry-run mode.
 - [x] Add rollback or restore plan.
 

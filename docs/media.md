@@ -45,6 +45,8 @@ npm run import:media-upload
 
 `import:media-upload` reads `.wrangler/dokuwiki-media-manifest.json` and uploads each listed file to `dokuwiki-pages-dev-media` with the detected content type. Use `node scripts/upload-r2-media.mjs --manifest <path> --bucket <bucket> --remote --dry-run` to review the generated Wrangler commands before running a live import.
 
+The upload script writes `.wrangler/dokuwiki-media-upload-state.json` after each successful object upload. If the import is interrupted, rerun the same command and already completed objects with matching key, path, byte length, and hash are skipped. Use `--state <file>` for a different journal path or `--no-resume` to force a fresh pass.
+
 ## Delete Semantics
 
 `POST /api/media/delete` expects `id` and optional `summary`. Deletion marks the current `media` row deleted, creates a `delete` media revision, appends a media changelog row, and records deletion metadata. R2 objects are kept so immutable old revisions remain fetchable.
