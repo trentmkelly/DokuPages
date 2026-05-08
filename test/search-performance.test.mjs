@@ -87,8 +87,16 @@ function seedSearchCorpus(db) {
     "insert into search_postings (term, page_id, frequency, updated_at) values (?, ?, ?, ?)"
   );
 
-  db.prepare("insert into search_terms (term, document_count) values (?, ?)").run("alpha", 650);
-  db.prepare("insert into search_terms (term, document_count) values (?, ?)").run("beta", 650);
+  db.prepare("insert into search_terms (term, term_length, document_count) values (?, ?, ?)").run(
+    "alpha",
+    5,
+    650
+  );
+  db.prepare("insert into search_terms (term, term_length, document_count) values (?, ?, ?)").run(
+    "beta",
+    4,
+    650
+  );
 
   for (let index = 0; index < 650; index += 1) {
     const namespace = index < 550 ? "wiki" : "private";

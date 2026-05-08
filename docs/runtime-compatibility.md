@@ -154,7 +154,7 @@ is a future architecture extension, not a hidden filesystem compatibility mode.
 | `data/meta`              | D1 metadata rows with DokuWiki-shaped page metadata plus compatibility helper keys.   |
 | `data/media_meta`        | D1 metadata rows plus native JPEG EXIF/IPTC/XMP display metadata for uploaded media.  |
 | `data/cache`             | KV rendered payloads, Cache API candidates, and D1 cache dependency rows.             |
-| `data/index`             | D1 search postings and term tables.                                                   |
+| `data/index`             | D1 search postings and term tables, including DokuWiki-style term length metadata.    |
 | `data/locks`             | Durable Object edit/media locks.                                                      |
 | `data/tmp`               | Request-local memory or short-lived Cloudflare storage only when explicitly required. |
 | `data/log`               | D1 audit rows plus Cloudflare structured logs.                                        |

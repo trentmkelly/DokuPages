@@ -269,10 +269,10 @@ describe("D1 storage adapters", () => {
     await expect(search.search([""], 10)).resolves.toEqual([]);
     expect(
       await d1
-        .prepare("select document_count from search_terms where term = ?")
+        .prepare("select term_length, document_count from search_terms where term = ?")
         .bind("start")
         .first()
-    ).toMatchObject({ document_count: 1 });
+    ).toMatchObject({ term_length: 5, document_count: 1 });
 
     await search.deletePage("wiki:start");
 

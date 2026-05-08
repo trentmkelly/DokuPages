@@ -3,6 +3,7 @@ import {
   buildSearchTermFrequencies,
   makeSearchSnippet,
   parseSearchQuery,
+  searchIndexWordLength,
   tokenizeSearchText
 } from "../src/wiki/search";
 
@@ -19,6 +20,31 @@ describe("wiki search helpers", () => {
 
   it("parses unique query terms", () => {
     expect(parseSearchQuery("welcome welcome syntax +the")).toEqual(["welcome", "syntax"]);
+  });
+
+  it("matches DokuWiki special-character stripping and numeric short terms", () => {
+    expect(tokenizeSearchText("Café wiki:start foo-bar docs.v1 under_score x 7")).toEqual([
+      "café",
+      "wiki",
+      "start",
+      "foo",
+      "bar",
+      "docs",
+      "v1",
+      "under",
+      "score",
+      "7"
+    ]);
+  });
+
+  it("separates Asian search words like DokuWiki", () => {
+    expect(tokenizeSearchText("漢字かな")).toEqual(["漢", "字", "か", "な"]);
+  });
+
+  it("stores DokuWiki-style index word lengths", () => {
+    expect(searchIndexWordLength("wiki:start")).toBe(10);
+    expect(searchIndexWordLength("é")).toBe(2);
+    expect(searchIndexWordLength("漢")).toBeGreaterThan(2);
   });
 
   it("weights title terms above body terms", () => {

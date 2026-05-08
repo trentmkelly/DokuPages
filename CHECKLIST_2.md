@@ -121,7 +121,7 @@ are not fixed by this checklist.
 
 ## Search And Indexing
 
-- [ ] Match DokuWiki's fulltext index structures and tokenizer from `inc/fulltext.php`, `inc/indexer.php`, and `inc/Search/Indexer.php` more closely.
+- [x] Match DokuWiki's fulltext index structures and tokenizer from `inc/fulltext.php`, `inc/indexer.php`, and `inc/Search/Indexer.php` more closely.
 - [ ] Match DokuWiki's language-specific stopword files instead of the current fixed English stopword set.
 - [ ] Match DokuWiki's search query operators, namespace filters, phrase behavior, exclusions, and wildcard or fragment behavior.
 - [ ] Implement `search_nslimit` and `search_fragment` configuration.

@@ -107,16 +107,17 @@ This page is safe to edit during local development.
 delete from search_postings
 where page_id in ('wiki:welcome', 'wiki:syntax', 'sidebar', 'playground:playground');
 
-insert into search_terms (term, document_count)
+insert into search_terms (term, term_length, document_count)
 values
-  ('welcome', 0),
-  ('dokuwiki', 0),
-  ('cloudflare', 0),
-  ('pages', 0),
-  ('syntax', 0),
-  ('playground', 0),
-  ('sidebar', 0)
-on conflict(term) do nothing;
+  ('welcome', 7, 0),
+  ('dokuwiki', 8, 0),
+  ('cloudflare', 10, 0),
+  ('pages', 5, 0),
+  ('syntax', 6, 0),
+  ('playground', 10, 0),
+  ('sidebar', 7, 0)
+on conflict(term) do update set
+  term_length = excluded.term_length;
 
 insert into search_postings (term, page_id, frequency, updated_at)
 values

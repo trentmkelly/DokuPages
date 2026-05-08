@@ -22,6 +22,7 @@ import type {
   UserRecord,
   UserStore
 } from "./interfaces";
+import { searchIndexWordLength } from "../wiki/search";
 
 type PageRow = {
   id: string;
@@ -696,11 +697,12 @@ export class D1SearchStore implements SearchStore {
       statements.push(
         this.db
           .prepare(
-            `insert into search_terms (term, document_count)
-             values (?, 0)
-             on conflict(term) do nothing`
+            `insert into search_terms (term, term_length, document_count)
+             values (?, ?, 0)
+             on conflict(term) do update set
+               term_length = excluded.term_length`
           )
-          .bind(term),
+          .bind(term, searchIndexWordLength(term)),
         this.db
           .prepare(
             `insert into search_postings (term, page_id, frequency, updated_at)

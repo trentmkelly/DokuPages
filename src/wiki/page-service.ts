@@ -2,7 +2,12 @@ import { cleanPageId, pageIdToRoutePath } from "./page-id";
 import { extractInternalPageLinks } from "./page-links";
 import { cleanMediaId, mediaName } from "./media-service";
 import { renderWikiText, type TocItem } from "./render";
-import { buildSearchTermFrequencies, makeSearchSnippet, parseSearchQuery } from "./search";
+import {
+  buildSearchTermFrequencies,
+  makeSearchSnippet,
+  parseSearchQuery,
+  searchIndexWordLength
+} from "./search";
 
 export interface CurrentPage {
   id: string;
@@ -928,10 +933,10 @@ export async function rebuildSearchIndex(
     statements.push(
       db
         .prepare(
-          `insert into search_terms (term, document_count)
-           values (?, ?)`
+          `insert into search_terms (term, term_length, document_count)
+           values (?, ?, ?)`
         )
-        .bind(term, documentCount)
+        .bind(term, searchIndexWordLength(term), documentCount)
     );
   }
 
@@ -1433,11 +1438,12 @@ function buildSearchIndexStatements(
     statements.push(
       db
         .prepare(
-          `insert into search_terms (term, document_count)
-           values (?, 0)
-           on conflict(term) do nothing`
+          `insert into search_terms (term, term_length, document_count)
+           values (?, ?, 0)
+           on conflict(term) do update set
+             term_length = excluded.term_length`
         )
-        .bind(term),
+        .bind(term, searchIndexWordLength(term)),
       db
         .prepare(
           `insert into search_postings (term, page_id, frequency, updated_at)

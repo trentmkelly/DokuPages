@@ -530,8 +530,16 @@ function seedRenderedCache(db) {
 }
 
 function seedSearchPostings(db, count) {
-  db.prepare("insert into search_terms (term, document_count) values (?, ?)").run("alpha", count);
-  db.prepare("insert into search_terms (term, document_count) values (?, ?)").run("beta", count);
+  db.prepare("insert into search_terms (term, term_length, document_count) values (?, ?, ?)").run(
+    "alpha",
+    5,
+    count
+  );
+  db.prepare("insert into search_terms (term, term_length, document_count) values (?, ?, ?)").run(
+    "beta",
+    4,
+    count
+  );
 
   const insert = db.prepare(
     "insert into search_postings (term, page_id, frequency, updated_at) values (?, ?, ?, ?)"

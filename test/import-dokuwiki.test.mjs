@@ -570,6 +570,7 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'wiki:welcome@2026-01-01T00:00:00.000Z'");
     expect(sql).toContain("Imported from DokuWiki attic");
     expect(sql).toContain("insert into search_terms");
+    expect(sql).toContain("term_length");
     expect(sql).toContain("insert into search_postings");
     expect(sql).toContain("insert into media (");
     expect(sql).toContain("insert or replace into media_revisions");

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { gunzip } from "node:zlib";
 import path from "node:path";
-import { promisify } from "node:util";
+import { promisify, TextEncoder } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const gunzipAsync = promisify(gunzip);
@@ -186,9 +186,10 @@ on conflict(id) do update set
 
     for (const [term, frequency] of searchTerms) {
       statements.push(
-        `insert into search_terms (term, document_count)
-values (${sql(term)}, 0)
-on conflict(term) do nothing;`
+        `insert into search_terms (term, term_length, document_count)
+values (${sql(term)}, ${searchIndexWordLength(term)}, 0)
+on conflict(term) do update set
+  term_length = excluded.term_length;`
       );
       statements.push(
         `insert into search_postings (term, page_id, frequency, updated_at)
@@ -1622,7 +1623,12 @@ const STOP_WORDS = new Set([
   "your"
 ]);
 
-const TERM_PATTERN = /[a-z0-9][a-z0-9_-]{1,63}/g;
+const SEARCH_MIN_WORD_BYTES = 2;
+const DOKUWIKI_SPECIAL_CHARS_PATTERN = /[^\p{L}\p{N}\p{M} ]+/gu;
+const SEARCH_CORE_CHAR_PATTERN = /[\p{L}\p{N}]/u;
+const ASIAN_WORD_PATTERN =
+  /([\p{Script=Thai}\p{Script=Han}\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u2eff\u3000-\u303f\u31f0-\u31ff\u3200-\u33ff\ufe30-\ufe4f])/gu;
+const utf8Encoder = new TextEncoder();
 
 function buildSearchTermFrequencies(content, title) {
   const terms = new Map();
@@ -1636,9 +1642,10 @@ function buildSearchTermFrequencies(content, title) {
 }
 
 function tokenizeSearchText(text) {
-  return (text.toLowerCase().normalize("NFKD").match(TERM_PATTERN) ?? []).filter(
-    (term) => !STOP_WORDS.has(term)
-  );
+  return prepareSearchText(text)
+    .split(" ")
+    .map((term) => term.toLowerCase())
+    .filter((term) => isSearchToken(term) && !STOP_WORDS.has(term));
 }
 
 function stripWikiSyntaxForSearch(content) {
@@ -1658,6 +1665,41 @@ function addTerms(target, terms, weight) {
   for (const term of terms) {
     target.set(term, (target.get(term) ?? 0) + weight);
   }
+}
+
+function prepareSearchText(text) {
+  return separateAsianWords(text.normalize("NFC"))
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/\u00ad/g, "")
+    .replace(DOKUWIKI_SPECIAL_CHARS_PATTERN, " ");
+}
+
+function separateAsianWords(text) {
+  return text.replace(ASIAN_WORD_PATTERN, " $1 ");
+}
+
+function isSearchToken(term) {
+  if (!term || !SEARCH_CORE_CHAR_PATTERN.test(term)) return false;
+  if (isNumericSearchToken(term)) return true;
+  return utf8Encoder.encode(term).length >= SEARCH_MIN_WORD_BYTES;
+}
+
+function isNumericSearchToken(term) {
+  if (term.trim() === "") return false;
+  return Number.isFinite(Number(term));
+}
+
+function searchIndexWordLength(term) {
+  const bytes = utf8Encoder.encode(term);
+  let length = bytes.length;
+
+  for (const byte of bytes) {
+    if (byte >= 0xe2 && byte <= 0xef) {
+      length += byte - 0xe1;
+    }
+  }
+
+  return length;
 }
 
 function sql(value) {
