@@ -86,6 +86,7 @@ describe("handleRequest", () => {
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
     env.MAINTENANCE_MODE = undefined;
+    env.CAMELCASE = undefined;
   });
 
   it("returns health information for the API health route", async () => {
@@ -203,6 +204,26 @@ describe("handleRequest", () => {
     expect(html).toContain(
       '<a href="/wiki/missing/page" class="wikilink2" title="This topic does not exist yet">Missing</a>'
     );
+  });
+
+  it("honors the CAMELCASE parser setting for page views", async () => {
+    env.CAMELCASE = "1";
+    state.row = {
+      ...currentPageRow(),
+      content: "====== Welcome ======\n\nCamelCase and ExistingPage."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<a href="/wiki/wiki/camelcase" class="wikilink2" title="This topic does not exist yet">CamelCase</a>'
+    );
+    expect(html).toContain(
+      '<a href="/wiki/wiki/existingpage" class="wikilink2" title="This topic does not exist yet">ExistingPage</a>'
+    );
+    expect(cachePuts).not.toContain("page:wiki:welcome");
   });
 
   it("fingerprints static assets with the Pages commit when available", async () => {

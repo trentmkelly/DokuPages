@@ -46,6 +46,7 @@ fresh render.
 - nowiki spans
 - simple tables
 - acronym, entity, smiley, and typography replacement
+- optional CamelCase links
 - section edit anchors
 - DokuWiki-template link classes for internal, external, interwiki, mail, media,
   and Windows-share links
@@ -62,6 +63,7 @@ section controls:
 | `maxtoclevel`    | `MAX_TOC_LEVEL`            | `3`     | Deepest heading level included in generated TOCs.   |
 | `maxseclevel`    | `MAX_SECTION_EDIT_LEVEL`   | `3`     | Deepest heading level with section edit links.      |
 | `useheading`     | `USE_HEADING`              | `false` | Prefer the first page heading as the display title. |
+| `camelcase`      | `CAMELCASE`                | `false` | Convert CamelCase words into internal page links.   |
 
 ## Still Pending
 

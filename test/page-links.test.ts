@@ -19,4 +19,15 @@ describe("page link extraction", () => {
   it("skips DokuWiki interwiki links", () => {
     expect(extractInternalPageLinks("[[doku>plugins]] [[this>doku.php?do=admin]]")).toEqual([]);
   });
+
+  it("extracts CamelCase links only when enabled", () => {
+    const content =
+      "CamelCase [[wiki:syntax|LinkedCamel]] %%NoWikiCamel%% {{wiki:MediaCamel.png}} <code>CodeCamel</code>";
+
+    expect(extractInternalPageLinks(content, "wiki:guide:page")).toEqual(["wiki:syntax"]);
+    expect(extractInternalPageLinks(content, "wiki:guide:page", { camelCaseLinks: true })).toEqual([
+      "wiki:guide:camelcase",
+      "wiki:syntax"
+    ]);
+  });
 });

@@ -29,6 +29,7 @@ export interface RenderWikiTextOptions {
   topTocLevel?: number;
   maxTocLevel?: number;
   maxSectionEditLevel?: number;
+  camelCaseLinks?: boolean;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -160,6 +161,7 @@ export function renderWikiText(
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
     maxSectionEditLevel: clampHeadingLevel(options.maxSectionEditLevel, 5, 0),
+    camelCaseLinks: options.camelCaseLinks ?? false,
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -348,6 +350,7 @@ interface RenderContext {
   topTocLevel: number;
   maxTocLevel: number;
   maxSectionEditLevel: number;
+  camelCaseLinks: boolean;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -616,6 +619,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
             maxSectionEditLevel: context.maxSectionEditLevel,
+            camelCaseLinks: context.camelCaseLinks,
             sectionIndex: context.sectionIndex,
             anchorIds: context.anchorIds
           }
@@ -658,6 +662,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
+  rendered = renderCamelCaseLinks(rendered, context, protectHtml);
   rendered = renderSmileys(rendered, protectHtml);
   rendered = renderAcronyms(rendered, protectHtml);
   rendered = rendered
@@ -908,6 +913,31 @@ function renderEmailAutolinks(source: string, protectHtml: (html: string) => str
     /&lt;([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})&gt;/gi,
     (_match, email: string) => protectHtml(renderEmailLink(email))
   );
+}
+
+function renderCamelCaseLinks(
+  source: string,
+  context: RenderContext,
+  protectHtml: (html: string) => string
+): string {
+  if (!context.camelCaseLinks) return source;
+
+  return source.replace(/\b[A-Z]+[a-z]+[A-Z][A-Za-z]*\b/g, (linkText: string) => {
+    const internalLink = resolveInternalLink(linkText, context.pageId);
+
+    if (!internalLink.pageId) {
+      return linkText;
+    }
+
+    addCacheDependency(context, "page", internalLink.pageId);
+    const internalMissing = isMissingInternalPage(context, internalLink.pageId);
+    const className = internalMissing ? "wikilink2" : "wikilink1";
+    const titleAttribute = internalMissing ? ' title="This topic does not exist yet"' : "";
+
+    return protectHtml(
+      `<a href="${escapeAttribute(internalLink.href)}" class="${className}"${titleAttribute}>${escapeHtml(linkText)}</a>`
+    );
+  });
 }
 
 function renderExternalAutolinks(source: string, protectHtml: (html: string) => string): string {

@@ -219,6 +219,31 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<a href="#local-section" class="wikilink1">Local</a>');
   });
 
+  it("renders CamelCase links only when enabled", () => {
+    const disabled = renderWikiText("See CamelCase and [[wiki:syntax|CamelCase]].", {
+      pageId: "wiki:welcome"
+    });
+    const enabled = renderWikiText("See CamelCase and ExistingPage.", {
+      pageId: "wiki:welcome",
+      existingPageIds: new Set(["wiki:existingpage"]),
+      camelCaseLinks: true
+    });
+
+    expect(disabled.html).toContain("See CamelCase and ");
+    expect(disabled.html).not.toContain('href="/wiki/wiki/camelcase"');
+    expect(disabled.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">CamelCase</a>');
+    expect(enabled.html).toContain(
+      '<a href="/wiki/wiki/camelcase" class="wikilink2" title="This topic does not exist yet">CamelCase</a>'
+    );
+    expect(enabled.html).toContain(
+      '<a href="/wiki/wiki/existingpage" class="wikilink1">ExistingPage</a>'
+    );
+    expect(enabled.dependencies).toEqual([
+      { subjectType: "page", subjectId: "wiki:camelcase" },
+      { subjectType: "page", subjectId: "wiki:existingpage" }
+    ]);
+  });
+
   it("renders interwiki links from the default DokuWiki map", () => {
     const rendered = renderWikiText(
       "[[doku>newsletter]] [[doku>faq:sidebar|FAQ]] [[wp>Wiki|Wiki]] [[this>doku.php?do=admin&page=config|config]]"

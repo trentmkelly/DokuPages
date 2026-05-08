@@ -1059,8 +1059,18 @@ async function handlePagePreview(
   const form = await request.formData();
   const content = String(form.get("content") ?? "");
   const pageId = cleanPageId(String(form.get("id") || overrideId || ""));
-  const existingPageIds = await existingPageIdsForContent(env, content, pageId || undefined);
-  const rendered = renderWikiText(content, { pageId: pageId || undefined, existingPageIds });
+  const config = getRuntimeConfig(env);
+  const existingPageIds = await existingPageIdsForContent(
+    env,
+    content,
+    pageId || undefined,
+    config.camelCaseLinks
+  );
+  const rendered = renderWikiText(content, {
+    pageId: pageId || undefined,
+    existingPageIds,
+    camelCaseLinks: config.camelCaseLinks
+  });
 
   if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
     return jsonResponse(rendered);
@@ -2507,7 +2517,8 @@ function usesDefaultRenderControls(config: ReturnType<typeof getRuntimeConfig>):
     config.topTocLevel === 1 &&
     config.tocMinHeads === 3 &&
     config.maxTocLevel === 3 &&
-    config.maxSectionEditLevel === 3
+    config.maxSectionEditLevel === 3 &&
+    !config.camelCaseLinks
   );
 }
 
@@ -2579,7 +2590,7 @@ async function renderPageHtml(
     });
   }
 
-  const existingPageIds = await existingPageIdsForContent(env, content, id);
+  const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
@@ -2587,7 +2598,8 @@ async function renderPageHtml(
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
-    maxSectionEditLevel: config.maxSectionEditLevel
+    maxSectionEditLevel: config.maxSectionEditLevel,
+    camelCaseLinks: config.camelCaseLinks
   });
   const title = displayPageTitle(config, rendered.title, page?.title, id);
 
@@ -2625,14 +2637,15 @@ async function renderPageExport(
 ): Promise<Response> {
   const content = page.content;
   const revisionId = "revisionId" in page ? page.revisionId : page.id;
-  const existingPageIds = await existingPageIdsForContent(env, content, id);
   const config = getRuntimeConfig(env);
+  const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
-    maxSectionEditLevel: config.maxSectionEditLevel
+    maxSectionEditLevel: config.maxSectionEditLevel,
+    camelCaseLinks: config.camelCaseLinks
   });
   const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
   const headers = securityHeaders({ "x-robots-tag": "noindex" });
@@ -2681,10 +2694,13 @@ function exportFileName(id: string): string {
 async function existingPageIdsForContent(
   env: Env,
   content: string,
-  sourcePageId?: string
+  sourcePageId?: string,
+  camelCaseLinks = false
 ): Promise<Set<string>> {
   const sourceId = sourcePageId ? cleanPageId(sourcePageId) : "";
-  const linkedPageIds = extractInternalPageLinks(content, sourceId || undefined);
+  const linkedPageIds = extractInternalPageLinks(content, sourceId || undefined, {
+    camelCaseLinks
+  });
   const existingPageIds = await listExistingPageIds(
     env.DB,
     sourceId ? [...linkedPageIds, sourceId] : linkedPageIds
