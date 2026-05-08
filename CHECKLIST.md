@@ -741,24 +741,24 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Pre-Launch
 
 - [ ] Freeze writes on the source DokuWiki or define a final sync window.
-- [ ] Run full migration dry run.
-- [ ] Review migration report.
-- [ ] Fix migration errors.
-- [ ] Run full migration rehearsal.
-- [ ] Run full test suite.
-- [ ] Run preview deployment smoke tests.
-- [ ] Run production-like load tests.
-- [ ] Verify redirects.
-- [ ] Verify auth and ACL behavior.
-- [ ] Verify page rendering for representative content.
-- [ ] Verify media rendering for representative media.
+- [x] Run full migration dry run.
+- [x] Review migration report.
+- [x] Fix migration errors.
+- [x] Run full migration rehearsal.
+- [x] Run full test suite.
+- [x] Run preview deployment smoke tests.
+- [x] Run production-like load tests.
+- [x] Verify redirects.
+- [x] Verify auth and ACL behavior.
+- [x] Verify page rendering for representative content.
+- [x] Verify media rendering for representative media.
 - [x] Verify search results.
-- [ ] Verify admin workflows.
-- [ ] Verify backup and restore.
-- [ ] Verify rollback.
-- [ ] Review security headers.
-- [ ] Review secrets.
-- [ ] Review observability.
+- [x] Verify admin workflows.
+- [x] Verify backup and restore.
+- [x] Verify rollback.
+- [x] Review security headers.
+- [x] Review secrets.
+- [x] Review observability.
 - [ ] Approve launch.
 
 ## Launch
