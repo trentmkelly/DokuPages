@@ -1076,6 +1076,18 @@ form.search button {
   color: var(--dw-text);
 }
 
+.media-manager__content:has(#media__upload:target) .media-manager__tab--active,
+.media-manager__content:has(#media__search:target) .media-manager__tab--active {
+  background: linear-gradient(var(--dw-background-alt), var(--dw-background-neutral));
+  color: var(--dw-text);
+}
+
+.media-manager__content:has(#media__upload:target) .media-manager__tab[href="#media__upload"],
+.media-manager__content:has(#media__search:target) .media-manager__tab[href="#media__search"] {
+  background: var(--dw-background-site);
+  color: var(--dw-text);
+}
+
 .media-manager__tabs {
   margin: 0;
   padding-left: 0.35em;
@@ -1253,6 +1265,11 @@ form.search button {
 .dokuwiki .page form.media-manager__upload:target,
 .media-manager__upload--disabled:target {
   display: block;
+}
+
+.media-manager__content:has(#media__upload:target) .media-manager__files,
+.media-manager__content:has(#media__search:target) .media-manager__files {
+  display: none;
 }
 
 .dokuwiki .page .media-manager__search-panel form {
