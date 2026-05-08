@@ -1249,9 +1249,10 @@ describe("auth routes", () => {
       );
 
       expect(removed.status, plugin).toBe(501);
-      await expect(removed.json(), plugin).resolves.toMatchObject({
-        status: "not_available"
-      });
+      expect(removed.headers.get("content-type"), plugin).toBe("text/html; charset=utf-8");
+      await expect(removed.text(), plugin).resolves.toContain(
+        "is not available in this Pages port"
+      );
     }
   });
 

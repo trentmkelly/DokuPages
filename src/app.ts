@@ -188,7 +188,7 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/install.php") {
-    return legacyEndpointNotAvailableResponse("DokuWiki installer", 410);
+    return legacyEndpointNotAvailableResponse(request, env, "DokuWiki installer", 410);
   }
 
   if (url.pathname === "/doku.php") {
@@ -237,7 +237,7 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/lib/exe/indexer.php") {
-    return legacyEndpointNotAvailableResponse("DokuWiki HTTP indexer", 501);
+    return legacyEndpointNotAvailableResponse(request, env, "DokuWiki HTTP indexer", 501);
   }
 
   if (url.pathname === "/lib/exe/taskrunner.php") {
@@ -842,7 +842,7 @@ export async function handleRequest(
 
 function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
   if (url.searchParams.get("do") === "admin") {
-    return redirectLegacyAdminPage(url.searchParams.get("page"));
+    return redirectLegacyAdminPage(request, env, url.searchParams.get("page"));
   }
 
   if (url.searchParams.get("do") === "profile") {
@@ -887,7 +887,7 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
   return redirectResponse(`${target.pathname}${target.search}`, 301);
 }
 
-function redirectLegacyAdminPage(page: string | null): Response {
+function redirectLegacyAdminPage(request: Request, env: Env, page: string | null): Response {
   switch (page) {
     case null:
     case "":
@@ -903,13 +903,18 @@ function redirectLegacyAdminPage(page: string | null): Response {
     case "usermanager":
       return redirectResponse("/admin/users", 301);
     case "extension":
-      return legacyEndpointNotAvailableResponse("DokuWiki extension manager", 501);
+      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki extension manager", 501);
     case "popularity":
-      return legacyEndpointNotAvailableResponse("DokuWiki popularity plugin", 501);
+      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki popularity plugin", 501);
     case "safefnrecode":
-      return legacyEndpointNotAvailableResponse("DokuWiki safefnrecode plugin", 501);
+      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki safefnrecode plugin", 501);
     case "styling":
-      return legacyEndpointNotAvailableResponse("DokuWiki styling plugin runtime editor", 501);
+      return legacyEndpointNotAvailableResponse(
+        request,
+        env,
+        "DokuWiki styling plugin runtime editor",
+        501
+      );
     default:
       return redirectResponse("/admin", 301);
   }
@@ -1745,12 +1750,29 @@ function stringOrNull(value: unknown): string | null {
   return normalized || null;
 }
 
-function legacyEndpointNotAvailableResponse(endpointName: string, status: 410 | 501): Response {
-  return jsonResponse(
-    {
-      error: `${endpointName} is not available in this Pages port.`,
-      status: "not_available"
-    },
+function legacyEndpointNotAvailableResponse(
+  request: Request,
+  env: Env,
+  endpointName: string,
+  status: 410 | 501
+): Response {
+  const body = {
+    error: `${endpointName} is not available in this Pages port.`,
+    status: "not_available"
+  };
+
+  if (acceptsJson(request)) {
+    return jsonResponse(body, { status });
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      endpointName,
+      `<h1>${escapeHtml(endpointName)}</h1>
+      <p>${escapeHtml(body.error)}</p>
+      <p><a href="${pagePath(startPageId(env))}">Go to the start page</a></p>`
+    ),
     { status }
   );
 }

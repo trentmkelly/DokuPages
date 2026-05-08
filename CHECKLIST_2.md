@@ -50,7 +50,7 @@ are not fixed by this checklist.
 - [ ] Match upstream canonical URL behavior controlled by `canonical`, `baseurl`, and `basedir`.
 - [ ] Support upstream `do=redirect` semantics and redirect metadata, not just route canonicalization.
 - [ ] Audit every legacy URL in `docs/url-compatibility.md` against upstream `doku.php`, `feed.php`, `index.php`, and `lib/exe/*` behavior with live fixture requests.
-- [ ] Replace placeholder `501` and `410` JSON responses with DokuWiki-template HTML where upstream would render an HTML page.
+- [x] Replace placeholder `501` and `410` JSON responses with DokuWiki-template HTML where upstream would render an HTML page.
 - [ ] Confirm `index.php`, `doku.php`, `/wiki`, `/index`, and root redirects match upstream status codes, query preservation, and cache headers.
 
 ## Parser And Wiki Syntax

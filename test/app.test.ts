@@ -523,11 +523,22 @@ describe("handleRequest", () => {
     expect(jquery.status).toBe(301);
     expect(jquery.headers.get("location")).toBe("/dokuwiki.js?v=0.1.0");
     expect(install.status).toBe(410);
-    await expect(install.json()).resolves.toMatchObject({ status: "not_available" });
+    expect(install.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    await expect(install.text()).resolves.toContain("<h1>DokuWiki installer</h1>");
     expect(indexer.status).toBe(501);
-    await expect(indexer.json()).resolves.toMatchObject({ status: "not_available" });
+    await expect(indexer.text()).resolves.toContain("<h1>DokuWiki HTTP indexer</h1>");
     expect(taskrunner.status).toBe(204);
     expect(taskrunner.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("returns JSON for unsupported legacy endpoints when JSON is requested", async () => {
+    const install = await handleRequest(
+      new Request("https://example.com/install.php", { headers: { accept: "application/json" } }),
+      env
+    );
+
+    expect(install.status).toBe(410);
+    await expect(install.json()).resolves.toMatchObject({ status: "not_available" });
   });
 
   it("serves authenticated native API read methods with configured CORS", async () => {
