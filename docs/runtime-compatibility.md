@@ -35,83 +35,83 @@ observe or replace core behavior. Pages does not recreate that generic mutable
 event bus. Each upstream event is mapped below to a native equivalent,
 replacement surface, or explicit unsupported status.
 
-| Upstream event                 | Pages status                                                               |
-| ------------------------------ | -------------------------------------------------------------------------- |
-| `ACTION_ACT_PREPROCESS`        | Native route dispatch in `src/app.ts`; no generic preprocessing hook.      |
-| `ACTION_DENIED_TPLCONTENT`     | Native denied-page renderer; no plugin hook.                               |
-| `ACTION_EXPORT_POSTPROCESS`    | Deferred with export-mode parity.                                          |
-| `ACTION_HANDLE_SUBSCRIBE`      | Native subscription handlers; no plugin hook.                              |
-| `ACTION_HEADERS_SEND`          | Native `Response` construction; no global header hook.                     |
-| `ACTION_SHOW_REDIRECT`         | Deferred with redirect metadata parity.                                    |
-| `ADMINPLUGIN_ACCESS_CHECK`     | Native admin ACL checks.                                                   |
-| `AJAX_CALL_UNKNOWN`            | Native AJAX router; unknown calls return compatibility errors.             |
-| `AUTH_ACL_CHECK`               | Native ACL resolver in `src/wiki/acl.ts`.                                  |
-| `AUTH_LOGIN_CHECK`             | Native auth validation and `auth_event` logs.                              |
-| `AUTH_PASSWORD_GENERATE`       | Deferred with upstream generated-password behavior.                        |
-| `AUTH_USER_CHANGE`             | Native user manager writes and audit records.                              |
-| `COMMON_PAGETPL_LOAD`          | Deferred with page-template parity.                                        |
-| `COMMON_USER_LINK`             | Native user display rendering; no plugin hook.                             |
-| `COMMON_WIKIPAGE_SAVE`         | Native page save service, changelog, cache purge, and notifications.       |
-| `COMMON_WORDBLOCK_BLOCKED`     | Native wordblock validator; no plugin hook.                                |
-| `CONFUTIL_CDN_SELECT`          | Not applicable; static assets are Pages assets.                            |
-| `DOKUWIKI_DONE`                | Not applicable; request lifecycle handled by Workers runtime.              |
-| `DOKUWIKI_INIT_DONE`           | Not applicable; module initialization is build/runtime initialization.     |
-| `DOKUWIKI_STARTED`             | Not applicable; request lifecycle handled by Workers runtime.              |
-| `DRAFT_SAVE`                   | Native draft storage and save routes.                                      |
-| `EDIT_FORM_ADDTEXTAREA`        | Native editor UI; no plugin hook.                                          |
-| `FEED_DATA_PROCESS`            | Deferred with feed parity.                                                 |
-| `FEED_ITEM_ADD`                | Deferred with feed parity.                                                 |
-| `FEED_MODE_UNKNOWN`            | Native unsupported feed-mode response.                                     |
-| `FEED_OPTS_POSTPROCESS`        | Deferred with feed parity.                                                 |
-| `FORM_LOGIN_OUTPUT`            | Native login form; no plugin hook.                                         |
-| `FULLTEXT_PHRASE_MATCH`        | Deferred with search-query parity.                                         |
-| `FULLTEXT_SNIPPET_CREATE`      | Native snippets; exact upstream hook deferred.                             |
-| `HTML_*FORM_OUTPUT`            | Native forms; dynamic plugin form hooks are unsupported.                   |
-| `HTML_EDIT_FORMSELECTION`      | Deferred with exact editor form parity.                                    |
-| `HTML_SECEDIT_BUTTON`          | Native section edit links; no plugin hook.                                 |
-| `HTML_SHOWREV_OUTPUT`          | Native old-revision notice; no plugin hook.                                |
-| `HTTPCLIENT_REQUEST_SEND`      | Native `fetch`; extension interception unsupported.                        |
-| `INDEXER_PAGE_ADD`             | Native search posting writer.                                              |
-| `INDEXER_TASKS_RUN`            | Deferred with task-runner/indexer parity.                                  |
-| `INDEXER_TEXT_PREPARE`         | Native tokenizer; exact upstream hook deferred.                            |
-| `INDEXER_VERSION_GET`          | Not applicable; native search schema versions replace index version hooks. |
-| `INFOUTIL_MSG_SHOW`            | Native diagnostics; no plugin hook.                                        |
-| `INIT_LANG_LOAD`               | Deferred with runtime language-pack parity.                                |
-| `IO_NAMESPACE_CREATED`         | Native D1/R2 namespace materialization; no plugin hook.                    |
-| `IO_NAMESPACE_DELETED`         | Native D1/R2 namespace cleanup; no plugin hook.                            |
-| `IO_WIKIPAGE_READ`             | Native page reads through D1 services; no plugin hook.                     |
-| `IO_WIKIPAGE_WRITE`            | Native page writes through D1 services; no plugin hook.                    |
-| `LOGGER_DATA_FORMAT`           | Native structured logs and audit rows.                                     |
-| `MAIL_MESSAGE_SEND`            | Native email adapter; no plugin hook.                                      |
-| `MANIFEST_SEND`                | Native manifest route; no plugin hook.                                     |
-| `MEDIAMANAGER_CONTENT_OUTPUT`  | Native media-manager renderer; no plugin hook.                             |
-| `MEDIA_DELETE_FILE`            | Native media delete service; no plugin hook.                               |
-| `MEDIA_SEARCH`                 | Native D1 media search; exact metadata hook deferred.                      |
-| `MEDIA_UPLOAD_FINISH`          | Native upload service, audit, cache purge, and validation.                 |
-| `MENU_ITEMS_ASSEMBLY`          | Native menu builder; no plugin hook.                                       |
-| `PAGEUTILS_ID_HIDEPAGE`        | Native hidden-page filtering.                                              |
-| `PARSER_HANDLER_DONE`          | Native renderer; no PHP instruction handler hook.                          |
-| `PARSER_LOCALE_XHTML`          | Deferred with localization parity.                                         |
-| `PARSER_METADATA_RENDER`       | Native metadata rows cover core page metadata; renderer hooks unsupported. |
-| `PARSER_WIKITEXT_PREPROCESS`   | Native renderer input; generic preprocessing hook unsupported.             |
-| `PLUGIN_CONFIG_PLUGINLIST`     | Native plugin compatibility report; no runtime plugin loading.             |
-| `PLUGIN_POPULARITY_DATA_SETUP` | Removed; popularity phone-home is unsupported.                             |
-| `RENDERER_CONTENT_POSTPROCESS` | Native renderer output; generic postprocess hook unsupported.              |
-| `SEARCH_QUERY_FULLPAGE`        | Native search service; exact query hook deferred.                          |
-| `SEARCH_QUERY_PAGELOOKUP`      | Native search service; exact query hook deferred.                          |
-| `SEARCH_RESULT_FULLPAGE`       | Native search result renderer; exact result hook deferred.                 |
-| `SEARCH_RESULT_PAGELOOKUP`     | Native search result renderer; exact result hook deferred.                 |
-| `SITEMAP_GENERATE`             | Native sitemap route; no plugin hook.                                      |
-| `SITEMAP_PING`                 | Unsupported; Pages does not ping search engines from request handlers.     |
-| `TASK_RECENTCHANGES_TRIM`      | Deferred with task-runner parity.                                          |
-| `TOOLBAR_DEFINE`               | Deferred with editor toolbar parity.                                       |
-| `TPL_ACTION_GET`               | Native template action mapping; no plugin hook.                            |
-| `TPL_ACT_RENDER`               | Native page shell renderer; no plugin hook.                                |
-| `TPL_ACT_UNKNOWN`              | Native unsupported action response.                                        |
-| `TPL_CONTENT_DISPLAY`          | Native page shell renderer; no plugin hook.                                |
-| `TPL_IMG_DISPLAY`              | Native media rendering; no plugin hook.                                    |
-| `TPL_METAHEADER_OUTPUT`        | Native head rendering; no plugin hook.                                     |
-| `TPL_TOC_RENDER`               | Native TOC renderer; no plugin hook.                                       |
+| Upstream event                 | Pages status                                                                |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `ACTION_ACT_PREPROCESS`        | Native route dispatch in `src/app.ts`; no generic preprocessing hook.       |
+| `ACTION_DENIED_TPLCONTENT`     | Native denied-page renderer; no plugin hook.                                |
+| `ACTION_EXPORT_POSTPROCESS`    | Deferred with export-mode parity.                                           |
+| `ACTION_HANDLE_SUBSCRIBE`      | Native subscription handlers; no plugin hook.                               |
+| `ACTION_HEADERS_SEND`          | Native `Response` construction; no global header hook.                      |
+| `ACTION_SHOW_REDIRECT`         | Deferred with redirect metadata parity.                                     |
+| `ADMINPLUGIN_ACCESS_CHECK`     | Native admin ACL checks.                                                    |
+| `AJAX_CALL_UNKNOWN`            | Native AJAX router; unknown calls return compatibility errors.              |
+| `AUTH_ACL_CHECK`               | Native ACL resolver in `src/wiki/acl.ts`.                                   |
+| `AUTH_LOGIN_CHECK`             | Native auth validation and `auth_event` logs.                               |
+| `AUTH_PASSWORD_GENERATE`       | Deferred with upstream generated-password behavior.                         |
+| `AUTH_USER_CHANGE`             | Native user manager writes and audit records.                               |
+| `COMMON_PAGETPL_LOAD`          | Deferred with page-template parity.                                         |
+| `COMMON_USER_LINK`             | Native user display rendering; no plugin hook.                              |
+| `COMMON_WIKIPAGE_SAVE`         | Native page save service, changelog, cache purge, and notifications.        |
+| `COMMON_WORDBLOCK_BLOCKED`     | Native wordblock validator; no plugin hook.                                 |
+| `CONFUTIL_CDN_SELECT`          | Not applicable; static assets are Pages assets.                             |
+| `DOKUWIKI_DONE`                | Not applicable; request lifecycle handled by Workers runtime.               |
+| `DOKUWIKI_INIT_DONE`           | Not applicable; module initialization is build/runtime initialization.      |
+| `DOKUWIKI_STARTED`             | Not applicable; request lifecycle handled by Workers runtime.               |
+| `DRAFT_SAVE`                   | Native draft storage and save routes.                                       |
+| `EDIT_FORM_ADDTEXTAREA`        | Native editor UI; no plugin hook.                                           |
+| `FEED_DATA_PROCESS`            | Deferred with feed parity.                                                  |
+| `FEED_ITEM_ADD`                | Deferred with feed parity.                                                  |
+| `FEED_MODE_UNKNOWN`            | Native unsupported feed-mode response.                                      |
+| `FEED_OPTS_POSTPROCESS`        | Deferred with feed parity.                                                  |
+| `FORM_LOGIN_OUTPUT`            | Native login form; no plugin hook.                                          |
+| `FULLTEXT_PHRASE_MATCH`        | Deferred with search-query parity.                                          |
+| `FULLTEXT_SNIPPET_CREATE`      | Native snippets; exact upstream hook deferred.                              |
+| `HTML_*FORM_OUTPUT`            | Native forms; dynamic plugin form hooks are unsupported.                    |
+| `HTML_EDIT_FORMSELECTION`      | Deferred with exact editor form parity.                                     |
+| `HTML_SECEDIT_BUTTON`          | Native section edit links; no plugin hook.                                  |
+| `HTML_SHOWREV_OUTPUT`          | Native old-revision notice; no plugin hook.                                 |
+| `HTTPCLIENT_REQUEST_SEND`      | Native `fetch`; extension interception unsupported.                         |
+| `INDEXER_PAGE_ADD`             | Native search posting writer.                                               |
+| `INDEXER_TASKS_RUN`            | Deferred with task-runner/indexer parity.                                   |
+| `INDEXER_TEXT_PREPARE`         | Native tokenizer; exact upstream hook deferred.                             |
+| `INDEXER_VERSION_GET`          | Not applicable; native search schema versions replace index version hooks.  |
+| `INFOUTIL_MSG_SHOW`            | Native diagnostics; no plugin hook.                                         |
+| `INIT_LANG_LOAD`               | Deferred with runtime language-pack parity.                                 |
+| `IO_NAMESPACE_CREATED`         | Native D1/R2 namespace materialization; no plugin hook.                     |
+| `IO_NAMESPACE_DELETED`         | Native D1/R2 namespace cleanup; no plugin hook.                             |
+| `IO_WIKIPAGE_READ`             | Native page reads through D1 services; no plugin hook.                      |
+| `IO_WIKIPAGE_WRITE`            | Native page writes through D1 services; no plugin hook.                     |
+| `LOGGER_DATA_FORMAT`           | Native structured logs and audit rows.                                      |
+| `MAIL_MESSAGE_SEND`            | Native email adapter; no plugin hook.                                       |
+| `MANIFEST_SEND`                | Native manifest route; no plugin hook.                                      |
+| `MEDIAMANAGER_CONTENT_OUTPUT`  | Native media-manager renderer; no plugin hook.                              |
+| `MEDIA_DELETE_FILE`            | Native media delete service; no plugin hook.                                |
+| `MEDIA_SEARCH`                 | Native recursive D1 media search over IDs, MIME types, and stored metadata. |
+| `MEDIA_UPLOAD_FINISH`          | Native upload service, audit, cache purge, and validation.                  |
+| `MENU_ITEMS_ASSEMBLY`          | Native menu builder; no plugin hook.                                        |
+| `PAGEUTILS_ID_HIDEPAGE`        | Native hidden-page filtering.                                               |
+| `PARSER_HANDLER_DONE`          | Native renderer; no PHP instruction handler hook.                           |
+| `PARSER_LOCALE_XHTML`          | Deferred with localization parity.                                          |
+| `PARSER_METADATA_RENDER`       | Native metadata rows cover core page metadata; renderer hooks unsupported.  |
+| `PARSER_WIKITEXT_PREPROCESS`   | Native renderer input; generic preprocessing hook unsupported.              |
+| `PLUGIN_CONFIG_PLUGINLIST`     | Native plugin compatibility report; no runtime plugin loading.              |
+| `PLUGIN_POPULARITY_DATA_SETUP` | Removed; popularity phone-home is unsupported.                              |
+| `RENDERER_CONTENT_POSTPROCESS` | Native renderer output; generic postprocess hook unsupported.               |
+| `SEARCH_QUERY_FULLPAGE`        | Native search service; exact query hook deferred.                           |
+| `SEARCH_QUERY_PAGELOOKUP`      | Native search service; exact query hook deferred.                           |
+| `SEARCH_RESULT_FULLPAGE`       | Native search result renderer; exact result hook deferred.                  |
+| `SEARCH_RESULT_PAGELOOKUP`     | Native search result renderer; exact result hook deferred.                  |
+| `SITEMAP_GENERATE`             | Native sitemap route; no plugin hook.                                       |
+| `SITEMAP_PING`                 | Unsupported; Pages does not ping search engines from request handlers.      |
+| `TASK_RECENTCHANGES_TRIM`      | Deferred with task-runner parity.                                           |
+| `TOOLBAR_DEFINE`               | Deferred with editor toolbar parity.                                        |
+| `TPL_ACTION_GET`               | Native template action mapping; no plugin hook.                             |
+| `TPL_ACT_RENDER`               | Native page shell renderer; no plugin hook.                                 |
+| `TPL_ACT_UNKNOWN`              | Native unsupported action response.                                         |
+| `TPL_CONTENT_DISPLAY`          | Native page shell renderer; no plugin hook.                                 |
+| `TPL_IMG_DISPLAY`              | Native media rendering; no plugin hook.                                     |
+| `TPL_METAHEADER_OUTPUT`        | Native head rendering; no plugin hook.                                      |
+| `TPL_TOC_RENDER`               | Native TOC renderer; no plugin hook.                                        |
 
 Bundled plugins currently register hooks for `AJAX_CALL_UNKNOWN`,
 `AUTH_LOGIN_CHECK`, `FORM_LOGIN_OUTPUT`, `INDEXER_TASKS_RUN`, and

@@ -1305,6 +1305,41 @@ describe("handleRequest", () => {
     }
   });
 
+  it("searches media recursively and matches imported metadata fields", async () => {
+    state.media.push({
+      id: "wiki:albums:photo.jpg",
+      namespace: "wiki:albums",
+      object_key: "media/current/wiki/albums/photo.jpg",
+      mime_type: "image/jpeg",
+      byte_length: 128,
+      content_hash: "photo-hash",
+      current_revision_id: "photo-rev",
+      is_deleted: 0,
+      created_at: "2026-05-08T00:00:00.000Z",
+      updated_at: "2026-05-08T00:00:00.000Z"
+    });
+    state.metadata.push({
+      subject_type: "media",
+      subject_id: "wiki:albums:photo.jpg",
+      key: "jpeg",
+      value_json: JSON.stringify({
+        fields: [{ label: "Title", value: "Sunset over the lake" }]
+      }),
+      updated_at: "2026-05-08T00:00:00.000Z"
+    });
+
+    const response = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki&q=sunset"),
+      env
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain("photo.jpg");
+    expect(html).toContain("Search results for <strong>sunset</strong>");
+    expect(html).not.toContain("No media found.");
+  });
+
   it("answers conditional media fetches without R2 body reads", async () => {
     const r2Operations = { head: 0, get: 0, put: 0, delete: 0 };
     env.MEDIA_BUCKET = createR2Stub(r2Operations);
@@ -3567,7 +3602,7 @@ function createD1Stub(state: D1StubState): D1Database {
             );
           }
 
-          if (sql.includes("from metadata")) {
+          if (sql.includes("from metadata") && !sql.includes("from media")) {
             const [subjectId, key] = values;
             return (
               state.metadata.find(
@@ -3649,7 +3684,7 @@ function createD1Stub(state: D1StubState): D1Database {
             };
           }
 
-          if (sql.includes("from metadata")) {
+          if (sql.includes("from metadata") && !sql.includes("from media")) {
             const [subjectType, subjectId] = values;
             return {
               results: state.metadata
@@ -3727,13 +3762,26 @@ function createD1Stub(state: D1StubState): D1Database {
             };
           }
 
-          if (sql.includes("from media") && sql.includes("where namespace = ?")) {
+          if (sql.includes("from media") && sql.includes("namespace = ?")) {
+            const recursiveSearch = sql.includes("metadata.subject_id = media.id");
+            const namespace = String(recursiveSearch ? values[0] : idOrLimit);
             const query = sql.includes("like")
-              ? String(values[1] ?? "")
+              ? String(recursiveSearch ? (values[4] ?? "") : (values[1] ?? ""))
                   .replaceAll("%", "")
                   .replaceAll("\\", "")
                   .toLowerCase()
               : "";
+            const inNamespace = (media: Record<string, unknown>) =>
+              !namespace ||
+              media.namespace === namespace ||
+              String(media.namespace ?? "").startsWith(`${namespace}:`);
+            const matchesMetadata = (media: Record<string, unknown>) =>
+              state.metadata.some(
+                (record) =>
+                  record.subject_type === "media" &&
+                  record.subject_id === media.id &&
+                  String(record.value_json).toLowerCase().includes(query)
+              );
             const sortMediaRows = (rows: Record<string, unknown>[]) => {
               const direction = sql.includes(" desc") ? -1 : 1;
               const key = sql.includes("order by updated_at") ? "updated_at" : "id";
@@ -3747,11 +3795,12 @@ function createD1Stub(state: D1StubState): D1Database {
                 sortMediaRows(
                   state.media.filter(
                     (media) =>
-                      media.namespace === idOrLimit &&
+                      inNamespace(media) &&
                       media.is_deleted === 0 &&
                       (!query ||
                         String(media.id).toLowerCase().includes(query) ||
-                        String(media.mime_type).toLowerCase().includes(query))
+                        String(media.mime_type).toLowerCase().includes(query) ||
+                        matchesMetadata(media))
                   )
                 ),
                 200

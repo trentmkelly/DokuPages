@@ -138,7 +138,11 @@ counts plus a bounded sample of deleted keys.
 
 ## Search Semantics
 
-Media manager search is namespace-scoped. The `q` parameter matches active media IDs and MIME types in D1 and excludes deleted media rows.
+Media manager search is recursive below the selected namespace, matching
+DokuWiki's `media_searchlist()` behavior for namespace searches. The `q`
+parameter matches active media IDs, MIME types, and stored media metadata JSON
+such as imported DokuWiki metadata rows or parsed JPEG title/caption fields.
+Deleted media rows are excluded.
 
 ## Delivery Semantics
 

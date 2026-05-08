@@ -353,19 +353,41 @@ export async function searchMedia(
 ): Promise<CurrentMedia[]> {
   const safeLimit = Math.max(1, Math.min(limit, 500));
   const safeOffset = Math.max(0, offset);
-  const pattern = likePattern(query);
+  const textPattern = likePattern(query);
+  const idPattern = mediaSearchIdPattern(query);
+  const childNamespacePattern = namespace ? `${escapeLike(namespace)}:%` : "%";
   const orderBy = mediaOrderBySql(options);
   const result = await db
     .prepare(
       `select id, namespace, object_key, mime_type, byte_length, content_hash,
               current_revision_id, created_at, updated_at
        from media
-       where namespace = ? and is_deleted = 0
-         and (id like ? escape '\\' or mime_type like ? escape '\\')
+       where (? = '' or namespace = ? or namespace like ? escape '\\')
+         and is_deleted = 0
+         and (
+           id like ? escape '\\'
+           or mime_type like ? escape '\\'
+           or exists (
+             select 1
+             from metadata
+             where metadata.subject_type = 'media'
+               and metadata.subject_id = media.id
+               and metadata.value_json like ? escape '\\'
+           )
+         )
        order by ${orderBy}
        limit ? offset ?`
     )
-    .bind(namespace, pattern, pattern, safeLimit, safeOffset)
+    .bind(
+      namespace,
+      namespace,
+      childNamespacePattern,
+      idPattern,
+      textPattern,
+      textPattern,
+      safeLimit,
+      safeOffset
+    )
     .all<CurrentMediaRow>();
 
   return result.results.map(mapCurrentMedia);
@@ -866,6 +888,26 @@ async function sha256(value: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function mediaSearchIdPattern(query: string): string {
+  if (!/[*?]/.test(query)) return likePattern(query);
+
+  let pattern = "";
+  for (const char of query) {
+    if (char === "*") {
+      pattern += "%";
+    } else if (char === "?") {
+      pattern += "_";
+    } else {
+      pattern += escapeLike(char);
+    }
+  }
+  return `%${pattern}%`;
+}
+
 function likePattern(query: string): string {
-  return `%${query.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+  return `%${escapeLike(query)}%`;
+}
+
+function escapeLike(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 }
