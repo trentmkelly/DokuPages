@@ -63,8 +63,8 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/lib/exe/xmlrpc.php`                               | Returns explicit `501` JSON.                                                                            |
 | `/lib/exe/jsonrpc.php`                              | Returns explicit `501` JSON.                                                                            |
 | `/lib/exe/openapi.php`                              | Returns explicit `501` JSON.                                                                            |
-| `/lib/exe/indexer.php`                              | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
-| `/lib/exe/taskrunner.php`                           | Returns `204` because there is no PHP task runner.                                                      |
+| `/lib/exe/indexer.php`                              | Runs the native D1 page indexer task for `id`, returning DokuWiki's task-runner GIF by default.         |
+| `/lib/exe/taskrunner.php`                           | Alias for the native D1 page indexer task runner.                                                       |
 | `/install.php`                                      | Returns explicit DokuWiki-styled `410` HTML, or JSON by request.                                        |
 | `/profile`                                          | Serves the native profile update form for authenticated users.                                          |
 | `/api/auth/profile`                                 | Updates display name, email, and password for authenticated users.                                      |

@@ -118,6 +118,7 @@ import {
   listWantedPages,
   lookupPages,
   pagePath,
+  rebuildPageSearchIndex,
   rebuildSearchIndex,
   savePage,
   savePageDraft,
@@ -290,15 +291,8 @@ export async function handleRequest(
     return remoteApiNotImplementedResponse("OpenAPI");
   }
 
-  if (url.pathname === "/lib/exe/indexer.php") {
-    return legacyEndpointNotAvailableResponse(request, env, "DokuWiki HTTP indexer", 501);
-  }
-
-  if (url.pathname === "/lib/exe/taskrunner.php") {
-    return new Response(null, {
-      status: 204,
-      headers: securityHeaders({ "cache-control": "no-store" })
-    });
+  if (url.pathname === "/lib/exe/indexer.php" || url.pathname === "/lib/exe/taskrunner.php") {
+    return handleIndexerTask(request, env, url);
   }
 
   if (url.pathname === "/lib/exe/ajax.php") {
@@ -2226,6 +2220,70 @@ function numericSearchParam(url: URL, name: string, fallback: number): number {
 function stringOrNull(value: unknown): string | null {
   const normalized = String(value ?? "");
   return normalized || null;
+}
+
+const TASKRUNNER_GIF_BASE64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAEALAAAAAABAAEAAAIBTAA7";
+
+async function handleIndexerTask(request: Request, env: Env, url: URL): Promise<Response> {
+  const config = getRuntimeConfig(env);
+  const id = cleanPageId(url.searchParams.get("id") ?? "", config.pageIdCleanOptions);
+
+  if (!id) {
+    const payload = {
+      ok: true,
+      task: "indexer",
+      status: "skipped",
+      reason: "missing_id"
+    };
+
+    if (acceptsJson(request)) return jsonResponse(payload);
+    if (url.searchParams.has("debug")) {
+      return indexerDebugResponse(["runIndexer(): started", "Indexer: no page id supplied"]);
+    }
+    return taskrunnerGifResponse();
+  }
+
+  const result = await rebuildPageSearchIndex(env.DB, id, new Date(), config.language);
+  const payload = {
+    ok: true,
+    task: "indexer",
+    ...result
+  };
+
+  if (acceptsJson(request)) return jsonResponse(payload);
+  if (url.searchParams.has("debug")) {
+    return indexerDebugResponse([
+      "runIndexer(): started",
+      result.status === "missing"
+        ? `Indexer: ${result.id} does not exist, removed from index`
+        : "Indexer: finished"
+    ]);
+  }
+
+  return taskrunnerGifResponse();
+}
+
+function taskrunnerGifResponse(): Response {
+  const bytes = Uint8Array.from(atob(TASKRUNNER_GIF_BASE64), (char) => char.charCodeAt(0));
+
+  return new Response(bytes, {
+    status: 200,
+    headers: securityHeaders({
+      "cache-control": "no-store",
+      "content-length": String(bytes.byteLength),
+      "content-type": "image/gif"
+    })
+  });
+}
+
+function indexerDebugResponse(lines: string[]): Response {
+  return new Response(`${lines.join("\n")}\n`, {
+    status: 200,
+    headers: securityHeaders({
+      "cache-control": "no-store",
+      "content-type": "text/plain; charset=utf-8"
+    })
+  });
 }
 
 function legacyEndpointNotAvailableResponse(

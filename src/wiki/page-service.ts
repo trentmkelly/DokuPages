@@ -92,6 +92,13 @@ export interface RebuildSearchIndexResult {
   postingCount: number;
 }
 
+export interface PageSearchIndexTaskResult {
+  id: string;
+  status: "indexed" | "missing";
+  termCount: number;
+  postingCount: number;
+}
+
 export interface RecentChangeListOptions {
   namespace?: string;
   groupBySubject?: boolean;
@@ -1270,6 +1277,39 @@ export async function rebuildSearchIndex(
     pageCount: pages.length,
     termCount: termDocumentCounts.size,
     postingCount: postings.length
+  };
+}
+
+export async function rebuildPageSearchIndex(
+  db: D1Database,
+  id: string,
+  now = new Date(),
+  language = "en"
+): Promise<PageSearchIndexTaskResult> {
+  const page = await getCurrentPage(db, id);
+  const previousTerms = await listIndexedTerms(db, id);
+  const updatedAt = now.toISOString();
+
+  if (!page) {
+    await db.batch(buildSearchIndexStatements(db, id, new Map(), previousTerms, updatedAt));
+
+    return {
+      id,
+      status: "missing",
+      termCount: 0,
+      postingCount: 0
+    };
+  }
+
+  const title = page.title ?? pageTitleFromId(page.id);
+  const terms = buildSearchTermFrequencies(page.content, title, language, page.id);
+  await db.batch(buildSearchIndexStatements(db, id, terms, previousTerms, updatedAt));
+
+  return {
+    id,
+    status: "indexed",
+    termCount: terms.size,
+    postingCount: terms.size
   };
 }
 

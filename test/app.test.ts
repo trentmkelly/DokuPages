@@ -780,10 +780,50 @@ describe("handleRequest", () => {
     expect(install.status).toBe(410);
     expect(install.headers.get("content-type")).toBe("text/html; charset=utf-8");
     await expect(install.text()).resolves.toContain("<h1>DokuWiki installer</h1>");
-    expect(indexer.status).toBe(501);
-    await expect(indexer.text()).resolves.toContain("<h1>DokuWiki HTTP indexer</h1>");
-    expect(taskrunner.status).toBe(204);
+    expect(indexer.status).toBe(200);
+    expect(indexer.headers.get("content-type")).toBe("image/gif");
+    expect(taskrunner.status).toBe(200);
+    expect(taskrunner.headers.get("content-type")).toBe("image/gif");
     expect(taskrunner.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("runs legacy DokuWiki indexer tasks for page ids", async () => {
+    state.searchPostings = [
+      {
+        term: "stale",
+        page_id: "wiki:welcome",
+        frequency: 1,
+        updated_at: "2026-05-01T00:00:00.000Z"
+      }
+    ];
+
+    const debug = await handleRequest(
+      new Request("https://example.com/lib/exe/indexer.php?id=Wiki:Welcome&debug=1"),
+      env
+    );
+    const json = await handleRequest(
+      new Request("https://example.com/lib/exe/taskrunner.php?id=wiki:missing", {
+        headers: { accept: "application/json" }
+      }),
+      env
+    );
+
+    expect(debug.status).toBe(200);
+    expect(debug.headers.get("content-type")).toContain("text/plain");
+    await expect(debug.text()).resolves.toContain("Indexer: finished");
+    expect(state.searchPostings).toContainEqual(
+      expect.objectContaining({ page_id: "wiki:welcome", term: "imported" })
+    );
+    expect(state.searchPostings).not.toContainEqual(
+      expect.objectContaining({ page_id: "wiki:welcome", term: "stale" })
+    );
+    expect(json.status).toBe(200);
+    await expect(json.json()).resolves.toMatchObject({
+      ok: true,
+      task: "indexer",
+      id: "wiki:missing",
+      status: "missing"
+    });
   });
 
   it("returns JSON for unsupported legacy endpoints when JSON is requested", async () => {
@@ -873,11 +913,11 @@ describe("handleRequest", () => {
       ["/lib/exe/manifest.php", 200, "application/manifest+json"],
       ["/manifest.webmanifest", 200, "application/manifest+json"],
       ["/install.php", 410, "text/html"],
-      ["/lib/exe/indexer.php", 501, "text/html"],
+      ["/lib/exe/indexer.php", 200, "image/gif"],
       ["/lib/exe/xmlrpc.php", 501, "application/json"],
       ["/lib/exe/jsonrpc.php", 501, "application/json"],
       ["/lib/exe/openapi.php", 501, "application/json"],
-      ["/lib/exe/taskrunner.php", 204, ""],
+      ["/lib/exe/taskrunner.php", 200, "image/gif"],
       ["/index?ns=wiki", 200, "text/html"]
     ];
 
