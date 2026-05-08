@@ -561,6 +561,90 @@ describe("handleRequest", () => {
     await expect(install.json()).resolves.toMatchObject({ status: "not_available" });
   });
 
+  it("audits documented legacy URL compatibility routes", async () => {
+    const redirects: Array<[string, number, string]> = [
+      ["/", 302, "/wiki/wiki/welcome"],
+      ["/index.php", 301, "/wiki/wiki/welcome"],
+      ["/index.html", 301, "/wiki/wiki/welcome"],
+      ["/wiki", 301, "/wiki/wiki/welcome"],
+      ["/wiki/", 301, "/wiki/wiki/welcome"],
+      ["/doku.php?id=Wiki:Welcome", 301, "/wiki/wiki/welcome"],
+      ["/doku.php?id=Wiki:Welcome&do=edit", 301, "/wiki/wiki/welcome?do=edit"],
+      ["/doku.php?id=Wiki:Welcome&do=revisions", 301, "/wiki/wiki/welcome?do=revisions"],
+      ["/doku.php?id=Wiki:Welcome&do=backlink", 301, "/wiki/wiki/welcome?do=backlink"],
+      ["/doku.php?id=Wiki:Welcome&do=source", 301, "/wiki/wiki/welcome?do=source"],
+      ["/doku.php?id=Wiki:Welcome&do=subscribe", 301, "/wiki/wiki/welcome?do=subscribe"],
+      ["/doku.php?id=Wiki:Welcome&do=check", 301, "/wiki/wiki/welcome?do=check"],
+      ["/doku.php?id=Wiki:Welcome&do=denied", 301, "/wiki/wiki/welcome?do=denied"],
+      ["/doku.php?id=Wiki:Welcome&do=locked", 301, "/wiki/wiki/welcome?do=locked"],
+      ["/doku.php?id=Wiki:Welcome&do=conflict", 301, "/wiki/wiki/welcome?do=conflict"],
+      ["/doku.php?id=Wiki:Welcome&do=cancel", 301, "/wiki/wiki/welcome?do=cancel"],
+      ["/doku.php?id=Wiki:Welcome&do=recover", 301, "/wiki/wiki/welcome?do=recover"],
+      ["/doku.php?id=Wiki:Welcome&do=draftdel", 301, "/wiki/wiki/welcome?do=draftdel"],
+      ["/doku.php?id=Wiki:Welcome&do=authtoken", 301, "/wiki/wiki/welcome?do=authtoken"],
+      ["/doku.php?id=Wiki:Welcome&do=plugin", 301, "/wiki/wiki/welcome?do=plugin"],
+      ["/doku.php?id=Wiki:Welcome&do=media", 301, "/wiki/wiki/welcome?do=media"],
+      ["/doku.php?id=Wiki:Welcome&do=export_raw", 301, "/wiki/wiki/welcome?do=export_raw"],
+      [
+        "/doku.php?id=Wiki:Welcome&do=export_htmlbody",
+        301,
+        "/wiki/wiki/welcome?do=export_xhtmlbody"
+      ],
+      ["/doku.php?do=admin", 301, "/admin"],
+      ["/doku.php?do=admin&page=acl", 301, "/admin/acl"],
+      ["/doku.php?do=admin&page=config", 301, "/admin/config"],
+      ["/doku.php?do=admin&page=info", 301, "/diagnostics"],
+      ["/doku.php?do=admin&page=logviewer", 301, "/admin/audit"],
+      ["/doku.php?do=admin&page=usermanager", 301, "/admin/users"],
+      ["/doku.php?do=register", 301, "/register"],
+      ["/doku.php?do=profile", 301, "/profile"],
+      ["/doku.php?do=resendpwd", 301, "/resendpwd"],
+      ["/lib/exe/css.php?t=1", 301, "/dokuwiki.css?v=0.1.0"],
+      ["/lib/exe/js.php?t=1", 301, "/dokuwiki.js?v=0.1.0"],
+      ["/lib/exe/jquery.php", 301, "/dokuwiki.js?v=0.1.0"],
+      ["/lib/exe/fetch.php?media=wiki:logo.svg&dl=1", 301, "/media/wiki/logo.svg?download=1"],
+      ["/lib/exe/detail.php?id=wiki:logo.svg", 301, "/media-detail/wiki/logo.svg"],
+      ["/lib/exe/mediamanager.php?ns=wiki", 301, "/media-manager?ns=wiki"]
+    ];
+
+    for (const [path, status, location] of redirects) {
+      const response = await handleRequest(new Request(`https://example.com${path}`), env);
+      expect(response.status, path).toBe(status);
+      expect(response.headers.get("location"), path).toBe(location);
+      expect(response.headers.get("content-security-policy"), path).toContain("default-src 'self'");
+    }
+
+    const htmlRoutes: Array<[string, number, string]> = [
+      ["/", 302, ""],
+      ["/feed.php", 200, "application/rss+xml"],
+      ["/feed", 200, "application/rss+xml"],
+      ["/feed.xml", 200, "application/rss+xml"],
+      ["/atom.xml", 200, "application/atom+xml"],
+      ["/sitemap.xml", 200, "application/xml"],
+      ["/sitemap", 200, "application/xml"],
+      ["/robots.txt", 200, "text/plain"],
+      ["/lib/exe/opensearch.php", 200, "application/xml"],
+      ["/opensearch.xml", 200, "application/xml"],
+      ["/lib/exe/manifest.php", 200, "application/manifest+json"],
+      ["/manifest.webmanifest", 200, "application/manifest+json"],
+      ["/install.php", 410, "text/html"],
+      ["/lib/exe/indexer.php", 501, "text/html"],
+      ["/lib/exe/xmlrpc.php", 501, "application/json"],
+      ["/lib/exe/jsonrpc.php", 501, "application/json"],
+      ["/lib/exe/openapi.php", 501, "application/json"],
+      ["/lib/exe/taskrunner.php", 204, ""],
+      ["/index?ns=wiki", 200, "text/html"]
+    ];
+
+    for (const [path, status, contentType] of htmlRoutes) {
+      const response = await handleRequest(new Request(`https://example.com${path}`), env);
+      expect(response.status, path).toBe(status);
+      if (contentType) {
+        expect(response.headers.get("content-type"), path).toContain(contentType);
+      }
+    }
+  });
+
   it("serves authenticated native API read methods with configured CORS", async () => {
     const headers = {
       authorization: "Bearer test-token",
