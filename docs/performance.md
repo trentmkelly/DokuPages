@@ -84,6 +84,16 @@ index on `(dependency_type, dependency_id, cache_key)`. Page saves and media
 uploads/deletes/reverts use that index to purge rendered pages that reference
 the changed subject.
 
+Important pages can be warmed after deployment with:
+
+```sh
+npm run cache:warm -- --base-url https://dokutest.pages.dev
+```
+
+The default warming set requests the site root, welcome page, syntax page,
+sitemap, and RSS feed. Operators can add `--path /wiki/custom/page` arguments
+for release-specific pages.
+
 ## Metadata Cache Decision
 
 No separate metadata cache is used for launch. Page and media saves write

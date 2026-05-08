@@ -22,6 +22,7 @@
     "import:media-upload": "node scripts/upload-r2-media.mjs --manifest .wrangler/dokuwiki-media-manifest.json --bucket dokuwiki-pages-dev-media --remote",
     "backup:export": "node scripts/export-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
     "backup:restore": "node scripts/restore-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
+    "cache:warm": "node scripts/warm-cache.mjs",
     "smoke": "node scripts/smoke-pages.mjs",
     "test:e2e": "node scripts/smoke-pages.mjs",
     "lint": "eslint .",

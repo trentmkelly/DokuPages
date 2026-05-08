@@ -50,6 +50,12 @@ Set `MAINTENANCE_MODE=1` during final sync or incident response to keep the wiki
 readable while blocking page/media writes, drafts, edit locks, and native API
 content writes. Clear the variable and redeploy to resume writes.
 
+After a deployment, warm important rendered/discovery cache entries:
+
+```sh
+npm run cache:warm -- --base-url https://dokutest.pages.dev
+```
+
 ## Deployment Decisions
 
 - Secrets: `API_BEARER_TOKEN` is optional and only required for native remote

@@ -82,6 +82,7 @@ rollback plan explicitly defines a final sync window.
   `MAINTENANCE_MODE=1` in Pages configuration and redeploy. Public reads remain
   available while content writes return HTTP 503.
 - Deploy the Pages project from the approved commit.
+- Warm important pages with `npm run cache:warm -- --base-url <base-url>`.
 - Verify Pages bindings for D1, R2, KV, and `PAGE_LOCKS`.
 - Verify runtime environment variables.
 - Run deployed smoke tests and `/api/health`.
