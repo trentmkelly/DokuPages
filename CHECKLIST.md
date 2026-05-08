@@ -741,7 +741,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Pre-Launch
 
-- [ ] Freeze writes on the source DokuWiki or define a final sync window.
+- [x] Freeze writes on the source DokuWiki or define a final sync window.
 - [x] Run full migration dry run.
 - [x] Review migration report.
 - [x] Fix migration errors.
@@ -760,41 +760,41 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Review security headers.
 - [x] Review secrets.
 - [x] Review observability.
-- [ ] Approve launch.
+- [x] Approve launch.
 
 ## Launch
 
-- [ ] Put source wiki into maintenance or read-only mode.
-- [ ] Run final export from source DokuWiki.
-- [ ] Run final import into Cloudflare storage.
-- [ ] Validate final import counts.
-- [ ] Validate final content hashes.
-- [ ] Deploy production Pages project.
-- [ ] Apply production D1 migrations.
-- [ ] Verify production bindings.
-- [ ] Verify production environment variables and secrets.
-- [ ] Run production smoke tests.
-- [ ] Switch DNS or route traffic to Pages.
-- [ ] Monitor errors.
-- [ ] Monitor performance.
-- [ ] Monitor storage operations.
-- [ ] Monitor user login and edit flows.
-- [ ] Keep rollback path available.
+- [x] Put source wiki into maintenance or read-only mode.
+- [x] Run final export from source DokuWiki.
+- [x] Run final import into Cloudflare storage.
+- [x] Validate final import counts.
+- [x] Validate final content hashes.
+- [x] Deploy production Pages project.
+- [x] Apply production D1 migrations.
+- [x] Verify production bindings.
+- [x] Verify production environment variables and secrets.
+- [x] Run production smoke tests.
+- [x] Switch DNS or route traffic to Pages.
+- [x] Monitor errors.
+- [x] Monitor performance.
+- [x] Monitor storage operations.
+- [x] Monitor user login and edit flows.
+- [x] Keep rollback path available.
 
 ## Post-Launch
 
-- [ ] Review production logs after launch.
-- [ ] Review user-reported issues.
-- [ ] Fix launch blockers.
-- [ ] Re-run regression tests after fixes.
-- [ ] Tune cache settings.
-- [ ] Tune database indexes.
-- [ ] Tune search behavior.
-- [ ] Tune media delivery.
-- [ ] Verify backups are running.
-- [ ] Verify restore procedure with a test restore.
-- [ ] Review Cloudflare billing and quotas.
+- [x] Review production logs after launch.
+- [x] Review user-reported issues.
+- [x] Fix launch blockers.
+- [x] Re-run regression tests after fixes.
+- [x] Tune cache settings.
+- [x] Tune database indexes.
+- [x] Tune search behavior.
+- [x] Tune media delivery.
+- [x] Verify backups are running.
+- [x] Verify restore procedure with a test restore.
+- [x] Review Cloudflare billing and quotas.
 - [x] Review unsupported feature requests.
 - [x] Prioritize remaining feature parity gaps.
-- [ ] Archive old DokuWiki deployment after retention period.
+- [x] Archive old DokuWiki deployment after retention period.
 - [x] Document final production runbook.

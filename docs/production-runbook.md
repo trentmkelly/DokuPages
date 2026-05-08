@@ -11,6 +11,9 @@ There is no production custom domain or DNS cutover target for this validation
 project. Treat DNS switch, source production archive, and old-route retirement
 steps below as no-ops until a real production hostname is selected.
 
+The completed proof-of-concept launch evidence is recorded in
+`docs/launch-audit.md`.
+
 ## Launch Inputs
 
 Before starting the final sync, confirm:

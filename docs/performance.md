@@ -93,19 +93,20 @@ The script compiles the Pages Functions bundle with Wrangler, measures local
 bundle import time as a cold-start proxy, records static asset and Worker bundle
 sizes, and times the DokuWiki import planner.
 
-Current local baseline from May 8, 2026 UTC, measured against `../dokuwiki`:
+Current local baseline from May 8, 2026 UTC, measured against `../dokuwiki`
+after the media manager UI port:
 
 | Measurement               |   Value |
 | ------------------------- | ------: |
-| Worker bundle build time  |  640 ms |
-| Worker bundle cold import | 3.82 ms |
-| Migration plan time       |   19 ms |
-| Worker bundle output size |  209 KB |
-| Minified Worker script    |  183 KB |
-| Static asset total size   |   82 KB |
+| Worker bundle build time  |  647 ms |
+| Worker bundle cold import | 4.20 ms |
+| Migration plan time       |   14 ms |
+| Worker bundle output size |  246 KB |
+| Minified Worker script    |  218 KB |
+| Static asset total size   |   87 KB |
 | Static asset file count   |      44 |
 
-Largest checked-in static assets are `dokuwiki.css` at 22 KB, `dokuwiki.js` at
+Largest checked-in static assets are `dokuwiki.css` at 29 KB, `dokuwiki.js` at
 9 KB, `images/favicon.ico` at 7 KB, and `images/apple-touch-icon.png` at 6 KB.
 
 ## Optimization Notes

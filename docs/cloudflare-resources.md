@@ -8,6 +8,8 @@ Provisioned resources for the `dokutest` Pages project.
 - Production URL: `https://dokutest.pages.dev/`
 - Production branch: `main`
 - Preview branch script: `preview`
+- Current production deployment: `9602bd18-f59a-4acb-847e-aad78dc196b7`
+  from commit `fc43dca`.
 
 ## D1
 
@@ -16,6 +18,8 @@ Provisioned resources for the `dokutest` Pages project.
 - Database ID: `bb1c5614-9eb2-4f06-9727-fb41cfb1786b`
 - Applied schema: D1 migrations under `migrations/`
 - Imported seed pages: 4
+- Current size after PoC launch verification: 880640 bytes across 26 tables.
+- Last 24h usage at launch review: 2218 read queries and 507 write queries.
 - Production smoke test: created and deleted `codex:smoke`, verified stale-revision conflict and changelog rows.
 
 ## KV
@@ -31,6 +35,7 @@ Provisioned resources for the `dokutest` Pages project.
 - Location: `EEUR`
 - Default storage class: `Standard`
 - Lifecycle policy: Cloudflare default multipart abort rule, aborting incomplete multipart uploads after 7 days.
+- Launch review bucket info: 38.5 kB reported bucket size.
 
 ## Durable Objects
 
