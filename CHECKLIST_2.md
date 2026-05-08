@@ -85,7 +85,7 @@ are not fixed by this checklist.
 - [x] Match DokuWiki's SafeFN behavior for URL, safe, and UTF-8 filename modes during import and routing.
 - [x] Support upstream `breadcrumbs` recent-page trail behavior, not only static "You are here" breadcrumbs.
 - [x] Make `youarehere` configurable like upstream instead of always rendering the current breadcrumb style.
-- [ ] Match upstream `fullpath` display behavior.
+- [x] Match upstream `fullpath` display behavior.
 - [ ] Match upstream page template selection and namespace template inheritance exactly, including all replacement variables.
 - [ ] Match upstream edit conflict pages from `inc/Ui/PageConflict.php` rather than only native optimistic-concurrency messages.
 - [ ] Match upstream locked-page UI and lock refresh timing from `locktime`.

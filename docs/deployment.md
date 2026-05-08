@@ -35,6 +35,8 @@ Optional Pages environment variables:
   trace. Default: `10`; set to `0` to disable the trace.
 - `YOUAREHERE`: truthy value enables the DokuWiki-style hierarchical "You are
   here" trail. Default: disabled.
+- `FULLPATH`: truthy value makes page info display the logical data path
+  instead of the relative page file path. Default: disabled.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.

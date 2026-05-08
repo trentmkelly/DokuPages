@@ -21,6 +21,7 @@ export interface Env {
   MAX_SECTION_EDIT_LEVEL?: string;
   BREADCRUMBS?: string;
   YOUAREHERE?: string;
+  FULLPATH?: string;
   USE_HEADING?: string;
   CAMELCASE?: string;
   TYPOGRAPHY?: string;

@@ -81,7 +81,12 @@ import {
   type MediaRevision
 } from "./wiki/media-service";
 import { validateMediaUpload } from "./wiki/media-validation";
-import { cleanPageId, cleanRoutePageId, type PageIdCleanOptions } from "./wiki/page-id";
+import {
+  cleanPageId,
+  cleanRoutePageId,
+  pageIdToPath,
+  type PageIdCleanOptions
+} from "./wiki/page-id";
 import {
   ACL_CREATE,
   ACL_DELETE,
@@ -6727,6 +6732,20 @@ function canonicalPageHref(env: Env, pageId: string): string {
   return new URL(path, origin).href;
 }
 
+function renderPageInfo(
+  config: ReturnType<typeof getRuntimeConfig>,
+  pageId: string,
+  updatedAt: string
+): string {
+  const path = pageInfoPath(config, pageId);
+  return `<bdi>${escapeHtml(path)}</bdi> · Last modified: <time datetime="${escapeAttribute(updatedAt)}">${escapeHtml(updatedAt)}</time>`;
+}
+
+function pageInfoPath(config: ReturnType<typeof getRuntimeConfig>, pageId: string): string {
+  const relativePath = pageIdToPath(pageId, config.pageIdCleanOptions);
+  return config.fullPath ? `data/pages/${relativePath}` : relativePath;
+}
+
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
   const config = getRuntimeConfig(env);
   const siteName = config.siteName;
@@ -6738,9 +6757,10 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const canonicalLink = pageId
     ? `<link rel="canonical" href="${escapeAttribute(canonicalPageHref(env, pageId))}">`
     : "";
-  const docInfo = options.updatedAt
-    ? `<div class="docInfo">Last modified: ${escapeHtml(options.updatedAt)}</div>`
-    : "";
+  const docInfo =
+    options.updatedAt && pageId
+      ? `<div class="docInfo">${renderPageInfo(config, pageId, options.updatedAt)}</div>`
+      : "";
   const disabledActions = new Set(config.disabledActions);
   const pageTools = pageId ? renderPageTools(pageId, disabledActions) : "";
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : namespaceForIndex(startId);

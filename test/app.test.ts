@@ -92,6 +92,7 @@ describe("handleRequest", () => {
     env.REL_NOFOLLOW = undefined;
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
+    env.FULLPATH = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
     env.TARGET_EXTERN = undefined;
@@ -182,6 +183,9 @@ describe("handleRequest", () => {
     expect(html).toContain('<link rel="canonical" href="/wiki/wiki/welcome">');
     expect(html).toContain('<link rel="stylesheet" href="/dokuwiki.css?v=0.1.0">');
     expect(html).toContain('<script src="/dokuwiki.js?v=0.1.0" defer></script>');
+    expect(html).toContain(
+      '<div class="docInfo"><bdi>wiki/welcome.txt</bdi> · Last modified: <time datetime="2026-05-07T00:00:00.000Z">2026-05-07T00:00:00.000Z</time></div>'
+    );
     expect(html).toContain('id="dokuwiki__usertools"');
     expect(html).toContain("User tools");
     expect(html).toContain('id="mobile__tools"');
@@ -197,6 +201,18 @@ describe("handleRequest", () => {
       '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
     );
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("honors the FULLPATH setting for page info paths", async () => {
+    env.FULLPATH = "1";
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<div class="docInfo"><bdi>data/pages/wiki/welcome.txt</bdi> · Last modified: <time datetime="2026-05-07T00:00:00.000Z">2026-05-07T00:00:00.000Z</time></div>'
+    );
   });
 
   it("renders and updates DokuWiki-style recent page breadcrumbs", async () => {
