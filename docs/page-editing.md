@@ -31,7 +31,7 @@ The save path:
 - cleans the page ID
 - reads the current revision from D1
 - checks `baseRevisionId` against the current revision ID
-- returns HTTP 409 on conflicts
+- returns HTTP 409 with a DokuWiki-style conflict form and submitted/current diff on conflicts
 - applies the page edit rate limit before saving
 - creates a page when no current revision exists
 - edits a page when content is non-empty

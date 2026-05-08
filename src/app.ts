@@ -616,7 +616,19 @@ export async function handleRequest(
         page ? ACL_EDIT : ACL_CREATE
       );
       if (denied) return denied;
-      return htmlResponse(renderConflictPage(env, id, "", page), { status: 409 });
+      const csrf = csrfContext(request);
+      const response = htmlResponse(
+        renderConflictPage(env, id, {
+          current: page,
+          csrfToken: csrf.token,
+          lockToken: randomPageLockToken(),
+          submittedContent: page?.content ?? "",
+          summary: ""
+        }),
+        { status: 409 }
+      );
+      response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
+      return response;
     }
 
     if (url.searchParams.get("do") === "cancel") {
@@ -7078,6 +7090,16 @@ async function handleSave(
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
   }
 
+  if (form.has("do[cancel]")) {
+    await releaseHeldPageLock(env, principal, id, submittedLockToken);
+    const response = redirectResponse(pagePath(id), 303);
+    response.headers.append(
+      "set-cookie",
+      clearPageLockCookieHeader(pageLockCookieName(id), request)
+    );
+    return response;
+  }
+
   const currentPage = await getCurrentPage(env.DB, id);
   const denied = await requireAclPermission(
     request,
@@ -7121,7 +7143,16 @@ async function handleSave(
     }
 
     const current = await getCurrentPage(env.DB, id);
-    return htmlResponse(renderConflictPage(env, id, content, current), { status: 409 });
+    return htmlResponse(
+      renderConflictPage(env, id, {
+        current,
+        csrfToken: csrfContext(request).token,
+        lockToken,
+        submittedContent: content,
+        summary
+      }),
+      { status: 409 }
+    );
   }
 
   await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
@@ -7418,7 +7449,16 @@ async function handleRevert(
     }
 
     const current = await getCurrentPage(env.DB, id);
-    return htmlResponse(renderConflictPage(env, id, revision.content, current), { status: 409 });
+    return htmlResponse(
+      renderConflictPage(env, id, {
+        current,
+        csrfToken: csrfContext(request).token,
+        lockToken,
+        submittedContent: revision.content,
+        summary: String(form.get("summary") || "") || `Reverted to ${revision.createdAt}`
+      }),
+      { status: 409 }
+    );
   }
 
   await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
@@ -8149,27 +8189,49 @@ function renderEditPage(
   );
 }
 
-function renderConflictPage(
-  env: Env,
-  id: string,
-  submittedContent: string,
-  current: CurrentPage | null
-): string {
-  const currentDetails = current
-    ? `<p><strong>${escapeHtml(current.title ?? id)}</strong> · ${escapeHtml(current.updatedAt)}</p>`
-    : "<p>The current page could not be loaded.</p>";
+interface ConflictPageOptions {
+  current: CurrentPage | null;
+  csrfToken: string;
+  lockToken: string;
+  submittedContent: string;
+  summary: string;
+}
+
+function renderConflictPage(env: Env, id: string, options: ConflictPageOptions): string {
+  const currentContent = options.current?.content ?? "";
+  const diffRows = renderLineDiff(currentContent, options.submittedContent);
+  const currentRevisionId = options.current?.revisionId ?? "";
+  const currentUpdatedAt = options.current?.updatedAt;
 
   return htmlShell(
     env,
     `Edit conflict for ${id}`,
-    `<h1>Edit conflict</h1>
-    <p>The page changed before your edit could be saved. Copy any changes you still need, then reopen the editor from the current page.</p>
-    <p><a href="${pagePath(id)}">View current page</a> · <a href="${pagePath(id)}?do=edit">Reopen editor</a></p>
-    <h2>Your submitted text</h2>
-    <pre><code>${escapeHtml(submittedContent)}</code></pre>
-    <h2>Current revision</h2>
-    ${currentDetails}`,
-    { pageId: id, updatedAt: current?.updatedAt }
+    `<h1>A newer version exists</h1>
+    <p>A newer version of the document you edited exists. This happens when another user changed the document while you were editing it.</p>
+    <p>Examine the differences shown below thoroughly, then decide which version to keep. If you choose <em>save</em>, your version will be saved. Hit <em>cancel</em> to keep the current version.</p>
+    <form id="dw__editform" class="conflict" method="post" action="/api/pages">
+      <div class="no">
+        ${csrfInput(options.csrfToken)}
+        <input type="hidden" name="id" value="${escapeAttribute(id)}">
+        <input type="hidden" name="content" value="${escapeAttribute(options.submittedContent)}">
+        <input type="hidden" name="summary" value="${escapeAttribute(options.summary)}">
+        <input type="hidden" name="baseRevisionId" value="${escapeAttribute(currentRevisionId)}">
+        <input type="hidden" name="lockToken" value="${escapeAttribute(options.lockToken)}">
+        <button type="submit" name="do[save]" value="1" accesskey="s">Save</button>
+        <button type="submit" name="do[cancel]" value="1">Cancel</button>
+      </div>
+    </form>
+    <br><br><br><br>
+    <table class="diff diff_sidebyside">
+      <thead>
+        <tr>
+          <th colspan="2">Current revision</th>
+          <th colspan="2">Your version</th>
+        </tr>
+      </thead>
+      <tbody>${diffRows}</tbody>
+    </table>`,
+    { pageId: id, updatedAt: currentUpdatedAt }
   );
 }
 

@@ -530,7 +530,12 @@ describe("handleRequest", () => {
     expect(locked.status).toBe(200);
     await expect(locked.text()).resolves.toContain("does not currently have an active edit lock");
     expect(conflict.status).toBe(409);
-    await expect(conflict.text()).resolves.toContain("<h1>Edit conflict</h1>");
+    const conflictHtml = await conflict.text();
+    expect(conflictHtml).toContain("<h1>A newer version exists</h1>");
+    expect(conflictHtml).toContain('<form id="dw__editform" class="conflict"');
+    expect(conflictHtml).toContain('name="do[save]"');
+    expect(conflictHtml).toContain('name="do[cancel]"');
+    expect(conflictHtml).toContain('class="diff diff_sidebyside"');
     expect(cancel.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(recover.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
     expect(draftDelete.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
@@ -2514,6 +2519,7 @@ describe("handleRequest", () => {
     form.set("id", "wiki:welcome");
     form.set("baseRevisionId", "stale");
     form.set("content", "Changed.");
+    form.set("summary", "stale edit");
 
     const response = await handleRequest(
       new Request("https://example.com/api/pages", {
@@ -2526,7 +2532,34 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(409);
     expect(response.headers.get("content-type")).toContain("text/html");
-    await expect(response.text()).resolves.toContain("Edit conflict");
+    const html = await response.text();
+    expect(html).toContain("<h1>A newer version exists</h1>");
+    expect(html).toContain('name="content" value="Changed."');
+    expect(html).toContain('name="summary" value="stale edit"');
+    expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
+    expect(html).toContain('<th colspan="2">Current revision</th>');
+    expect(html).toContain('<th colspan="2">Your version</th>');
+    expect(html).toContain("Changed.");
+    expect(state.batches).toHaveLength(0);
+  });
+
+  it("cancels from the conflict form without saving", async () => {
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("lockToken", "conflict-lock");
+    form.set("do[cancel]", "1");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(state.batches).toHaveLength(0);
   });
 
