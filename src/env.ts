@@ -23,6 +23,7 @@ export interface Env {
   YOUAREHERE?: string;
   FULLPATH?: string;
   DFORMAT?: string;
+  CACHETIME?: string;
   LOCKTIME?: string;
   USEDRAFT?: string;
   USE_HEADING?: string;

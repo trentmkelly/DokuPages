@@ -146,15 +146,25 @@ Deleted media rows are excluded.
 
 ## Delivery Semantics
 
-Media fetches support `GET` and `HEAD`. Current media responses use a one-hour
-shared cache lifetime; immutable revision responses use a one-year immutable
-cache lifetime. Both current and revision fetches include strong ETags derived
-from the imported or uploaded content hash.
+Media fetches support `GET` and `HEAD`. Current media responses and old media
+revision responses use DokuWiki-style `sendFile()` cache headers:
+`cache=nocache` returns `Cache-Control: no-cache, no-transform`, `cache=recache`
+uses `CACHETIME`, and normal cache requests use `max(CACHETIME, 3600)`. Public
+media emits `public, proxy-revalidate, no-transform`; ACL-private media emits
+`private, no-transform`.
 
+Both current and revision fetches include `Last-Modified` plus an ETag generated
+as `md5(Last-Modified)`, matching DokuWiki's `http_conditionalRequest()`.
 Conditional requests are resolved from D1 media metadata before opening the R2
-object body. Matching `If-None-Match` or `If-Modified-Since` requests return
-`304 Not Modified` with zero R2 operations. `HEAD` requests verify the R2 object
-with `head` and return metadata without streaming the object body.
+object body. Matching `If-None-Match` or exact `If-Modified-Since` requests
+return `304 Not Modified` with zero R2 operations. `HEAD` requests verify the R2
+object with `head` and return metadata without streaming the object body.
+
+Media responses always send DokuWiki-style `Content-Disposition` for inline or
+attachment delivery, including RFC2231 filename encoding for names that require
+it. Byte range requests return `Accept-Ranges: bytes`, single-range `206
+Partial Content`, multipart byte ranges for multiple ranges, and DokuWiki's
+plain `416` bad-range response for unsatisfiable ranges.
 
 Requests with positive `w` or `h` parameters are treated as DokuWiki resized
 media requests and must include a valid six-character `tok` value. The token is

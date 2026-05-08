@@ -75,6 +75,10 @@ export function mediaSizeQuery(
   return params.toString();
 }
 
+export function md5Hex(value: string): string {
+  return bytesToHex(md5(utf8Bytes(value)));
+}
+
 function requiresMediaToken(id: string, size: RequestedMediaSize): boolean {
   return size.requested || isExternalMediaId(id);
 }

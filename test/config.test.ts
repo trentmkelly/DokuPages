@@ -31,6 +31,7 @@ describe("runtime config", () => {
       youAreHere: false,
       fullPath: false,
       dateFormat: "%Y/%m/%d %H:%M",
+      cacheTime: 86400,
       lockTime: 900,
       useDraft: true,
       useHeading: false,
@@ -83,6 +84,7 @@ describe("runtime config", () => {
       YOUAREHERE: "1",
       FULLPATH: "1",
       DFORMAT: "%F %R",
+      CACHETIME: "7200",
       LOCKTIME: "120",
       USEDRAFT: "0",
       USE_HEADING: "1",
@@ -123,6 +125,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).youAreHere).toBe(true);
     expect(getRuntimeConfig(env).fullPath).toBe(true);
     expect(getRuntimeConfig(env).dateFormat).toBe("%F %R");
+    expect(getRuntimeConfig(env).cacheTime).toBe(7200);
     expect(getRuntimeConfig(env).lockTime).toBe(120);
     expect(getRuntimeConfig(env).useDraft).toBe(false);
     expect(getRuntimeConfig(env).useHeading).toBe(true);
@@ -229,6 +232,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "DFORMAT",
           effectiveValue: "%Y/%m/%d %H:%M"
+        }),
+        expect.objectContaining({
+          key: "CACHETIME",
+          effectiveValue: "86400"
         }),
         expect.objectContaining({
           key: "LOCKTIME",
@@ -374,6 +381,7 @@ describe("runtime config", () => {
       MAX_TOC_LEVEL: "9",
       MAX_SECTION_EDIT_LEVEL: "-1",
       BREADCRUMBS: "-1",
+      CACHETIME: "-1",
       LOCKTIME: "-1",
       TYPOGRAPHY: "3",
       DEACCENT: "3",
@@ -397,6 +405,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "MAX_TOC_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "MAX_SECTION_EDIT_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "BREADCRUMBS", severity: "error" }),
+        expect.objectContaining({ key: "CACHETIME", severity: "error" }),
         expect.objectContaining({ key: "LOCKTIME", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),

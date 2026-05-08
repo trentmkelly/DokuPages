@@ -11,6 +11,7 @@ import { cleanPageId, type DokuWikiFnEncode, type PageIdCleanOptions } from "./w
 const DEFAULT_SITE_NAME = "DokuWiki Pages";
 const DEFAULT_START_PAGE = "wiki:welcome";
 const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
+const DEFAULT_CACHE_TIME = 60 * 60 * 24;
 const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
@@ -35,6 +36,7 @@ export interface RuntimeConfig {
   youAreHere: boolean;
   fullPath: boolean;
   dateFormat: string;
+  cacheTime: number;
   lockTime: number;
   useDraft: boolean;
   useHeading: boolean;
@@ -123,6 +125,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     youAreHere: truthy(env.YOUAREHERE),
     fullPath: truthy(env.FULLPATH),
     dateFormat: nonEmpty(env.DFORMAT) ?? "%Y/%m/%d %H:%M",
+    cacheTime: integerConfig(env.CACHETIME, DEFAULT_CACHE_TIME, 0, 365 * 24 * 60 * 60),
     lockTime: integerConfig(env.LOCKTIME, 15 * 60, 0, 604800),
     useDraft: booleanConfig(env.USEDRAFT, true),
     useHeading: truthy(env.USE_HEADING),
@@ -163,6 +166,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("MAX_SECTION_EDIT_LEVEL", env.MAX_SECTION_EDIT_LEVEL, 0, 5, issues);
   validateIntegerRange("BREADCRUMBS", env.BREADCRUMBS, 0, 99, issues);
+  validateIntegerRange("CACHETIME", env.CACHETIME, 0, 365 * 24 * 60 * 60, issues);
   validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateIntegerRange("FETCHSIZE", env.FETCHSIZE, 0, 100 * 1024 * 1024, issues);
@@ -218,6 +222,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("YOUAREHERE", env.YOUAREHERE, String(config.youAreHere), "false"),
     configEntry("FULLPATH", env.FULLPATH, String(config.fullPath), "false"),
     configEntry("DFORMAT", env.DFORMAT, config.dateFormat, "%Y/%m/%d %H:%M"),
+    configEntry("CACHETIME", env.CACHETIME, String(config.cacheTime), String(DEFAULT_CACHE_TIME)),
     configEntry("LOCKTIME", env.LOCKTIME, String(config.lockTime), String(15 * 60)),
     configEntry("USEDRAFT", env.USEDRAFT, String(config.useDraft), "true"),
     configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),

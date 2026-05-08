@@ -39,6 +39,9 @@ Optional Pages environment variables:
   instead of the relative page file path. Default: disabled.
 - `DFORMAT`: DokuWiki-style strftime date format used by page template
   `@DATE@` replacement. Default: `%Y/%m/%d %H:%M`.
+- `CACHETIME`: DokuWiki-compatible cache lifetime in seconds. Media fetches use
+  `max(CACHETIME, 3600)` for normal `cache` requests and `CACHETIME` for
+  `cache=recache`. Default: `86400`.
 - `LOCKTIME`: maximum page edit lock age in seconds, matching DokuWiki
   `locktime`. Default: `900`; set to `0` to disable edit locks.
 - `USEDRAFT`: enables DokuWiki-style edit draft autosave and recovery screens.

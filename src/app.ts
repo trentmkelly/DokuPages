@@ -145,11 +145,11 @@ import {
   expectedMediaDerivativeStatus,
   generateMediaDerivative,
   hasRequestedMediaSize,
-  mediaDerivativeCacheKey,
   mediaDerivativeHeaders,
   type MediaDerivativeStatus
 } from "./wiki/media-derivatives";
 import {
+  md5Hex,
   mediaSizeQuery,
   requestedMediaSize,
   requestedMediaSizeFromUrl,
@@ -174,7 +174,7 @@ const BREADCRUMB_COOKIE_NAME = "DW_PAGES_BC";
 const BREADCRUMB_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
-const DEFAULT_MEDIA_CACHE_SECONDS = 60 * 60 * 24;
+const HTTP_MULTIPART_BOUNDARY = "D0KuW1K1B0uNDARY";
 const REMOTE_MEDIA_FETCH_TIMEOUT_MS = 25_000;
 const PAGE_LOCK_WARNING_SECONDS = 60;
 const PAGE_LOCK_MIN_REFRESH_SECONDS = 30;
@@ -1118,7 +1118,7 @@ async function handleRemoteMediaFetch(
   const headers = securityHeaders({
     "content-type": contentType,
     "content-length": String(body.byteLength),
-    "cache-control": `public, proxy-revalidate, no-transform, max-age=${DEFAULT_MEDIA_CACHE_SECONDS}`,
+    "cache-control": `public, proxy-revalidate, no-transform, max-age=${Math.max(config.cacheTime, 3600)}`,
     "content-disposition": `inline; filename="${escapeHeaderValue(mediaName(mediaUrl))}"`,
     "x-dokuwiki-remote-media": "fetched",
     "x-dokuwiki-resize-policy": size.requested ? derivativeStatus : "original"
@@ -2455,24 +2455,22 @@ async function handleMediaFetch(
     return jsonResponse({ error: "Media bucket is not configured." }, { status: 503 });
   }
 
+  const config = getRuntimeConfig(env);
   const requestedSize = requestedMediaSizeFromUrl(url);
   const expectedDerivativeStatus = expectedMediaDerivativeStatus(media, requestedSize);
-  const expectedEtag =
-    expectedDerivativeStatus === "generated"
-      ? mediaEtag(media, mediaDerivativeCacheKey(requestedSize))
-      : mediaEtag(media);
-  const headers = mediaFetchHeaders(url, media, Boolean(revisionId), {
+  const expectedEtag = mediaEtag(media);
+  const publicCache = await isPublicMedia(env, id);
+  const headers = mediaFetchHeaders(url, media, {
+    cacheTime: config.cacheTime,
     derivativeStatus: expectedDerivativeStatus,
-    etag: expectedEtag
+    etag: expectedEtag,
+    publicCache
   });
   const forceDownload = await shouldForceDownloadMedia(env.DB, id);
-
-  if (isMediaDownloadRequested(url) || forceDownload) {
-    headers.set(
-      "content-disposition",
-      `attachment; filename="${escapeHeaderValue(mediaName(id))}"`
-    );
-  }
+  const contentDisposition = mediaContentDisposition(
+    isMediaDownloadRequested(url) || forceDownload ? "attachment" : "inline",
+    mediaName(id)
+  );
 
   if (!bypassesMediaClientCache(url) && isMediaNotModified(request, media, expectedEtag)) {
     headers.delete("content-length");
@@ -2483,7 +2481,10 @@ async function handleMediaFetch(
     return new Response(null, { status: 304, headers });
   }
 
-  if (request.method === "HEAD" && !requestedSize.requested) {
+  headers.set("content-disposition", contentDisposition);
+  headers.set("accept-ranges", "bytes");
+
+  if (request.method === "HEAD" && !requestedSize.requested && !request.headers.has("range")) {
     const object = await env.MEDIA_BUCKET.head(media.objectKey);
 
     if (!object) {
@@ -2510,26 +2511,41 @@ async function handleMediaFetch(
       derivative.status === "generated" && derivative.body
         ? uint8ArrayToArrayBuffer(derivative.body)
         : originalBody;
-    const derivativeHeaders = mediaFetchHeaders(url, media, Boolean(revisionId), {
+    const derivativeHeaders = mediaFetchHeaders(url, media, {
+      cacheTime: config.cacheTime,
       byteLength: derivativeBody.byteLength,
       contentType: derivative.mimeType,
       derivativeStatus: derivative.status,
-      etag:
-        derivative.status === "generated"
-          ? mediaEtag(media, mediaDerivativeCacheKey(requestedSize))
-          : mediaEtag(media)
+      etag: mediaEtag(media),
+      publicCache
     });
 
     copyDownloadHeader(headers, derivativeHeaders);
+    derivativeHeaders.set("accept-ranges", "bytes");
 
     logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
       delivery: request.method === "HEAD" ? "headers" : "body",
       r2Operations: 1
     });
 
+    const rangeResponse = mediaRangeResponse(request, derivativeBody, derivativeHeaders);
+    if (rangeResponse) return rangeResponse;
+
     return new Response(request.method === "HEAD" ? null : derivativeBody, {
       headers: derivativeHeaders
     });
+  }
+
+  if (request.headers.has("range")) {
+    const body = await new Response(object.body).arrayBuffer();
+    const rangeResponse = mediaRangeResponse(request, body, headers);
+    if (rangeResponse) {
+      logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+        delivery: request.method === "HEAD" ? "headers" : "body",
+        r2Operations: 1
+      });
+      return rangeResponse;
+    }
   }
 
   logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
@@ -2562,21 +2578,22 @@ function mediaTokenSecret(env: Env): string | null {
 function mediaFetchHeaders(
   url: URL,
   media: CurrentMedia | MediaRevision,
-  revision: boolean,
   options: {
     byteLength?: number;
+    cacheTime?: number;
     contentType?: string;
     derivativeStatus?: MediaDerivativeStatus;
     etag?: string;
+    publicCache?: boolean;
   } = {}
 ): Headers {
   const headers = securityHeaders();
   headers.set("content-type", options.contentType ?? media.mimeType);
   headers.set("content-length", String(options.byteLength ?? media.byteLength));
   headers.set("etag", options.etag ?? mediaEtag(media));
-  headers.set("last-modified", new Date(getMediaTimestamp(media)).toUTCString());
+  headers.set("last-modified", mediaLastModified(media));
   headers.set("x-content-type-options", "nosniff");
-  applyMediaCacheHeaders(headers, url, revision);
+  applyMediaCacheHeaders(headers, url, options.publicCache ?? false, options.cacheTime);
 
   for (const [name, value] of Object.entries(
     mediaDerivativeHeaders(
@@ -2590,18 +2607,26 @@ function mediaFetchHeaders(
   return headers;
 }
 
-function applyMediaCacheHeaders(headers: Headers, url: URL, revision: boolean): void {
+function applyMediaCacheHeaders(
+  headers: Headers,
+  url: URL,
+  publicCache: boolean,
+  cacheTime = 60 * 60 * 24
+): void {
   if (bypassesMediaClientCache(url)) {
-    headers.set("cache-control", "no-cache, no-store, must-revalidate");
-    headers.set("pragma", "no-cache");
-    headers.set("expires", "0");
+    headers.set("expires", "Thu, 01 Jan 1970 00:00:00 GMT");
+    headers.set("cache-control", "no-cache, no-transform");
     return;
   }
 
-  headers.set(
-    "cache-control",
-    revision ? "public, max-age=31536000, immutable" : "public, max-age=3600"
-  );
+  const maxAge =
+    url.searchParams.get("cache")?.toLowerCase() === "recache"
+      ? cacheTime
+      : Math.max(cacheTime, 3600);
+  const scope = publicCache ? "public, proxy-revalidate" : "private";
+
+  headers.set("expires", new Date(Date.now() + maxAge * 1000).toUTCString());
+  headers.set("cache-control", `${scope}, no-transform, max-age=${maxAge}`);
 }
 
 function bypassesMediaClientCache(url: URL): boolean {
@@ -2612,9 +2637,182 @@ function isMediaDownloadRequested(url: URL): boolean {
   return url.searchParams.get("download") === "1" || url.searchParams.get("dl") === "1";
 }
 
+async function isPublicMedia(env: Env, id: string): Promise<boolean> {
+  const rules = await listAclRules(env);
+  const namespace = mediaNamespace(id);
+  const permission = resolveAclPermission(
+    rules,
+    namespace ? `${namespace}:*` : "*",
+    anonymousPrincipal()
+  );
+  return hasAclPermission(permission, ACL_READ);
+}
+
+function mediaContentDisposition(disposition: "attachment" | "inline", filename: string): string {
+  return `${disposition};${rfc2231EncodeHeaderParameter("filename", filename)};`;
+}
+
+function rfc2231EncodeHeaderParameter(name: string, value: string): string {
+  const encoded = [...value]
+    .map((character) =>
+      needsRfc2231Encoding(character) ? percentEncodeUtf8(character) : character
+    )
+    .join("");
+
+  if (encoded !== value) {
+    return ` ${name}*=utf-8'en'${encoded}`;
+  }
+
+  return ` ${name}="${value}"`;
+}
+
+function needsRfc2231Encoding(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return codePoint <= 0x20 || codePoint >= 0x80 || "*'%()<>@,;:\\\"/[]?=".includes(character);
+}
+
+function percentEncodeUtf8(value: string): string {
+  return [...new TextEncoder().encode(value)]
+    .map((byte) => `%${byte.toString(16).padStart(2, "0").toUpperCase()}`)
+    .join("");
+}
+
 function copyDownloadHeader(source: Headers, target: Headers): void {
   const contentDisposition = source.get("content-disposition");
   if (contentDisposition) target.set("content-disposition", contentDisposition);
+}
+
+interface ByteRange {
+  start: number;
+  end: number;
+}
+
+function mediaRangeResponse(
+  request: Request,
+  body: ArrayBuffer,
+  headers: Headers
+): Response | null {
+  const rangeHeader = request.headers.get("range");
+  if (!rangeHeader) return null;
+
+  const ranges = parseMediaRanges(rangeHeader, body.byteLength);
+  if (!ranges) {
+    const badRangeHeaders = new Headers(headers);
+    badRangeHeaders.delete("content-length");
+    return new Response(request.method === "HEAD" ? null : "Bad Range Request!", {
+      status: 416,
+      headers: badRangeHeaders
+    });
+  }
+
+  const rangeHeaders = new Headers(headers);
+  rangeHeaders.set("accept-ranges", "bytes");
+
+  if (ranges.length === 1) {
+    const [range] = ranges;
+    const rangeBody = sliceArrayBuffer(body, range.start, range.end + 1);
+    rangeHeaders.set("content-length", String(rangeBody.byteLength));
+    rangeHeaders.set("content-range", `bytes ${range.start}-${range.end}/${body.byteLength}`);
+    return new Response(request.method === "HEAD" ? null : rangeBody, {
+      status: 206,
+      headers: rangeHeaders
+    });
+  }
+
+  const multipartBody = multipartByteRangeBody(
+    body,
+    ranges,
+    headers.get("content-type") ?? "application/octet-stream"
+  );
+  rangeHeaders.delete("content-length");
+  rangeHeaders.set("content-type", `multipart/byteranges; boundary=${HTTP_MULTIPART_BOUNDARY}`);
+  return new Response(request.method === "HEAD" ? null : multipartBody, {
+    status: 206,
+    headers: rangeHeaders
+  });
+}
+
+function parseMediaRanges(header: string, size: number): ByteRange[] | null {
+  const [unit, rawRanges] = header.split("=", 2);
+  if (unit?.trim() !== "bytes" || !rawRanges) return [{ start: 0, end: Math.max(0, size - 1) }];
+
+  const ranges: ByteRange[] = [];
+  for (const rawRange of rawRanges.split(",")) {
+    const range = parseMediaRange(rawRange.trim(), size);
+    if (!range) return null;
+    ranges.push(range);
+  }
+
+  return ranges.length > 0 ? ranges : null;
+}
+
+function parseMediaRange(value: string, size: number): ByteRange | null {
+  const match = /^(\d*)-(\d*)$/.exec(value);
+  if (!match || size <= 0) return null;
+
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+
+  let start: number;
+  let end: number;
+
+  if (!rawStart) {
+    const suffixLength = Number(rawEnd);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return null;
+    start = Math.max(0, size - suffixLength);
+    end = size - 1;
+  } else {
+    start = Number(rawStart);
+    end = rawEnd ? Number(rawEnd) : size - 1;
+  }
+
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) ||
+    start < 0 ||
+    end < start ||
+    start >= size
+  ) {
+    return null;
+  }
+
+  return { start, end: Math.min(end, size - 1) };
+}
+
+function multipartByteRangeBody(
+  body: ArrayBuffer,
+  ranges: ByteRange[],
+  mimeType: string
+): ArrayBuffer {
+  const parts: Uint8Array[] = [];
+  let byteLength = 0;
+
+  const push = (part: Uint8Array) => {
+    parts.push(part);
+    byteLength += part.byteLength;
+  };
+
+  for (const range of ranges) {
+    push(
+      new TextEncoder().encode(
+        `\r\n--${HTTP_MULTIPART_BOUNDARY}\r\nContent-Type: ${mimeType}\r\nContent-Range: bytes ${range.start}-${range.end}/${body.byteLength}\r\n\r\n`
+      )
+    );
+    push(new Uint8Array(sliceArrayBuffer(body, range.start, range.end + 1)));
+  }
+  push(new TextEncoder().encode(`\r\n--${HTTP_MULTIPART_BOUNDARY}--\r\n`));
+
+  const multipart = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const part of parts) {
+    multipart.set(part, offset);
+    offset += part.byteLength;
+  }
+  return uint8ArrayToArrayBuffer(multipart);
+}
+
+function sliceArrayBuffer(body: ArrayBuffer, start: number, end: number): ArrayBuffer {
+  return uint8ArrayToArrayBuffer(new Uint8Array(body).slice(start, end));
 }
 
 function uint8ArrayToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -2630,36 +2828,30 @@ function isMediaNotModified(
 ): boolean {
   const ifNoneMatch = request.headers.get("if-none-match");
 
-  if (ifNoneMatch) {
-    return matchesMediaEtag(ifNoneMatch, etag);
+  const ifModifiedSince = request.headers.get("if-modified-since");
+  if (!ifNoneMatch && !ifModifiedSince) return false;
+
+  if (ifNoneMatch && !matchesMediaEtag(ifNoneMatch, etag)) {
+    return false;
   }
 
-  const ifModifiedSince = request.headers.get("if-modified-since");
-  if (!ifModifiedSince) return false;
+  if (ifModifiedSince && ifModifiedSince !== mediaLastModified(media)) {
+    return false;
+  }
 
-  const since = Date.parse(ifModifiedSince);
-  if (Number.isNaN(since)) return false;
-
-  const modified = new Date(getMediaTimestamp(media)).getTime();
-  return Math.floor(modified / 1000) <= Math.floor(since / 1000);
+  return true;
 }
 
 function matchesMediaEtag(header: string, etag: string): boolean {
-  return header
-    .split(",")
-    .map((value) => value.trim())
-    .some((value) => {
-      if (value === "*") return true;
-      return stripWeakEtagPrefix(value) === stripWeakEtagPrefix(etag);
-    });
+  return header === etag;
 }
 
-function stripWeakEtagPrefix(value: string): string {
-  return value.startsWith("W/") ? value.slice(2) : value;
+function mediaEtag(media: CurrentMedia | MediaRevision): string {
+  return `"${md5Hex(mediaLastModified(media))}"`;
 }
 
-function mediaEtag(media: CurrentMedia | MediaRevision, derivativeKey = ""): string {
-  return derivativeKey ? `"${media.contentHash}:${derivativeKey}"` : `"${media.contentHash}"`;
+function mediaLastModified(media: CurrentMedia | MediaRevision): string {
+  return new Date(getMediaTimestamp(media)).toUTCString();
 }
 
 function logMediaFetchMetric(

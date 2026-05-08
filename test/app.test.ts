@@ -1147,7 +1147,13 @@ describe("handleRequest", () => {
 
     expect(fetch.status).toBe(200);
     expect(fetch.headers.get("content-type")).toBe("image/svg+xml");
-    expect(fetch.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(fetch.headers.get("cache-control")).toBe(
+      "public, proxy-revalidate, no-transform, max-age=86400"
+    );
+    expect(fetch.headers.get("etag")).toBe('"fecd9e624768fd026cab0b594d0b836a"');
+    expect(fetch.headers.get("last-modified")).toBe("Thu, 07 May 2026 00:00:00 GMT");
+    expect(fetch.headers.get("content-disposition")).toBe('inline; filename="logo.svg";');
+    expect(fetch.headers.get("accept-ranges")).toBe("bytes");
     expect(fetch.headers.get("x-dokuwiki-thumbnail-policy")).toBe("original");
     expect(resized.headers.get("x-dokuwiki-resize-policy")).toBe("unsupported");
     expect(invalidResized.status).toBe(412);
@@ -1160,12 +1166,17 @@ describe("handleRequest", () => {
     await expect(fetch.text()).resolves.toBe("<svg>current</svg>");
     expect(head.status).toBe(200);
     expect(head.headers.get("content-length")).toBe("18");
+    expect(head.headers.get("content-disposition")).toBe('inline; filename="logo.svg";');
+    expect(head.headers.get("accept-ranges")).toBe("bytes");
     await expect(head.text()).resolves.toBe("");
-    expect(download.headers.get("content-disposition")).toBe('attachment; filename="logo.svg"');
-    expect(noCache.headers.get("cache-control")).toBe("no-cache, no-store, must-revalidate");
-    expect(noCache.headers.get("pragma")).toBe("no-cache");
+    expect(download.headers.get("content-disposition")).toBe('attachment; filename="logo.svg";');
+    expect(noCache.headers.get("cache-control")).toBe("no-cache, no-transform");
+    expect(noCache.headers.get("expires")).toBe("Thu, 01 Jan 1970 00:00:00 GMT");
     expect(noCacheConditional.status).toBe(200);
-    expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(revision.headers.get("cache-control")).toBe(
+      "public, proxy-revalidate, no-transform, max-age=86400"
+    );
+    expect(revision.headers.get("etag")).toBe('"1912590ec0e578319276d01c8923e98c"');
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
     const detailHtml = await detail.text();
     expect(detailHtml).toContain('id="dokuwiki__detail"');
@@ -1346,7 +1357,7 @@ describe("handleRequest", () => {
 
     const etag = await handleRequest(
       new Request("https://example.com/media/wiki/logo.svg", {
-        headers: { "if-none-match": '"current-media-hash"' }
+        headers: { "if-none-match": '"fecd9e624768fd026cab0b594d0b836a"' }
       }),
       env
     );
@@ -1358,11 +1369,48 @@ describe("handleRequest", () => {
     );
 
     expect(etag.status).toBe(304);
-    expect(etag.headers.get("etag")).toBe('"current-media-hash"');
+    expect(etag.headers.get("etag")).toBe('"fecd9e624768fd026cab0b594d0b836a"');
     expect(etag.headers.get("content-length")).toBe(null);
+    expect(etag.headers.get("content-disposition")).toBeNull();
     expect(modifiedSince.status).toBe(304);
     expect(r2Operations.get).toBe(0);
     expect(r2Operations.head).toBe(0);
+  });
+
+  it("serves current and old media byte ranges with DokuWiki-style headers", async () => {
+    const current = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg", {
+        headers: { range: "bytes=0-4" }
+      }),
+      env
+    );
+    const oldRevision = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?rev=media-rev-1", {
+        headers: { range: "bytes=5-7" }
+      }),
+      env
+    );
+    const badRange = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg", {
+        headers: { range: "bytes=99-100" }
+      }),
+      env
+    );
+
+    expect(current.status).toBe(206);
+    expect(current.headers.get("accept-ranges")).toBe("bytes");
+    expect(current.headers.get("content-range")).toBe("bytes 0-4/18");
+    expect(current.headers.get("content-length")).toBe("5");
+    expect(current.headers.get("content-disposition")).toBe('inline; filename="logo.svg";');
+    await expect(current.text()).resolves.toBe("<svg>");
+
+    expect(oldRevision.status).toBe(206);
+    expect(oldRevision.headers.get("content-range")).toBe("bytes 5-7/14");
+    expect(oldRevision.headers.get("etag")).toBe('"1912590ec0e578319276d01c8923e98c"');
+    await expect(oldRevision.text()).resolves.toBe("old");
+
+    expect(badRange.status).toBe(416);
+    await expect(badRange.text()).resolves.toBe("Bad Range Request!");
   });
 
   it("forces media downloads from default and imported MIME configuration", async () => {
@@ -1414,9 +1462,9 @@ describe("handleRequest", () => {
     );
     const inline = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
 
-    expect(archive.headers.get("content-disposition")).toBe('attachment; filename="archive.zip"');
-    expect(custom.headers.get("content-disposition")).toBe('attachment; filename="readme.foo"');
-    expect(inline.headers.get("content-disposition")).toBeNull();
+    expect(archive.headers.get("content-disposition")).toBe('attachment; filename="archive.zip";');
+    expect(custom.headers.get("content-disposition")).toBe('attachment; filename="readme.foo";');
+    expect(inline.headers.get("content-disposition")).toBe('inline; filename="logo.svg";');
   });
 
   it("uploads media to R2 and records D1 media revision metadata", async () => {
