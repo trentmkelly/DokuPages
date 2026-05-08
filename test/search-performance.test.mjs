@@ -62,12 +62,36 @@ describe("search performance guardrails", () => {
     expect(plan).toContain("sqlite_autoindex_search_postings_1");
     expect(plan).not.toContain("SCAN search_postings");
   });
+
+  it("applies DokuWiki-style operators, phrases, namespace filters, and wildcards", async () => {
+    ({ d1 } = createOperatorSearchDatabase());
+
+    await expect(searchPages(d1, 'alpha -legacy @wiki "exact phrase"', "", 10)).resolves.toEqual([
+      expect.objectContaining({ id: "wiki:alpha" })
+    ]);
+    await expect(searchPages(d1, "alph* -legacy", "", 10)).resolves.toEqual([
+      expect.objectContaining({ id: "wiki:alpha" }),
+      expect.objectContaining({ id: "private:alpha" }),
+      expect.objectContaining({ id: "wiki:alphabet" })
+    ]);
+    await expect(searchPages(d1, "legacy or alphabet", "", 10)).resolves.toEqual([
+      expect.objectContaining({ id: "wiki:beta" }),
+      expect.objectContaining({ id: "wiki:alphabet" })
+    ]);
+  });
 });
 
 function createSearchDatabase() {
   const database = new DatabaseSync(":memory:");
   database.exec(migrationSql);
   seedSearchCorpus(database);
+  return { db: database, d1: new CapturingSqliteD1(database) };
+}
+
+function createOperatorSearchDatabase() {
+  const database = new DatabaseSync(":memory:");
+  database.exec(migrationSql);
+  seedOperatorSearchCorpus(database);
   return { db: database, d1: new CapturingSqliteD1(database) };
 }
 
@@ -119,6 +143,81 @@ function seedSearchCorpus(db) {
     );
     insertPosting.run("alpha", pageId, 1000 - index, createdAt);
     insertPosting.run("beta", pageId, 1, createdAt);
+  }
+}
+
+function seedOperatorSearchCorpus(db) {
+  const pages = [
+    {
+      id: "wiki:alpha",
+      namespace: "wiki",
+      title: "Alpha",
+      content: "alpha beta exact phrase",
+      terms: { alpha: 4, beta: 1, exact: 1, phrase: 1 }
+    },
+    {
+      id: "wiki:beta",
+      namespace: "wiki",
+      title: "Beta",
+      content: "alpha legacy",
+      terms: { alpha: 1, legacy: 5 }
+    },
+    {
+      id: "private:alpha",
+      namespace: "private",
+      title: "Private Alpha",
+      content: "alpha beta exact phrase",
+      terms: { alpha: 3, beta: 1, exact: 1, phrase: 1 }
+    },
+    {
+      id: "wiki:alphabet",
+      namespace: "wiki",
+      title: "Alphabet",
+      content: "alphabet soup",
+      terms: { alphabet: 2, soup: 1 }
+    }
+  ];
+  const insertPage = db.prepare(
+    `insert into pages (
+       id, namespace, title, current_revision_id, is_deleted, created_at, updated_at
+     ) values (?, ?, ?, ?, 0, ?, ?)`
+  );
+  const insertRevision = db.prepare(
+    `insert into page_revisions (
+       id, page_id, content, content_hash, author_id, author_name, summary,
+       change_type, size_change, created_at
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertTerm = db.prepare(
+    `insert into search_terms (term, term_length, document_count)
+     values (?, ?, ?)
+     on conflict(term) do update set document_count = document_count + 1`
+  );
+  const insertPosting = db.prepare(
+    "insert into search_postings (term, page_id, frequency, updated_at) values (?, ?, ?, ?)"
+  );
+
+  for (const [index, page] of pages.entries()) {
+    const createdAt = timestamp(index);
+    const revisionId = `${page.id}@current`;
+    insertPage.run(page.id, page.namespace, page.title, revisionId, createdAt, createdAt);
+    insertRevision.run(
+      revisionId,
+      page.id,
+      page.content,
+      `hash-${page.id}`,
+      null,
+      null,
+      "current",
+      "create",
+      page.content.length,
+      createdAt
+    );
+
+    for (const [term, frequency] of Object.entries(page.terms)) {
+      insertTerm.run(term, term.length, 1);
+      insertPosting.run(term, page.id, frequency, createdAt);
+    }
   }
 }
 

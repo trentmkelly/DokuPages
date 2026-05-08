@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSearchTermFrequencies,
   makeSearchSnippet,
+  parseFulltextSearchQuery,
   parseSearchQuery,
   searchIndexWordLength,
   searchStopWords,
@@ -21,6 +22,16 @@ describe("wiki search helpers", () => {
 
   it("parses unique query terms", () => {
     expect(parseSearchQuery("welcome welcome syntax +the")).toEqual(["welcome", "syntax"]);
+  });
+
+  it("parses DokuWiki boolean, namespace, phrase, and wildcard syntax", () => {
+    const query = parseFulltextSearchQuery('welcome -"old page" @wiki ^private synt*', "en");
+
+    expect(query.highlight).toEqual(["welcome", "synt"]);
+    expect(query.namespaces).toEqual(["wiki"]);
+    expect(query.excludedNamespaces).toEqual(["private"]);
+    expect(query.words).toContain("synt*");
+    expect(query.simpleTerms).toEqual([]);
   });
 
   it("uses DokuWiki language-specific stopword files", () => {

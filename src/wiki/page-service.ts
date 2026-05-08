@@ -5,8 +5,13 @@ import { renderWikiText, type TocItem } from "./render";
 import {
   buildSearchTermFrequencies,
   makeSearchSnippet,
-  parseSearchQuery,
-  searchIndexWordLength
+  parseFulltextSearchQuery,
+  searchIndexWordLength,
+  type ParsedFulltextSearchQuery,
+  type SearchOperand,
+  type SearchRpnToken,
+  type SearchWildcard,
+  type SearchWordOperand
 } from "./search";
 
 export interface CurrentPage {
@@ -171,6 +176,7 @@ interface NamespacePageRow {
 
 interface CurrentPageSourceRow {
   id: string;
+  namespace: string;
   title: string | null;
   content: string;
   updated_at: string;
@@ -329,12 +335,28 @@ export async function searchPages(
   limit = 25,
   language = "en"
 ): Promise<PageSearchResult[]> {
-  const terms = parseSearchQuery(query, language);
+  const parsedQuery = parseFulltextSearchQuery(query, language);
+  if (parsedQuery.rpn.length === 0) return [];
+  if (parsedQuery.simpleTerms.length > 0) {
+    return searchPagesSimple(db, parsedQuery, namespace, limit);
+  }
+
+  return searchPagesWithQueryPlan(db, parsedQuery, namespace, limit);
+}
+
+async function searchPagesSimple(
+  db: D1Database,
+  parsedQuery: ParsedFulltextSearchQuery,
+  namespace = "",
+  limit = 25
+): Promise<PageSearchResult[]> {
+  const terms = parsedQuery.simpleTerms;
   if (terms.length === 0) return [];
 
   const safeLimit = Math.max(1, Math.min(limit, 50));
   const placeholders = terms.map(() => "?").join(", ");
   const namespaceClause = namespace ? " and p.namespace = ?" : "";
+  const requiredTermCount = terms.length;
   const result = await db
     .prepare(
       `select p.id, p.title, r.content, p.updated_at, sum(sp.frequency) as score
@@ -343,6 +365,7 @@ export async function searchPages(
        join page_revisions r on r.id = p.current_revision_id
        where sp.term in (${placeholders}) and p.is_deleted = 0${namespaceClause}
        group by p.id
+       having count(distinct sp.term) = ${requiredTermCount}
        order by score desc, p.updated_at desc
        limit ?`
     )
@@ -352,10 +375,244 @@ export async function searchPages(
   return result.results.map((row) => ({
     id: row.id,
     title: row.title,
-    snippet: makeSearchSnippet(row.content, terms),
+    snippet: makeSearchSnippet(row.content, parsedQuery.highlight),
     score: row.score,
     updatedAt: row.updated_at
   }));
+}
+
+async function searchPagesWithQueryPlan(
+  db: D1Database,
+  parsedQuery: ParsedFulltextSearchQuery,
+  namespace = "",
+  limit = 25
+): Promise<PageSearchResult[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 50));
+  const pages = await listSearchPageSources(db, 5_000);
+  if (pages.length === 0) return [];
+
+  const pageRows = new Map(pages.map((page) => [page.id, page]));
+  const wordHits = await buildSearchWordHitMaps(db, parsedQuery);
+  const evaluated = evaluateSearchRpn(parsedQuery.rpn, pages, wordHits);
+  const rows = [...evaluated.entries()]
+    .map(([id, score]) => ({ page: pageRows.get(id), score }))
+    .filter((entry): entry is { page: CurrentPageSourceRow; score: number } => {
+      if (!entry.page) return false;
+      return !namespace || entry.page.namespace === namespace;
+    })
+    .sort((a, b) => b.score - a.score || b.page.updated_at.localeCompare(a.page.updated_at))
+    .slice(0, safeLimit);
+
+  return rows.map(({ page, score }) => ({
+    id: page.id,
+    title: page.title,
+    snippet: makeSearchSnippet(page.content, parsedQuery.highlight),
+    score,
+    updatedAt: page.updated_at
+  }));
+}
+
+async function buildSearchWordHitMaps(
+  db: D1Database,
+  parsedQuery: ParsedFulltextSearchQuery
+): Promise<Map<string, Map<string, number>>> {
+  const wordOperands = uniqueWordOperands(parsedQuery.rpn);
+  const exactTerms = new Set<string>();
+  const resolvedTerms = new Map<string, string[]>();
+
+  for (const operand of wordOperands) {
+    if (operand.wildcard === "none") {
+      exactTerms.add(operand.lookupTerm);
+      resolvedTerms.set(wordOperandKey(operand), [operand.lookupTerm]);
+      continue;
+    }
+
+    const matchingTerms = await resolveWildcardSearchTerms(db, operand);
+    resolvedTerms.set(wordOperandKey(operand), matchingTerms);
+    for (const term of matchingTerms) {
+      exactTerms.add(term);
+    }
+  }
+
+  const postings = await listSearchPostingsForTerms(db, [...exactTerms]);
+  const postingsByTerm = new Map<string, Array<{ pageId: string; frequency: number }>>();
+  for (const posting of postings) {
+    const bucket = postingsByTerm.get(posting.term) ?? [];
+    bucket.push({ pageId: posting.page_id, frequency: posting.frequency });
+    postingsByTerm.set(posting.term, bucket);
+  }
+
+  const hitMaps = new Map<string, Map<string, number>>();
+  for (const operand of wordOperands) {
+    const pageHits = new Map<string, number>();
+    for (const term of resolvedTerms.get(wordOperandKey(operand)) ?? []) {
+      for (const posting of postingsByTerm.get(term) ?? []) {
+        pageHits.set(posting.pageId, (pageHits.get(posting.pageId) ?? 0) + posting.frequency);
+      }
+    }
+    hitMaps.set(wordOperandKey(operand), pageHits);
+  }
+
+  return hitMaps;
+}
+
+function evaluateSearchRpn(
+  rpn: SearchRpnToken[],
+  pages: CurrentPageSourceRow[],
+  wordHits: Map<string, Map<string, number>>
+): Map<string, number> {
+  const universe = new Map(pages.map((page) => [page.id, 0]));
+  const stack: Array<Map<string, number>> = [];
+
+  for (const token of rpn) {
+    if (typeof token !== "string") {
+      stack.push(evaluateSearchOperand(token, pages, wordHits));
+      continue;
+    }
+
+    if (token === "NOT") {
+      const value = stack.pop() ?? new Map<string, number>();
+      stack.push(complementSearchHits(universe, value));
+      continue;
+    }
+
+    const right = stack.pop() ?? new Map<string, number>();
+    const left = stack.pop() ?? new Map<string, number>();
+    stack.push(token === "AND" ? intersectSearchHits(left, right) : uniteSearchHits(left, right));
+  }
+
+  return stack.pop() ?? new Map<string, number>();
+}
+
+function evaluateSearchOperand(
+  operand: SearchOperand,
+  pages: CurrentPageSourceRow[],
+  wordHits: Map<string, Map<string, number>>
+): Map<string, number> {
+  if (operand.kind === "word") {
+    return new Map(wordHits.get(wordOperandKey(operand)) ?? []);
+  }
+
+  if (operand.kind === "phrase") {
+    const phrase = operand.phrase.toLowerCase();
+    return new Map(
+      pages
+        .filter((page) => page.content.toLowerCase().includes(phrase))
+        .map((page) => [page.id, 0])
+    );
+  }
+
+  const namespace = cleanPageId(operand.namespace);
+  const prefix = namespace ? `${namespace}:` : "";
+  return new Map(
+    pages.filter((page) => prefix && page.id.startsWith(prefix)).map((page) => [page.id, 0])
+  );
+}
+
+function intersectSearchHits(
+  left: Map<string, number>,
+  right: Map<string, number>
+): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const [id, score] of left) {
+    if (right.has(id)) {
+      result.set(id, score + (right.get(id) ?? 0));
+    }
+  }
+  return result;
+}
+
+function uniteSearchHits(
+  left: Map<string, number>,
+  right: Map<string, number>
+): Map<string, number> {
+  const result = new Map(left);
+  for (const [id, score] of right) {
+    result.set(id, (result.get(id) ?? 0) + score);
+  }
+  return result;
+}
+
+function complementSearchHits(
+  universe: Map<string, number>,
+  excluded: Map<string, number>
+): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const id of universe.keys()) {
+    if (!excluded.has(id)) result.set(id, 0);
+  }
+  return result;
+}
+
+function uniqueWordOperands(rpn: SearchRpnToken[]): SearchWordOperand[] {
+  const operands = new Map<string, SearchWordOperand>();
+  for (const token of rpn) {
+    if (typeof token === "object" && token.kind === "word") {
+      operands.set(wordOperandKey(token), token);
+    }
+  }
+  return [...operands.values()];
+}
+
+function wordOperandKey(operand: SearchWordOperand): string {
+  return `${operand.wildcard}:${operand.term}`;
+}
+
+async function resolveWildcardSearchTerms(
+  db: D1Database,
+  operand: SearchWordOperand
+): Promise<string[]> {
+  const pattern = likePatternForWildcard(operand.lookupTerm, operand.wildcard);
+  if (!pattern) return [];
+
+  const result = await db
+    .prepare(
+      `select term
+       from search_terms
+       where term like ? escape '\\'
+       order by document_count desc, term asc
+       limit 256`
+    )
+    .bind(pattern)
+    .all<SearchTermRow>();
+
+  return result.results.map((row) => row.term);
+}
+
+function likePatternForWildcard(term: string, wildcard: SearchWildcard): string | null {
+  if (wildcard === "none" || !term) return null;
+  const escaped = escapeSqlLike(term);
+  if (wildcard === "prefix") return `${escaped}%`;
+  if (wildcard === "suffix") return `%${escaped}`;
+  return `%${escaped}%`;
+}
+
+function escapeSqlLike(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+async function listSearchPostingsForTerms(
+  db: D1Database,
+  terms: string[]
+): Promise<Array<{ term: string; page_id: string; frequency: number }>> {
+  if (terms.length === 0) return [];
+
+  const rows: Array<{ term: string; page_id: string; frequency: number }> = [];
+  for (let index = 0; index < terms.length; index += 100) {
+    const chunk = terms.slice(index, index + 100);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const result = await db
+      .prepare(
+        `select term, page_id, frequency
+         from search_postings
+         where term in (${placeholders})`
+      )
+      .bind(...chunk)
+      .all<{ term: string; page_id: string; frequency: number }>();
+    rows.push(...result.results);
+  }
+
+  return rows;
 }
 
 export async function listNamespacePages(
@@ -1229,6 +1486,9 @@ async function buildBacklinkMetadata(
             : [
                 {
                   id: sourcePageId,
+                  namespace: sourcePageId.includes(":")
+                    ? sourcePageId.slice(0, sourcePageId.lastIndexOf(":"))
+                    : "",
                   title: null,
                   content: sourceContent,
                   updated_at: new Date(0).toISOString()
@@ -1413,7 +1673,7 @@ async function listCurrentPageSources(
 ): Promise<CurrentPageSourceRow[]> {
   const result = await db
     .prepare(
-      `select p.id, p.title, r.content, p.updated_at
+      `select p.id, p.namespace, p.title, r.content, p.updated_at
        from pages p
        join page_revisions r on r.id = p.current_revision_id
        where p.is_deleted = 0
@@ -1421,6 +1681,25 @@ async function listCurrentPageSources(
        limit ?`
     )
     .bind(Math.max(1, Math.min(limit, 500)))
+    .all<CurrentPageSourceRow>();
+
+  return result.results;
+}
+
+async function listSearchPageSources(
+  db: D1Database,
+  limit: number
+): Promise<CurrentPageSourceRow[]> {
+  const result = await db
+    .prepare(
+      `select p.id, p.namespace, p.title, r.content, p.updated_at
+       from pages p
+       join page_revisions r on r.id = p.current_revision_id
+       where p.is_deleted = 0
+       order by p.updated_at desc
+       limit ?`
+    )
+    .bind(Math.max(1, Math.min(limit, 5_000)))
     .all<CurrentPageSourceRow>();
 
   return result.results;
