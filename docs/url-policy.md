@@ -39,12 +39,12 @@ The Pages equivalents are environment variables:
 
 | DokuWiki setting | Pages environment variable | Behavior                                                                    |
 | ---------------- | -------------------------- | --------------------------------------------------------------------------- |
-| `canonical`      | `CANONICAL_URLS`           | When true, canonical page links are absolute URLs.                          |
+| `canonical`      | `CANONICAL_URLS`           | When true, generated root-relative wiki URLs are emitted as absolute URLs.  |
 | `baseurl`        | `BASE_URL`                 | Absolute origin used for canonical URLs when `CANONICAL_URLS` is enabled.   |
-| `basedir`        | `BASE_DIR`                 | Path prefix applied to generated canonical page URLs.                       |
+| `basedir`        | `BASE_DIR`                 | Path prefix applied to generated wiki URLs and accepted on incoming routes. |
 | `send404`        | `SEND404`                  | Controls whether missing wiki pages return HTTP 404 or DokuWiki-style 200.  |
 | `disableactions` | `DISABLE_ACTIONS`          | Comma-separated action names hidden from menus and rejected for `do=` URLs. |
 
-Route matching remains bound to the deployed Pages project path. `BASE_DIR` does
-not mount a second application path; it only mirrors DokuWiki's generated URL
-metadata behavior for deployments that need a canonical path prefix.
+`BASE_DIR` mirrors DokuWiki's `DOKU_BASE` path prefix: generated links, assets,
+form actions, redirect locations, and canonical metadata include the prefix, and
+incoming requests under that prefix are routed to the same native handlers.

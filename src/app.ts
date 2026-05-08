@@ -221,6 +221,16 @@ export async function handleRequest(
   env: Env,
   assetFallback?: AssetFallback
 ): Promise<Response> {
+  const routedRequest = requestForConfiguredBaseDir(request, env);
+  const response = await dispatchRequest(routedRequest, env, assetFallback);
+  return applyPublicUrlPolicyToResponse(response, env);
+}
+
+async function dispatchRequest(
+  request: Request,
+  env: Env,
+  assetFallback?: AssetFallback
+): Promise<Response> {
   const url = new URL(request.url);
   const principal = await resolveRequestPrincipal(request, env);
 
@@ -1239,6 +1249,82 @@ function redirectLegacyMediaDetail(url: URL): Response {
   }
 
   return redirectResponse(mediaDetailPath(id), 301);
+}
+
+function requestForConfiguredBaseDir(request: Request, env: Env): Request {
+  const baseDir = getRuntimeConfig(env).baseDir;
+  if (!baseDir) return request;
+
+  const url = new URL(request.url);
+  if (url.pathname === baseDir) {
+    url.pathname = "/";
+  } else if (url.pathname.startsWith(`${baseDir}/`)) {
+    url.pathname = url.pathname.slice(baseDir.length) || "/";
+  } else {
+    return request;
+  }
+
+  return new Request(url.href, request as unknown as RequestInit);
+}
+
+async function applyPublicUrlPolicyToResponse(response: Response, env: Env): Promise<Response> {
+  const config = getRuntimeConfig(env);
+  if (!config.baseDir && !config.canonicalUrls) return response;
+
+  const headers = new Headers(response.headers);
+  const location = headers.get("location");
+  if (location && isRootRelativeUrl(location)) {
+    headers.set("location", publicUrlForRootRelativeHref(config, env, location));
+  }
+
+  const contentType = headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("text/html") || response.body === null) {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  }
+
+  const html = await response.text();
+  return new Response(rewriteRootRelativeHtmlUrls(html, config, env), {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+function rewriteRootRelativeHtmlUrls(html: string, config: RuntimeConfig, env: Env): string {
+  return html
+    .replace(/\b(href|src|action)="(\/(?!\/)[^"]*)"/g, (_match, attribute, href) => {
+      return `${attribute}="${publicUrlForRootRelativeHref(config, env, href)}"`;
+    })
+    .replace(/(<option\b[^>]*\svalue=")(\/(?!\/)[^"]*)"/g, (_match, prefix, href) => {
+      return `${prefix}${publicUrlForRootRelativeHref(config, env, href)}"`;
+    });
+}
+
+function publicUrlForRootRelativeHref(config: RuntimeConfig, env: Env, href: string): string {
+  if (!isRootRelativeUrl(href)) return href;
+
+  const pathWithBaseDir =
+    config.baseDir && (href === config.baseDir || href.startsWith(`${config.baseDir}/`))
+      ? href
+      : `${config.baseDir}${href}`;
+
+  if (!config.canonicalUrls) {
+    return pathWithBaseDir;
+  }
+
+  return new URL(pathWithBaseDir, canonicalOrigin(config, env)).href;
+}
+
+function canonicalOrigin(config: RuntimeConfig, env: Env): string {
+  return config.baseUrl ?? env.CF_PAGES_URL ?? "https://example.invalid";
+}
+
+function isRootRelativeUrl(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//");
 }
 
 function remoteApiNotImplementedResponse(apiName: string): Response {
@@ -9096,8 +9182,7 @@ function canonicalPageHref(env: Env, pageId: string): string {
     return path;
   }
 
-  const origin = config.baseUrl ?? env.CF_PAGES_URL ?? "https://example.invalid";
-  return new URL(path, origin).href;
+  return new URL(path, canonicalOrigin(config, env)).href;
 }
 
 function renderPageInfo(

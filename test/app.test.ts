@@ -446,6 +446,31 @@ describe("handleRequest", () => {
     expect(staticIndex.headers.get("location")).toBe("/wiki/wiki/welcome");
   });
 
+  it("applies BASE_DIR to generated URLs and routed requests", async () => {
+    const configuredEnv = {
+      ...env,
+      BASE_DIR: "/docs"
+    } satisfies Env;
+
+    const response = await handleRequest(
+      new Request("https://example.com/docs/wiki/wiki/welcome"),
+      configuredEnv
+    );
+    const redirect = await handleRequest(new Request("https://example.com/docs/"), configuredEnv);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<link rel="canonical" href="/docs/wiki/wiki/welcome">');
+    expect(html).toContain('<link rel="stylesheet" href="/docs/dokuwiki.css?v=0.1.0">');
+    expect(html).toContain(
+      '<li class="action login"><a href="/docs/wiki/wiki/welcome?do=login" rel="nofollow">Log In</a></li>'
+    );
+    expect(html).toContain('<form class="search" method="get" action="/docs/search">');
+    expect(html).toContain('<option value="/docs/media-manager?ns=wiki">Media Manager</option>');
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("location")).toBe("/docs/wiki/wiki/welcome");
+  });
+
   it("redirects legacy DokuWiki query URLs to canonical page routes", async () => {
     const page = await handleRequest(
       new Request("https://example.com/doku.php?id=Wiki:Welcome"),
@@ -2401,11 +2426,19 @@ describe("handleRequest", () => {
       new Request("https://example.com/wiki/missing/page"),
       configuredEnv
     );
+    const redirect = await handleRequest(new Request("https://example.com/"), configuredEnv);
 
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain(
       '<link rel="canonical" href="https://wiki.example.test/docs/wiki/missing/page">'
+    );
+    expect(html).toContain(
+      '<link rel="stylesheet" href="https://wiki.example.test/docs/dokuwiki.css?v=0.1.0">'
+    );
+    expect(html).toContain('href="https://wiki.example.test/docs/wiki/missing/page?do=edit"');
+    expect(redirect.headers.get("location")).toBe(
+      "https://wiki.example.test/docs/wiki/wiki/welcome"
     );
   });
 
