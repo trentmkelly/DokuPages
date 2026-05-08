@@ -677,20 +677,20 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 
 ## Performance And Limits
 
-- [ ] Measure cold start time.
+- [x] Measure cold start time.
 - [x] Measure warm request time.
 - [x] Measure page render time.
 - [x] Measure edit save time.
 - [x] Measure media fetch time.
 - [x] Measure search time.
-- [ ] Measure migration time.
+- [x] Measure migration time.
 - [x] Measure D1 query counts per route.
 - [x] Measure R2 operation counts per route.
 - [x] Measure KV operation counts per route if used.
-- [ ] Measure Worker CPU usage per route.
-- [ ] Measure Worker memory usage per route.
-- [ ] Measure bundle size.
-- [ ] Measure static asset size.
+- [x] Measure Worker CPU usage per route.
+- [x] Measure Worker memory usage per route.
+- [x] Measure bundle size.
+- [x] Measure static asset size.
 - [ ] Optimize parser hot paths.
 - [ ] Optimize rendered page caching.
 - [ ] Optimize search indexing.

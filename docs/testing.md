@@ -51,7 +51,11 @@ sizes, and R2 media operation counts.
 
 Route performance tests cover warm page render latency, concurrent page read
 load, edit-save latency, and bounded D1/KV operation counts for those request
-paths.
+paths. They also record local CPU time and heap deltas for representative render
+and edit-save requests.
+
+Performance measurement helper tests cover the file-tree summarizer used by
+`npm run limits:measure` for bundle and static asset size baselines.
 
 Search performance tests cover indexed page search query plans, raw posting
 search result clamps, term deduplication, and one-read D1 behavior across large

@@ -29,6 +29,8 @@ describe("route performance guardrails", () => {
 
     expect(measured.response.status).toBe(200);
     expect(measured.durationMs).toBeLessThan(1000);
+    expect(measured.cpuMs).toBeLessThan(500);
+    expect(Math.abs(measured.heapDeltaBytes)).toBeLessThan(16 * 1024 * 1024);
     expect(env.DB.totalReads()).toBeLessThanOrEqual(6);
     expect(env.DB.counts.batch).toBe(0);
     expect(env.RENDER_CACHE.counts.get).toBeLessThanOrEqual(2);
@@ -83,6 +85,8 @@ describe("route performance guardrails", () => {
     expect(measured.response.status).toBe(303);
     expect(measured.response.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(measured.durationMs).toBeLessThan(1000);
+    expect(measured.cpuMs).toBeLessThan(500);
+    expect(Math.abs(measured.heapDeltaBytes)).toBeLessThan(16 * 1024 * 1024);
     expect(env.DB.counts.batch).toBeLessThanOrEqual(4);
     expect(env.DB.totalReads()).toBeLessThanOrEqual(12);
     expect(env.RENDER_CACHE.counts.get).toBeLessThanOrEqual(4);
@@ -174,10 +178,15 @@ function csrfHeaders(headers = {}) {
 
 async function measure(callback) {
   const startedAt = performance.now();
+  const cpuStartedAt = process.cpuUsage();
+  const heapStartedAt = process.memoryUsage().heapUsed;
   const response = await callback();
+  const cpu = process.cpuUsage(cpuStartedAt);
   return {
     response,
-    durationMs: performance.now() - startedAt
+    durationMs: performance.now() - startedAt,
+    cpuMs: (cpu.user + cpu.system) / 1000,
+    heapDeltaBytes: process.memoryUsage().heapUsed - heapStartedAt
   };
 }
 

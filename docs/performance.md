@@ -76,7 +76,37 @@ Local route performance tests measure representative warm page render time,
 concurrent page read load, edit-save time, and D1/KV operation counts. Guardrails
 keep warm page renders and edit saves under one second in the in-memory harness,
 keep 25 concurrent cached page reads under three seconds, prevent warm reads from
-writing KV, and bound storage calls for the render and save paths.
+writing KV, and bound storage calls for the render and save paths. The same
+tests record CPU time and heap deltas for warm page render and edit-save routes,
+with local guardrails below 500 ms CPU and 16 MiB absolute heap delta per
+measured request.
+
+## Limits Measurement Baseline
+
+Run local limit measurements with:
+
+```sh
+npm run limits:measure
+```
+
+The script compiles the Pages Functions bundle with Wrangler, measures local
+bundle import time as a cold-start proxy, records static asset and Worker bundle
+sizes, and times the DokuWiki import planner.
+
+Current local baseline from May 8, 2026 UTC, measured against `../dokuwiki`:
+
+| Measurement               |   Value |
+| ------------------------- | ------: |
+| Worker bundle build time  |  640 ms |
+| Worker bundle cold import | 3.82 ms |
+| Migration plan time       |   19 ms |
+| Worker bundle output size |  209 KB |
+| Minified Worker script    |  183 KB |
+| Static asset total size   |   82 KB |
+| Static asset file count   |      44 |
+
+Largest checked-in static assets are `dokuwiki.css` at 22 KB, `dokuwiki.js` at
+9 KB, `images/favicon.ico` at 7 KB, and `images/apple-touch-icon.png` at 6 KB.
 
 ## Parser Cache Equivalent
 
