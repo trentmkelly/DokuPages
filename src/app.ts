@@ -173,6 +173,10 @@ export async function handleRequest(
     return redirectResponse(pagePath(startPageId(env)), 301);
   }
 
+  if (url.pathname === "/index.html") {
+    return redirectResponse(pagePath(startPageId(env)), 301);
+  }
+
   if (url.pathname === "/install.php") {
     return legacyEndpointNotAvailableResponse("DokuWiki installer", 410);
   }
@@ -747,11 +751,11 @@ export async function handleRequest(
     );
   }
 
-  if (assetFallback) {
+  if (assetFallback && isStaticAssetPath(url.pathname)) {
     return assetFallback();
   }
 
-  return notFoundResponse("Not found.");
+  return htmlResponse(renderRouteNotFoundPage(env, url, principal), { status: 404 });
 }
 
 function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
@@ -2440,6 +2444,34 @@ function renderMissingPage(env: Env, id: string, principal?: AuthPrincipal): str
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
     </p>`,
     { pageId: id, principal }
+  );
+}
+
+function renderRouteNotFoundPage(env: Env, url: URL, principal: AuthPrincipal): string {
+  const startId = startPageId(env);
+  const startPath = pagePath(startId);
+  const requestedPath = `${url.pathname}${url.search}`;
+
+  return htmlShell(
+    env,
+    "Not found",
+    `<h1 id="not-found">Not found</h1>
+    <p>The requested path <code>${escapeHtml(requestedPath)}</code> was not found.</p>
+    <p>
+      <a href="${startPath}">Go to the start page</a>
+      <span class="sep"> · </span>
+      <a href="/search?q=${encodeURIComponent(requestedPath)}">Search the wiki</a>
+    </p>`,
+    { principal }
+  );
+}
+
+function isStaticAssetPath(pathname: string): boolean {
+  return (
+    pathname === "/dokuwiki.css" ||
+    pathname === "/dokuwiki.js" ||
+    pathname === "/dokuwiki-logo.png" ||
+    pathname.startsWith("/images/")
   );
 }
 

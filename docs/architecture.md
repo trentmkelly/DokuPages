@@ -19,7 +19,9 @@ The port is a native TypeScript implementation on Cloudflare Pages Functions. Th
 - `/feed.php`, `/feed.xml`, `/atom.xml`, `/sitemap.xml`, `/robots.txt`, `/opensearch.xml`, and `/manifest.webmanifest` compatibility documents
 - `POST /api/pages` page create, edit, and delete saves
 - `POST /api/pages/preview` rendered preview responses
-- all other paths to static asset fallback
+- checked-in public asset paths such as `/dokuwiki.css`, `/dokuwiki.js`, and
+  `/images/*` to static asset fallback
+- unknown non-asset paths to a DokuWiki-styled HTML 404 page
 
 Specific endpoint files may be added under `functions/` as the route surface expands.
 

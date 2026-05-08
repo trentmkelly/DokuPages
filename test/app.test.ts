@@ -229,9 +229,12 @@ describe("handleRequest", () => {
 
   it("redirects the site root to the configured start page", async () => {
     const response = await handleRequest(new Request("https://example.com/"), env);
+    const staticIndex = await handleRequest(new Request("https://example.com/index.html"), env);
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(staticIndex.status).toBe(301);
+    expect(staticIndex.headers.get("location")).toBe("/wiki/wiki/welcome");
   });
 
   it("redirects legacy DokuWiki query URLs to canonical page routes", async () => {
@@ -1992,14 +1995,36 @@ describe("handleRequest", () => {
     expect(state.searchPostings.some((posting) => posting.page_id === "wiki:new")).toBe(false);
   });
 
-  it("falls back to static assets for non-dynamic routes", async () => {
+  it("falls back to static assets for public asset routes", async () => {
     const response = await handleRequest(
-      new Request("https://example.com/static.txt"),
+      new Request("https://example.com/dokuwiki.css"),
       env,
       async () => new Response("static asset")
     );
 
     await expect(response.text()).resolves.toBe("static asset");
+  });
+
+  it("renders a DokuWiki-styled HTML 404 for unknown extensionless routes", async () => {
+    let staticFallbackCalled = false;
+    const response = await handleRequest(
+      new Request("https://example.com/qwetrqrweqwe"),
+      env,
+      async () => {
+        staticFallbackCalled = true;
+        return new Response("stale static index");
+      }
+    );
+
+    expect(staticFallbackCalled).toBe(false);
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    const html = await response.text();
+    expect(html).toContain('<link rel="stylesheet" href="/dokuwiki.css?v=0.1.0">');
+    expect(html).toContain('<h1 id="not-found">Not found</h1>');
+    expect(html).toContain("<code>/qwetrqrweqwe</code>");
+    expect(html).toContain('href="/wiki/wiki/welcome"');
+    expect(html).not.toContain("DokuWiki Pages.dev Port</h1>");
   });
 });
 
