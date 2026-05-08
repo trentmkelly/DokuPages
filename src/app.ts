@@ -2897,25 +2897,31 @@ async function renderMediaManagerPage(
       ? `<p class="media-manager__empty">No media found.</p>`
       : renderMediaManagerItems(env, media, viewMode);
   const uploadPanel = canUpload
-    ? `<form id="media__upload" class="media-manager__upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
-        ${csrfInput(csrfToken)}
-        <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
-        <div class="media-manager__form-grid">
-          <label for="media__file">File</label>
-          <input id="media__file" name="file" type="file" required>
-          <label for="media__id">Media ID</label>
-          <input id="media__id" name="id" type="text" placeholder="${escapeAttribute(namespace ? `${namespace}:example.png` : "example.png")}">
-          <label for="media__summary">Summary</label>
-          <input id="media__summary" name="summary" type="text">
+    ? `<section id="media__upload" class="media-manager__upload-panel">
+        <div id="mediamanager__uploader">
+          <form id="dw__upload" class="media-manager__upload" method="post" action="/api/media/upload" enctype="multipart/form-data" data-media-upload="1">
+            ${csrfInput(csrfToken)}
+            <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
+            <div class="media-manager__form-grid">
+              <label for="upload__file">File</label>
+              <input id="upload__file" name="file" type="file" required>
+              <label for="upload__name">Media ID</label>
+              <input id="upload__name" name="id" type="text" placeholder="${escapeAttribute(namespace ? `${namespace}:example.png` : "example.png")}">
+              <label for="media__summary">Summary</label>
+              <input id="media__summary" name="summary" type="text">
+            </div>
+            <div class="media-manager__form-actions">
+              <label class="media-manager__check" for="dw__ow">
+                <input id="dw__ow" name="overwrite" type="checkbox" value="1">
+                Overwrite existing media
+              </label>
+              <button type="submit">Upload</button>
+            </div>
+            <progress id="media__upload_progress" class="media-manager__upload-progress" max="100" value="0" hidden></progress>
+            <output id="media__upload_status" class="media-manager__upload-status" role="status"></output>
+          </form>
         </div>
-        <div class="media-manager__form-actions">
-          <label class="media-manager__check" for="media__overwrite">
-            <input id="media__overwrite" name="overwrite" type="checkbox" value="1">
-            Overwrite existing media
-          </label>
-          <button type="submit">Upload</button>
-        </div>
-      </form>`
+      </section>`
     : `<section id="media__upload" class="media-manager__upload media-manager__upload--disabled">
         <p>Upload access is not available for this namespace.</p>
       </section>`;
@@ -2929,54 +2935,62 @@ async function renderMediaManagerPage(
         <aside id="mediamgr__aside" class="media-manager__aside">
           <div class="media-manager__side-tab">Namespaces</div>
           <div class="media-manager__side-head">Choose namespace</div>
-          ${renderMediaNamespaceTree(namespaces, namespace)}
+          <div id="media__tree">${renderMediaNamespaceTree(namespaces, namespace)}</div>
         </aside>
         <section id="mediamgr__content" class="media-manager__content">
-          <nav class="media-manager__tabs" aria-label="Media manager sections">
-            <a class="media-manager__tab media-manager__tab--active" href="#media__files">Media Files</a>
-            <a class="media-manager__tab" href="#media__upload">Upload</a>
-            <a class="media-manager__tab" href="#media__search">Search</a>
-          </nav>
-          <section id="media__files" class="media-manager__files">
-            <div class="media-manager__toolbar">
-              <div class="media-manager__crumb">Files in <strong>${escapeHtml(namespaceTitle)}</strong></div>
-              <div class="media-manager__view" aria-label="Media view">
-                ${renderMediaManagerToolbarLink(url, "Thumbnails", { view: "thumbs" }, viewMode === "thumbs")}
-                ${renderMediaManagerToolbarLink(url, "Rows", { view: "rows" }, viewMode === "rows")}
-                ${renderMediaManagerToolbarLink(
-                  url,
-                  "Name",
-                  {
-                    sort: "name",
-                    order: sortMode === "name" && sortOrder === "asc" ? "desc" : "asc"
-                  },
-                  sortMode === "name"
-                )}
-                ${renderMediaManagerToolbarLink(
-                  url,
-                  "Date",
-                  {
-                    sort: "date",
-                    order: sortMode === "date" && sortOrder === "desc" ? "asc" : "desc"
-                  },
-                  sortMode === "date"
-                )}
+          <div id="media__content">
+          <div id="mediamanager__page">
+            <nav class="media-manager__tabs" aria-label="Media manager sections">
+              <ul class="tabs">
+                <li><a class="media-manager__tab media-manager__tab--active" href="#media__files">Media Files</a></li>
+                <li><a class="media-manager__tab" href="#media__upload">Upload</a></li>
+                <li><a class="media-manager__tab" href="#media__search">Search</a></li>
+              </ul>
+            </nav>
+            <section id="media__files" class="media-manager__files filelist">
+              <div class="media-manager__toolbar panelHeader">
+                <div class="media-manager__crumb">Files in <strong>${escapeHtml(namespaceTitle)}</strong></div>
+                <div class="media-manager__view" aria-label="Media view">
+                  ${renderMediaManagerToolbarLink(url, "Thumbnails", { view: "thumbs" }, viewMode === "thumbs")}
+                  ${renderMediaManagerToolbarLink(url, "Rows", { view: "rows" }, viewMode === "rows")}
+                  ${renderMediaManagerToolbarLink(
+                    url,
+                    "Name",
+                    {
+                      sort: "name",
+                      order: sortMode === "name" && sortOrder === "asc" ? "desc" : "asc"
+                    },
+                    sortMode === "name"
+                  )}
+                  ${renderMediaManagerToolbarLink(
+                    url,
+                    "Date",
+                    {
+                      sort: "date",
+                      order: sortMode === "date" && sortOrder === "desc" ? "asc" : "desc"
+                    },
+                    sortMode === "date"
+                  )}
+                </div>
               </div>
-            </div>
-            ${query ? `<p class="media-manager__query">Search results for <strong>${escapeHtml(query)}</strong></p>` : ""}
-            ${mediaItems}
-            ${renderPaginationControls(url, pagination, media.length)}
-          </section>
-          <section id="media__search" class="media-manager__search-panel">
-            <form class="media-manager__search" method="get" action="/media-manager">
-              <label for="media__ns">Namespace</label>
-              <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
-              <label for="media__q">Search</label>
-              <input id="media__q" name="q" type="search" value="${escapeAttribute(query)}">
-              <button type="submit">Search</button>
-            </form>
-          </section>
-          ${uploadPanel}
+              <div class="panelContent">
+                ${query ? `<p class="media-manager__query">Search results for <strong>${escapeHtml(query)}</strong></p>` : ""}
+                ${mediaItems}
+                ${renderPaginationControls(url, pagination, media.length)}
+              </div>
+            </section>
+            <section id="media__search" class="media-manager__search-panel">
+              <form id="dw__mediasearch" class="media-manager__search" method="get" action="/media-manager">
+                <label for="media__ns">Namespace</label>
+                <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
+                <label for="media__q">Search</label>
+                <input id="media__q" name="q" type="search" value="${escapeAttribute(query)}">
+                <button type="submit">Search</button>
+              </form>
+            </section>
+            ${uploadPanel}
+          </div>
+          </div>
         </section>
       </div>
     </div>`,
@@ -3005,8 +3019,14 @@ function renderMediaNamespaceTree(namespaces: string[], activeNamespace: string)
       const depth = Math.min(namespace ? namespace.split(":").length - 1 : 0, 6);
       const activeClass = namespace === activeNamespace ? " media-tree__item--active" : "";
       const indent = '<span class="media-tree__indent" aria-hidden="true"></span>'.repeat(depth);
-      return `<li class="media-tree__item media-tree__item--depth-${depth}${activeClass}">
-        ${indent}<span class="media-tree__toggle" aria-hidden="true">${namespace ? "+" : ""}</span>
+      const hasChildren = namespace
+        ? entries.some((entry) => entry.startsWith(`${namespace}:`))
+        : entries.some((entry) => entry.includes(":") || entry);
+      const toggle = hasChildren
+        ? `<button class="media-tree__toggle" type="button" data-media-tree-toggle data-depth="${depth}" aria-expanded="true" aria-label="Toggle ${escapeAttribute(label)} namespace">-</button>`
+        : '<span class="media-tree__toggle" aria-hidden="true"></span>';
+      return `<li class="media-tree__item media-tree__item--depth-${depth}${activeClass}" data-media-tree-item data-depth="${depth}">
+        ${indent}${toggle}
         <a href="${escapeAttribute(mediaManagerNamespacePath(namespace))}">${escapeHtml(label)}</a>
       </li>`;
     })
@@ -3081,13 +3101,14 @@ function renderMediaManagerTile(env: Env, item: CurrentMedia): string {
   const name = mediaName(item.id);
   const detailPath = mediaDetailPath(item.id);
   const thumbPath = mediaThumbnailPath(env, item.id, 120);
+  const selectionAttributes = mediaSelectionAttributes(item);
   const preview = isPreviewableImage(item)
-    ? `<a class="media-tile__thumb" href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(thumbPath)}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a>`
-    : `<a class="media-tile__thumb media-tile__thumb--file" href="${escapeAttribute(detailPath)}"><span>${escapeHtml(mediaFileExtension(name))}</span></a>`;
+    ? `<a id="l_:${escapeAttribute(item.id)}" class="media-tile__thumb image thumb select" href="${escapeAttribute(detailPath)}" ${selectionAttributes}><img src="${escapeAttribute(thumbPath)}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a>`
+    : `<a id="l_:${escapeAttribute(item.id)}" class="media-tile__thumb media-tile__thumb--file select" href="${escapeAttribute(detailPath)}" ${selectionAttributes}><span>${escapeHtml(mediaFileExtension(name))}</span></a>`;
 
   return `<li class="media-tile">
     ${preview}
-    <a class="media-tile__name" href="${escapeAttribute(detailPath)}" title="${escapeAttribute(item.id)}">${escapeHtml(name)}</a>
+    <a id="h_:${escapeAttribute(item.id)}" class="media-tile__name select" href="${escapeAttribute(detailPath)}" title="${escapeAttribute(item.id)}" ${selectionAttributes}>${escapeHtml(name)}</a>
     <span class="media-tile__meta">${escapeHtml(item.mimeType)}</span>
     <span class="media-tile__meta">${escapeHtml(formatMediaDate(item.updatedAt))}</span>
     <span class="media-tile__meta">${escapeHtml(formatMediaByteLength(item.byteLength))}</span>
@@ -3099,6 +3120,7 @@ function renderMediaManagerRow(env: Env, item: CurrentMedia): string {
   const detailPath = mediaDetailPath(item.id);
   const mediaUrl = mediaPath(item.id);
   const thumbPath = mediaThumbnailPath(env, item.id, 160);
+  const selectionAttributes = mediaSelectionAttributes(item);
   const info = [
     item.mimeType,
     formatMediaDate(item.updatedAt),
@@ -3110,7 +3132,7 @@ function renderMediaManagerRow(env: Env, item: CurrentMedia): string {
 
   return `<li class="media-row" title="${escapeAttribute(item.id)}">
     <div class="media-row__main">
-      <a class="select mediafile mf_${escapeAttribute(mediaFileExtension(name).toLowerCase())}" href="${escapeAttribute(detailPath)}">${escapeHtml(name)}</a>
+      <a id="h_:${escapeAttribute(item.id)}" class="select mediafile mf_${escapeAttribute(mediaFileExtension(name).toLowerCase())}" href="${escapeAttribute(detailPath)}" ${selectionAttributes}>${escapeHtml(name)}</a>
       <span class="info">(${escapeHtml(info)})</span>
       <a class="media-row__button" href="${escapeAttribute(mediaUrl)}" target="_blank" rel="noopener">View</a>
       <a class="media-row__button" href="${escapeAttribute(detailPath)}">Details</a>
@@ -3119,6 +3141,11 @@ function renderMediaManagerRow(env: Env, item: CurrentMedia): string {
     ${preview}
     <div class="clearer"></div>
   </li>`;
+}
+
+function mediaSelectionAttributes(item: CurrentMedia): string {
+  const name = mediaName(item.id);
+  return `data-media-id="${escapeAttribute(item.id)}" data-media-url="${escapeAttribute(mediaPath(item.id))}" data-media-title="${escapeAttribute(name)}"`;
 }
 
 function mediaThumbnailPath(env: Env, id: string, width: number): string {

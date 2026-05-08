@@ -1181,10 +1181,23 @@ describe("handleRequest", () => {
     const managerHtml = await manager.text();
     expect(managerHtml).toContain('id="media__manager"');
     expect(managerHtml).toContain('id="mediamgr__aside"');
+    expect(managerHtml).toContain('id="mediamgr__content"');
+    expect(managerHtml).toContain('id="media__tree"');
+    expect(managerHtml).toContain('id="media__content"');
+    expect(managerHtml).toContain('id="mediamanager__page"');
+    expect(managerHtml).toContain("data-media-tree-toggle");
     expect(managerHtml).toContain("Media Files");
     expect(managerHtml).toContain("logo.svg");
     expect(managerHtml).toContain('class="idx media__manager media-grid"');
     expect(managerHtml).toContain('href="/media-manager?ns=wiki&amp;view=rows"');
+    expect(managerHtml).toContain('id="dw__upload"');
+    expect(managerHtml).toContain('id="upload__file"');
+    expect(managerHtml).toContain('id="upload__name"');
+    expect(managerHtml).toContain('id="dw__ow"');
+    expect(managerHtml).toContain('id="media__upload_progress"');
+    expect(managerHtml).toContain('id="dw__mediasearch"');
+    expect(managerHtml).toContain('data-media-id="wiki:logo.svg"');
+    expect(managerHtml).toContain('data-media-url="/media/wiki/logo.svg"');
     const rowManager = await handleRequest(
       new Request("https://example.com/media-manager?ns=wiki&view=rows&sort=date&order=desc"),
       env

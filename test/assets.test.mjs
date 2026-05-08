@@ -11,4 +11,13 @@ describe("public assets", () => {
     expect(createActionRule).toBeGreaterThan(missingLinkRule);
     expect(css.slice(createActionRule, createActionRule + 220)).toContain("color: var(--dw-link)");
   });
+
+  it("keeps DokuWiki media manager frontend hooks available", async () => {
+    const js = await readFile("public/dokuwiki.js", "utf8");
+
+    expect(js).toContain("bindMediaManager");
+    expect(js).toContain("data-media-tree-toggle");
+    expect(js).toContain("dokuwiki-media-select");
+    expect(js).toContain("#dw__upload[data-media-upload]");
+  });
 });

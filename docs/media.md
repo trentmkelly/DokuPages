@@ -14,6 +14,15 @@ Media storage uses D1 for metadata and R2 for object bodies.
 
 ## Upload Semantics
 
+The media manager keeps the upstream popup/full-screen hook structure used by
+`lib/exe/mediamanager.php` and `lib/scripts/media.js`: `mediamgr__aside`,
+`mediamgr__content`, `media__tree`, `media__content`, `mediamanager__page`,
+`dw__mediasearch`, `dw__upload`, `upload__file`, and `upload__name`. The
+frontend script handles namespace-tree toggles, suggests the upload media ID
+from the selected file and namespace, reports XMLHttpRequest upload progress,
+and posts a `dokuwiki-media-select` message to opener or parent frames when a
+media link with `class="select"` is chosen.
+
 `POST /api/media/upload` expects:
 
 - `file`

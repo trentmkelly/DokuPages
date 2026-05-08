@@ -4,7 +4,7 @@
  * This is a small native replacement for the default template/editor
  * JavaScript paths that cannot run directly in Workers.
  */
-/* global document, Event, fetch, FormData, navigator, window */
+/* global document, Event, fetch, FormData, navigator, window, XMLHttpRequest */
 (function () {
   function ready(callback) {
     if (document.readyState === "loading") {
@@ -336,8 +336,204 @@
     bindPageLock(form, status);
   }
 
+  function mediaDetailUrl(id) {
+    return (
+      "/media-detail/" +
+      id
+        .split(":")
+        .map(function (part) {
+          return encodeURIComponent(part);
+        })
+        .join("/")
+    );
+  }
+
+  function bindMediaNamespaceTree(manager) {
+    var tree = manager.querySelector("#media__tree");
+
+    if (!tree) {
+      return;
+    }
+
+    tree.addEventListener("click", function (event) {
+      var toggle = event.target.closest("[data-media-tree-toggle]");
+
+      if (!toggle || !tree.contains(toggle)) {
+        return;
+      }
+
+      var item = toggle.closest("[data-media-tree-item]");
+      var depth = Number(item ? item.dataset.depth : 0);
+      var expanded = toggle.getAttribute("aria-expanded") === "true";
+      var next = item ? item.nextElementSibling : null;
+
+      event.preventDefault();
+      toggle.setAttribute("aria-expanded", expanded ? "false" : "true");
+      toggle.textContent = expanded ? "+" : "-";
+
+      while (next && next.matches("[data-media-tree-item]")) {
+        var nextDepth = Number(next.dataset.depth || 0);
+
+        if (nextDepth <= depth) {
+          break;
+        }
+
+        if (expanded) {
+          next.hidden = true;
+          next.querySelectorAll("[data-media-tree-toggle]").forEach(function (childToggle) {
+            childToggle.setAttribute("aria-expanded", "false");
+            childToggle.textContent = "+";
+          });
+        } else if (nextDepth === depth + 1) {
+          next.hidden = false;
+        }
+
+        next = next.nextElementSibling;
+      }
+    });
+  }
+
+  function bindMediaSelection(manager) {
+    manager.addEventListener("click", function (event) {
+      var link = event.target.closest("a.select[data-media-id]");
+
+      if (!link || !manager.contains(link)) {
+        return;
+      }
+
+      var target = null;
+
+      if (window.opener && !window.opener.closed) {
+        target = window.opener;
+      } else if (window.parent && window.parent !== window) {
+        target = window.parent;
+      }
+
+      if (!target) {
+        return;
+      }
+
+      event.preventDefault();
+      target.postMessage(
+        {
+          type: "dokuwiki-media-select",
+          id: link.dataset.mediaId || "",
+          url: link.dataset.mediaUrl || link.getAttribute("href") || "",
+          title: link.dataset.mediaTitle || link.textContent.trim()
+        },
+        window.location.origin
+      );
+    });
+  }
+
+  function bindMediaUpload(manager) {
+    var form = manager.querySelector("#dw__upload[data-media-upload]");
+
+    if (!form) {
+      return;
+    }
+
+    var fileInput = form.querySelector("#upload__file");
+    var idInput = form.querySelector("#upload__name");
+    var namespaceInput = form.querySelector('input[name="ns"]');
+    var progress = form.querySelector("#media__upload_progress");
+    var status = form.querySelector("#media__upload_status");
+
+    if (fileInput && idInput) {
+      fileInput.addEventListener("change", function () {
+        if (idInput.value || !fileInput.files || !fileInput.files.length) {
+          return;
+        }
+
+        var namespace = namespaceInput ? namespaceInput.value : "";
+        var name = fileInput.files[0].name;
+        idInput.value = namespace ? namespace + ":" + name : name;
+      });
+    }
+
+    form.addEventListener("submit", function (event) {
+      if (typeof XMLHttpRequest === "undefined") {
+        return;
+      }
+
+      var data = new FormData(form);
+      var xhr = new XMLHttpRequest();
+      var buttons = form.querySelectorAll("button");
+
+      event.preventDefault();
+      buttons.forEach(function (button) {
+        button.disabled = true;
+      });
+
+      if (progress) {
+        progress.hidden = false;
+        progress.removeAttribute("value");
+      }
+
+      setStatus(status, "Uploading...");
+
+      xhr.upload.addEventListener("progress", function (uploadEvent) {
+        if (!progress || !uploadEvent.lengthComputable) {
+          return;
+        }
+
+        progress.value = Math.round((uploadEvent.loaded / uploadEvent.total) * 100);
+      });
+
+      xhr.addEventListener("load", function () {
+        var payload = {};
+
+        try {
+          payload = JSON.parse(xhr.responseText || "{}");
+        } catch {
+          payload = {};
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300 && payload.id) {
+          setStatus(status, "Upload complete.");
+          window.location.href = mediaDetailUrl(payload.id);
+          return;
+        }
+
+        setStatus(status, payload.error || "Upload failed.");
+      });
+
+      xhr.addEventListener("error", function () {
+        setStatus(status, "Upload failed.");
+      });
+
+      xhr.addEventListener("loadend", function () {
+        buttons.forEach(function (button) {
+          button.disabled = false;
+        });
+
+        if (progress) {
+          progress.hidden = true;
+        }
+      });
+
+      xhr.open(form.method || "POST", form.action);
+      xhr.setRequestHeader("accept", "application/json");
+      xhr.setRequestHeader("x-requested-with", "XMLHttpRequest");
+      xhr.send(data);
+    });
+  }
+
+  function bindMediaManager() {
+    var manager = document.querySelector("#media__manager");
+
+    if (!manager) {
+      return;
+    }
+
+    bindMediaNamespaceTree(manager);
+    bindMediaSelection(manager);
+    bindMediaUpload(manager);
+  }
+
   ready(function () {
     bindMobileTools();
     bindEditor();
+    bindMediaManager();
   });
 })();

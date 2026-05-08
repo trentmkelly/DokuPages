@@ -1173,6 +1173,20 @@ form.search button {
   border-bottom: 1px solid var(--dw-border);
 }
 
+.media-manager__tabs .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-manager__tabs li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .media-manager__tab:hover,
 .media-manager__tab:focus {
   text-decoration: none;
@@ -1221,6 +1235,15 @@ form.search button {
 .media-tree__toggle {
   color: var(--dw-text-neutral);
   text-align: center;
+}
+
+button.media-tree__toggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.4;
+  padding: 0;
 }
 
 .media-manager__files {
@@ -1371,7 +1394,7 @@ form.search button {
 }
 
 .media-manager__search-panel,
-.dokuwiki .page form.media-manager__upload,
+.media-manager__upload-panel,
 .media-manager__upload--disabled {
   display: none;
   margin-top: 1.2em;
@@ -1381,7 +1404,7 @@ form.search button {
 }
 
 .media-manager__search-panel:target,
-.dokuwiki .page form.media-manager__upload:target,
+.media-manager__upload-panel:target,
 .media-manager__upload--disabled:target {
   display: block;
 }
@@ -1393,6 +1416,13 @@ form.search button {
 
 .dokuwiki .page .media-manager__search-panel form {
   margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dokuwiki .page form.media-manager__upload {
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1427,6 +1457,19 @@ form.search button {
 
 .media-manager__check input {
   flex: 0 0 auto;
+}
+
+.media-manager__upload-progress {
+  display: block;
+  width: 100%;
+  margin-top: 0.75em;
+}
+
+.media-manager__upload-status {
+  display: block;
+  min-height: 1.4em;
+  margin-top: 0.4em;
+  color: var(--dw-text-neutral);
 }
 
 .dokuwiki .page del {
