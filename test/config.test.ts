@@ -160,7 +160,8 @@ describe("runtime config", () => {
       EMAIL_REGISTRATION_NOTIFY: "admin@example.test",
       RESEND_API_KEY: "resend-secret-token",
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
-      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+      DOKUWIKI_COOKIE_SALT: "dokuwiki-cookie-salt"
     } as Env;
     const exported = createConfigExport(env, new Date("2026-05-07T00:00:00.000Z"));
 
@@ -294,6 +295,11 @@ describe("runtime config", () => {
           key: "TURNSTILE_SECRET_KEY",
           configured: true,
           redactedValue: "[redacted]"
+        }),
+        expect.objectContaining({
+          key: "DOKUWIKI_COOKIE_SALT",
+          configured: true,
+          redactedValue: "[redacted]"
         })
       ])
     );
@@ -314,6 +320,7 @@ describe("runtime config", () => {
     expect(JSON.stringify(exported)).not.toContain("super-secret-token");
     expect(JSON.stringify(exported)).not.toContain("resend-secret-token");
     expect(JSON.stringify(exported)).not.toContain("1x0000000000000000000000000000000AA");
+    expect(JSON.stringify(exported)).not.toContain("dokuwiki-cookie-salt");
     expect(exported).toMatchObject({
       exportedAt: "2026-05-07T00:00:00.000Z",
       runtime: {

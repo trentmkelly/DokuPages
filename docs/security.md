@@ -11,6 +11,14 @@ CSRF protections. API reads accept either an authenticated same-origin session o
 the configured `API_BEARER_TOKEN`. API writes require `Authorization: Bearer ...`
 and do not accept cookie-only auth.
 
+## Media Tokens
+
+Resized media fetches with positive `w` or `h` parameters require DokuWiki's
+six-character `tok` signature. The Pages port signs and verifies these tokens
+with the `DOKUWIKI_COOKIE_SALT` secret, matching upstream `media_get_token()`.
+Invalid or unsigned resized-media requests return `412 Precondition Failed`
+before R2 is opened.
+
 ## Rendered Content
 
 The native wiki renderer escapes raw HTML in headings, paragraphs, link labels,

@@ -136,6 +136,7 @@ import {
 } from "./wiki/render";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-derivatives";
+import { requestedMediaSizeFromUrl, validMediaToken } from "./wiki/media-token";
 import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
@@ -150,7 +151,7 @@ interface BreadcrumbEntry {
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 29;
+const RENDER_CACHE_VERSION = 30;
 const BREADCRUMB_COOKIE_NAME = "DW_PAGES_BC";
 const BREADCRUMB_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MEDIA_CLEANUP_PREFIX = "media/";
@@ -1026,6 +1027,11 @@ function redirectLegacyMediaFetch(url: URL): Response {
     target.searchParams.set("download", "1");
   }
 
+  for (const name of ["w", "h", "tok", "cache"]) {
+    const value = url.searchParams.get(name);
+    if (value) target.searchParams.set(name, value);
+  }
+
   return redirectResponse(`${target.pathname}${target.search}`, 301);
 }
 
@@ -1273,7 +1279,8 @@ async function handlePagePreview(
     autoPluralLinks,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode,
-    pageIdCleanOptions: config.pageIdCleanOptions
+    pageIdCleanOptions: config.pageIdCleanOptions,
+    mediaTokenSecret: mediaTokenSecret(env)
   });
 
   if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
@@ -2208,6 +2215,9 @@ async function handleMediaFetch(
     return notFoundResponse("Missing media id.");
   }
 
+  const tokenCheck = validateMediaResizeToken(id, url, env);
+  if (tokenCheck) return tokenCheck;
+
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
   if (denied) return denied;
 
@@ -2268,6 +2278,25 @@ async function handleMediaFetch(
   });
 
   return new Response(object.body, { headers });
+}
+
+function validateMediaResizeToken(id: string, url: URL, env: Env): Response | null {
+  const size = requestedMediaSizeFromUrl(url);
+  if (!size.requested) return null;
+
+  if (validMediaToken(id, size, url.searchParams.get("tok"), mediaTokenSecret(env))) {
+    return null;
+  }
+
+  return new Response("Precondition Failed", {
+    status: 412,
+    headers: securityHeaders({ "content-type": "text/plain; charset=utf-8" })
+  });
+}
+
+function mediaTokenSecret(env: Env): string | null {
+  const secret = env.DOKUWIKI_COOKIE_SALT?.trim();
+  return secret || null;
 }
 
 function mediaFetchHeaders(
@@ -3129,7 +3158,8 @@ async function renderPageHtml(
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
     camelCaseLinks: config.camelCaseLinks,
-    typographyMode: config.typographyMode
+    typographyMode: config.typographyMode,
+    mediaTokenSecret: mediaTokenSecret(env)
   });
   const title = displayPageTitle(config, rendered.title, page?.title, id);
 
@@ -3233,7 +3263,8 @@ async function renderPageExport(
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
     camelCaseLinks: config.camelCaseLinks,
-    typographyMode: config.typographyMode
+    typographyMode: config.typographyMode,
+    mediaTokenSecret: mediaTokenSecret(env)
   });
   const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
   const language = config.language;

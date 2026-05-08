@@ -211,6 +211,9 @@ describe("renderWikiText", () => {
     const targeted = renderWikiText("{{wiki:dokuwiki.svg|Logo}}", {
       linkTargets: { media: "_media" }
     });
+    const tokenized = renderWikiText("{{wiki:dokuwiki-128.png?200x50|Caption}}", {
+      mediaTokenSecret: "secret"
+    });
 
     expect(rendered.html).toContain(
       '<img src="/media/wiki/dokuwiki-128.png" class="mediacenter" loading="lazy" title="Caption" alt="Caption" width="200" height="50">'
@@ -223,6 +226,9 @@ describe("renderWikiText", () => {
     );
     expect(targeted.html).toContain(
       '<a href="/media-detail/wiki/dokuwiki.svg" class="media" title="wiki:dokuwiki.svg" target="_media" rel="noopener"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+    );
+    expect(tokenized.html).toContain(
+      '<img src="/media/wiki/dokuwiki-128.png?w=200&amp;h=50&amp;tok=1ff39d" class="media" loading="lazy" title="Caption" alt="Caption" width="200" height="50">'
     );
   });
 

@@ -62,6 +62,9 @@ Optional Pages environment variables:
   endpoint.
 - `TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for login and
   registration forms.
+- `DOKUWIKI_COOKIE_SALT`: Pages secret containing the upstream
+  `auth_cookiesalt()` value, usually `data/meta/_htcookiesalt` from a migrated
+  DokuWiki install. It signs DokuWiki-compatible media resize tokens.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.
@@ -70,10 +73,11 @@ Set `API_BEARER_TOKEN` as a Pages secret when remote API automation should be
 enabled. Set `RESEND_API_KEY` or `EMAIL_API_TOKEN` as a Pages secret when
 outbound email should be enabled. Set `EMAIL_TASK_TOKEN` when scheduled digest
 execution is enabled. Set `TURNSTILE_SECRET_KEY` as a Pages secret when
-Turnstile gating should be enforced. Wrangler authentication, API bearer tokens,
-provider tokens, and Turnstile secrets stay outside the repository and should
-never be checked in. `npm run scan:secrets` guards tracked files for
-high-signal tokens.
+Turnstile gating should be enforced. Set `DOKUWIKI_COOKIE_SALT` as a Pages
+secret before enabling tokenized resized-media URLs. Wrangler authentication,
+API bearer tokens, provider tokens, Turnstile secrets, and imported cookie salts
+stay outside the repository and should never be checked in. `npm run
+scan:secrets` guards tracked files for high-signal tokens.
 
 Admins can inspect the effective runtime configuration at `/admin/config` and
 download a JSON configuration backup from `/api/admin/config/export`. Secret

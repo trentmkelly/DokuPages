@@ -104,7 +104,7 @@ are not fixed by this checklist.
 
 - [ ] Implement server-side thumbnail generation compatible with DokuWiki `media.php`, `fetch.functions.php`, GD, and ImageMagick behavior.
 - [ ] Implement resized media responses for `w`, `h`, `tok`, and cache-busting parameters accepted by `lib/exe/fetch.php`.
-- [ ] Implement DokuWiki's media token and anti-hotlink checks where applicable.
+- [x] Implement DokuWiki's media token and anti-hotlink checks where applicable.
 - [ ] Implement DokuWiki's `refcheck` behavior before media deletion.
 - [ ] Match upstream media overwrite, delete, and revision behavior when `mediarevisions` is disabled.
 - [ ] Match upstream media detail UI from `lib/tpl/dokuwiki/detail.php` and `inc/Ui/MediaRevisions.php`.

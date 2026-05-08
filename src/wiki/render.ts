@@ -6,6 +6,7 @@ import {
   type PageIdCleanOptions
 } from "./page-id";
 import { cleanMediaId, mediaDetailPath, mediaName, mediaPath } from "./media-service";
+import { mediaSizeQuery, requestedMediaSize } from "./media-token";
 
 export interface TocItem {
   id: string;
@@ -56,6 +57,7 @@ export interface RenderWikiTextOptions {
   camelCaseLinks?: boolean;
   typographyMode?: number;
   pageIdCleanOptions?: PageIdCleanOptions;
+  mediaTokenSecret?: string | null;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -211,6 +213,7 @@ export function renderWikiText(
     camelCaseLinks: options.camelCaseLinks ?? false,
     typographyMode: clampTypographyMode(options.typographyMode),
     pageIdCleanOptions: options.pageIdCleanOptions,
+    mediaTokenSecret: options.mediaTokenSecret,
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -451,6 +454,7 @@ interface RenderContext {
   camelCaseLinks: boolean;
   typographyMode: number;
   pageIdCleanOptions?: PageIdCleanOptions;
+  mediaTokenSecret?: string | null;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -992,8 +996,9 @@ function renderMedia(
       );
     }
 
+    const src = mediaImageSrc(parsed, context);
     const attributes = [
-      `src="${mediaPath(parsed.id)}"`,
+      `src="${escapeAttribute(src)}"`,
       `class="media${parsed.align ?? ""}"`,
       'loading="lazy"',
       title ? `title="${escapeAttribute(title)}"` : "",
@@ -1017,6 +1022,16 @@ function renderMedia(
       }
     );
   });
+}
+
+function mediaImageSrc(parsed: ParsedMedia, context: RenderContext): string {
+  const path = mediaPath(parsed.id);
+  const query = mediaSizeQuery(
+    parsed.id,
+    requestedMediaSize(parsed.width, parsed.height),
+    context.mediaTokenSecret
+  );
+  return query ? `${path}?${query}` : path;
 }
 
 interface ProtectedHtml {

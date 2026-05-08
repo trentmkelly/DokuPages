@@ -272,6 +272,7 @@ export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
   const emailApiToken = nonEmpty(env.EMAIL_API_TOKEN) ?? null;
   const emailTaskToken = nonEmpty(env.EMAIL_TASK_TOKEN) ?? null;
   const turnstileSecretKey = nonEmpty(env.TURNSTILE_SECRET_KEY) ?? null;
+  const dokuwikiCookieSalt = nonEmpty(env.DOKUWIKI_COOKIE_SALT) ?? null;
 
   return [
     {
@@ -303,6 +304,12 @@ export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
       configured: Boolean(turnstileSecretKey),
       redactedValue: turnstileSecretKey ? "[redacted]" : null,
       purpose: "Cloudflare Turnstile Siteverify secret for login and registration forms."
+    },
+    {
+      key: "DOKUWIKI_COOKIE_SALT",
+      configured: Boolean(dokuwikiCookieSalt),
+      redactedValue: dokuwikiCookieSalt ? "[redacted]" : null,
+      purpose: "DokuWiki auth_cookiesalt-compatible secret used for media resize tokens."
     }
   ];
 }

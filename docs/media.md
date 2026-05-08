@@ -84,6 +84,19 @@ object body. Matching `If-None-Match` or `If-Modified-Since` requests return
 `304 Not Modified` with zero R2 operations. `HEAD` requests verify the R2 object
 with `head` and return metadata without streaming the object body.
 
+Requests with positive `w` or `h` parameters are treated as DokuWiki resized
+media requests and must include a valid six-character `tok` value. The token is
+the upstream `media_get_token()` HMAC-MD5 signature over the cleaned media ID and
+requested dimensions, using the `DOKUWIKI_COOKIE_SALT` Pages secret. Missing or
+invalid tokens fail with `412 Precondition Failed`, matching
+`lib/exe/fetch.php` anti-hotlink behavior. Legacy `lib/exe/fetch.php` redirects
+preserve `w`, `h`, `tok`, and `cache` parameters.
+
 ## Derivative Strategy
 
-The Pages port does not generate thumbnail or resized image files inside Workers. Media fetches return the original R2 object and include `x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`, and `x-dokuwiki-exif-policy` headers documenting the replacement strategy. Image previews use browser-constrained originals with lazy decoding. JPEG EXIF metadata is not parsed in the request path.
+The Pages port does not yet generate thumbnail or resized image bytes inside
+Workers. Tokenized resized-media requests currently return the original R2
+object and include `x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`,
+and `x-dokuwiki-exif-policy` headers documenting the replacement strategy. Image
+previews use browser-constrained originals with lazy decoding. JPEG EXIF
+metadata is not parsed in the request path.

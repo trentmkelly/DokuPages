@@ -1,4 +1,5 @@
 import type { CurrentMedia, MediaRevision } from "./media-service";
+import { requestedMediaSizeFromUrl } from "./media-token";
 
 export interface MediaDerivativePolicy {
   thumbnails: "original";
@@ -26,5 +27,5 @@ export function mediaDerivativeHeaders(
 }
 
 export function hasRequestedMediaSize(url: URL): boolean {
-  return Boolean(url.searchParams.get("w") || url.searchParams.get("h"));
+  return requestedMediaSizeFromUrl(url).requested;
 }

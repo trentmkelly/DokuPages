@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app";
 import type { Env } from "../src/env";
 import { PageLockObject } from "../src/storage/page-lock-object";
+import { mediaToken, requestedMediaSize } from "../src/wiki/media-token";
 import { WORD_BLOCK_MESSAGE } from "../src/wiki/wordblock";
 
 interface D1StubState {
@@ -39,6 +40,7 @@ const cachePuts: string[] = [];
 const renderCache = new Map<string, string>();
 const pageLocks = createPageLockNamespaceStub();
 const TEST_CSRF_TOKEN = "test-csrf-token";
+const TEST_DOKUWIKI_COOKIE_SALT = "test-dokuwiki-cookie-salt";
 
 const env: Env = {
   DB: createD1Stub(state),
@@ -62,6 +64,7 @@ const env: Env = {
   SITE_NAME: "Test Wiki",
   API_BEARER_TOKEN: "test-token",
   API_CORS_ORIGINS: "https://client.example",
+  DOKUWIKI_COOKIE_SALT: TEST_DOKUWIKI_COOKIE_SALT,
   MAINTENANCE_MODE: undefined
 };
 
@@ -85,6 +88,7 @@ describe("handleRequest", () => {
     pageLocks.reset();
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
+    env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
     env.MAINTENANCE_MODE = undefined;
     env.CAMELCASE = undefined;
     env.TYPOGRAPHY = undefined;
@@ -815,6 +819,11 @@ describe("handleRequest", () => {
       ["/lib/exe/js.php?t=1", 301, "/dokuwiki.js?v=0.1.0"],
       ["/lib/exe/jquery.php", 301, "/dokuwiki.js?v=0.1.0"],
       ["/lib/exe/fetch.php?media=wiki:logo.svg&dl=1", 301, "/media/wiki/logo.svg?download=1"],
+      [
+        "/lib/exe/fetch.php?media=wiki:logo.svg&w=80&tok=abc123&cache=nocache",
+        301,
+        "/media/wiki/logo.svg?w=80&tok=abc123&cache=nocache"
+      ],
       ["/lib/exe/detail.php?id=wiki:logo.svg", 301, "/media-detail/wiki/logo.svg"],
       ["/lib/exe/mediamanager.php?ns=wiki", 301, "/media-manager?ns=wiki"]
     ];
@@ -1034,8 +1043,17 @@ describe("handleRequest", () => {
       new Request("https://example.com/media/wiki/logo.svg?download=1"),
       env
     );
+    const resizedToken = mediaToken(
+      "wiki:logo.svg",
+      requestedMediaSize("80", null),
+      TEST_DOKUWIKI_COOKIE_SALT
+    );
     const resized = await handleRequest(
-      new Request("https://example.com/media/wiki/logo.svg?w=80"),
+      new Request(`https://example.com/media/wiki/logo.svg?w=80&tok=${resizedToken}`),
+      env
+    );
+    const invalidResized = await handleRequest(
+      new Request("https://example.com/media/wiki/logo.svg?w=80&tok=bad"),
       env
     );
     const revision = await handleRequest(
@@ -1080,6 +1098,8 @@ describe("handleRequest", () => {
     expect(fetch.headers.get("cache-control")).toBe("public, max-age=3600");
     expect(fetch.headers.get("x-dokuwiki-thumbnail-policy")).toBe("original");
     expect(resized.headers.get("x-dokuwiki-resize-policy")).toBe("browser-constrained-original");
+    expect(invalidResized.status).toBe(412);
+    await expect(invalidResized.text()).resolves.toBe("Precondition Failed");
     await expect(fetch.text()).resolves.toBe("<svg>current</svg>");
     expect(head.status).toBe(200);
     expect(head.headers.get("content-length")).toBe("18");
@@ -1476,7 +1496,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 29,
+        rendererVersion: 30,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1498,7 +1518,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 29,
+        rendererVersion: 30,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",
