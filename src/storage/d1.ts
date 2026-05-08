@@ -686,7 +686,8 @@ export class D1SearchStore implements SearchStore {
       .prepare("select term from search_postings where page_id = ?")
       .bind(pageId)
       .all<SearchTermRow>();
-    const affectedTerms = new Set([...existing.results.map((row) => row.term), ...terms.keys()]);
+    const previousTerms = new Set(existing.results.map((row) => row.term));
+    const nextTerms = new Set(terms.keys());
     const statements: D1PreparedStatement[] = [
       this.db.prepare("delete from search_postings where page_id = ?").bind(pageId)
     ];
@@ -712,21 +713,33 @@ export class D1SearchStore implements SearchStore {
       );
     }
 
-    for (const term of affectedTerms) {
+    for (const term of nextTerms) {
+      if (previousTerms.has(term)) continue;
       statements.push(
         this.db
           .prepare(
             `update search_terms
-             set document_count = (
-               select count(*) from search_postings where search_postings.term = search_terms.term
-             )
+             set document_count = document_count + 1
              where term = ?`
           )
           .bind(term)
       );
     }
 
-    statements.push(this.db.prepare("delete from search_terms where document_count = 0"));
+    for (const term of previousTerms) {
+      if (nextTerms.has(term)) continue;
+      statements.push(
+        this.db
+          .prepare(
+            `update search_terms
+             set document_count = max(document_count - 1, 0)
+             where term = ?`
+          )
+          .bind(term)
+      );
+    }
+
+    statements.push(this.db.prepare("delete from search_terms where document_count = 0").bind());
 
     await this.db.batch(statements);
   }
@@ -745,16 +758,14 @@ export class D1SearchStore implements SearchStore {
         this.db
           .prepare(
             `update search_terms
-             set document_count = (
-               select count(*) from search_postings where search_postings.term = search_terms.term
-             )
+             set document_count = max(document_count - 1, 0)
              where term = ?`
           )
           .bind(row.term)
       );
     }
 
-    statements.push(this.db.prepare("delete from search_terms where document_count = 0"));
+    statements.push(this.db.prepare("delete from search_terms where document_count = 0").bind());
 
     await this.db.batch(statements);
   }

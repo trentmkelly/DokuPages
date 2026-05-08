@@ -115,6 +115,7 @@ type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody";
 type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
+const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 17;
 const MEDIA_CLEANUP_PREFIX = "media/";
@@ -2061,7 +2062,7 @@ async function renderPageHtml(
     });
   }
 
-  const rendered = renderWikiText(content, { pageId: id });
+  const rendered = renderWikiText(content, { pageId: id, directives });
   const title = rendered.title ?? page?.title ?? id;
 
   if (!rendered.noCache && !privateCache) {
@@ -6095,8 +6096,11 @@ async function writeRenderCache(
   cacheKey: string,
   entry: RenderCacheEntry
 ): Promise<void> {
+  const payload = JSON.stringify(entry);
+  if (payload.length > MAX_RENDER_CACHE_ENTRY_BYTES) return;
+
   try {
-    await env.RENDER_CACHE.put(cacheKey, JSON.stringify(entry), {
+    await env.RENDER_CACHE.put(cacheKey, payload, {
       expirationTtl: RENDER_CACHE_TTL_SECONDS
     });
     await replaceRenderCacheDependencies(env, cacheKey, entry.dependencies ?? []);

@@ -691,11 +691,11 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Measure Worker memory usage per route.
 - [x] Measure bundle size.
 - [x] Measure static asset size.
-- [ ] Optimize parser hot paths.
-- [ ] Optimize rendered page caching.
-- [ ] Optimize search indexing.
+- [x] Optimize parser hot paths.
+- [x] Optimize rendered page caching.
+- [x] Optimize search indexing.
 - [x] Optimize media delivery.
-- [ ] Optimize database indexes.
+- [x] Optimize database indexes.
 - [ ] Add alerts for limit pressure.
 
 ## Observability

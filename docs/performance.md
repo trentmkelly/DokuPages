@@ -108,6 +108,19 @@ Current local baseline from May 8, 2026 UTC, measured against `../dokuwiki`:
 Largest checked-in static assets are `dokuwiki.css` at 22 KB, `dokuwiki.js` at
 9 KB, `images/favicon.ico` at 7 KB, and `images/apple-touch-icon.png` at 6 KB.
 
+## Optimization Notes
+
+Parser hot paths keep a per-render heading-anchor set so duplicate heading IDs
+are resolved without rebuilding table-of-contents state for every heading.
+Rendered page cache writes skip entries above 512 KiB to avoid spending KV write
+time and storage on unusually large pages. Search indexing maintains
+`search_terms.document_count` with per-page deltas instead of recounting
+postings for every affected term on each save or delete.
+
+`migrations/0004_operational_performance_indexes.sql` adds import-job indexes
+for started-time and status/started-time diagnostic scans. Storage performance
+tests assert those plans use the expected indexes.
+
 ## Parser Cache Equivalent
 
 The port uses revision-aware rendered HTML cache entries instead of DokuWiki's

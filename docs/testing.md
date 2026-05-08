@@ -47,7 +47,8 @@ screenshots in `.wrangler/visual-regression/`.
 
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
-sizes, and R2 media operation counts.
+sizes, delta-based search term counts, operational import-job indexes, and R2
+media operation counts.
 
 Route performance tests cover warm page render latency, concurrent page read
 load, edit-save latency, and bounded D1/KV operation counts for those request

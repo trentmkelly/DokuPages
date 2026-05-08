@@ -14,6 +14,18 @@ describe("renderWikiText", () => {
     );
   });
 
+  it("deduplicates heading anchors without rescanning the table of contents", () => {
+    const content = Array.from({ length: 50 }, () => "===== Repeated =====").join("\n\n");
+
+    const rendered = renderWikiText(content, { pageId: "wiki:repeated" });
+
+    expect(rendered.toc).toHaveLength(50);
+    expect(rendered.toc[0]).toMatchObject({ id: "repeated", title: "Repeated" });
+    expect(rendered.toc[1]).toMatchObject({ id: "repeated-2", title: "Repeated" });
+    expect(rendered.toc[49]).toMatchObject({ id: "repeated-50", title: "Repeated" });
+    expect(rendered.html).toContain('id="repeated-50"');
+  });
+
   it("omits section edit anchors without page context", () => {
     const rendered = renderWikiText("====== Welcome Page ======\n\nText");
 

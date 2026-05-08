@@ -704,7 +704,8 @@ function buildSearchIndexStatements(
   previousTerms: string[],
   updatedAt: string
 ): D1PreparedStatement[] {
-  const impactedTerms = new Set([...previousTerms, ...terms.keys()]);
+  const previousTermSet = new Set(previousTerms);
+  const nextTermSet = new Set(terms.keys());
   const statements = [db.prepare("delete from search_postings where page_id = ?").bind(pageId)];
 
   for (const [term, frequency] of terms) {
@@ -728,22 +729,33 @@ function buildSearchIndexStatements(
     );
   }
 
-  for (const term of impactedTerms) {
+  for (const term of nextTermSet) {
+    if (previousTermSet.has(term)) continue;
     statements.push(
       db
         .prepare(
           `update search_terms
-           set document_count = (
-             select count(*)
-             from search_postings
-             where search_postings.term = search_terms.term
-           )
+           set document_count = document_count + 1
            where term = ?`
         )
-        .bind(term),
-      db.prepare("delete from search_terms where term = ? and document_count = 0").bind(term)
+        .bind(term)
     );
   }
+
+  for (const term of previousTermSet) {
+    if (nextTermSet.has(term)) continue;
+    statements.push(
+      db
+        .prepare(
+          `update search_terms
+           set document_count = max(document_count - 1, 0)
+           where term = ?`
+        )
+        .bind(term)
+    );
+  }
+
+  statements.push(db.prepare("delete from search_terms where document_count = 0").bind());
 
   return statements;
 }

@@ -24,6 +24,10 @@ export interface RenderedWikiText {
 
 export interface RenderWikiTextOptions {
   pageId?: string;
+  directives?: {
+    noCache: boolean;
+    noToc: boolean;
+  };
 }
 
 const SMILEY_IMAGE_BASE = "/images/smileys";
@@ -139,14 +143,15 @@ export function renderWikiText(
   source: string,
   options: RenderWikiTextOptions = {}
 ): RenderedWikiText {
-  const directives = getWikiRenderDirectives(source);
+  const directives = options.directives ?? getWikiRenderDirectives(source);
   const blocks: string[] = [];
   const toc: TocItem[] = [];
   const context: RenderContext = {
     footnotes: [],
     dependencies: new Map(),
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
-    sectionIndex: 0
+    sectionIndex: 0,
+    anchorIds: new Set()
   };
   const title: { value: string | null } = { value: null };
   const state: ParserState = {
@@ -191,7 +196,7 @@ export function renderWikiText(
 
     if (heading) {
       flushAll(blocks, state, context);
-      const id = uniqueAnchor(slugify(heading.title), toc);
+      const id = uniqueAnchor(slugify(heading.title), context.anchorIds);
       toc.push({ id, level: heading.level, title: heading.title });
       title.value ??= heading.title;
       context.sectionIndex += 1;
@@ -326,6 +331,7 @@ interface RenderContext {
   dependencies: Map<string, CacheDependency>;
   pageId?: string;
   sectionIndex: number;
+  anchorIds: Set<string>;
 }
 
 function parseHeading(line: string): { level: number; title: string } | null {
@@ -588,7 +594,8 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             footnotes: [],
             dependencies: context.dependencies,
             pageId: context.pageId,
-            sectionIndex: context.sectionIndex
+            sectionIndex: context.sectionIndex,
+            anchorIds: context.anchorIds
           }
         )}</div>`
     )
@@ -958,15 +965,19 @@ function sortedDependencies(dependencies: Map<string, CacheDependency>): CacheDe
   );
 }
 
-function uniqueAnchor(base: string, toc: TocItem[]): string {
-  const existing = new Set(toc.map((item) => item.id));
-  if (!existing.has(base)) return base;
+function uniqueAnchor(base: string, existing: Set<string>): string {
+  if (!existing.has(base)) {
+    existing.add(base);
+    return base;
+  }
 
   let index = 2;
   while (existing.has(`${base}-${index}`)) {
     index += 1;
   }
-  return `${base}-${index}`;
+  const id = `${base}-${index}`;
+  existing.add(id);
+  return id;
 }
 
 function slugify(value: string): string {

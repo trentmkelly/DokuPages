@@ -147,6 +147,27 @@ describe("storage performance guardrails", () => {
       ["user-1", "session-1"],
       "idx_sessions_user"
     );
+    expectPlanUsesIndex(
+      db,
+      "import job diagnostics",
+      `select id, source_path, status, counts_json, errors_json, started_at, finished_at
+       from import_jobs
+       order by started_at desc
+       limit ?`,
+      [20],
+      "idx_import_jobs_started"
+    );
+    expectPlanUsesIndex(
+      db,
+      "failed import job diagnostics",
+      `select id, source_path, status, counts_json, errors_json, started_at, finished_at
+       from import_jobs
+       where status = ?
+       order by started_at desc
+       limit ?`,
+      ["failed", 20],
+      "idx_import_jobs_status_started"
+    );
   });
 
   it("keeps paginated D1 reads to one bounded storage query", async () => {
@@ -240,11 +261,41 @@ describe("storage performance guardrails", () => {
     );
     expect(d1.counts).toMatchObject({ all: 1, batch: 1 });
     expect(d1.counts.batchStatements).toEqual([17]);
+    expectSearchDocumentCounts(db, [
+      ["alpha", 1],
+      ["beta", 1],
+      ["gamma", 1],
+      ["delta", 1],
+      ["epsilon", 1]
+    ]);
+
+    d1.resetCounts();
+    await search.indexPage(
+      "wiki:indexed",
+      new Map([
+        ["alpha", 4],
+        ["beta", 1],
+        ["gamma", 1],
+        ["delta", 1],
+        ["epsilon", 1]
+      ]),
+      timestamp(2)
+    );
+    expect(d1.counts).toMatchObject({ all: 1, batch: 1 });
+    expect(d1.counts.batchStatements).toEqual([12]);
+    expectSearchDocumentCounts(db, [
+      ["alpha", 1],
+      ["beta", 1],
+      ["gamma", 1],
+      ["delta", 1],
+      ["epsilon", 1]
+    ]);
 
     d1.resetCounts();
     await search.deletePage("wiki:indexed");
     expect(d1.counts).toMatchObject({ all: 1, batch: 1 });
     expect(d1.counts.batchStatements).toEqual([7]);
+    expect(db.prepare("select count(*) as count from search_terms").get().count).toBe(0);
   });
 });
 
@@ -258,6 +309,15 @@ function expectPlanUsesIndex(db, name, sql, params, indexName) {
   const plan = explainQueryPlan(db, sql, params);
 
   expect(plan, `${name} query plan:\n${plan}`).toContain(indexName);
+}
+
+function expectSearchDocumentCounts(db, expected) {
+  const rows = db
+    .prepare("select term, document_count from search_terms order by term")
+    .all()
+    .map((row) => [row.term, row.document_count]);
+
+  expect(rows).toEqual([...expected].sort((a, b) => a[0].localeCompare(b[0])));
 }
 
 function explainQueryPlan(db, sql, params) {
