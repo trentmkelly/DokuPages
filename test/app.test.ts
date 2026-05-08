@@ -175,13 +175,13 @@ describe("handleRequest", () => {
     expect(html).toContain("User tools");
     expect(html).toContain('id="mobile__tools"');
     expect(html).toContain(
-      '<li class="action login"><a href="/login" rel="nofollow">Log In</a></li>'
+      '<li class="action login"><a href="/wiki/wiki/welcome?do=login" rel="nofollow">Log In</a></li>'
     );
     expect(html).toContain(
-      '<li class="action register"><a href="/register" rel="nofollow">Register</a></li>'
+      '<li class="action register"><a href="/wiki/wiki/welcome?do=register" rel="nofollow">Register</a></li>'
     );
-    expect(html).toContain('<option value="/login">Log In</option>');
-    expect(html).toContain('<option value="/register">Register</option>');
+    expect(html).toContain('<option value="/wiki/wiki/welcome?do=login">Log In</option>');
+    expect(html).toContain('<option value="/wiki/wiki/welcome?do=register">Register</option>');
     expect(html).toContain(
       '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
     );

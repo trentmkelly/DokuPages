@@ -31,6 +31,22 @@ describe("auth routes", () => {
     expect(html).toContain('name="sectok"');
   });
 
+  it("renders DokuWiki-style page action login links with CSRF", async () => {
+    env = createEnv();
+
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=login"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie") ?? "").toContain("DW_CSRF_TOKEN=");
+    const html = await response.text();
+    expect(html).toContain('id="dw__login"');
+    expect(html).toContain('name="returnTo" value="/wiki/wiki/welcome"');
+    expect(html).toMatch(/name="sectok" value="[^"]+"/);
+  });
+
   it("returns explicit not-supported responses for deferred account flows", async () => {
     env = createEnv();
     const browserUrls = [

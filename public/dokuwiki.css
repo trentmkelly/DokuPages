@@ -204,6 +204,7 @@ kbd {
 }
 
 #dokuwiki__site > .site {
+  position: relative;
   padding: 0 40px;
 }
 
@@ -307,6 +308,9 @@ kbd {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0 1em;
+  max-width: var(--dw-site-width);
+  margin-right: auto;
+  margin-left: auto;
 }
 
 #dokuwiki__header .tools li {
@@ -331,6 +335,10 @@ kbd {
 }
 
 #dokuwiki__usertools {
+  position: absolute;
+  top: 0.5em;
+  right: 40px;
+  left: 40px;
   margin-bottom: 0.4em;
   text-align: right;
 }
@@ -1169,11 +1177,15 @@ form.search button {
   }
 
   #dokuwiki__usertools {
+    position: static;
     text-align: left;
   }
 
   #dokuwiki__usertools ul {
     justify-content: flex-start;
+    max-width: none;
+    margin-right: 0;
+    margin-left: 0;
   }
 
   #dw__toc {

@@ -512,11 +512,21 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "login") {
-      return htmlResponse(renderLoginPage(env, url, null, pagePath(id)));
+      const csrf = csrfContext(request);
+      return htmlResponseWithCsrf(
+        request,
+        renderLoginPage(env, url, null, pagePath(id), csrf.token),
+        csrf
+      );
     }
 
     if (url.searchParams.get("do") === "logout") {
-      return htmlResponse(renderLogoutPage(env, url, pagePath(id)));
+      const csrf = csrfContext(request);
+      return htmlResponseWithCsrf(
+        request,
+        renderLogoutPage(env, url, pagePath(id), csrf.token),
+        csrf
+      );
     }
 
     if (url.searchParams.get("do") === "profile") {
@@ -4574,7 +4584,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">
-          ${renderUserTools(options.principal)}
+          ${renderUserTools(options.principal, pageId)}
           <nav id="dokuwiki__sitetools" aria-label="Site tools">
             <h3 class="a11y">Site tools</h3>
             <form class="search" method="get" action="/search">
@@ -4622,14 +4632,15 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
 </html>`;
 }
 
-function renderUserTools(principal?: AuthPrincipal): string {
+function renderUserTools(principal?: AuthPrincipal, pageId?: string): string {
+  const actionLinks = accountActionLinks(pageId);
   const accountItems =
     principal?.type === "user"
       ? `${isManagerPrincipal(principal) ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
-        <li class="action profile"><a href="/profile" rel="nofollow">Update Profile</a></li>
-        <li class="action logout"><a href="/logout" rel="nofollow">Log Out</a></li>`
-      : `<li class="action login"><a href="/login" rel="nofollow">Log In</a></li>
-        <li class="action register"><a href="/register" rel="nofollow">Register</a></li>`;
+        <li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">Update Profile</a></li>
+        <li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">Log Out</a></li>`
+      : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">Log In</a></li>
+        <li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">Register</a></li>`;
 
   return `<nav id="dokuwiki__usertools" aria-label="User tools">
             <h3 class="a11y">User tools</h3>
@@ -4638,6 +4649,7 @@ function renderUserTools(principal?: AuthPrincipal): string {
 }
 
 function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
+  const actionLinks = accountActionLinks(pageId);
   const pageOptions = pageId
     ? `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>
       <option value="${pagePath(pageId)}?do=source">Show source</option>
@@ -4647,10 +4659,10 @@ function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
   const accountOptions =
     principal?.type === "user"
       ? `${isManagerPrincipal(principal) ? '<option value="/admin">Admin</option>' : ""}
-        <option value="/profile">Update Profile</option>
-        <option value="/logout">Log Out</option>`
-      : `<option value="/login">Log In</option>
-        <option value="/register">Register</option>`;
+        <option value="${escapeAttribute(actionLinks.profile)}">Update Profile</option>
+        <option value="${escapeAttribute(actionLinks.logout)}">Log Out</option>`
+      : `<option value="${escapeAttribute(actionLinks.login)}">Log In</option>
+        <option value="${escapeAttribute(actionLinks.register)}">Register</option>`;
 
   return `<div class="mobileTools">
       <label class="a11y" for="mobile__tools">Tools</label>
@@ -4664,6 +4676,30 @@ function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
         ${accountOptions}
       </select>
     </div>`;
+}
+
+function accountActionLinks(pageId?: string): {
+  login: string;
+  logout: string;
+  profile: string;
+  register: string;
+} {
+  if (!pageId) {
+    return {
+      login: "/login",
+      logout: "/logout",
+      profile: "/profile",
+      register: "/register"
+    };
+  }
+
+  const currentPagePath = pagePath(pageId);
+  return {
+    login: `${currentPagePath}?do=login`,
+    logout: `${currentPagePath}?do=logout`,
+    profile: `${currentPagePath}?do=profile`,
+    register: `${currentPagePath}?do=register`
+  };
 }
 
 function renderPageTools(pageId: string): string {
