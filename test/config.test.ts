@@ -23,6 +23,10 @@ describe("runtime config", () => {
       canonicalUrls: false,
       baseUrl: null,
       baseDir: "",
+      topTocLevel: 1,
+      tocMinHeads: 3,
+      maxTocLevel: 3,
+      maxSectionEditLevel: 3,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -42,7 +46,11 @@ describe("runtime config", () => {
       SEND404: "0",
       CANONICAL_URLS: "true",
       BASE_URL: "https://wiki.example.test/",
-      BASE_DIR: "/docs/"
+      BASE_DIR: "/docs/",
+      TOP_TOC_LEVEL: "2",
+      TOC_MIN_HEADS: "4",
+      MAX_TOC_LEVEL: "4",
+      MAX_SECTION_EDIT_LEVEL: "2"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
@@ -55,6 +63,10 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).canonicalUrls).toBe(true);
     expect(getRuntimeConfig(env).baseUrl).toBe("https://wiki.example.test");
     expect(getRuntimeConfig(env).baseDir).toBe("/docs");
+    expect(getRuntimeConfig(env).topTocLevel).toBe(2);
+    expect(getRuntimeConfig(env).tocMinHeads).toBe(4);
+    expect(getRuntimeConfig(env).maxTocLevel).toBe(4);
+    expect(getRuntimeConfig(env).maxSectionEditLevel).toBe(2);
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -112,6 +124,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "CANONICAL_URLS",
           effectiveValue: "false"
+        }),
+        expect.objectContaining({
+          key: "TOC_MIN_HEADS",
+          effectiveValue: "3"
         }),
         expect.objectContaining({
           key: "EMAIL_PROVIDER",
@@ -186,6 +202,10 @@ describe("runtime config", () => {
       DISABLE_ACTIONS: "edit,bad action,$",
       BASE_URL: "ftp://example.test",
       BASE_DIR: "../wiki",
+      TOP_TOC_LEVEL: "0",
+      TOC_MIN_HEADS: "many",
+      MAX_TOC_LEVEL: "9",
+      MAX_SECTION_EDIT_LEVEL: "-1",
       API_BEARER_TOKEN: " "
     } as Env);
 
@@ -199,6 +219,10 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "DISABLE_ACTIONS", severity: "error" }),
         expect.objectContaining({ key: "BASE_URL", severity: "error" }),
         expect.objectContaining({ key: "BASE_DIR", severity: "error" }),
+        expect.objectContaining({ key: "TOP_TOC_LEVEL", severity: "error" }),
+        expect.objectContaining({ key: "TOC_MIN_HEADS", severity: "error" }),
+        expect.objectContaining({ key: "MAX_TOC_LEVEL", severity: "error" }),
+        expect.objectContaining({ key: "MAX_SECTION_EDIT_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "API_BEARER_TOKEN", severity: "warning" })
       ])
     );

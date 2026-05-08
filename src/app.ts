@@ -2501,6 +2501,7 @@ async function renderPageHtml(
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
   const privateCache = options.cacheMode === "private";
   const directives = getWikiRenderDirectives(content);
+  const config = getRuntimeConfig(env);
   const sectionEdit = !isActionDisabled(env, "edit");
   const revisionNotice = revisionDate
     ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
@@ -2540,7 +2541,7 @@ async function renderPageHtml(
     return htmlShell(
       env,
       cached.title,
-      `${renderBreadcrumbs(id)}${renderToc(cached.toc)}${revisionNotice}${cached.html}`,
+      `${renderBreadcrumbs(id)}${renderToc(cached.toc, config.tocMinHeads)}${revisionNotice}${cached.html}`,
       { pageId: id, principal: options.principal, updatedAt: revisionDate ?? page?.updatedAt }
     );
   }
@@ -2559,7 +2560,10 @@ async function renderPageHtml(
     pageId: id,
     directives,
     existingPageIds,
-    sectionEdit
+    sectionEdit,
+    topTocLevel: config.topTocLevel,
+    maxTocLevel: config.maxTocLevel,
+    maxSectionEditLevel: config.maxSectionEditLevel
   });
   const title = rendered.title ?? page?.title ?? id;
 
@@ -2583,7 +2587,7 @@ async function renderPageHtml(
   return htmlShell(
     env,
     title,
-    `${renderBreadcrumbs(id)}${renderToc(rendered.toc)}${revisionNotice}${rendered.html}`,
+    `${renderBreadcrumbs(id)}${renderToc(rendered.toc, config.tocMinHeads)}${revisionNotice}${rendered.html}`,
     { pageId: id, principal: options.principal, updatedAt: revisionDate ?? page?.updatedAt }
   );
 }
@@ -2598,10 +2602,17 @@ async function renderPageExport(
   const content = page.content;
   const revisionId = "revisionId" in page ? page.revisionId : page.id;
   const existingPageIds = await existingPageIdsForContent(env, content, id);
-  const rendered = renderWikiText(content, { pageId: id, existingPageIds });
+  const config = getRuntimeConfig(env);
+  const rendered = renderWikiText(content, {
+    pageId: id,
+    existingPageIds,
+    topTocLevel: config.topTocLevel,
+    maxTocLevel: config.maxTocLevel,
+    maxSectionEditLevel: config.maxSectionEditLevel
+  });
   const title = rendered.title ?? ("title" in page ? page.title : null) ?? id;
   const headers = securityHeaders({ "x-robots-tag": "noindex" });
-  const language = getRuntimeConfig(env).language;
+  const language = config.language;
 
   if (mode === "raw") {
     headers.set("content-type", "text/plain; charset=utf-8");
@@ -2629,7 +2640,7 @@ async function renderPageExport(
 </head>
 <body>
 <div class="dokuwiki export">
-${revisionComment}${renderToc(rendered.toc)}
+${revisionComment}${renderToc(rendered.toc, config.tocMinHeads)}
 ${rendered.html}
 </div>
 </body>
@@ -2816,8 +2827,8 @@ function renderHeaderBreadcrumbs(pageId: string | undefined, startId: string): s
   return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span>${crumbs}</div></div>`;
 }
 
-function renderToc(toc: TocItem[]): string {
-  if (toc.length < 2) return "";
+function renderToc(toc: TocItem[], minimumHeadings = 2): string {
+  if (toc.length < minimumHeadings) return "";
 
   const items = toc
     .map(

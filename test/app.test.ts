@@ -1364,7 +1364,7 @@ describe("handleRequest", () => {
   it("renders table of contents for multi-heading pages", async () => {
     state.row = {
       ...currentPageRow(),
-      content: "====== Welcome ======\n\n===== Details =====\n\nMore text."
+      content: "====== Welcome ======\n\n===== Details =====\n\n==== More ====\n\nMore text."
     };
 
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
@@ -1373,6 +1373,34 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain('id="dw__toc"');
     expect(html).toContain('<a href="#details">Details</a>');
+  });
+
+  it("honors DokuWiki TOC and section edit settings", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content:
+        "====== Welcome ======\n\n===== Details =====\n\n==== Hidden From TOC ====\n\nMore text."
+    };
+    const renderEnv = {
+      ...env,
+      TOC_MIN_HEADS: "2",
+      MAX_TOC_LEVEL: "2",
+      MAX_SECTION_EDIT_LEVEL: "1"
+    } satisfies Env;
+
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome"),
+      renderEnv
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('id="dw__toc"');
+    expect(html).toContain('<a href="#welcome">Welcome</a>');
+    expect(html).toContain('<a href="#details">Details</a>');
+    expect(html).not.toContain('<a href="#hidden-from-toc">Hidden From TOC</a>');
+    expect(html).toContain('href="/wiki/wiki/welcome?do=edit&amp;section=1"');
+    expect(html).not.toContain('href="/wiki/wiki/welcome?do=edit&amp;section=2"');
   });
 
   it("honors page render control macros", async () => {

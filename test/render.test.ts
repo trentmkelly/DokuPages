@@ -44,6 +44,27 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain("~~NOCACHE~~");
   });
 
+  it("honors DokuWiki TOC and section-edit level options", () => {
+    const rendered = renderWikiText(
+      "====== One ======\n\n===== Two =====\n\n==== Three ====\n\n=== Four ===",
+      {
+        pageId: "wiki:levels",
+        topTocLevel: 2,
+        maxTocLevel: 3,
+        maxSectionEditLevel: 2
+      }
+    );
+
+    expect(rendered.toc).toEqual([
+      { id: "two", level: 2, title: "Two" },
+      { id: "three", level: 3, title: "Three" }
+    ]);
+    expect(rendered.html).toContain('href="/wiki/wiki/levels?do=edit&amp;section=1"');
+    expect(rendered.html).toContain('href="/wiki/wiki/levels?do=edit&amp;section=2"');
+    expect(rendered.html).not.toContain('section=3"');
+    expect(rendered.html).not.toContain('section=4"');
+  });
+
   it("renders paragraphs and inline formatting", () => {
     const rendered = renderWikiText(
       "**bold** //italic// __under__ ''code'' ,,sub,, <sup>sup</sup> <del>gone</del>"

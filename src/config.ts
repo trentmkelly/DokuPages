@@ -27,6 +27,10 @@ export interface RuntimeConfig {
   canonicalUrls: boolean;
   baseUrl: string | null;
   baseDir: string;
+  topTocLevel: number;
+  tocMinHeads: number;
+  maxTocLevel: number;
+  maxSectionEditLevel: number;
   appVersion: string;
 }
 
@@ -77,6 +81,10 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     canonicalUrls: truthy(env.CANONICAL_URLS),
     baseUrl: normalizedBaseUrl(env.BASE_URL),
     baseDir: normalizedBaseDir(env.BASE_DIR),
+    topTocLevel: integerConfig(env.TOP_TOC_LEVEL, 1, 1, 5),
+    tocMinHeads: integerConfig(env.TOC_MIN_HEADS, 3, 0, 99),
+    maxTocLevel: integerConfig(env.MAX_TOC_LEVEL, 3, 1, 5),
+    maxSectionEditLevel: integerConfig(env.MAX_SECTION_EDIT_LEVEL, 3, 0, 5),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -92,6 +100,10 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateActionList(env.DISABLE_ACTIONS, issues);
   validateBaseUrl(env.BASE_URL, issues);
   validateBaseDir(env.BASE_DIR, issues);
+  validateIntegerRange("TOP_TOC_LEVEL", env.TOP_TOC_LEVEL, 1, 5, issues);
+  validateIntegerRange("TOC_MIN_HEADS", env.TOC_MIN_HEADS, 0, 99, issues);
+  validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
+  validateIntegerRange("MAX_SECTION_EDIT_LEVEL", env.MAX_SECTION_EDIT_LEVEL, 0, 5, issues);
   validateAppVersion(env.APP_VERSION, issues);
   validateApiBearerToken(env.API_BEARER_TOKEN, issues);
   validateEmailProvider(env.EMAIL_PROVIDER, issues);
@@ -128,6 +140,15 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("CANONICAL_URLS", env.CANONICAL_URLS, String(config.canonicalUrls), "false"),
     configEntry("BASE_URL", env.BASE_URL, config.baseUrl, null),
     configEntry("BASE_DIR", env.BASE_DIR, config.baseDir, ""),
+    configEntry("TOP_TOC_LEVEL", env.TOP_TOC_LEVEL, String(config.topTocLevel), "1"),
+    configEntry("TOC_MIN_HEADS", env.TOC_MIN_HEADS, String(config.tocMinHeads), "3"),
+    configEntry("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, String(config.maxTocLevel), "3"),
+    configEntry(
+      "MAX_SECTION_EDIT_LEVEL",
+      env.MAX_SECTION_EDIT_LEVEL,
+      String(config.maxSectionEditLevel),
+      "3"
+    ),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",
@@ -384,6 +405,26 @@ function validateBaseDir(value: string | undefined, issues: ConfigValidationIssu
   }
 }
 
+function validateIntegerRange(
+  key: string,
+  value: string | undefined,
+  min: number,
+  max: number,
+  issues: ConfigValidationIssue[]
+): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    issues.push({
+      key,
+      severity: "error",
+      message: `${key} must be an integer from ${min} to ${max}.`
+    });
+  }
+}
+
 function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
@@ -577,4 +618,15 @@ function booleanConfig(value: string | undefined, fallback: boolean): boolean {
     return false;
   }
   return fallback;
+}
+
+function integerConfig(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number(nonEmpty(value));
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
 }

@@ -72,8 +72,8 @@ are not fixed by this checklist.
 - [ ] Match DokuWiki's `scheme.conf` protocol handling for external links and autolinks.
 - [ ] Match DokuWiki's `relnofollow` behavior, including `ugc nofollow` distinctions for external user content.
 - [ ] Match DokuWiki's configurable link targets for wiki, interwiki, external, media, and Windows-share links.
-- [ ] Match DokuWiki's section edit limits from `maxseclevel`.
-- [ ] Match DokuWiki's TOC thresholds from `toptoclevel`, `tocminheads`, and `maxtoclevel`.
+- [x] Match DokuWiki's section edit limits from `maxseclevel`.
+- [x] Match DokuWiki's TOC thresholds from `toptoclevel`, `tocminheads`, and `maxtoclevel`.
 - [ ] Match DokuWiki's first-heading title behavior controlled by `useheading`.
 - [ ] Match DokuWiki's autoplural lookup for nonexistent pages when `autoplural` is enabled.
 - [ ] Add parser parity fixtures for malformed nested formatting, nested lists, nested quotes, mixed tables, link labels containing media, and punctuation-heavy autolinks.

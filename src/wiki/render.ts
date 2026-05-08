@@ -26,6 +26,9 @@ export interface RenderWikiTextOptions {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
   sectionEdit?: boolean;
+  topTocLevel?: number;
+  maxTocLevel?: number;
+  maxSectionEditLevel?: number;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -154,6 +157,9 @@ export function renderWikiText(
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
     existingPageIds: options.existingPageIds,
     sectionEdit: options.sectionEdit ?? true,
+    topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
+    maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
+    maxSectionEditLevel: clampHeadingLevel(options.maxSectionEditLevel, 5, 0),
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -201,12 +207,15 @@ export function renderWikiText(
     if (heading) {
       flushAll(blocks, state, context);
       const id = uniqueAnchor(slugify(heading.title), context.anchorIds);
-      toc.push({ id, level: heading.level, title: heading.title });
+      if (heading.level >= context.topTocLevel && heading.level <= context.maxTocLevel) {
+        toc.push({ id, level: heading.level, title: heading.title });
+      }
       title.value ??= heading.title;
       context.sectionIndex += 1;
       blocks.push(
         `<h${heading.level} id="${id}">${renderInline(heading.title, context)}${renderSectionEditLink(
           heading.title,
+          heading.level,
           context
         )}</h${heading.level}>`
       );
@@ -336,6 +345,9 @@ interface RenderContext {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
   sectionEdit: boolean;
+  topTocLevel: number;
+  maxTocLevel: number;
+  maxSectionEditLevel: number;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -350,8 +362,8 @@ function parseHeading(line: string): { level: number; title: string } | null {
   };
 }
 
-function renderSectionEditLink(title: string, context: RenderContext): string {
-  if (!context.pageId || !context.sectionEdit) return "";
+function renderSectionEditLink(title: string, level: number, context: RenderContext): string {
+  if (!context.pageId || !context.sectionEdit || level > context.maxSectionEditLevel) return "";
 
   const href = `${pageIdToRoutePath(context.pageId)}?do=edit&section=${context.sectionIndex}`;
 
@@ -601,6 +613,9 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             dependencies: context.dependencies,
             pageId: context.pageId,
             sectionEdit: context.sectionEdit,
+            topTocLevel: context.topTocLevel,
+            maxTocLevel: context.maxTocLevel,
+            maxSectionEditLevel: context.maxSectionEditLevel,
             sectionIndex: context.sectionIndex,
             anchorIds: context.anchorIds
           }
@@ -1000,6 +1015,12 @@ function uniqueAnchor(base: string, existing: Set<string>): string {
 function slugify(value: string): string {
   const slug = cleanPageId(value).replaceAll(":", "-").replaceAll("_", "-");
   return slug || "section";
+}
+
+function clampHeadingLevel(value: number | undefined, fallback: number, min = 1): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.max(min, Math.min(5, parsed));
 }
 
 function escapeHtml(value: string): string {
