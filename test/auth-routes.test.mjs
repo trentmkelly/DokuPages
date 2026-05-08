@@ -612,6 +612,8 @@ describe("auth routes", () => {
     expect(profile.status).toBe(200);
     const html = await profile.text();
     expect(html).toContain('id="dw__profile"');
+    expect(html).toContain('name="oldpass"');
+    expect(html).toContain('id="dw__profiledelete"');
     expect(html).toContain("Alice Example");
     expect(html).toContain('id="dokuwiki__usertools"');
     expect(html).toContain(
@@ -639,7 +641,7 @@ describe("auth routes", () => {
     );
 
     expect(rejected.status).toBe(400);
-    await expect(rejected.text()).resolves.toContain("Current password is incorrect.");
+    await expect(rejected.text()).resolves.toContain("Sorry, the password was wrong");
 
     const form = new FormData();
     form.set("displayName", "Alice Updated");
@@ -689,6 +691,162 @@ describe("auth routes", () => {
         displayName: "Alice Updated"
       }
     });
+  });
+
+  it("matches DokuWiki profileconfirm for profile updates", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const withoutPassword = new FormData();
+    withoutPassword.set("fullname", "Alice Renamed");
+    withoutPassword.set("email", "alice@example.test");
+
+    const rejected = await handleRequest(
+      new Request("https://example.com/api/auth/profile", {
+        method: "POST",
+        body: withoutPassword,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(rejected.status).toBe(400);
+    await expect(rejected.text()).resolves.toContain("Sorry, the password was wrong");
+
+    withoutPassword.set("oldpass", "correct horse battery staple");
+    const saved = await handleRequest(
+      new Request("https://example.com/api/auth/profile", {
+        method: "POST",
+        body: withoutPassword,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    await expect(
+      env.DB.prepare("select display_name from users where id = ?").bind("user-1").first()
+    ).resolves.toMatchObject({ display_name: "Alice Renamed" });
+
+    const noChange = new FormData();
+    noChange.set("fullname", "Alice Renamed");
+    noChange.set("email", "alice@example.test");
+    noChange.set("oldpass", "correct horse battery staple");
+    const noChangeResponse = await handleRequest(
+      new Request("https://example.com/api/auth/profile", {
+        method: "POST",
+        body: noChange,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(noChangeResponse.status).toBe(400);
+    await expect(noChangeResponse.text()).resolves.toContain("No changes, nothing to do.");
+
+    db.close();
+    env = createEnv({ PROFILECONFIRM: "0" });
+    await seedUser(env.DB);
+    const relaxedCookie = await loginAsAlice(env);
+    const relaxedForm = new FormData();
+    relaxedForm.set("fullname", "Alice Without Confirm");
+    relaxedForm.set("email", "alice@example.test");
+
+    const relaxed = await handleRequest(
+      new Request("https://example.com/api/auth/profile", {
+        method: "POST",
+        body: relaxedForm,
+        headers: csrfHeaders({ cookie: relaxedCookie })
+      }),
+      env
+    );
+
+    expect(relaxed.status).toBe(303);
+    await expect(
+      env.DB.prepare("select display_name from users where id = ?").bind("user-1").first()
+    ).resolves.toMatchObject({ display_name: "Alice Without Confirm" });
+  });
+
+  it("deletes authenticated profiles through the DokuWiki confirmation flow", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+    await seedProfileDeleteDependents(env.DB);
+
+    const missingConfirm = new FormData();
+    missingConfirm.set("delete", "1");
+    missingConfirm.set("oldpass", "correct horse battery staple");
+    const missingConfirmResponse = await handleRequest(
+      new Request("https://example.com/api/auth/profile/delete", {
+        method: "POST",
+        body: missingConfirm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(missingConfirmResponse.status).toBe(400);
+    await expect(missingConfirmResponse.text()).resolves.toContain(
+      "Confirmation check box not ticked"
+    );
+
+    const wrongPassword = new FormData();
+    wrongPassword.set("delete", "1");
+    wrongPassword.set("confirm_delete", "1");
+    wrongPassword.set("oldpass", "wrong password");
+    const wrongPasswordResponse = await handleRequest(
+      new Request("https://example.com/api/auth/profile/delete", {
+        method: "POST",
+        body: wrongPassword,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(wrongPasswordResponse.status).toBe(400);
+    await expect(wrongPasswordResponse.text()).resolves.toContain("Sorry, the password was wrong");
+
+    const form = new FormData();
+    form.set("delete", "1");
+    form.set("confirm_delete", "1");
+    form.set("oldpass", "correct horse battery staple");
+
+    const deleted = await handleRequest(
+      new Request("https://example.com/doku.php?do=profile_delete&id=wiki:welcome", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(deleted.status).toBe(200);
+    expect(deleted.headers.get("set-cookie") ?? "").toContain("Max-Age=0");
+    await expect(deleted.text()).resolves.toContain(
+      "Your user account has been deleted from this wiki."
+    );
+
+    for (const table of [
+      "users",
+      "sessions",
+      "user_groups",
+      "subscriptions",
+      "password_reset_tokens",
+      "drafts"
+    ]) {
+      await expect(
+        env.DB.prepare(
+          `select count(*) as count from ${table} where ${profileDeleteUserWhere(table)}`
+        )
+          .bind("user-1")
+          .first()
+      ).resolves.toMatchObject({ count: 0 });
+    }
+
+    await expect(
+      env.DB.prepare("select count(*) as count from email_digest_deliveries").first()
+    ).resolves.toMatchObject({ count: 0 });
   });
 
   it("logs in native users, resolves the session principal, and logs out", async () => {
@@ -2293,6 +2451,50 @@ async function seedAuthUser(
       .bind(userId, groupId, now)
       .run();
   }
+}
+
+async function seedProfileDeleteDependents(d1) {
+  const now = "2026-05-07T00:00:00.000Z";
+  await d1
+    .prepare(
+      `insert into drafts (id, page_id, user_id, content, base_revision_id, updated_at)
+       values (?, ?, ?, ?, ?, ?)`
+    )
+    .bind("draft:wiki:start:user-1", "wiki:start", "user-1", "draft text", null, now)
+    .run();
+  await d1
+    .prepare(
+      `insert into password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+       values (?, ?, ?, ?, ?)`
+    )
+    .bind("reset-1", "user-1", "token-hash-1", "2026-05-08T00:00:00.000Z", now)
+    .run();
+  await d1
+    .prepare(
+      `insert into subscriptions (id, subject_type, subject_id, user_id, digest_interval, created_at)
+       values (?, ?, ?, ?, ?, ?)`
+    )
+    .bind("sub-1", "page", "wiki:start", "user-1", "daily", now)
+    .run();
+  await d1
+    .prepare(
+      `insert into email_notification_events (
+         id, subject_type, subject_id, revision_id, change_type, summary, actor_id, actor_name, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind("event-1", "page", "wiki:start", "rev-1", "edit", "summary", "user-1", "Alice", now)
+    .run();
+  await d1
+    .prepare(
+      `insert into email_digest_deliveries (subscription_id, event_id, delivered_at)
+       values (?, ?, ?)`
+    )
+    .bind("sub-1", "event-1", now)
+    .run();
+}
+
+function profileDeleteUserWhere(table) {
+  return table === "users" ? "id = ?" : "user_id = ?";
 }
 
 async function loginAsAlice(env) {

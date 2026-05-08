@@ -37,14 +37,26 @@ When `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are both configured, login
 submissions must include a valid Cloudflare Turnstile response before password
 verification or rate-limit updates run.
 
-Login success, login failure, login rate-limit, logout, and profile update events emit typed `auth_event` records through the native auth event handler boundary in `src/auth/events.ts`. The default handler writes structured logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
+Login success, login failure, login rate-limit, logout, profile update, and
+profile delete events emit typed `auth_event` records through the native auth
+event handler boundary in `src/auth/events.ts`. The default handler writes
+structured logs with non-sensitive actor and request metadata. Passwords,
+session tokens, and cookie values are never logged.
 
 ## Profile Updates
 
 Authenticated users can update their display name and email address at
-`/profile`. Password changes are supported through the same page after the user
-confirms their current password. Changing a password keeps the current session
-and removes other active sessions for that user.
+`/profile`. By default, `PROFILECONFIRM=1` matches upstream DokuWiki and
+requires the current password before any profile change is saved. Setting
+`PROFILECONFIRM=0` disables that confirmation step. Password changes keep the
+current session and remove other active sessions for that user.
+
+The profile page also implements DokuWiki's own-account delete flow when
+`profile_delete` is not listed in `DISABLE_ACTIONS`. Deletion requires the
+confirmation checkbox, CSRF token, and current password when `PROFILECONFIRM` is
+enabled. It removes the D1 user, sessions, groups, subscriptions, reset tokens,
+and drafts, then clears the browser session cookie. Historical page and media
+author names are preserved like upstream `authplain` history.
 
 ## Registration And Password Reset
 

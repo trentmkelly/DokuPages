@@ -26,6 +26,7 @@ export interface RuntimeConfig {
   superuser: string;
   manager: string;
   autoPassword: boolean;
+  profileConfirm: boolean;
   hidePages: string | null;
   sneakyIndex: boolean;
   maintenanceMode: boolean;
@@ -121,6 +122,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     superuser: normalizedMemberList(env.SUPERUSER, DEFAULT_SUPERUSER),
     manager: normalizedMemberList(env.MANAGER, DEFAULT_MANAGER),
     autoPassword: truthy(env.AUTOPASSWD),
+    profileConfirm: booleanConfig(env.PROFILECONFIRM, true),
     hidePages: nonEmpty(env.HIDE_PAGES) ?? null,
     sneakyIndex: truthy(env.SNEAKY_INDEX),
     maintenanceMode: truthy(env.MAINTENANCE_MODE),
@@ -224,6 +226,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("SUPERUSER", env.SUPERUSER, config.superuser, DEFAULT_SUPERUSER),
     configEntry("MANAGER", env.MANAGER, config.manager, DEFAULT_MANAGER),
     configEntry("AUTOPASSWD", env.AUTOPASSWD, String(config.autoPassword), "false"),
+    configEntry("PROFILECONFIRM", env.PROFILECONFIRM, String(config.profileConfirm), "true"),
     configEntry("HIDE_PAGES", env.HIDE_PAGES, config.hidePages, null),
     configEntry("SNEAKY_INDEX", env.SNEAKY_INDEX, String(config.sneakyIndex), "false"),
     configEntry("MAINTENANCE_MODE", env.MAINTENANCE_MODE, String(config.maintenanceMode), "false"),

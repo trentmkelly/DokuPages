@@ -66,8 +66,9 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/lib/exe/indexer.php`                              | Runs the native D1 page indexer task for `id`, returning DokuWiki's task-runner GIF by default.         |
 | `/lib/exe/taskrunner.php`                           | Alias for the native D1 page indexer task runner.                                                       |
 | `/install.php`                                      | Returns explicit DokuWiki-styled `410` HTML, or JSON by request.                                        |
-| `/profile`                                          | Serves the native profile update form for authenticated users.                                          |
+| `/profile`                                          | Serves the native profile update and own-account delete forms for authenticated users.                  |
 | `/api/auth/profile`                                 | Updates display name, email, and password for authenticated users.                                      |
+| `/api/auth/profile/delete`                          | Deletes the authenticated user's own account after DokuWiki-style confirmation.                         |
 | `/register`, `/resendpwd`, `/password-reset`        | Serve native registration and password reset forms.                                                     |
 | `/api/auth/register`                                | Creates a native D1 user and session.                                                                   |
 | `/api/auth/password-reset`                          | Requests a password reset email.                                                                        |

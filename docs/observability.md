@@ -19,8 +19,9 @@ Unhandled errors emit `request_error` events. Storage failures are mapped throug
 storage service, error code, retry hint, and request ID.
 
 Auth flows emit `auth_event` logs for login success, login failure, login rate
-limits, and logout. Admin ACL changes and search index rebuilds also write D1
-audit log rows that are visible in `/admin/audit`.
+limits, logout, profile updates, and profile deletes. Admin ACL changes and
+search index rebuilds also write D1 audit log rows that are visible in
+`/admin/audit`.
 
 ## Metrics
 

@@ -75,6 +75,9 @@ Optional Pages environment variables:
   endpoint.
 - `AUTOPASSWD`: set to `1` to use DokuWiki-style generated-password
   registration. Requires outbound email configuration.
+- `PROFILECONFIRM`: set to `0` to disable DokuWiki-style current-password
+  confirmation on profile update and own-account delete forms. Default:
+  enabled.
 - `TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for login and
   registration forms.
 - `DOKUWIKI_COOKIE_SALT`: Pages secret containing the upstream

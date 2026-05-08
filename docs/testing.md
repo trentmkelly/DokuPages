@@ -36,7 +36,7 @@ to native replacements, plus explicit removal responses for unsupported bundled
 plugins.
 
 Auth event tests cover the native replacement hook boundary used by login,
-logout, rate-limit, and profile-update flows.
+logout, rate-limit, profile-update, and profile-delete flows.
 
 Accessibility tests cover rendered wiki shell landmarks, the keyboard skip link,
 the header search label, the mobile tools label, and accessible names for

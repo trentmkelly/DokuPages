@@ -407,6 +407,10 @@ export async function handleRequest(
     return handleProfileUpdate(request, env, principal);
   }
 
+  if (url.pathname === "/api/auth/profile/delete" && request.method === "POST") {
+    return handleProfileDelete(request, env, principal);
+  }
+
   if (url.pathname === "/api/subscriptions" && request.method === "POST") {
     return handleSubscriptionUpdate(request, env, principal);
   }
@@ -769,7 +773,10 @@ export async function handleRequest(
       );
     }
 
-    if (url.searchParams.get("do") === "profile") {
+    if (
+      url.searchParams.get("do") === "profile" ||
+      url.searchParams.get("do") === "profile_delete"
+    ) {
       return redirectResponse("/profile", 302);
     }
 
@@ -946,7 +953,7 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
     return redirectLegacyAdminPage(request, env, url.searchParams.get("page"));
   }
 
-  if (url.searchParams.get("do") === "profile") {
+  if (url.searchParams.get("do") === "profile" || url.searchParams.get("do") === "profile_delete") {
     return redirectResponse("/profile", 301);
   }
 
@@ -1308,6 +1315,8 @@ async function handleWikiPostAction(
       return handleDeleteDraft(request, env, principal, id, pagePath(id));
     case "redirect":
       return handleRedirectAction(request, id);
+    case "profile_delete":
+      return handleProfileDelete(request, env, principal);
     default:
       return null;
   }
@@ -7511,6 +7520,20 @@ interface ProfileFormValues {
   email: string;
 }
 
+interface ParsedProfileForm {
+  displayName: string;
+  email: string;
+  oldPassword: string;
+  newPassword: string | null;
+}
+
+interface ProfileChangeSet {
+  hasChanges: boolean;
+  displayNameChanged: boolean;
+  emailChanged: boolean;
+  passwordChanged: boolean;
+}
+
 async function handleProfileUpdate(
   request: Request,
   env: Env,
@@ -7527,18 +7550,26 @@ async function handleProfileUpdate(
   const values = profileValuesFromForm(form, principal);
   const parsed = parseProfileForm(form);
   const csrf = csrfContext(request);
+  const config = getRuntimeConfig(env);
 
   if (!parsed.ok) {
     return profileUpdateErrorResponse(request, env, principal, values, parsed.error, csrf);
   }
 
-  let passwordHash: string | null = null;
-  if (parsed.newPassword) {
-    const authenticated = await authenticateUser(
-      env.DB,
-      principal.username,
-      parsed.currentPassword
+  const changes = profileChangeSet(principal, parsed);
+  if (!changes.hasChanges) {
+    return profileUpdateErrorResponse(
+      request,
+      env,
+      principal,
+      values,
+      "No changes, nothing to do.",
+      csrf
     );
+  }
+
+  if (config.profileConfirm) {
+    const authenticated = await authenticateUser(env.DB, principal.username, parsed.oldPassword);
 
     if (!authenticated || authenticated.id !== principal.id) {
       return profileUpdateErrorResponse(
@@ -7546,11 +7577,14 @@ async function handleProfileUpdate(
         env,
         principal,
         values,
-        "Current password is incorrect.",
+        "Sorry, the password was wrong",
         csrf
       );
     }
+  }
 
+  let passwordHash: string | null = null;
+  if (parsed.newPassword) {
     passwordHash = await hashPassword(parsed.newPassword);
   }
 
@@ -7578,6 +7612,8 @@ async function handleProfileUpdate(
   logAuthEvent(request, "profile_update", {
     userId: principal.id,
     username: principal.username,
+    displayNameChanged: changes.displayNameChanged,
+    emailChanged: changes.emailChanged,
     passwordChanged: Boolean(passwordHash)
   });
 
@@ -7610,6 +7646,14 @@ function renderProfilePage(
   const formValues = values ?? profileValuesFromPrincipal(principal);
   const notice = message ?? profileNoticeFromUrl(url);
   const noticeHtml = notice ? `<p class="${notice.type}">${escapeHtml(notice.text)}</p>` : "";
+  const config = getRuntimeConfig(env);
+  const confirmPasswordHtml = config.profileConfirm
+    ? `<label for="profile__oldpass">Confirm current password</label>
+        <input id="profile__oldpass" name="oldpass" class="edit" type="password" autocomplete="current-password" required>`
+    : "";
+  const deleteProfileForm = isActionDisabled(env, "profile_delete")
+    ? ""
+    : renderProfileDeleteForm(csrfToken, config.profileConfirm);
 
   return htmlShell(
     env,
@@ -7623,49 +7667,39 @@ function renderProfilePage(
         <label for="profile__user">Username</label>
         <input id="profile__user" class="edit" type="text" value="${escapeAttribute(principal.username)}" readonly>
         <label for="profile__display">Full name</label>
-        <input id="profile__display" name="displayName" class="edit" type="text" value="${escapeAttribute(formValues.displayName)}" autocomplete="name" required>
+        <input id="profile__display" name="fullname" class="edit" type="text" value="${escapeAttribute(formValues.displayName)}" autocomplete="name" required>
         <label for="profile__email">Email</label>
-        <input id="profile__email" name="email" class="edit" type="email" value="${escapeAttribute(formValues.email)}" autocomplete="email">
+        <input id="profile__email" name="email" class="edit" type="email" value="${escapeAttribute(formValues.email)}" autocomplete="email" required>
       </fieldset>
       <fieldset>
         <legend>Change password</legend>
-        <label for="profile__current_password">Current password</label>
-        <input id="profile__current_password" name="currentPassword" class="edit" type="password" autocomplete="current-password">
         <label for="profile__new_password">New password</label>
-        <input id="profile__new_password" name="newPassword" class="edit" type="password" autocomplete="new-password">
+        <input id="profile__new_password" name="newpass" class="edit" type="password" autocomplete="new-password">
         <label for="profile__new_password_confirm">Confirm password</label>
-        <input id="profile__new_password_confirm" name="newPasswordConfirm" class="edit" type="password" autocomplete="new-password">
+        <input id="profile__new_password_confirm" name="passchk" class="edit" type="password" autocomplete="new-password">
+        ${confirmPasswordHtml}
       </fieldset>
       <button type="submit">Update Profile</button>
-    </form>`,
+    </form>
+    ${deleteProfileForm}`,
     { principal }
   );
 }
 
-function parseProfileForm(form: FormData):
-  | {
-      ok: true;
-      displayName: string;
-      email: string | null;
-      currentPassword: string;
-      newPassword: string | null;
-    }
-  | { ok: false; error: string } {
-  const displayName = String(form.get("displayName") ?? "").trim();
-  if (!displayName) {
-    return { ok: false, error: "Full name is required." };
+function parseProfileForm(
+  form: FormData
+): ({ ok: true } & ParsedProfileForm) | { ok: false; error: string } {
+  const displayName = String(form.get("fullname") ?? form.get("displayName") ?? "").trim();
+  const email = String(form.get("email") ?? "").trim();
+  const oldPassword = String(form.get("oldpass") ?? form.get("currentPassword") ?? "");
+  const newPassword = String(form.get("newpass") ?? form.get("newPassword") ?? "");
+  const newPasswordConfirm = String(form.get("passchk") ?? form.get("newPasswordConfirm") ?? "");
+
+  if (!displayName || !email) {
+    return { ok: false, error: "An empty name or email address is not allowed." };
   }
 
-  const email = String(form.get("email") ?? "").trim() || null;
-  const currentPassword = String(form.get("currentPassword") ?? "");
-  const newPassword = String(form.get("newPassword") ?? "");
-  const newPasswordConfirm = String(form.get("newPasswordConfirm") ?? "");
-
   if (newPassword || newPasswordConfirm) {
-    if (!currentPassword) {
-      return { ok: false, error: "Current password is required to change password." };
-    }
-
     if (newPassword !== newPasswordConfirm) {
       return { ok: false, error: "New passwords do not match." };
     }
@@ -7679,7 +7713,7 @@ function parseProfileForm(form: FormData):
     ok: true,
     displayName,
     email,
-    currentPassword,
+    oldPassword,
     newPassword: newPassword || null
   };
 }
@@ -7693,8 +7727,27 @@ function profileValuesFromPrincipal(principal: AuthPrincipal): ProfileFormValues
 
 function profileValuesFromForm(form: FormData, principal: AuthPrincipal): ProfileFormValues {
   return {
-    displayName: String(form.get("displayName") ?? principal.displayName).trim(),
+    displayName: String(
+      form.get("fullname") ?? form.get("displayName") ?? principal.displayName
+    ).trim(),
     email: String(form.get("email") ?? principal.email ?? "").trim()
+  };
+}
+
+function profileChangeSet(
+  principal: AuthPrincipal & { type: "user" },
+  parsed: ParsedProfileForm
+): ProfileChangeSet {
+  const currentEmail = principal.email ?? "";
+  const displayNameChanged = parsed.displayName !== principal.displayName;
+  const emailChanged = parsed.email !== currentEmail;
+  const passwordChanged = Boolean(parsed.newPassword);
+
+  return {
+    hasChanges: displayNameChanged || emailChanged || passwordChanged,
+    displayNameChanged,
+    emailChanged,
+    passwordChanged
   };
 }
 
@@ -7730,6 +7783,160 @@ function profileUpdateErrorResponse(
     csrf,
     { status: 400 }
   );
+}
+
+async function handleProfileDelete(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (principal.type !== "user") {
+    return accountLoginRequiredResponse(request, env, "/profile");
+  }
+
+  const csrf = csrfContext(request);
+  const oldPassword = String(form.get("oldpass") ?? form.get("currentPassword") ?? "");
+
+  if (isActionDisabled(env, "profile_delete")) {
+    return profileDeleteErrorResponse(
+      request,
+      env,
+      principal,
+      "This wiki does not support deleting users",
+      csrf,
+      403
+    );
+  }
+
+  if (!formFlag(form, "delete")) {
+    return profileDeleteErrorResponse(
+      request,
+      env,
+      principal,
+      "This wiki does not support deleting users",
+      csrf
+    );
+  }
+
+  if (!formFlag(form, "confirm_delete") && !formFlag(form, "confirmDelete")) {
+    return profileDeleteErrorResponse(
+      request,
+      env,
+      principal,
+      "Confirmation check box not ticked",
+      csrf
+    );
+  }
+
+  if (getRuntimeConfig(env).profileConfirm) {
+    const authenticated = await authenticateUser(env.DB, principal.username, oldPassword);
+    if (!authenticated || authenticated.id !== principal.id) {
+      return profileDeleteErrorResponse(
+        request,
+        env,
+        principal,
+        "Sorry, the password was wrong",
+        csrf
+      );
+    }
+  }
+
+  await deleteProfileUserRows(env, principal.id);
+
+  logAuthEvent(request, "profile_delete", {
+    userId: principal.id,
+    username: principal.username
+  });
+
+  const cookieName = getRuntimeConfig(env).sessionCookieName;
+  const headers = {
+    "set-cookie": clearSessionCookieHeader(cookieName, request)
+  };
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, deleted: true }, { headers });
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Account deleted",
+      `<h1>Account deleted</h1>
+      <p class="success">Your user account has been deleted from this wiki.</p>
+      <p><a href="${pagePath(startPageId(env))}">Continue</a></p>`
+    ),
+    { headers }
+  );
+}
+
+function renderProfileDeleteForm(csrfToken: string, profileConfirm: boolean): string {
+  const confirmPasswordHtml = profileConfirm
+    ? `<label for="profiledelete__oldpass">Confirm current password</label>
+        <input id="profiledelete__oldpass" name="oldpass" class="edit" type="password" autocomplete="current-password" required>`
+    : "";
+
+  return `<form id="dw__profiledelete" method="post" action="/api/auth/profile/delete">
+    ${csrfInput(csrfToken)}
+    <input type="hidden" name="delete" value="1">
+    <fieldset>
+      <legend>Delete Account</legend>
+      <label for="dw__confirmdelete">
+        <input id="dw__confirmdelete" name="confirm_delete" type="checkbox" value="1" required>
+        I wish to remove my account from this wiki. <br> This action can not be undone.
+      </label>
+      ${confirmPasswordHtml}
+      <button type="submit">Remove My Account</button>
+    </fieldset>
+  </form>`;
+}
+
+function profileDeleteErrorResponse(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal & { type: "user" },
+  error: string,
+  csrf: CsrfContext,
+  status = 400
+): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error }, { status });
+  }
+
+  return htmlResponseWithCsrf(
+    request,
+    renderProfilePage(request, env, new URL(request.url), principal, csrf.token, {
+      type: "error",
+      text: error
+    }) as string,
+    csrf,
+    { status }
+  );
+}
+
+function formFlag(form: FormData, name: string): boolean {
+  const value = form.get(name);
+  if (value === null) return false;
+  const normalized = String(value).toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+async function deleteProfileUserRows(env: Env, userId: string): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare(
+      `delete from email_digest_deliveries
+       where subscription_id in (select id from subscriptions where user_id = ?)`
+    ).bind(userId),
+    env.DB.prepare("delete from subscriptions where user_id = ?").bind(userId),
+    env.DB.prepare("delete from password_reset_tokens where user_id = ?").bind(userId),
+    env.DB.prepare("delete from drafts where user_id = ?").bind(userId),
+    env.DB.prepare("delete from user_groups where user_id = ?").bind(userId),
+    env.DB.prepare("delete from sessions where user_id = ?").bind(userId),
+    env.DB.prepare("delete from users where id = ?").bind(userId)
+  ]);
 }
 
 async function deleteOtherLoginSessions(request: Request, env: Env, userId: string): Promise<void> {

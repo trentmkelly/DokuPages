@@ -10,6 +10,7 @@ export interface Env {
   SUPERUSER?: string;
   MANAGER?: string;
   AUTOPASSWD?: string;
+  PROFILECONFIRM?: string;
   HIDE_PAGES?: string;
   SNEAKY_INDEX?: string;
   MAINTENANCE_MODE?: string;

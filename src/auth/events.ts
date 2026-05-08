@@ -3,7 +3,8 @@ export type AuthEventName =
   | "login_failure"
   | "login_rate_limited"
   | "logout"
-  | "profile_update";
+  | "profile_update"
+  | "profile_delete";
 
 export interface AuthEventRecord {
   level: "info";
