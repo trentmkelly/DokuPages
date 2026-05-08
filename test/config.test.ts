@@ -38,6 +38,7 @@ describe("runtime config", () => {
       typographyMode: 1,
       autoPluralLinks: false,
       relNofollow: true,
+      refcheck: true,
       pageIdCleanOptions: {
         deaccent: 1,
         fnencode: "url",
@@ -86,6 +87,7 @@ describe("runtime config", () => {
       TYPOGRAPHY: "2",
       AUTOPLURAL: "1",
       REL_NOFOLLOW: "0",
+      REFCHECK: "0",
       DEACCENT: "2",
       FNENCODE: "safe",
       SEPCHAR: "-",
@@ -122,6 +124,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
     expect(getRuntimeConfig(env).autoPluralLinks).toBe(true);
     expect(getRuntimeConfig(env).relNofollow).toBe(false);
+    expect(getRuntimeConfig(env).refcheck).toBe(false);
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
       deaccent: 2,
       fnencode: "safe",
@@ -240,6 +243,10 @@ describe("runtime config", () => {
         }),
         expect.objectContaining({
           key: "REL_NOFOLLOW",
+          effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "REFCHECK",
           effectiveValue: "true"
         }),
         expect.objectContaining({

@@ -42,6 +42,7 @@ export interface RuntimeConfig {
   typographyMode: number;
   autoPluralLinks: boolean;
   relNofollow: boolean;
+  refcheck: boolean;
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
@@ -126,6 +127,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
     autoPluralLinks: truthy(env.AUTOPLURAL),
     relNofollow: booleanConfig(env.REL_NOFOLLOW, true),
+    refcheck: booleanConfig(env.REFCHECK, true),
     pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
@@ -216,6 +218,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),
     configEntry("AUTOPLURAL", env.AUTOPLURAL, String(config.autoPluralLinks), "false"),
     configEntry("REL_NOFOLLOW", env.REL_NOFOLLOW, String(config.relNofollow), "true"),
+    configEntry("REFCHECK", env.REFCHECK, String(config.refcheck), "true"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
     configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
     configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),

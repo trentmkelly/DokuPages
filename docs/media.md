@@ -51,6 +51,12 @@ The upload script writes `.wrangler/dokuwiki-media-upload-state.json` after each
 
 `POST /api/media/delete` expects `id` and optional `summary`. Deletion marks the current `media` row deleted, creates a `delete` media revision, appends a media changelog row, and records deletion metadata. R2 objects are kept so immutable old revisions remain fetchable.
 
+DokuWiki-style `refcheck` is enabled by default through `REFCHECK=1`. Before a
+delete is written, the service reads page relation metadata and blocks deletion
+with `409 Conflict` when a non-deleted page still references the media ID. Set
+`REFCHECK=0` only when intentionally allowing deletion of media that is still
+mentioned by existing pages.
+
 ## Revert Semantics
 
 `POST /api/media/revert` expects `id`, `revisionId`, and optional `summary`. Revert points the current media row back at the selected immutable R2 object, creates a new `revert` media revision, appends a media changelog row, and records the source revision ID in metadata. Delete revisions cannot be restored directly.

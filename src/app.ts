@@ -79,7 +79,8 @@ import {
   saveMediaUpload,
   searchMedia,
   type CurrentMedia,
-  type MediaRevision
+  type MediaRevision,
+  type MediaUsageReference
 } from "./wiki/media-service";
 import { validateMediaUpload } from "./wiki/media-validation";
 import {
@@ -1721,12 +1722,16 @@ async function handleNativeApiMediaDelete(
   const result = await deleteMedia(env.DB, {
     id,
     summary: String(body.value.summary ?? ""),
+    refcheck: getRuntimeConfig(env).refcheck,
     authorId: author.authorId,
     authorName: author.authorName,
     ip: getClientIp(request)
   });
 
   if (!result.ok) {
+    if (result.reason === "in_use") {
+      return jsonResponse(mediaInUsePayload(id, result.references), { status: 409 });
+    }
     return jsonResponse({ error: `Media '${id}' was not found.` }, { status: 404 });
   }
 
@@ -8494,12 +8499,21 @@ async function handleMediaDelete(
   const result = await deleteMedia(env.DB, {
     id,
     summary: String(form.get("summary") ?? ""),
+    refcheck: getRuntimeConfig(env).refcheck,
     authorId: author.authorId,
     authorName: author.authorName,
     ip: getClientIp(request)
   });
 
   if (!result.ok) {
+    if (result.reason === "in_use") {
+      if (acceptsJson(request)) {
+        return jsonResponse(mediaInUsePayload(id, result.references), { status: 409 });
+      }
+      return htmlResponse(renderMediaInUsePage(env, id, result.references, principal), {
+        status: 409
+      });
+    }
     const message = `Media '${id}' was not found.`;
     if (acceptsJson(request)) {
       return jsonResponse({ error: message }, { status: 404 });
@@ -8523,6 +8537,59 @@ async function handleMediaDelete(
   }
 
   return redirectResponse(`/media-manager?ns=${encodeURIComponent(mediaNamespace(id))}`);
+}
+
+function mediaInUsePayload(
+  id: string,
+  references: MediaUsageReference[]
+): {
+  error: string;
+  id: string;
+  references: Array<{ id: string; title: string | null; updatedAt: string }>;
+} {
+  return {
+    error: "Media file is still referenced.",
+    id,
+    references: references.map(mediaUsageReferencePayload)
+  };
+}
+
+function mediaUsageReferencePayload(reference: MediaUsageReference): {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+} {
+  return {
+    id: reference.id,
+    title: reference.title,
+    updatedAt: reference.updatedAt
+  };
+}
+
+function renderMediaInUsePage(
+  env: Env,
+  id: string,
+  references: MediaUsageReference[],
+  principal: AuthPrincipal
+): string {
+  const items = references
+    .map(
+      (reference) => `<li>
+        <a href="${pagePath(reference.id)}">${escapeHtml(reference.title ?? reference.id)}</a>
+        <small>${escapeHtml(reference.id)} - ${escapeHtml(reference.updatedAt)}</small>
+      </li>`
+    )
+    .join("");
+
+  return htmlShell(
+    env,
+    "Media file is still referenced",
+    `<h1>Media file is still referenced</h1>
+    <p>The file <code>${escapeHtml(id)}</code> cannot be deleted because it is still used by these pages:</p>
+    <ul>${items}</ul>
+    <p><a href="${mediaDetailPath(id)}">Back to media details</a></p>`,
+    { principal }
+  );
 }
 
 async function handleMediaRevert(

@@ -30,6 +30,7 @@ export interface Env {
   TYPOGRAPHY?: string;
   AUTOPLURAL?: string;
   REL_NOFOLLOW?: string;
+  REFCHECK?: string;
   DEACCENT?: string;
   FNENCODE?: string;
   SEPCHAR?: string;

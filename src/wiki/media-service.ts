@@ -30,6 +30,12 @@ export interface MediaListOptions {
   order?: "asc" | "desc";
 }
 
+export interface MediaUsageReference {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+}
+
 export interface SaveMediaUploadInput {
   id: string;
   body: ArrayBuffer;
@@ -57,6 +63,7 @@ export type SaveMediaUploadResult =
 export interface DeleteMediaInput {
   id: string;
   summary: string;
+  refcheck?: boolean;
   authorId?: string | null;
   authorName?: string | null;
   ip?: string | null;
@@ -71,6 +78,11 @@ export type DeleteMediaResult =
   | {
       ok: false;
       reason: "not_found";
+    }
+  | {
+      ok: false;
+      reason: "in_use";
+      references: MediaUsageReference[];
     };
 
 export interface RevertMediaInput {
@@ -125,6 +137,15 @@ interface MediaRevisionRow {
   summary: string;
   created_at: string;
 }
+
+interface MediaUsageReferenceRow {
+  subject_id: string;
+  value_json: string;
+  title: string | null;
+  updated_at: string;
+}
+
+const MAX_MEDIA_USAGE_REFERENCES = 500;
 
 export function cleanMediaId(rawId: string): string {
   return cleanPageId(rawId);
@@ -240,6 +261,39 @@ export async function listMediaRevisions(
         .all<MediaRevisionRow>();
 
   return result.results.map(mapMediaRevision);
+}
+
+export async function listMediaUsageReferences(
+  db: D1Database,
+  mediaId: string,
+  limit = MAX_MEDIA_USAGE_REFERENCES
+): Promise<MediaUsageReference[]> {
+  const id = cleanMediaId(mediaId);
+  if (!id) return [];
+
+  const result = await db
+    .prepare(
+      `select m.subject_id, m.value_json, p.title, p.updated_at
+       from metadata m
+       join pages p on p.id = m.subject_id
+       where m.subject_type = 'page'
+         and m.key = 'relation'
+         and p.is_deleted = 0
+       order by m.subject_id
+       limit ?`
+    )
+    .bind(MAX_MEDIA_USAGE_REFERENCES)
+    .all<MediaUsageReferenceRow>();
+  const safeLimit = Math.max(1, Math.min(limit, MAX_MEDIA_USAGE_REFERENCES));
+
+  return result.results
+    .filter((row) => relationMediaUses(row.value_json, id))
+    .slice(0, safeLimit)
+    .map((row) => ({
+      id: row.subject_id,
+      title: row.title,
+      updatedAt: row.updated_at
+    }));
 }
 
 export async function listNamespaceMedia(
@@ -445,6 +499,13 @@ export async function deleteMedia(
 
   if (!current) {
     return { ok: false, reason: "not_found" };
+  }
+
+  if (input.refcheck) {
+    const references = await listMediaUsageReferences(db, id);
+    if (references.length > 0) {
+      return { ok: false, reason: "in_use", references };
+    }
   }
 
   const now = (input.now ?? new Date()).toISOString();
@@ -682,6 +743,37 @@ function mapMediaRevision(row: MediaRevisionRow): MediaRevision {
     summary: row.summary,
     createdAt: row.created_at
   };
+}
+
+function relationMediaUses(valueJson: string, mediaId: string): boolean {
+  const media = relationMedia(valueJson);
+  return Object.keys(media).some((candidate) => cleanMediaId(candidate) === mediaId);
+}
+
+function relationMedia(valueJson: string): Record<string, unknown> {
+  const parsed = parseJsonObject(valueJson);
+  const directRelation = objectValue(parsed.relation);
+  const currentRelation = objectValue(objectValue(parsed.current).relation);
+  const relation = Object.keys(directRelation).length > 0 ? directRelation : currentRelation;
+  const source = Object.keys(relation).length > 0 ? relation : parsed;
+  return objectValue(source.media);
+}
+
+function parseJsonObject(valueJson: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(valueJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function mediaRevisionObjectKey(id: string, revisionId: string): string {

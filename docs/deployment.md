@@ -65,6 +65,8 @@ Optional Pages environment variables:
 - `DOKUWIKI_COOKIE_SALT`: Pages secret containing the upstream
   `auth_cookiesalt()` value, usually `data/meta/_htcookiesalt` from a migrated
   DokuWiki install. It signs DokuWiki-compatible media resize tokens.
+- `REFCHECK`: set to `0` to disable DokuWiki-style media delete reference
+  checks. Default: enabled.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.

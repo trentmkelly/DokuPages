@@ -94,6 +94,7 @@ describe("handleRequest", () => {
     env.TYPOGRAPHY = undefined;
     env.AUTOPLURAL = undefined;
     env.REL_NOFOLLOW = undefined;
+    env.REFCHECK = undefined;
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
@@ -1399,6 +1400,88 @@ describe("handleRequest", () => {
     await expect(oldRevision.text()).resolves.toBe("<svg>old</svg>");
     expect(purgedKeys).toContain("page:wiki:welcome");
     expect(state.cacheDependencies).toEqual([]);
+  });
+
+  it("blocks media deletes when refcheck finds relation metadata", async () => {
+    state.metadata.push({
+      subject_type: "page",
+      subject_id: "wiki:welcome",
+      key: "relation",
+      value_json: JSON.stringify({
+        references: {},
+        media: {
+          "wiki:logo.svg": true
+        },
+        firstimage: "wiki:logo.svg"
+      }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
+    const initialRevisionCount = state.mediaRevisions.length;
+    const form = new FormData();
+    form.set("id", "wiki:logo.svg");
+    form.set("summary", "Remove logo");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/delete", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Media file is still referenced.",
+      id: "wiki:logo.svg",
+      references: [
+        {
+          id: "wiki:welcome",
+          title: "Welcome",
+          updatedAt: "2026-05-07T00:00:00.000Z"
+        }
+      ]
+    });
+    expect(state.media.find((media) => media.id === "wiki:logo.svg")).toMatchObject({
+      is_deleted: 0
+    });
+    expect(state.mediaRevisions).toHaveLength(initialRevisionCount);
+  });
+
+  it("allows media deletes when refcheck is disabled", async () => {
+    env.REFCHECK = "0";
+    state.metadata.push({
+      subject_type: "page",
+      subject_id: "wiki:welcome",
+      key: "relation",
+      value_json: JSON.stringify({
+        media: {
+          "wiki:logo.svg": true
+        }
+      }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
+    const form = new FormData();
+    form.set("id", "wiki:logo.svg");
+    form.set("summary", "Remove stale logo");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/delete", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      id: "wiki:logo.svg"
+    });
+    expect(state.media.find((media) => media.id === "wiki:logo.svg")).toMatchObject({
+      is_deleted: 1
+    });
   });
 
   it("prevents media upload and delete ACL bypasses", async () => {
@@ -3097,6 +3180,33 @@ function createD1Stub(state: D1StubState): D1Database {
               results: sql.includes("where scope = ?")
                 ? state.aclRules.filter((rule) => rule.scope === idOrLimit)
                 : [...state.aclRules]
+            };
+          }
+
+          if (sql.includes("from metadata m") && sql.includes("join pages p")) {
+            const pageRows = currentPageSourceRows(state);
+            const pageById = new Map(pageRows.map((page) => [String(page.id), page]));
+
+            return {
+              results: state.metadata
+                .filter((record) => record.subject_type === "page" && record.key === "relation")
+                .flatMap((record) => {
+                  const page = pageById.get(String(record.subject_id));
+                  if (!page) return [];
+
+                  return [
+                    {
+                      subject_id: record.subject_id,
+                      value_json: record.value_json,
+                      title: page.title ?? null,
+                      updated_at: page.updated_at
+                    }
+                  ];
+                })
+                .sort((left, right) =>
+                  String(left.subject_id).localeCompare(String(right.subject_id))
+                )
+                .slice(0, Number.isFinite(limit) ? limit : 500)
             };
           }
 
