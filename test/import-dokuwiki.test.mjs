@@ -98,6 +98,8 @@ describe("DokuWiki import planner", () => {
     );
     await writeFile(path.join(root, "conf/mime.conf"), "jpg image/jpeg\nzip !application/zip\n");
     await writeFile(path.join(root, "conf/mime.local.conf"), "zip application/x-custom-zip\n");
+    await writeFile(path.join(root, "conf/scheme.conf"), "http\nhttps\nftp\n");
+    await writeFile(path.join(root, "conf/scheme.local.conf"), "!ftp\nirc\n");
     await writeFile(path.join(root, "conf/entities.conf"), "-> →\n(c) ©\n");
     await writeFile(path.join(root, "conf/entities.local.conf"), "(c) COPY\n?? ‽\n");
     await writeFile(path.join(root, "conf/smileys.conf"), ":-) smile.svg\nLOL lol.svg\n");
@@ -137,6 +139,7 @@ describe("DokuWiki import planner", () => {
       pluginSettings: 3,
       interwikiTemplates: 2,
       mimeTypes: 2,
+      schemeProtocols: 3,
       entityReplacements: 3,
       smileyMappings: 2,
       acronymMappings: 2,
@@ -323,6 +326,11 @@ describe("DokuWiki import planner", () => {
       mimeType: "application/x-custom-zip",
       forceDownload: false
     });
+    expect(plan.schemeProtocols).toEqual([
+      { protocol: "http", source: "scheme.conf" },
+      { protocol: "https", source: "scheme.conf" },
+      { protocol: "irc", source: "scheme.local.conf" }
+    ]);
     expect(plan.entityReplacements).toEqual([
       { token: "->", replacement: "→", order: 0, source: "entities.conf" },
       { token: "(c)", replacement: "COPY", order: 1, source: "entities.local.conf" },
@@ -488,6 +496,7 @@ describe("DokuWiki import planner", () => {
       "docs https://docs.example/{URL}\n"
     );
     await writeFile(path.join(root, "conf/mime.local.conf"), "foo text/x-foo\n");
+    await writeFile(path.join(root, "conf/scheme.local.conf"), "irc\n");
     await writeFile(path.join(root, "conf/entities.local.conf"), "?? ‽\n");
     await writeFile(path.join(root, "conf/smileys.local.conf"), ":-) custom.svg\n");
     await writeFile(path.join(root, "conf/acronyms.local.conf"), "API Custom API\n");
@@ -522,6 +531,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'docs'");
     expect(sql).toContain("'mime'");
     expect(sql).toContain("'foo'");
+    expect(sql).toContain("'scheme'");
+    expect(sql).toContain('"protocol":"irc"');
     expect(sql).toContain("'entities'");
     expect(sql).toContain("'??'");
     expect(sql).toContain("'smileys'");

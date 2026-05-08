@@ -257,9 +257,17 @@ describe("handleRequest", () => {
       value_json: JSON.stringify({ shortcut: "docs", template: "https://docs.example/{URL}" }),
       updated_at: "2026-05-07T00:00:00.000Z"
     });
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "scheme",
+      key: "foo",
+      value_json: JSON.stringify({ protocol: "foo" }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
     state.row = {
       ...currentPageRow(),
-      content: "====== Welcome ======\n\n'quoted' don't and 640x480?? :-) API [[docs>Guide|Docs]]"
+      content:
+        "====== Welcome ======\n\n'quoted' don't and 640x480?? :-) API [[docs>Guide|Docs]] [[foo://service/path|Foo]]"
     };
 
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
@@ -271,6 +279,9 @@ describe("handleRequest", () => {
     expect(html).toContain('<abbr title="Custom API">API</abbr>');
     expect(html).toContain(
       '<a href="https://docs.example/Guide" class="interwiki iw_docs" rel="nofollow noopener noreferrer">Docs</a>'
+    );
+    expect(html).toContain(
+      '<a href="foo://service/path" class="urlextern" rel="nofollow noopener noreferrer">Foo</a>'
     );
     expect(cachePuts).not.toContain("page:wiki:welcome");
   });
@@ -1305,7 +1316,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 24,
+        rendererVersion: 25,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1327,7 +1338,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 24,
+        rendererVersion: 25,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",

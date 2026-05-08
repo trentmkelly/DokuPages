@@ -37,6 +37,7 @@ export interface RenderWikiTextOptions {
   smileys?: Readonly<Record<string, string>>;
   acronyms?: Readonly<Record<string, string>>;
   interwikiTemplates?: InterwikiTemplates;
+  linkSchemes?: ReadonlyArray<string> | ReadonlySet<string>;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -157,6 +158,17 @@ const DEFAULT_ACRONYMS: Record<string, string> = {
   YMMV: "Your mileage may vary"
 };
 const ACRONYM_BOUNDARY = "[\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7f]";
+const DEFAULT_LINK_SCHEMES = new Set([
+  "http",
+  "https",
+  "telnet",
+  "gopher",
+  "wais",
+  "ftp",
+  "ed2k",
+  "irc",
+  "ldap"
+]);
 const IMAGE_MEDIA_EXTENSIONS = new Set(["gif", "jpg", "jpeg", "png", "svg", "webp", "avif"]);
 type ListType = "ul" | "ol";
 
@@ -176,6 +188,7 @@ export function renderWikiText(
     smileys: options.smileys ?? DEFAULT_SMILEYS,
     acronyms: options.acronyms ?? DEFAULT_ACRONYMS,
     interwikiTemplates: options.interwikiTemplates,
+    linkSchemes: normalizeLinkSchemes(options.linkSchemes),
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -411,6 +424,7 @@ interface RenderContext {
   smileys: Readonly<Record<string, string>>;
   acronyms: Readonly<Record<string, string>>;
   interwikiTemplates?: InterwikiTemplates;
+  linkSchemes: ReadonlySet<string>;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -735,6 +749,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             smileys: context.smileys,
             acronyms: context.acronyms,
             interwikiTemplates: context.interwikiTemplates,
+            linkSchemes: context.linkSchemes,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -780,7 +795,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = escapeHtml(rendered);
   rendered = renderMedia(rendered, context, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
-  rendered = renderExternalAutolinks(rendered, protectHtml);
+  rendered = renderExternalAutolinks(rendered, context.linkSchemes, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = renderTypography(rendered, context.entityReplacements, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
@@ -1014,7 +1029,7 @@ function renderLinks(
       return protectHtml(renderEmailLink(target, explicitLabel ? label : undefined));
     }
 
-    const external = /^https?:\/\//i.test(target);
+    const external = isExternalLinkTarget(target, context.linkSchemes);
     const interwiki = external ? null : resolveInterwikiLink(target, context.interwikiTemplates);
     const windowsShare = external || interwiki ? null : windowsSharePath(target);
     const internal = !external && !interwiki && !windowsShare;
@@ -1079,6 +1094,11 @@ function interwikiShortcut(target: string): string | null {
     .replace(/[^a-z0-9_-]+/g, "_");
 }
 
+function isExternalLinkTarget(target: string, linkSchemes: ReadonlySet<string>): boolean {
+  const match = target.match(/^([a-z][a-z0-9+.-]*):\/\//i);
+  return Boolean(match && linkSchemes.has(match[1].toLowerCase()));
+}
+
 function renderEmailAutolinks(source: string, protectHtml: (html: string) => string): string {
   return source.replace(
     /&lt;([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})&gt;/gi,
@@ -1111,23 +1131,57 @@ function renderCamelCaseLinks(
   });
 }
 
-function renderExternalAutolinks(source: string, protectHtml: (html: string) => string): string {
-  return source.replace(
-    /\b((?:https?|ftp):\/\/[A-Z0-9/#~:.?+=&%@!_()[\],;-]+|(?:www|ftp)\.[A-Z0-9.?\-;,#~=+&%@!_()[\]/]+)(?=\s|$|[<])/gi,
-    (match) => {
-      const { linkText, suffix } = splitTrailingLinkPunctuation(match);
-      const decoded = decodeHtmlEntities(linkText);
-      const href = decoded.startsWith("www.")
-        ? `http://${decoded}`
-        : decoded.startsWith("ftp.")
-          ? `ftp://${decoded}`
-          : decoded;
+function renderExternalAutolinks(
+  source: string,
+  linkSchemes: ReadonlySet<string>,
+  protectHtml: (html: string) => string
+): string {
+  const pattern = externalAutolinkPattern(linkSchemes);
 
-      return `${protectHtml(
-        `<a href="${escapeAttribute(href)}" class="urlextern" rel="nofollow noopener noreferrer">${escapeHtml(decoded)}</a>`
-      )}${suffix}`;
-    }
-  );
+  return source.replace(pattern, (match) => {
+    const { linkText, suffix } = splitTrailingLinkPunctuation(match);
+    const decoded = decodeHtmlEntities(linkText);
+    const href = decoded.startsWith("www.")
+      ? `http://${decoded}`
+      : decoded.startsWith("ftp.")
+        ? `ftp://${decoded}`
+        : decoded;
+
+    return `${protectHtml(
+      `<a href="${escapeAttribute(href)}" class="urlextern" rel="nofollow noopener noreferrer">${escapeHtml(decoded)}</a>`
+    )}${suffix}`;
+  });
+}
+
+function externalAutolinkPattern(linkSchemes: ReadonlySet<string>): RegExp {
+  const any = "[A-Z0-9/#~:.?+=&%@!_()[\\],;-]";
+  const host = "[A-Z0-9.?\\-;,#~=+&%@!_()[\\]/]";
+  const patterns = [`(?:www|ftp)\\.${host}+`];
+  const schemes = [...linkSchemes].filter(isSafeUrlScheme);
+
+  if (schemes.length > 0) {
+    patterns.unshift(
+      `(?:${schemes
+        .sort((a, b) => b.length - a.length)
+        .map(escapeRegExp)
+        .join("|")}):\\/\\/${any}+`
+    );
+  }
+
+  return new RegExp(`\\b(${patterns.join("|")})(?=\\s|$|[<])`, "gi");
+}
+
+function normalizeLinkSchemes(
+  linkSchemes: ReadonlyArray<string> | ReadonlySet<string> | undefined
+): ReadonlySet<string> {
+  if (!linkSchemes) return DEFAULT_LINK_SCHEMES;
+
+  const values = Array.isArray(linkSchemes) ? linkSchemes : [...linkSchemes];
+  return new Set(values.map((scheme) => scheme.toLowerCase()).filter(isSafeUrlScheme));
+}
+
+function isSafeUrlScheme(scheme: string): boolean {
+  return /^[a-z][a-z0-9+.-]*$/.test(scheme);
 }
 
 function splitTrailingLinkPunctuation(value: string): { linkText: string; suffix: string } {

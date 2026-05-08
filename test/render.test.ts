@@ -160,9 +160,12 @@ describe("renderWikiText", () => {
 
   it("renders internal links, external links, and media embeds", () => {
     const rendered = renderWikiText(
-      "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] {{wiki:dokuwiki.svg|Logo}}",
+      "[[wiki:syntax|Syntax]] [[https://example.test|Example]] [[http://www.google.com|Google]] [[irc://irc.example/channel|IRC]] {{wiki:dokuwiki.svg|Logo}}",
       { pageId: "wiki:welcome" }
     );
+    const customScheme = renderWikiText("[[foo://service/path|Foo]] [[irc://irc.example|IRC]]", {
+      linkSchemes: ["foo"]
+    });
 
     expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">Syntax</a>');
     expect(rendered.html).toContain(
@@ -170,6 +173,15 @@ describe("renderWikiText", () => {
     );
     expect(rendered.html).toContain(
       '<a href="http://www.google.com" class="urlextern" rel="nofollow noopener noreferrer">Google</a>'
+    );
+    expect(rendered.html).toContain(
+      '<a href="irc://irc.example/channel" class="urlextern" rel="nofollow noopener noreferrer">IRC</a>'
+    );
+    expect(customScheme.html).toContain(
+      '<a href="foo://service/path" class="urlextern" rel="nofollow noopener noreferrer">Foo</a>'
+    );
+    expect(customScheme.html).toContain(
+      '<a href="/wiki/irc/irc.example" class="wikilink1">IRC</a>'
     );
     expect(rendered.html).not.toContain("http:<em>");
     expect(rendered.html).toContain(
@@ -198,7 +210,12 @@ describe("renderWikiText", () => {
   });
 
   it("renders automatic external links", () => {
-    const rendered = renderWikiText("Visit http://www.google.com or www.example.org.");
+    const rendered = renderWikiText(
+      "Visit http://www.google.com or www.example.org. Join irc://irc.example/channel."
+    );
+    const custom = renderWikiText("Visit foo://service/path and http://example.test", {
+      linkSchemes: ["foo"]
+    });
 
     expect(rendered.html).toContain(
       '<a href="http://www.google.com" class="urlextern" rel="nofollow noopener noreferrer">http://www.google.com</a>'
@@ -206,6 +223,14 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain(
       '<a href="http://www.example.org" class="urlextern" rel="nofollow noopener noreferrer">www.example.org</a>.'
     );
+    expect(rendered.html).toContain(
+      '<a href="irc://irc.example/channel" class="urlextern" rel="nofollow noopener noreferrer">irc://irc.example/channel</a>.'
+    );
+    expect(custom.html).toContain(
+      '<a href="foo://service/path" class="urlextern" rel="nofollow noopener noreferrer">foo://service/path</a>'
+    );
+    expect(custom.html).toContain("http://example.test");
+    expect(custom.html).not.toContain('href="http://example.test"');
   });
 
   it("renders namespace-relative internal links from page context", () => {

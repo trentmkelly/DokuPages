@@ -62,6 +62,10 @@ export async function buildImportPlan(sourceRoot) {
     path.join(confRoot, "mime.conf"),
     path.join(confRoot, "mime.local.conf")
   ]);
+  const schemeProtocols = await discoverSchemeProtocols([
+    path.join(confRoot, "scheme.conf"),
+    path.join(confRoot, "scheme.local.conf")
+  ]);
   const entityReplacements = await discoverEntityReplacements([
     path.join(confRoot, "entities.conf"),
     path.join(confRoot, "entities.local.conf")
@@ -97,6 +101,7 @@ export async function buildImportPlan(sourceRoot) {
       pluginSettings: pluginSettings.length,
       interwikiTemplates: interwikiTemplates.length,
       mimeTypes: mimeTypes.length,
+      schemeProtocols: schemeProtocols.length,
       entityReplacements: entityReplacements.length,
       smileyMappings: smileyMappings.length,
       acronymMappings: acronymMappings.length,
@@ -119,6 +124,7 @@ export async function buildImportPlan(sourceRoot) {
     pluginSettings,
     interwikiTemplates,
     mimeTypes,
+    schemeProtocols,
     entityReplacements,
     smileyMappings,
     acronymMappings,
@@ -336,6 +342,10 @@ on conflict(id) do update set
 
   for (const entry of plan.mimeTypes) {
     statements.push(metadataStatement("config", "mime", entry.extension, entry, plan.generatedAt));
+  }
+
+  for (const entry of plan.schemeProtocols) {
+    statements.push(metadataStatement("config", "scheme", entry.protocol, entry, plan.generatedAt));
   }
 
   for (const entry of plan.entityReplacements) {
@@ -1146,6 +1156,35 @@ export async function discoverMimeTypes(files) {
   }
 
   return [...entries.values()].sort((a, b) => a.extension.localeCompare(b.extension));
+}
+
+export async function discoverSchemeProtocols(files) {
+  const entries = new Map();
+
+  for (const file of files) {
+    const text = await readTextIfExists(file);
+    if (!text) continue;
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const remove = line.startsWith("!");
+      const protocol = (remove ? line.slice(1) : line).trim().toLowerCase();
+      if (!/^[a-z][a-z0-9+.-]*$/.test(protocol)) continue;
+
+      if (remove) {
+        entries.delete(protocol);
+      } else {
+        entries.set(protocol, {
+          protocol,
+          source: path.basename(file)
+        });
+      }
+    }
+  }
+
+  return [...entries.values()].sort((a, b) => a.protocol.localeCompare(b.protocol));
 }
 
 export async function discoverEntityReplacements(files) {

@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 24;
+const RENDER_CACHE_VERSION = 25;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1070,6 +1070,7 @@ async function handlePagePreview(
   const smileys = await smileysForRender(env);
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
+  const linkSchemes = await linkSchemesForRender(env);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
@@ -1083,6 +1084,7 @@ async function handlePagePreview(
     smileys,
     acronyms,
     interwikiTemplates,
+    linkSchemes,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2614,6 +2616,7 @@ async function renderPageHtml(
   const smileys = await smileysForRender(env);
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
+  const linkSchemes = await linkSchemesForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
@@ -2622,6 +2625,7 @@ async function renderPageHtml(
     smileys,
     acronyms,
     interwikiTemplates,
+    linkSchemes,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2683,6 +2687,7 @@ async function renderPageExport(
   const smileys = await smileysForRender(env);
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
+  const linkSchemes = await linkSchemesForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
@@ -2690,6 +2695,7 @@ async function renderPageExport(
     smileys,
     acronyms,
     interwikiTemplates,
+    linkSchemes,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2832,6 +2838,23 @@ async function interwikiTemplatesForRender(env: Env): Promise<Record<string, str
     : undefined;
 }
 
+async function linkSchemesForRender(env: Env): Promise<string[] | undefined> {
+  const result = await env.DB.prepare(
+    `select value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?`
+  )
+    .bind("config", "scheme")
+    .all<{ value_json: string }>();
+  const entries = result.results
+    .map((row) => parseSchemeMetadata(row.value_json))
+    .filter((entry): entry is { protocol: string } => Boolean(entry))
+    .map((entry) => entry.protocol);
+
+  return entries.length > 0 ? entries : undefined;
+}
+
 function parseEntityMetadata(
   value: string
 ): { token: string; replacement: string; order: number } | null {
@@ -2879,6 +2902,16 @@ function parseInterwikiMetadata(value: string): { shortcut: string; template: st
     const parsed = JSON.parse(value) as { shortcut?: unknown; template?: unknown };
     if (typeof parsed.shortcut !== "string" || typeof parsed.template !== "string") return null;
     return { shortcut: parsed.shortcut.toLowerCase(), template: parsed.template };
+  } catch {
+    return null;
+  }
+}
+
+function parseSchemeMetadata(value: string): { protocol: string } | null {
+  try {
+    const parsed = JSON.parse(value) as { protocol?: unknown };
+    if (typeof parsed.protocol !== "string") return null;
+    return { protocol: parsed.protocol.toLowerCase() };
   } catch {
     return null;
   }

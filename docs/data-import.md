@@ -8,7 +8,10 @@ The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media m
 npm run import:dry-run
 ```
 
-The dry run prints the import plan and counts discovered pages, page revisions, media, media revisions, metadata, custom language files, custom template files, ACL rules, users, config values, plugin settings, interwiki templates, MIME mappings, and wordblock patterns.
+The dry run prints the import plan and counts discovered pages, page revisions,
+media, media revisions, metadata, custom language files, custom template files,
+ACL rules, users, config values, plugin settings, interwiki templates, MIME
+mappings, scheme protocols, and wordblock patterns.
 
 ## D1 SQL
 

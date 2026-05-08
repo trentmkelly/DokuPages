@@ -69,7 +69,7 @@ are not fixed by this checklist.
 - [x] Load smileys from `conf/smileys.conf` and local overrides instead of only the checked-in default map.
 - [x] Load acronyms from `conf/acronyms.conf` and local overrides instead of only the checked-in default map.
 - [x] Load interwiki shortcuts from imported D1 metadata at render time instead of only using the built-in TypeScript map.
-- [ ] Match DokuWiki's `scheme.conf` protocol handling for external links and autolinks.
+- [x] Match DokuWiki's `scheme.conf` protocol handling for external links and autolinks.
 - [ ] Match DokuWiki's `relnofollow` behavior, including `ugc nofollow` distinctions for external user content.
 - [ ] Match DokuWiki's configurable link targets for wiki, interwiki, external, media, and Windows-share links.
 - [x] Match DokuWiki's section edit limits from `maxseclevel`.

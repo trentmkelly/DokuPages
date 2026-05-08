@@ -11,7 +11,10 @@ of full PHP DokuWiki runtime compatibility.
   groups, native registration, profile updates, password changes, and emailed
   password resets.
 - DokuWiki-style ACL matching for pages, namespaces, media reads, uploads, deletes, aggregate views, feeds, search, and admin routes.
-- Native renderer coverage for headings, paragraphs, inline formatting, links, interwiki links, media embeds, lists, tables, horizontal rules, code/file blocks, quotes, footnotes, typography replacements, smileys, acronyms, and mailguard-style email links.
+- Native renderer coverage for headings, paragraphs, inline formatting, links,
+  imported interwiki and external-link scheme rules, media embeds, lists,
+  tables, horizontal rules, code/file blocks, quotes, footnotes, typography
+  replacements, smileys, acronyms, and mailguard-style email links.
 - R2-backed current media and media revisions, including uploads, deletes, reverts, detail pages, and media manager browsing/search.
 - D1-backed page/media changelogs, metadata, search postings, rendered cache records, sessions, drafts, ACLs, users, plugin settings, import jobs, schema versions, and audit logs.
 - KV-backed rendered page cache with D1 dependency tracking, rate-limit counters, and discovery cache.
