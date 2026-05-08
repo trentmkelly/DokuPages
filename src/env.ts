@@ -13,6 +13,16 @@ export interface Env {
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;
+  EMAIL_PROVIDER?: string;
+  EMAIL_PROVIDER_ENDPOINT?: string;
+  EMAIL_FROM?: string;
+  EMAIL_REPLY_TO?: string;
+  EMAIL_RETURN_PATH?: string;
+  EMAIL_BASE_URL?: string;
+  EMAIL_REGISTRATION_NOTIFY?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_API_TOKEN?: string;
+  EMAIL_TASK_TOKEN?: string;
   CF_PAGES_BRANCH?: string;
   CF_PAGES_COMMIT_SHA?: string;
   CF_PAGES_URL?: string;

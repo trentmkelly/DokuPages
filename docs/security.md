@@ -61,3 +61,10 @@ review.
 The repository includes a tracked-file secret scanner at `scripts/secret-scan.mjs`.
 CI runs it on every push and pull request to catch high-signal private keys and
 service tokens before deployment.
+
+## Outbound Email
+
+Outbound email uses fixed sender configuration from environment variables. The
+runtime does not allow user input to become the sender, reply-to, or return-path
+address. Provider tokens are reported only as redacted secret status in the admin
+configuration export.

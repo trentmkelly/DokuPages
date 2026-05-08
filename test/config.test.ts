@@ -59,7 +59,11 @@ describe("runtime config", () => {
     const env = {
       SITE_NAME: "Private Wiki",
       API_CORS_ORIGINS: "https://client.example",
-      API_BEARER_TOKEN: "super-secret-token"
+      API_BEARER_TOKEN: "super-secret-token",
+      EMAIL_PROVIDER: "resend",
+      EMAIL_FROM: "Wiki <wiki@example.test>",
+      EMAIL_REGISTRATION_NOTIFY: "admin@example.test",
+      RESEND_API_KEY: "resend-secret-token"
     } as Env;
     const exported = createConfigExport(env, new Date("2026-05-07T00:00:00.000Z"));
 
@@ -79,17 +83,49 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "MAINTENANCE_MODE",
           effectiveValue: "false"
+        }),
+        expect.objectContaining({
+          key: "EMAIL_PROVIDER",
+          value: "resend",
+          effectiveValue: "resend"
+        }),
+        expect.objectContaining({
+          key: "EMAIL_FROM",
+          value: "Wiki <wiki@example.test>",
+          effectiveValue: "Wiki <wiki@example.test>"
         })
       ])
     );
-    expect(getSecretConfigStatus(env)).toEqual([
+    expect(getSecretConfigStatus(env)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "API_BEARER_TOKEN",
+          configured: true,
+          redactedValue: "[redacted]"
+        }),
+        expect.objectContaining({
+          key: "RESEND_API_KEY",
+          configured: true,
+          redactedValue: "[redacted]"
+        })
+      ])
+    );
+    expect(getSecretConfigStatus({} as Env)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "RESEND_API_KEY",
+          configured: false,
+          redactedValue: null
+        })
+      ])
+    );
+    expect(getSecretConfigStatus(env)).not.toEqual([
       expect.objectContaining({
-        key: "API_BEARER_TOKEN",
-        configured: true,
-        redactedValue: "[redacted]"
+        redactedValue: "resend-secret-token"
       })
     ]);
     expect(JSON.stringify(exported)).not.toContain("super-secret-token");
+    expect(JSON.stringify(exported)).not.toContain("resend-secret-token");
     expect(exported).toMatchObject({
       exportedAt: "2026-05-07T00:00:00.000Z",
       runtime: {
@@ -118,6 +154,31 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "SESSION_COOKIE_NAME", severity: "error" }),
         expect.objectContaining({ key: "HIDE_PAGES", severity: "error" }),
         expect.objectContaining({ key: "API_BEARER_TOKEN", severity: "warning" })
+      ])
+    );
+  });
+
+  it("validates email provider configuration", () => {
+    const validation = validateRuntimeConfig({
+      EMAIL_PROVIDER: "smtp",
+      EMAIL_FROM: "bad sender",
+      EMAIL_REPLY_TO: "Team <team@example.test>",
+      EMAIL_RETURN_PATH: "bounces@example.test",
+      EMAIL_REGISTRATION_NOTIFY: "admin@example.test, broken"
+    } as Env);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "EMAIL_PROVIDER", severity: "error" }),
+        expect.objectContaining({ key: "EMAIL_FROM", severity: "error" }),
+        expect.objectContaining({ key: "EMAIL_REGISTRATION_NOTIFY", severity: "error" })
+      ])
+    );
+    expect(validation.issues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "EMAIL_REPLY_TO", severity: "error" }),
+        expect.objectContaining({ key: "EMAIL_RETURN_PATH", severity: "error" })
       ])
     );
   });

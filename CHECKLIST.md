@@ -524,16 +524,16 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Email And Notifications
 
 - [x] Decide whether email features are in scope.
-- [ ] Choose an email provider compatible with Workers.
-- [ ] Implement mail sending adapter.
+- [x] Choose an email provider compatible with Workers.
+- [x] Implement mail sending adapter.
 - [ ] Implement registration notifications.
 - [ ] Implement password reset emails.
 - [ ] Implement page change notifications.
 - [ ] Implement subscriptions.
 - [ ] Implement digest scheduling.
-- [ ] Implement bounce-safe sender configuration.
-- [ ] Add email template tests.
-- [ ] Add email delivery failure handling.
+- [x] Implement bounce-safe sender configuration.
+- [x] Add email template tests.
+- [x] Add email delivery failure handling.
 
 ## Anti-Abuse And Security
 

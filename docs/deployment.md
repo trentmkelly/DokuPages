@@ -28,14 +28,23 @@ Optional Pages environment variables:
 - `APP_VERSION`: display/build version override. Defaults to the package version.
 - `API_CORS_ORIGINS`: comma-separated exact origins allowed to call the native
   `/api/v1` JSON API cross-origin. Default: no cross-origin API access.
+- `EMAIL_PROVIDER`: set to `resend` to enable outbound mail.
+- `EMAIL_PROVIDER_ENDPOINT`: optional Resend-compatible endpoint override.
+- `EMAIL_FROM`: fixed sender address for outbound mail.
+- `EMAIL_REPLY_TO`: optional fixed reply-to address.
+- `EMAIL_RETURN_PATH`: optional fixed return-path header value.
+- `EMAIL_BASE_URL`: optional public base URL for email links.
+- `EMAIL_REGISTRATION_NOTIFY`: optional comma-separated registration notification recipients.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.
 
 Set `API_BEARER_TOKEN` as a Pages secret when remote API automation should be
-enabled. Wrangler authentication and API bearer tokens stay outside the
-repository and should never be checked in. `npm run scan:secrets` guards tracked
-files for high-signal tokens.
+enabled. Set `RESEND_API_KEY` or `EMAIL_API_TOKEN` as a Pages secret when
+outbound email should be enabled. Set `EMAIL_TASK_TOKEN` when scheduled digest
+execution is enabled. Wrangler authentication, API bearer tokens, and provider
+tokens stay outside the repository and should never be checked in. `npm run
+scan:secrets` guards tracked files for high-signal tokens.
 
 Admins can inspect the effective runtime configuration at `/admin/config` and
 download a JSON configuration backup from `/api/admin/config/export`. Secret

@@ -17,6 +17,8 @@ of full PHP DokuWiki runtime compatibility.
 - Durable Object-backed page edit locks.
 - Native admin dashboard, ACL manager, configuration manager, user manager,
   audit log view, diagnostics, cache purge, and search index rebuild action.
+- Resend-compatible outbound email adapter with fixed sender configuration,
+  escaped native templates, and D1 delivery logging.
 - Read-only maintenance mode controlled by `MAINTENANCE_MODE`.
 - Native `/api/v1` JSON API with bearer-token write auth, configurable CORS,
   page/media/search/user read methods, and page/media write methods.
@@ -30,7 +32,9 @@ of full PHP DokuWiki runtime compatibility.
 - Production extension-manager installs and plugin code uploads.
 - LDAP, Active Directory, and PDO auth backends at runtime.
 - XML-RPC, JSON-RPC, and OpenAPI method compatibility.
-- Email delivery, subscriptions, digests, password reset emails, and registration notifications.
+- User-facing email flows: subscriptions, digests, password reset emails, and
+  registration/page-change notification dispatch are still being wired to
+  routes and scheduled tasks.
 - Server-side ImageMagick/GD thumbnail generation. The current media strategy serves originals and documents derivative policy headers.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
 - Thumbnail cache and stale fallback.

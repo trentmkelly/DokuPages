@@ -41,7 +41,7 @@ Namespaces are stored as colon-separated IDs in page and media records. They can
 
 ## ACL And Auth
 
-`acl_rules`, `users`, `groups`, and `user_groups` replace `acl.auth.php` and `users.auth.php`. Sessions are represented by `sessions` with hashed tokens and expiration timestamps.
+`acl_rules`, `users`, `groups`, and `user_groups` replace `acl.auth.php` and `users.auth.php`. Sessions are represented by `sessions` with hashed tokens and expiration timestamps. `email_deliveries` records outbound email attempts, provider message IDs, skipped sends, and failure text for notification troubleshooting.
 
 ## Drafts And Locks
 

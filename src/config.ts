@@ -12,6 +12,7 @@ const DEFAULT_SITE_NAME = "DokuWiki Pages";
 const DEFAULT_START_PAGE = "wiki:welcome";
 const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
 const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 export interface RuntimeConfig {
   siteName: string;
@@ -80,6 +81,11 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateHidePages(env.HIDE_PAGES, issues);
   validateAppVersion(env.APP_VERSION, issues);
   validateApiBearerToken(env.API_BEARER_TOKEN, issues);
+  validateEmailProvider(env.EMAIL_PROVIDER, issues);
+  validateEmailAddress("EMAIL_FROM", env.EMAIL_FROM, issues);
+  validateEmailAddress("EMAIL_REPLY_TO", env.EMAIL_REPLY_TO, issues);
+  validateEmailAddress("EMAIL_RETURN_PATH", env.EMAIL_RETURN_PATH, issues);
+  validateEmailList("EMAIL_REGISTRATION_NOTIFY", env.EMAIL_REGISTRATION_NOTIFY, issues);
 
   return {
     ok: issues.every((issue) => issue.severity !== "error"),
@@ -110,6 +116,28 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       nonEmpty(env.API_CORS_ORIGINS) ?? null,
       null
     ),
+    configEntry("EMAIL_PROVIDER", env.EMAIL_PROVIDER, nonEmpty(env.EMAIL_PROVIDER) ?? null, null),
+    configEntry(
+      "EMAIL_PROVIDER_ENDPOINT",
+      env.EMAIL_PROVIDER_ENDPOINT,
+      nonEmpty(env.EMAIL_PROVIDER_ENDPOINT) ?? null,
+      null
+    ),
+    configEntry("EMAIL_FROM", env.EMAIL_FROM, nonEmpty(env.EMAIL_FROM) ?? null, null),
+    configEntry("EMAIL_REPLY_TO", env.EMAIL_REPLY_TO, nonEmpty(env.EMAIL_REPLY_TO) ?? null, null),
+    configEntry(
+      "EMAIL_RETURN_PATH",
+      env.EMAIL_RETURN_PATH,
+      nonEmpty(env.EMAIL_RETURN_PATH) ?? null,
+      null
+    ),
+    configEntry("EMAIL_BASE_URL", env.EMAIL_BASE_URL, nonEmpty(env.EMAIL_BASE_URL) ?? null, null),
+    configEntry(
+      "EMAIL_REGISTRATION_NOTIFY",
+      env.EMAIL_REGISTRATION_NOTIFY,
+      nonEmpty(env.EMAIL_REGISTRATION_NOTIFY) ?? null,
+      null
+    ),
     cloudflareEntry("CF_PAGES_BRANCH", env.CF_PAGES_BRANCH),
     cloudflareEntry("CF_PAGES_COMMIT_SHA", env.CF_PAGES_COMMIT_SHA),
     cloudflareEntry("CF_PAGES_URL", env.CF_PAGES_URL)
@@ -118,6 +146,9 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
 
 export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
   const apiToken = nonEmpty(env.API_BEARER_TOKEN) ?? null;
+  const resendApiKey = nonEmpty(env.RESEND_API_KEY) ?? null;
+  const emailApiToken = nonEmpty(env.EMAIL_API_TOKEN) ?? null;
+  const emailTaskToken = nonEmpty(env.EMAIL_TASK_TOKEN) ?? null;
 
   return [
     {
@@ -125,6 +156,24 @@ export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
       configured: Boolean(apiToken),
       redactedValue: apiToken ? "[redacted]" : null,
       purpose: "Native API bearer-token authentication for automation writes."
+    },
+    {
+      key: "RESEND_API_KEY",
+      configured: Boolean(resendApiKey),
+      redactedValue: resendApiKey ? "[redacted]" : null,
+      purpose: "Resend API authentication for outbound email delivery."
+    },
+    {
+      key: "EMAIL_API_TOKEN",
+      configured: Boolean(emailApiToken),
+      redactedValue: emailApiToken ? "[redacted]" : null,
+      purpose: "Generic outbound email provider token fallback."
+    },
+    {
+      key: "EMAIL_TASK_TOKEN",
+      configured: Boolean(emailTaskToken),
+      redactedValue: emailTaskToken ? "[redacted]" : null,
+      purpose: "Bearer token for scheduled email digest task execution."
     }
   ];
 }
@@ -261,6 +310,64 @@ function validateApiBearerToken(value: string | undefined, issues: ConfigValidat
       message: "API_BEARER_TOKEN is blank; bearer-token API writes will remain disabled."
     });
   }
+}
+
+function validateEmailProvider(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const provider = nonEmpty(value);
+  if (!provider) return;
+
+  if (provider !== "resend") {
+    issues.push({
+      key: "EMAIL_PROVIDER",
+      severity: "error",
+      message: "EMAIL_PROVIDER must be 'resend' when outbound email is enabled."
+    });
+  }
+}
+
+function validateEmailAddress(
+  key: string,
+  value: string | undefined,
+  issues: ConfigValidationIssue[]
+): void {
+  const email = nonEmpty(value);
+  if (!email) return;
+
+  if (!EMAIL_ADDRESS.test(extractEmailAddress(email))) {
+    issues.push({
+      key,
+      severity: "error",
+      message: `${key} must be a valid email address or 'Name <address@example.test>' sender.`
+    });
+  }
+}
+
+function validateEmailList(
+  key: string,
+  value: string | undefined,
+  issues: ConfigValidationIssue[]
+): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  const invalid = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .filter((entry) => !EMAIL_ADDRESS.test(extractEmailAddress(entry)));
+
+  if (invalid.length > 0) {
+    issues.push({
+      key,
+      severity: "error",
+      message: `${key} contains invalid email address entries.`
+    });
+  }
+}
+
+function extractEmailAddress(value: string): string {
+  const match = value.match(/<([^<>]+)>/);
+  return (match?.[1] ?? value).trim();
 }
 
 function configEntry(
