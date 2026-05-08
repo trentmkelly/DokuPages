@@ -1263,6 +1263,60 @@ describe("handleRequest", () => {
     expect(r2Operations.head).toBe(0);
   });
 
+  it("forces media downloads from default and imported MIME configuration", async () => {
+    state.media.push(
+      {
+        id: "wiki:archive.zip",
+        namespace: "wiki",
+        object_key: "media/current/wiki/archive.zip",
+        mime_type: "application/zip",
+        byte_length: 7,
+        content_hash: "archive-hash",
+        current_revision_id: "archive-rev",
+        is_deleted: 0,
+        created_at: "2026-05-08T00:00:00.000Z",
+        updated_at: "2026-05-08T00:00:00.000Z"
+      },
+      {
+        id: "wiki:readme.foo",
+        namespace: "wiki",
+        object_key: "media/current/wiki/readme.foo",
+        mime_type: "text/x-foo",
+        byte_length: 3,
+        content_hash: "foo-hash",
+        current_revision_id: "foo-rev",
+        is_deleted: 0,
+        created_at: "2026-05-08T00:00:00.000Z",
+        updated_at: "2026-05-08T00:00:00.000Z"
+      }
+    );
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "mime",
+      key: "foo",
+      value_json: JSON.stringify({
+        extension: "foo",
+        mimeType: "text/x-foo",
+        forceDownload: true
+      }),
+      updated_at: "2026-05-08T00:00:00.000Z"
+    });
+
+    const archive = await handleRequest(
+      new Request("https://example.com/media/wiki/archive.zip"),
+      env
+    );
+    const custom = await handleRequest(
+      new Request("https://example.com/media/wiki/readme.foo"),
+      env
+    );
+    const inline = await handleRequest(new Request("https://example.com/media/wiki/logo.svg"), env);
+
+    expect(archive.headers.get("content-disposition")).toBe('attachment; filename="archive.zip"');
+    expect(custom.headers.get("content-disposition")).toBe('attachment; filename="readme.foo"');
+    expect(inline.headers.get("content-disposition")).toBeNull();
+  });
+
   it("uploads media to R2 and records D1 media revision metadata", async () => {
     const form = new FormData();
     form.set("ns", "wiki");
@@ -3349,6 +3403,18 @@ function createD1Stub(state: D1StubState): D1Database {
             return state.mediaRevisions.find((revision) => revision.id === id) ?? null;
           }
 
+          if (sql.includes("subject_type = 'config'") && sql.includes("subject_id = 'mime'")) {
+            const [key] = values;
+            return (
+              state.metadata.find(
+                (record) =>
+                  record.subject_type === "config" &&
+                  record.subject_id === "mime" &&
+                  record.key === key
+              ) ?? null
+            );
+          }
+
           if (sql.includes("from metadata")) {
             const [subjectId, key] = values;
             return (
@@ -3916,6 +3982,8 @@ type R2OperationCounters = Record<"head" | "get" | "put" | "delete", number>;
 function createR2Stub(counters?: R2OperationCounters): R2Bucket {
   const objects = new Map<string, BodyInit>([
     ["media/current/wiki/logo.svg", "<svg>current</svg>"],
+    ["media/current/wiki/archive.zip", "zipbody"],
+    ["media/current/wiki/readme.foo", "foo"],
     ["media/current/wiki/pixel.png", uint8ArrayToArrayBuffer(TEST_PIXEL_PNG)],
     ["media/revisions/wiki/logo.svg/20260506000000", "<svg>old</svg>"]
   ]);

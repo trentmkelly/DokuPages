@@ -86,6 +86,7 @@ import {
 } from "./wiki/media-service";
 import { dokuMediaMetadataToJpegMetadata, type ParsedJpegMetadata } from "./wiki/jpeg-metadata";
 import { validateMediaUpload } from "./wiki/media-validation";
+import { shouldForceDownloadMedia } from "./wiki/mime";
 import {
   cleanPageId,
   cleanRoutePageId,
@@ -2287,8 +2288,9 @@ async function handleMediaFetch(
     derivativeStatus: expectedDerivativeStatus,
     etag: expectedEtag
   });
+  const forceDownload = await shouldForceDownloadMedia(env.DB, id);
 
-  if (url.searchParams.get("download") === "1") {
+  if (isMediaDownloadRequested(url) || forceDownload) {
     headers.set(
       "content-disposition",
       `attachment; filename="${escapeHeaderValue(mediaName(id))}"`
@@ -2427,6 +2429,10 @@ function applyMediaCacheHeaders(headers: Headers, url: URL, revision: boolean): 
 
 function bypassesMediaClientCache(url: URL): boolean {
   return url.searchParams.get("cache")?.toLowerCase() === "nocache";
+}
+
+function isMediaDownloadRequested(url: URL): boolean {
+  return url.searchParams.get("download") === "1" || url.searchParams.get("dl") === "1";
 }
 
 function copyDownloadHeader(source: Headers, target: Headers): void {

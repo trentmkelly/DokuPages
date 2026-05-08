@@ -12,6 +12,17 @@ Media storage uses D1 for metadata and R2 for object bodies.
 - `POST /api/media/delete` marks the current media object deleted.
 - `POST /api/media/revert` restores an old media revision as current.
 
+## MIME And Download Semantics
+
+Media fetches resolve the file extension against the imported
+`config/mime:<extension>` metadata written from `conf/mime.conf` and
+`conf/mime.local.conf`, falling back to the bundled DokuWiki default MIME table.
+Entries whose MIME type was prefixed with `!` force
+`Content-Disposition: attachment`; unknown extensions are also forced to
+download, matching DokuWiki's `lib/exe/fetch.php` behavior when `mimetype()`
+cannot resolve an extension. Explicit `download=1` or legacy `dl=1` query
+parameters still force attachment for otherwise inline media.
+
 ## Upload Semantics
 
 The media manager keeps the upstream popup/full-screen hook structure used by

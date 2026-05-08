@@ -111,7 +111,7 @@ are not fixed by this checklist.
 - [x] Match upstream media manager tabs, namespace tree behavior, file list behavior, upload progress, and selection callbacks from `lib/exe/mediamanager.php` and `lib/scripts/media.js`.
 - [x] Match upstream row and thumbnail media-manager modes, sorting, and pagination from `inc/Ui/Media/DisplayRow.php` and `DisplayTile.php`.
 - [x] Parse and display JPEG/EXIF/IPTC metadata like `inc/JpegMeta.php` and `conf/mediameta.php`.
-- [ ] Match upstream MIME force-download behavior from `conf/mime.conf`, including imported `mime.local.conf` metadata.
+- [x] Match upstream MIME force-download behavior from `conf/mime.conf`, including imported `mime.local.conf` metadata.
 - [ ] Allow configurable media extension and MIME policies rather than the current conservative validator-only policy.
 - [ ] Match upstream SVG handling policy and messages when `iexssprotect` is enabled or disabled.
 - [ ] Match upstream remote media fetch behavior and `fetchsize` where DokuWiki downloads external media.

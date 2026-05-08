@@ -4,6 +4,10 @@ export interface MimeTypeConfig {
   forceDownload: boolean;
 }
 
+interface MimeMetadataRow {
+  value_json: string;
+}
+
 // Default mapping from DokuWiki's conf/mime.conf.
 const DEFAULT_MIME_TYPES: MimeTypeConfig[] = [
   { extension: "jpg", mimeType: "image/jpeg", forceDownload: false },
@@ -95,6 +99,70 @@ export function getMimeTypeForExtension(extension: string): string | null {
 
 export function shouldForceDownloadExtension(extension: string): boolean {
   return DEFAULT_MIME_TYPE_MAP.get(normalizeExtension(extension))?.forceDownload ?? false;
+}
+
+export async function getEffectiveMimeTypeConfig(
+  db: D1Database,
+  extension: string
+): Promise<MimeTypeConfig> {
+  const normalized = normalizeExtension(extension);
+  const configured = await getImportedMimeTypeConfig(db, normalized);
+  if (configured) return configured;
+
+  const fallback = DEFAULT_MIME_TYPE_MAP.get(normalized);
+  if (fallback) return { ...fallback };
+
+  return {
+    extension: normalized,
+    mimeType: "application/octet-stream",
+    forceDownload: true
+  };
+}
+
+export async function shouldForceDownloadMedia(db: D1Database, mediaId: string): Promise<boolean> {
+  return (await getEffectiveMimeTypeConfig(db, extensionFromMediaId(mediaId))).forceDownload;
+}
+
+export function extensionFromMediaId(mediaId: string): string {
+  const name = mediaId.includes(":") ? mediaId.slice(mediaId.lastIndexOf(":") + 1) : mediaId;
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : normalizeExtension(name.slice(dot + 1));
+}
+
+async function getImportedMimeTypeConfig(
+  db: D1Database,
+  extension: string
+): Promise<MimeTypeConfig | null> {
+  if (!extension) return null;
+
+  const row = await db
+    .prepare(
+      `select value_json
+       from metadata
+       where subject_type = 'config' and subject_id = 'mime' and key = ?`
+    )
+    .bind(extension)
+    .first<MimeMetadataRow>();
+
+  if (!row) return null;
+
+  return parseMimeTypeConfig(row.value_json, extension);
+}
+
+function parseMimeTypeConfig(valueJson: string, extension: string): MimeTypeConfig | null {
+  try {
+    const parsed = JSON.parse(valueJson) as Partial<MimeTypeConfig>;
+    const mimeType = typeof parsed.mimeType === "string" ? parsed.mimeType.trim() : "";
+    if (!mimeType) return null;
+
+    return {
+      extension,
+      mimeType,
+      forceDownload: Boolean(parsed.forceDownload)
+    };
+  } catch {
+    return null;
+  }
 }
 
 function normalizeExtension(extension: string): string {
