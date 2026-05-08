@@ -54,7 +54,14 @@ photographer, copyright, format, file size, dimensions, camera, and keywords.
 DokuWiki `data/media_meta/*.meta` rows stored under the `dokuwiki` metadata key
 are adapted to the same display fields when a native `jpeg` row is not present.
 
-Uploads are validated before R2 writes. The native validator enforces a 25 MiB body limit, allows the conservative built-in safe set plus extensions enabled through imported DokuWiki MIME configuration, checks non-generic browser MIME types against the configured extension MIME type, and rejects SVG content containing scripts, event handlers, doctypes, entities, foreign objects, or `javascript:` links.
+Uploads are validated before R2 writes. The native validator enforces a 25 MiB
+body limit, allows the conservative built-in safe set plus extensions enabled
+through imported DokuWiki MIME configuration, and checks non-generic browser MIME
+types against the configured extension MIME type. DokuWiki's `iexssprotect`
+behavior is enabled by default through `IEXSSPROTECT=1`: the upload path scans
+the first 256 bytes for the upstream IE-XSS tag pattern and returns DokuWiki's
+`uploadxss` message when it matches. Set `IEXSSPROTECT=0` only for trusted wikis
+that intentionally allow active SVG or HTML uploads through MIME configuration.
 
 Authorized upload submissions are rate limited in KV by client IP and actor. Twenty attempts in a 15 minute window block additional attempts for that pair and return `429` with `Retry-After: 900`.
 

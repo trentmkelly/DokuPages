@@ -2,6 +2,8 @@ import { mediaName } from "./media-service";
 import type { MimeTypeConfig } from "./mime";
 
 export const MEDIA_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const UPLOAD_XSS_MESSAGE = "The upload was blocked for possibly malicious content.";
+const IE_XSS_SCAN_BYTES = 256;
 
 const ALLOWED_EXTENSIONS = new Set([
   "avif",
@@ -37,20 +39,14 @@ const EXPECTED_MIME_TYPES: Record<string, string[]> = {
   zip: ["application/zip", "application/x-zip-compressed"]
 };
 
-const SVG_ACTIVE_CONTENT_PATTERNS = [
-  /<\s*script\b/i,
-  /<\s*foreignobject\b/i,
-  /<!doctype\b/i,
-  /<!entity\b/i,
-  /\son[a-z]+\s*=/i,
-  /javascript\s*:/i
-];
+const IE_XSS_PATTERN = /<(script|a|img|html|body|iframe)[\s>]/i;
 
 export interface ValidateMediaUploadInput {
   id: string;
   body: ArrayBuffer;
   mimeType?: string | null;
   mimePolicy?: Pick<MimeTypeConfig, "mimeType"> | null;
+  ieXssProtect?: boolean;
   maxBytes?: number;
 }
 
@@ -96,16 +92,11 @@ export function validateMediaUpload(input: ValidateMediaUploadInput): MediaUploa
     };
   }
 
-  if (extension === "svg" || mimeType === "image/svg+xml") {
-    const text = new TextDecoder("utf-8", { fatal: false }).decode(input.body);
-
-    if (SVG_ACTIVE_CONTENT_PATTERNS.some((pattern) => pattern.test(text))) {
-      return {
-        ok: false,
-        error:
-          "SVG uploads cannot contain scripts, event handlers, external entities, or active links."
-      };
-    }
+  if ((input.ieXssProtect ?? true) && containsIeXssContent(input.body)) {
+    return {
+      ok: false,
+      error: UPLOAD_XSS_MESSAGE
+    };
   }
 
   return { ok: true };
@@ -119,6 +110,12 @@ function mediaExtension(id: string): string {
 
 function normalizeMimeType(mimeType: string | null | undefined): string {
   return (mimeType ?? "").split(";")[0].trim().toLowerCase();
+}
+
+function containsIeXssContent(body: ArrayBuffer): boolean {
+  const prefix = new Uint8Array(body, 0, Math.min(body.byteLength, IE_XSS_SCAN_BYTES));
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(prefix);
+  return IE_XSS_PATTERN.test(text);
 }
 
 function isGenericMimeType(mimeType: string): boolean {

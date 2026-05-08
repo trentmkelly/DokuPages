@@ -40,6 +40,7 @@ describe("runtime config", () => {
       relNofollow: true,
       refcheck: true,
       mediaRevisions: true,
+      ieXssProtect: true,
       pageIdCleanOptions: {
         deaccent: 1,
         fnencode: "url",
@@ -90,6 +91,7 @@ describe("runtime config", () => {
       REL_NOFOLLOW: "0",
       REFCHECK: "0",
       MEDIAREVISIONS: "0",
+      IEXSSPROTECT: "0",
       DEACCENT: "2",
       FNENCODE: "safe",
       SEPCHAR: "-",
@@ -128,6 +130,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).relNofollow).toBe(false);
     expect(getRuntimeConfig(env).refcheck).toBe(false);
     expect(getRuntimeConfig(env).mediaRevisions).toBe(false);
+    expect(getRuntimeConfig(env).ieXssProtect).toBe(false);
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
       deaccent: 2,
       fnencode: "safe",
@@ -254,6 +257,10 @@ describe("runtime config", () => {
         }),
         expect.objectContaining({
           key: "MEDIAREVISIONS",
+          effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "IEXSSPROTECT",
           effectiveValue: "true"
         }),
         expect.objectContaining({

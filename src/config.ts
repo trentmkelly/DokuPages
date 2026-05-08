@@ -44,6 +44,7 @@ export interface RuntimeConfig {
   relNofollow: boolean;
   refcheck: boolean;
   mediaRevisions: boolean;
+  ieXssProtect: boolean;
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
@@ -130,6 +131,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     relNofollow: booleanConfig(env.REL_NOFOLLOW, true),
     refcheck: booleanConfig(env.REFCHECK, true),
     mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
+    ieXssProtect: booleanConfig(env.IEXSSPROTECT, true),
     pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
@@ -222,6 +224,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("REL_NOFOLLOW", env.REL_NOFOLLOW, String(config.relNofollow), "true"),
     configEntry("REFCHECK", env.REFCHECK, String(config.refcheck), "true"),
     configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
+    configEntry("IEXSSPROTECT", env.IEXSSPROTECT, String(config.ieXssProtect), "true"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
     configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
     configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),

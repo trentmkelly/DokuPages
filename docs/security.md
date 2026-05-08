@@ -43,6 +43,12 @@ Authorized page save and revert submissions are rate limited by client IP and ac
 
 Authorized media upload submissions are rate limited by client IP and actor in KV. Twenty attempts in a 15 minute window block additional upload attempts for that pair and return `429` with `Retry-After: 900` before the request writes to R2.
 
+Media uploads also honor DokuWiki's `iexssprotect` scan by default. With
+`IEXSSPROTECT=1`, the first 256 bytes are checked for the upstream IE-XSS tag
+pattern before any R2 write; matching uploads are rejected with the DokuWiki
+`uploadxss` message. `IEXSSPROTECT=0` disables that scan for trusted
+installations that deliberately allow active SVG or HTML media.
+
 ## ACL
 
 ACL records use DokuWiki permission levels: none `0`, read `1`, edit `2`, create `4`,

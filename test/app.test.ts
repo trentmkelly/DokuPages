@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app";
 import type { Env } from "../src/env";
 import { PageLockObject } from "../src/storage/page-lock-object";
+import { UPLOAD_XSS_MESSAGE } from "../src/wiki/media-validation";
 import { mediaToken, requestedMediaSize } from "../src/wiki/media-token";
 import { WORD_BLOCK_MESSAGE } from "../src/wiki/wordblock";
 
@@ -99,6 +100,7 @@ describe("handleRequest", () => {
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
+    env.IEXSSPROTECT = undefined;
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
@@ -1597,6 +1599,57 @@ describe("handleRequest", () => {
     });
     expect(state.media).toHaveLength(1);
     expect(state.mediaRevisions).toHaveLength(1);
+  });
+
+  it("honors the upstream iexssprotect toggle for SVG uploads", async () => {
+    const blockedForm = new FormData();
+    blockedForm.set("ns", "wiki");
+    blockedForm.set(
+      "file",
+      new File(["<svg><script>alert(1)</script></svg>"], "bad.svg", {
+        type: "image/svg+xml"
+      })
+    );
+
+    const blocked = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: blockedForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(blocked.status).toBe(400);
+    await expect(blocked.json()).resolves.toMatchObject({
+      error: UPLOAD_XSS_MESSAGE
+    });
+    expect(state.media.some((media) => media.id === "wiki:bad.svg")).toBe(false);
+
+    env.IEXSSPROTECT = "0";
+    const allowedForm = new FormData();
+    allowedForm.set("ns", "wiki");
+    allowedForm.set(
+      "file",
+      new File(["<svg><script>alert(1)</script></svg>"], "trusted.svg", {
+        type: "image/svg+xml"
+      })
+    );
+
+    const allowed = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: allowedForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(allowed.status).toBe(303);
+    expect(allowed.headers.get("location")).toBe("/media-detail/wiki/trusted.svg");
+    expect(state.media.find((media) => media.id === "wiki:trusted.svg")).toMatchObject({
+      mime_type: "image/svg+xml"
+    });
   });
 
   it("rate limits repeated media upload attempts before writing R2 objects", async () => {

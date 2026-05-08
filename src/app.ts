@@ -1687,7 +1687,8 @@ async function handleNativeApiMediaUpload(
     id,
     body: mediaBody,
     mimeType: file.type || null,
-    mimePolicy
+    mimePolicy,
+    ieXssProtect: config.ieXssProtect
   });
 
   if (!validation.ok) {
@@ -8705,7 +8706,8 @@ async function handleMediaUpload(
     id,
     body,
     mimeType: file.type || null,
-    mimePolicy
+    mimePolicy,
+    ieXssProtect: config.ieXssProtect
   });
 
   if (!validation.ok) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateMediaUpload } from "../src/wiki/media-validation";
+import { UPLOAD_XSS_MESSAGE, validateMediaUpload } from "../src/wiki/media-validation";
 
 const encoder = new TextEncoder();
 
@@ -65,16 +65,37 @@ describe("validateMediaUpload", () => {
     });
   });
 
-  it("rejects active SVG content", () => {
+  it("rejects upstream IE-XSS upload patterns when iexssprotect is enabled", () => {
     expect(
       validateMediaUpload({
         id: "wiki:bad.svg",
-        body: encoder.encode('<svg onload="alert(1)"></svg>').buffer,
+        body: encoder.encode("<svg><script>alert(1)</script></svg>").buffer,
         mimeType: "image/svg+xml"
       })
-    ).toMatchObject({
+    ).toEqual({
       ok: false,
-      error: expect.stringContaining("SVG")
+      error: UPLOAD_XSS_MESSAGE
     });
+  });
+
+  it("allows SVG active-content patterns when iexssprotect is disabled", () => {
+    expect(
+      validateMediaUpload({
+        id: "wiki:trusted.svg",
+        body: encoder.encode("<svg><script>alert(1)</script></svg>").buffer,
+        mimeType: "image/svg+xml",
+        ieXssProtect: false
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it("matches DokuWiki's first-256-byte iexssprotect scan window", () => {
+    expect(
+      validateMediaUpload({
+        id: "wiki:late.svg",
+        body: encoder.encode(`${" ".repeat(256)}<script>alert(1)</script>`).buffer,
+        mimeType: "image/svg+xml"
+      })
+    ).toEqual({ ok: true });
   });
 });

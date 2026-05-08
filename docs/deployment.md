@@ -69,6 +69,8 @@ Optional Pages environment variables:
   checks. Default: enabled.
 - `MEDIAREVISIONS`: set to `0` to disable media revision history, restore,
   and old-revision fetches. Default: enabled.
+- `IEXSSPROTECT`: set to `0` to disable DokuWiki's upstream upload XSS scan.
+  Default: enabled.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.

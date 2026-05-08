@@ -113,7 +113,7 @@ are not fixed by this checklist.
 - [x] Parse and display JPEG/EXIF/IPTC metadata like `inc/JpegMeta.php` and `conf/mediameta.php`.
 - [x] Match upstream MIME force-download behavior from `conf/mime.conf`, including imported `mime.local.conf` metadata.
 - [x] Allow configurable media extension and MIME policies rather than the current conservative validator-only policy.
-- [ ] Match upstream SVG handling policy and messages when `iexssprotect` is enabled or disabled.
+- [x] Match upstream SVG handling policy and messages when `iexssprotect` is enabled or disabled.
 - [ ] Match upstream remote media fetch behavior and `fetchsize` where DokuWiki downloads external media.
 - [ ] Match upstream media search semantics, including metadata/title fields and namespace recursion.
 - [ ] Match upstream current media and old media revision cache headers, ETag behavior, range requests, and content-disposition details.
@@ -257,7 +257,7 @@ are not fixed by this checklist.
 - [ ] Match DokuWiki's wordblock behavior and config toggles exactly, including local wordblock overrides.
 - [ ] Match upstream email obfuscation modes from `mailguard`: visible, hex, and none.
 - [x] Match upstream external link `rel` behavior from `relnofollow`.
-- [ ] Match upstream upload XSS protection toggles from `iexssprotect`.
+- [x] Match upstream upload XSS protection toggles from `iexssprotect`.
 - [ ] Match upstream CSRF token names and behavior where legacy clients rely on `sectok`.
 - [ ] Match upstream cookie path behavior from `cookiedir`.
 - [ ] Match upstream secure cookie and SameSite settings from `securecookie` and `samesitecookie`.
