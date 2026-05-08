@@ -65,6 +65,10 @@ The scan compares R2 objects under `media/` with object keys referenced by D1
 CSRF token, and explicit confirmation, then writes an audit log entry with the
 cleanup counts. Take or verify a backup before deleting objects in production.
 
+Do not prune D1 page or media revision rows as a cleanup task. Those rows are the
+wiki history source of truth used by old revisions, diffs, reverts, backups, and
+hash verification.
+
 ## Rollback Workflow
 
 Use the smallest rollback that removes the bad state:

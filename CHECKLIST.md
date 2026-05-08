@@ -479,7 +479,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement search index rebuild.
 - [x] Implement cache purge.
 - [x] Implement media cleanup.
-- [ ] Implement orphaned revision cleanup if needed.
+- [x] Implement orphaned revision cleanup if needed.
 - [x] Implement diagnostics.
 - [x] Implement version display.
 - [x] Implement storage health checks.

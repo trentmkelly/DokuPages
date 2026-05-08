@@ -14,6 +14,19 @@ Deleted pages are represented by `pages.is_deleted = 1` and a `page_revisions.ch
 
 Deleted media is represented by `media.is_deleted = 1` with corresponding media changelog rows.
 
+## Revision Retention
+
+Page and media revisions are canonical wiki history, not derived cache files.
+They are intentionally retained for old-revision views, diffs, reverts, audits,
+backups, and import hash verification. The D1 schema stores revision rows with
+parent page/media references, and write paths create the parent/current pointer,
+revision row, changelog row, and metadata rows together.
+
+The Pages port therefore does not run a separate orphaned-revision cleanup job.
+Deleting revision rows would break DokuWiki history semantics. Storage cleanup is
+limited to unreferenced R2 media objects under `media/`; D1 revision integrity is
+handled by migrations, import validation, backups, and restore rehearsal checks.
+
 ## Namespaces
 
 Namespaces are stored as colon-separated IDs in page and media records. They can be queried by the `namespace` columns and reconstructed for URL compatibility.
