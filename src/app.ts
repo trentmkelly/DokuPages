@@ -2439,7 +2439,7 @@ function renderMissingPage(env: Env, id: string, principal?: AuthPrincipal): str
     <h1 id="${escapeAttribute(slugForPageHeading(id))}">${escapeHtml(id)}</h1>
     <p>This topic does not exist yet.</p>
     <p>
-      <a class="wikilink2" href="${pagePath(id)}?do=edit" title="This topic does not exist yet">Create this page</a>
+      <a class="action create" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
       <span class="sep"> · </span>
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
     </p>`,

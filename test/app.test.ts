@@ -1118,8 +1118,9 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("This topic does not exist yet.");
     expect(html).toContain(
-      '<a class="wikilink2" href="/wiki/missing/page?do=edit" title="This topic does not exist yet">Create this page</a>'
+      '<a class="action create" href="/wiki/missing/page?do=edit" rel="nofollow" title="Create this page">Create this page</a>'
     );
+    expect(html).not.toContain('class="wikilink2" href="/wiki/missing/page?do=edit"');
     expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');
   });
 
