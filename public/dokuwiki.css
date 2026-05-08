@@ -529,6 +529,12 @@ form.search button {
   background-color: inherit;
 }
 
+.dokuwiki .page a.action.create,
+.dokuwiki .page a.action.create:link,
+.dokuwiki .page a.action.create:visited {
+  color: var(--dw-link);
+}
+
 .dokuwiki .page li {
   color: var(--dw-text);
 }
