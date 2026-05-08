@@ -147,6 +147,7 @@ describe("DokuWiki import planner", () => {
       customLanguageFiles: 2,
       customTemplateFiles: 2
     });
+    expect(plan.language).toBe("pt-br");
     expect(plan.pages[0]).toMatchObject({ id: "wiki:welcome" });
     expect(plan.pageRevisions[0]).toMatchObject({
       pageId: "wiki:welcome",
@@ -515,7 +516,7 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "lib/tpl/custom"), { recursive: true });
     await writeFile(
       path.join(root, "data/pages/wiki/welcome.txt"),
-      "====== Welcome ======\n\nText\n"
+      "====== Welcome ======\n\naber Text\n"
     );
     await writeFile(
       path.join(root, "data/attic/wiki/welcome.1767225600.txt.gz"),
@@ -543,7 +544,10 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
-    await writeFile(path.join(root, "conf/local.php"), "$conf['title'] = 'SQL Wiki';\n");
+    await writeFile(
+      path.join(root, "conf/local.php"),
+      "$conf['title'] = 'SQL Wiki';\n$conf['lang'] = 'de';\n"
+    );
     await writeFile(path.join(root, "conf/plugins.local.php"), "$plugins['acl'] = 1;\n");
     await writeFile(
       path.join(root, "conf/interwiki.local.conf"),
@@ -564,6 +568,7 @@ describe("DokuWiki import planner", () => {
     await writePageImportSql(plan, output);
 
     const sql = await readFile(output, "utf8");
+    expect(plan.language).toBe("de");
     expect(sql).toContain("insert into pages");
     expect(sql).toContain("on conflict(id) do update");
     expect(sql).toContain("insert or replace into page_revisions");
@@ -571,6 +576,7 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("Imported from DokuWiki attic");
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("term_length");
+    expect(sql).not.toContain("values ('aber'");
     expect(sql).toContain("insert into search_postings");
     expect(sql).toContain("insert into media (");
     expect(sql).toContain("insert or replace into media_revisions");

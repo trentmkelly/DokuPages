@@ -97,6 +97,7 @@ export interface SavePageInput {
   authorId?: string | null;
   authorName?: string | null;
   ip?: string | null;
+  language?: string;
   now?: Date;
 }
 
@@ -325,9 +326,10 @@ export async function searchPages(
   db: D1Database,
   query: string,
   namespace = "",
-  limit = 25
+  limit = 25,
+  language = "en"
 ): Promise<PageSearchResult[]> {
-  const terms = parseSearchQuery(query);
+  const terms = parseSearchQuery(query, language);
   if (terms.length === 0) return [];
 
   const safeLimit = Math.max(1, Math.min(limit, 50));
@@ -794,7 +796,7 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   const indexedTerms = await listIndexedTerms(db, input.id);
   const searchTerms = isDelete
     ? new Map<string, number>()
-    : buildSearchTermFrequencies(input.content, title);
+    : buildSearchTermFrequencies(input.content, title, input.language);
   const renderedMetadata = isDelete
     ? null
     : renderWikiText(input.content, { pageId: input.id, sectionEdit: false });
@@ -907,7 +909,8 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
 export async function rebuildSearchIndex(
   db: D1Database,
   now = new Date(),
-  limit = 5_000
+  limit = 5_000,
+  language = "en"
 ): Promise<RebuildSearchIndexResult> {
   const pages = await listCurrentPageSources(db, limit);
   const updatedAt = now.toISOString();
@@ -916,7 +919,7 @@ export async function rebuildSearchIndex(
 
   for (const page of pages) {
     const title = page.title ?? pageTitleFromId(page.id);
-    const terms = buildSearchTermFrequencies(page.content, title);
+    const terms = buildSearchTermFrequencies(page.content, title, language);
 
     for (const [term, frequency] of terms) {
       postings.push({ term, pageId: page.id, frequency });

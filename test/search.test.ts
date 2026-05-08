@@ -4,6 +4,7 @@ import {
   makeSearchSnippet,
   parseSearchQuery,
   searchIndexWordLength,
+  searchStopWords,
   tokenizeSearchText
 } from "../src/wiki/search";
 
@@ -20,6 +21,16 @@ describe("wiki search helpers", () => {
 
   it("parses unique query terms", () => {
     expect(parseSearchQuery("welcome welcome syntax +the")).toEqual(["welcome", "syntax"]);
+  });
+
+  it("uses DokuWiki language-specific stopword files", () => {
+    expect(tokenizeSearchText("aber welcome wiki", "en")).toEqual(["aber", "welcome", "wiki"]);
+    expect(tokenizeSearchText("aber welcome wiki", "de")).toEqual(["welcome", "wiki"]);
+  });
+
+  it("uses an empty stopword set when DokuWiki has no file for the language", () => {
+    expect(searchStopWords("af").size).toBe(0);
+    expect(tokenizeSearchText("about wiki", "af")).toEqual(["about", "wiki"]);
   });
 
   it("matches DokuWiki special-character stripping and numeric short terms", () => {

@@ -1,40 +1,5 @@
-const STOP_WORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "are",
-  "as",
-  "at",
-  "be",
-  "but",
-  "by",
-  "for",
-  "from",
-  "if",
-  "in",
-  "into",
-  "is",
-  "it",
-  "no",
-  "not",
-  "of",
-  "on",
-  "or",
-  "such",
-  "that",
-  "the",
-  "their",
-  "then",
-  "there",
-  "these",
-  "this",
-  "to",
-  "was",
-  "will",
-  "with",
-  "you",
-  "your"
-]);
+import { DEFAULT_LANGUAGE, normalizeLanguage } from "./language";
+import { STOP_WORDS_BY_LANGUAGE, type StopWordsLanguage } from "./stopwords";
 
 const SEARCH_MIN_WORD_BYTES = 2;
 const DOKUWIKI_SPECIAL_CHARS_PATTERN = /[^\p{L}\p{N}\p{M} ]+/gu;
@@ -42,31 +7,35 @@ const SEARCH_CORE_CHAR_PATTERN = /[\p{L}\p{N}]/u;
 const ASIAN_WORD_PATTERN =
   /([\p{Script=Thai}\p{Script=Han}\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u2eff\u3000-\u303f\u31f0-\u31ff\u3200-\u33ff\ufe30-\ufe4f])/gu;
 const utf8Encoder = new TextEncoder();
+const stopWordSetCache = new Map<string, ReadonlySet<string>>();
 
-export function parseSearchQuery(query: string): string[] {
-  return [...new Set(tokenizeSearchText(query))].slice(0, 12);
+export function parseSearchQuery(query: string, language = DEFAULT_LANGUAGE): string[] {
+  return [...new Set(tokenizeSearchText(query, language))].slice(0, 12);
 }
 
 export function buildSearchTermFrequencies(
   content: string,
-  title?: string | null
+  title?: string | null,
+  language = DEFAULT_LANGUAGE
 ): Map<string, number> {
   const terms = new Map<string, number>();
 
-  addTerms(terms, tokenizeSearchText(stripWikiSyntaxForSearch(content)), 1);
+  addTerms(terms, tokenizeSearchText(stripWikiSyntaxForSearch(content), language), 1);
 
   if (title) {
-    addTerms(terms, tokenizeSearchText(title), 3);
+    addTerms(terms, tokenizeSearchText(title, language), 3);
   }
 
   return terms;
 }
 
-export function tokenizeSearchText(text: string): string[] {
+export function tokenizeSearchText(text: string, language = DEFAULT_LANGUAGE): string[] {
+  const stopWords = searchStopWords(language);
+
   return prepareSearchText(text)
     .split(" ")
     .map((term) => term.toLowerCase())
-    .filter((term) => isSearchToken(term) && !STOP_WORDS.has(term));
+    .filter((term) => isSearchToken(term) && !stopWords.has(term));
 }
 
 export function searchIndexWordLength(term: string): number {
@@ -104,6 +73,18 @@ export function makeSearchSnippet(content: string, terms: string[], maxLength = 
   return `${prefix}${text.slice(start, end).trim()}${suffix}`;
 }
 
+export function searchStopWords(language = DEFAULT_LANGUAGE): ReadonlySet<string> {
+  const normalized = normalizeLanguage(language || DEFAULT_LANGUAGE) || DEFAULT_LANGUAGE;
+  const key = isStopWordsLanguage(normalized) ? normalized : null;
+  const cacheKey = key ?? `empty:${normalized}`;
+  const cached = stopWordSetCache.get(cacheKey);
+  if (cached) return cached;
+
+  const words = new Set<string>(key ? STOP_WORDS_BY_LANGUAGE[key] : []);
+  stopWordSetCache.set(cacheKey, words);
+  return words;
+}
+
 function stripWikiSyntaxForSearch(content: string): string {
   return content
     .replace(/^={2,6}\s*(.*?)\s*={2,6}$/gm, "$1")
@@ -115,6 +96,10 @@ function stripWikiSyntaxForSearch(content: string): string {
     .replace(/<file[\s\S]*?<\/file>/gi, " ")
     .replace(/%%[\s\S]*?%%/g, " ")
     .replace(/[=*_/`~[\]{}|<>#]/g, " ");
+}
+
+function isStopWordsLanguage(language: string): language is StopWordsLanguage {
+  return Object.hasOwn(STOP_WORDS_BY_LANGUAGE, language);
 }
 
 function prepareSearchText(text: string): string {

@@ -1695,7 +1695,8 @@ async function handleNativeApiPageWrite(
     changeType: body.value.minor ? "minor" : undefined,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: getClientIp(request),
+    language: getRuntimeConfig(env).language
   });
 
   if (!result.ok) {
@@ -1746,7 +1747,8 @@ async function handleNativeApiPageRevert(
     changeType: "revert",
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: getClientIp(request),
+    language: getRuntimeConfig(env).language
   });
 
   if (!result.ok) {
@@ -2013,7 +2015,7 @@ async function handleNativeApiSearch(
     ? await filterReadablePageItems(
         env,
         principal,
-        await searchPages(env.DB, query, namespace, limit)
+        await searchPages(env.DB, query, namespace, limit, getRuntimeConfig(env).language)
       )
     : [];
 
@@ -2268,7 +2270,7 @@ async function handleAjax(
     const results = await filterReadablePageItems(
       env,
       principal,
-      await searchPages(env.DB, query, "", 50)
+      await searchPages(env.DB, query, "", 50, getRuntimeConfig(env).language)
     );
     const items = results
       .map(
@@ -2298,7 +2300,7 @@ async function handleAjax(
     const results = await filterReadablePageItems(
       env,
       principal,
-      await searchPages(env.DB, query, "", 15)
+      await searchPages(env.DB, query, "", 15, getRuntimeConfig(env).language)
     );
     const names = [...new Set(results.map((page) => pageName(page.id)))].sort((a, b) =>
       a.localeCompare(b)
@@ -2324,7 +2326,7 @@ async function handleAjax(
       const results = await filterReadablePageItems(
         env,
         principal,
-        await searchPages(env.DB, query, namespace, 50)
+        await searchPages(env.DB, query, namespace, 50, getRuntimeConfig(env).language)
       );
       logMetric("search_metric", {
         surface: "ajax_linkwiz",
@@ -5758,7 +5760,11 @@ async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): P
   const query = url.searchParams.get("q")?.trim() ?? "";
   const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
   const results = query
-    ? await filterReadablePageItems(env, principal, await searchPages(env.DB, query, namespace))
+    ? await filterReadablePageItems(
+        env,
+        principal,
+        await searchPages(env.DB, query, namespace, 25, getRuntimeConfig(env).language)
+      )
     : [];
   logMetric("search_metric", {
     surface: "search_page",
@@ -6425,7 +6431,8 @@ async function executeRevertManagerBatch(
       changeType: restoreRevision ? "revert" : "delete",
       authorId: author.authorId,
       authorName: author.authorName,
-      ip: getClientIp(request)
+      ip: getClientIp(request),
+      language: getRuntimeConfig(env).language
     });
 
     if (!result.ok) {
@@ -6491,7 +6498,12 @@ async function handleSearchIndexRebuild(
     return adminDeniedResponse(request, env);
   }
 
-  const result = await rebuildSearchIndex(env.DB);
+  const result = await rebuildSearchIndex(
+    env.DB,
+    new Date(),
+    5_000,
+    getRuntimeConfig(env).language
+  );
   await appendAdminAuditLog(request, env, principal, {
     action: "search_index_rebuild",
     targetType: "search_index",
@@ -9059,7 +9071,8 @@ async function handleSave(
     changeType: form.get("minor") ? "minor" : undefined,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: getClientIp(request),
+    language: getRuntimeConfig(env).language
   });
 
   if (!result.ok) {
@@ -9451,7 +9464,8 @@ async function handleRevert(
     changeType: "revert",
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: getClientIp(request),
+    language: getRuntimeConfig(env).language
   });
 
   if (!result.ok) {
