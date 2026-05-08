@@ -17,6 +17,9 @@ of full PHP DokuWiki runtime compatibility.
   replacements, smileys, acronyms, and mailguard-style email links.
 - R2-backed current media and media revisions, including uploads, deletes, reverts, detail pages, and media manager browsing/search.
 - D1-backed page/media changelogs, metadata, search postings, rendered cache records, sessions, drafts, ACLs, users, plugin settings, import jobs, schema versions, and audit logs.
+- Recent page changes use DokuWiki-style latest-change grouping, namespace and
+  minor-edit filters, configured date formatting, hidden-page filtering, and
+  `first[...]` pagination controls.
 - KV-backed rendered page cache with D1 dependency tracking, rate-limit counters, and discovery cache.
 - Durable Object-backed page edit locks.
 - Native admin dashboard, ACL manager, configuration manager, user manager,

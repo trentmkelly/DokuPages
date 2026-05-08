@@ -697,7 +697,7 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "recent") {
-      return htmlResponse(await renderRecentPage(env, url, principal));
+      return htmlResponse(await renderRecentPage(env, url, principal, namespaceForIndex(id)));
     }
 
     if (url.searchParams.get("do") === "search") {
@@ -3628,30 +3628,221 @@ async function renderRevertPage(
   );
 }
 
-async function renderRecentPage(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
-  const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
-  const changes = await filterReadableChanges(
-    env,
-    principal,
-    await listRecentChanges(env.DB, pagination.limit, pagination.offset)
-  );
-  const items = changes
-    .map(
-      (change) => `<li>
-        <a href="${pagePath(change.subjectId)}">${escapeHtml(change.subjectId)}</a>
-        ${escapeHtml(change.changeType)}
-        ${change.summary ? ` - ${escapeHtml(change.summary)}` : ""}
-        <time>${escapeHtml(change.createdAt)}</time>
-      </li>`
-    )
-    .join("");
+async function renderRecentPage(
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  defaultNamespace = ""
+): Promise<string> {
+  const pagination = recentPaginationFromUrl(url);
+  const namespace = cleanPageId(url.searchParams.get("ns") ?? defaultNamespace);
+  const showChanges = recentShowChanges(url);
+  const includeMinor = url.searchParams.get("show_minor") !== "0";
+  const { changes, hasNext } = await collectReadableRecentChanges(env, principal, {
+    pagination,
+    namespace,
+    includeMinor,
+    showChanges
+  });
+  const items = changes.map((change) => renderRecentChangeItem(env, change)).join("");
+  const emptyState = changes.length === 0 ? "<p>No recent changes found.</p>" : "";
+  const namespaceNotice = namespace
+    ? `<div class="level1"><p>You're currently watching the changes inside the <b>${escapeHtml(namespace)}</b> namespace. You can also <a href="/recent">view the recent changes of the whole wiki</a>.</p></div>`
+    : "";
 
   return htmlShell(
     env,
     "Recent changes",
-    `<h1>Recent changes</h1><ul>${items}</ul>${renderPaginationControls(url, pagination, changes.length)}`,
+    `<h1>Recent changes</h1>
+    ${namespaceNotice}
+    <form id="dw__recent" class="changes" method="get" action="/recent">
+      <div class="no">
+        ${renderRecentFilters(namespace, showChanges, includeMinor, pagination.limit)}
+        ${emptyState}
+        <ul>${items}</ul>
+      </div>
+      ${renderRecentNavigation(pagination, hasNext)}
+    </form>`,
     { principal }
   );
+}
+
+interface RecentPageOptions {
+  pagination: Pagination;
+  namespace: string;
+  includeMinor: boolean;
+  showChanges: "pages" | "mediafiles" | "both";
+}
+
+async function collectReadableRecentChanges(
+  env: Env,
+  principal: AuthPrincipal,
+  options: RecentPageOptions
+): Promise<{ changes: RecentChange[]; hasNext: boolean }> {
+  if (options.showChanges === "mediafiles") {
+    return { changes: [], hasNext: false };
+  }
+
+  const rules = await listAclRules(env);
+  const collected: RecentChange[] = [];
+  const batchSize = Math.max(options.pagination.limit + 1, 50);
+  let scanOffset = 0;
+  let visibleOffset = 0;
+
+  while (collected.length <= options.pagination.limit) {
+    const batch = await listRecentChanges(env.DB, batchSize, scanOffset, {
+      namespace: options.namespace,
+      groupBySubject: true,
+      includeMinor: options.includeMinor
+    });
+    if (batch.length === 0) break;
+
+    for (const change of batch) {
+      if (!isReadablePageId(env, rules, principal, change.subjectId)) continue;
+      if (visibleOffset < options.pagination.offset) {
+        visibleOffset += 1;
+        continue;
+      }
+
+      collected.push(change);
+      if (collected.length > options.pagination.limit) break;
+    }
+
+    scanOffset += batch.length;
+    if (batch.length < batchSize) break;
+  }
+
+  return {
+    changes: collected.slice(0, options.pagination.limit),
+    hasNext: collected.length > options.pagination.limit
+  };
+}
+
+function recentPaginationFromUrl(url: URL): Pagination {
+  const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
+  return {
+    ...pagination,
+    offset: recentFirstOffset(url) ?? pagination.offset
+  };
+}
+
+function recentFirstOffset(url: URL): number | null {
+  const direct = nonNegativeIntegerSearchParam(url, "first");
+  if (direct !== null) return direct;
+
+  for (const key of url.searchParams.keys()) {
+    const match = /^first\[(\d+)\]$/.exec(key);
+    if (match) return Number(match[1]);
+  }
+
+  return null;
+}
+
+function nonNegativeIntegerSearchParam(url: URL, key: string): number | null {
+  const value = url.searchParams.get(key);
+  if (value === null || value.trim() === "") return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function recentShowChanges(url: URL): "pages" | "mediafiles" | "both" {
+  const value = url.searchParams.get("show_changes");
+  return value === "mediafiles" || value === "both" ? value : "pages";
+}
+
+function renderRecentFilters(
+  namespace: string,
+  showChanges: "pages" | "mediafiles" | "both",
+  includeMinor: boolean,
+  limit: number
+): string {
+  const showMinorValue = includeMinor ? "1" : "0";
+
+  return `<div class="changeType">
+    <label for="recent__show_changes">View changes of</label>
+    <select id="recent__show_changes" name="show_changes" class="quickselect">
+      <option value="pages"${showChanges === "pages" ? " selected" : ""}>Pages</option>
+      <option value="mediafiles"${showChanges === "mediafiles" ? " selected" : ""}>Media files</option>
+      <option value="both"${showChanges === "both" ? " selected" : ""}>Both pages and media files</option>
+    </select>
+    <label for="recent__show_minor">Minor edits</label>
+    <select id="recent__show_minor" name="show_minor" class="quickselect">
+      <option value="1"${showMinorValue === "1" ? " selected" : ""}>Show</option>
+      <option value="0"${showMinorValue === "0" ? " selected" : ""}>Hide</option>
+    </select>
+    <label for="recent__ns">Namespace</label>
+    <input id="recent__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
+    <input type="hidden" name="limit" value="${limit}">
+    <button type="submit" name="do[recent]" value="1">Apply</button>
+  </div>`;
+}
+
+function renderRecentNavigation(pagination: Pagination, hasNext: boolean): string {
+  const previousOffset = Math.max(0, pagination.offset - pagination.limit);
+  const nextOffset = pagination.offset + pagination.limit;
+  const previous =
+    pagination.offset > 0
+      ? `<div class="pagenav-prev"><button type="submit" name="first[${previousOffset}]" accesskey="n" title="<< more recent [N]" class="button show">&lt;&lt; more recent</button></div>`
+      : "";
+  const next = hasNext
+    ? `<div class="pagenav-next"><button type="submit" name="first[${nextOffset}]" accesskey="p" title="less recent >> [P]" class="button show">less recent &gt;&gt;</button></div>`
+    : "";
+
+  if (!previous && !next) return "";
+
+  return `<div class="pagenav">${previous}${next}</div>`;
+}
+
+function renderRecentChangeItem(env: Env, change: RecentChange): string {
+  const pageUrl = pagePath(change.subjectId);
+  const isDelete = change.changeType === "delete";
+  const isCreate = change.changeType === "create";
+  const itemClass = change.changeType === "minor" ? ' class="minor"' : "";
+  const diffLink = isCreate
+    ? '<span class="diff_link" aria-hidden="true"></span>'
+    : `<a class="diff_link" href="${pageUrl}?do=diff">diff</a>`;
+  const summary = change.summary ? `<span class="sum"> - ${escapeHtml(change.summary)}</span>` : "";
+  const editor = change.userName || change.ip;
+  const editorHtml = editor ? `<span class="user"><bdi>${escapeHtml(editor)}</bdi></span>` : "";
+
+  return `<li${itemClass}><div class="li">
+    <span class="date"><time datetime="${escapeAttribute(change.createdAt)}">${escapeHtml(formatRecentDate(env, change.createdAt))}</time></span>
+    ${diffLink}
+    <a class="revisions_link" href="${pageUrl}?do=revisions">revisions</a>
+    <a href="${pageUrl}" class="${isDelete ? "wikilink2" : "wikilink1"}">${escapeHtml(change.subjectId)}</a>
+    <span class="changeType">${escapeHtml(change.changeType)}</span>
+    ${summary}
+    ${editorHtml}
+    ${renderRecentSizeChange(change.sizeChange)}
+  </div></li>`;
+}
+
+function formatRecentDate(env: Env, value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return renderDokuWikiDateFormat(getRuntimeConfig(env).dateFormat, date);
+}
+
+function formatByteLength(byteLength: number): string {
+  if (byteLength < 1024) return `${byteLength.toLocaleString("en-US")} B`;
+
+  const units = ["KB", "MB", "GB"];
+  let value = byteLength / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = value >= 10 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function renderRecentSizeChange(sizeChange: number): string {
+  const className =
+    sizeChange > 0 ? "sizechange positive" : sizeChange < 0 ? "sizechange negative" : "sizechange";
+  const prefix = sizeChange > 0 ? "+" : sizeChange < 0 ? "-" : "±";
+  return `<span class="${className}">${prefix}${escapeHtml(formatByteLength(Math.abs(sizeChange)))}</span>`;
 }
 
 async function renderDiagnosticsPage(env: Env): Promise<string> {

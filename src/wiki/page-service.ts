@@ -27,6 +27,7 @@ export interface RecentChange {
   subjectId: string;
   revisionId: string | null;
   userName: string | null;
+  ip: string | null;
   changeType: string;
   summary: string;
   sizeChange: number;
@@ -71,6 +72,13 @@ export interface RebuildSearchIndexResult {
   pageCount: number;
   termCount: number;
   postingCount: number;
+}
+
+export interface RecentChangeListOptions {
+  namespace?: string;
+  groupBySubject?: boolean;
+  includeMinor?: boolean;
+  onlyCreates?: boolean;
 }
 
 export interface SavePageInput {
@@ -120,6 +128,7 @@ interface RecentChangeRow {
   subject_id: string;
   revision_id: string | null;
   user_name: string | null;
+  ip: string | null;
   change_type: string;
   summary: string;
   size_change: number;
@@ -238,19 +247,48 @@ export async function listPageRevisions(
 export async function listRecentChanges(
   db: D1Database,
   limit = 50,
-  offset = 0
+  offset = 0,
+  options: RecentChangeListOptions = {}
 ): Promise<RecentChange[]> {
   const safeLimit = Math.max(1, Math.min(limit, 100));
   const safeOffset = Math.max(0, offset);
-  const result = await db
-    .prepare(
-      `select id, subject_id, revision_id, user_name, change_type, summary, size_change, created_at
-       from changelog
-       where subject_type = 'page'
-       order by created_at desc
+  const where = ["subject_type = 'page'"];
+  const values: unknown[] = [];
+  const namespace = cleanPageId(options.namespace ?? "");
+
+  if (namespace) {
+    where.push("subject_id like ?");
+    values.push(`${namespace}:%`);
+  }
+
+  if (options.includeMinor === false) {
+    where.push("change_type <> 'minor'");
+  }
+
+  if (options.onlyCreates) {
+    where.push("change_type = 'create'");
+  }
+
+  const whereSql = where.join(" and ");
+  const sql = options.groupBySubject
+    ? `select id, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
+       from (
+         select id, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at,
+                row_number() over (partition by subject_id order by created_at desc, id desc) as recent_rank
+         from changelog
+         where ${whereSql}
+       )
+       where recent_rank = 1
+       order by created_at desc, id desc
        limit ? offset ?`
-    )
-    .bind(safeLimit, safeOffset)
+    : `select id, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
+       from changelog
+       where ${whereSql}
+       order by created_at desc, id desc
+       limit ? offset ?`;
+  const result = await db
+    .prepare(sql)
+    .bind(...values, safeLimit, safeOffset)
     .all<RecentChangeRow>();
 
   return result.results.map((row) => ({
@@ -258,6 +296,7 @@ export async function listRecentChanges(
     subjectId: row.subject_id,
     revisionId: row.revision_id,
     userName: row.user_name,
+    ip: row.ip,
     changeType: row.change_type,
     summary: row.summary,
     sizeChange: row.size_change,

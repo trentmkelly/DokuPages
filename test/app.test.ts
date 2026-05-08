@@ -2080,19 +2080,43 @@ describe("handleRequest", () => {
   });
 
   it("renders recent page changes", async () => {
+    state.changelog.push({
+      id: "page:wiki:guide@2026-05-06T00:00:00.000Z",
+      subject_type: "page",
+      subject_id: "wiki:guide",
+      revision_id: "wiki:guide@2026-05-06T00:00:00.000Z",
+      user_name: "Seeder",
+      ip: "127.0.0.1",
+      change_type: "edit",
+      summary: "Guide update",
+      size_change: -4,
+      created_at: "2026-05-06T00:00:00.000Z"
+    });
     const response = await handleRequest(new Request("https://example.com/recent"), env);
 
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Recent changes");
+    expect(html).toContain('id="dw__recent"');
     expect(html).toContain("Initial import");
     expect(html).toContain("/wiki/wiki/welcome");
+    expect(html).toContain("2026/05/07 00:00");
+    expect(html).toContain("sizechange positive");
 
     const paged = await handleRequest(new Request("https://example.com/recent?limit=1"), env);
     const pagedHtml = await paged.text();
     expect(paged.status).toBe(200);
-    expect(pagedHtml).toContain("limit=1");
-    expect(pagedHtml).toContain("offset=1");
+    expect(pagedHtml).toContain('name="first[1]"');
+    expect(pagedHtml).toContain("less recent &gt;&gt;");
+
+    const older = await handleRequest(
+      new Request("https://example.com/recent?limit=1&first%5B1%5D=1"),
+      env
+    );
+    const olderHtml = await older.text();
+    expect(older.status).toBe(200);
+    expect(olderHtml).toContain("Guide update");
+    expect(olderHtml).toContain("&lt;&lt; more recent");
   });
 
   it("renders search results from the page index", async () => {

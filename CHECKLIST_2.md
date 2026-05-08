@@ -96,7 +96,7 @@ are not fixed by this checklist.
 - [x] Match upstream revert plugin behavior, messages, and revision selection edge cases.
 - [x] Match upstream page metadata generation from `inc/parser/metadata.php`, including relations, contributors, date metadata, description abstracts, and backlinks.
 - [x] Match upstream backlink, wanted, and orphan calculations against metadata/index behavior rather than only current D1 source scans.
-- [ ] Match upstream recent changes filters, grouping, date labels, pagination, and hidden-page handling.
+- [x] Match upstream recent changes filters, grouping, date labels, pagination, and hidden-page handling.
 - [ ] Match upstream diff options, side-by-side output, inline output, media diff pages, and revision comparison edge cases.
 - [ ] Match upstream raw, XHTML, XHTML body, and other export modes from `inc/Action/Export.php`.
 

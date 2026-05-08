@@ -1286,6 +1286,87 @@ describe("auth routes", () => {
     expect(orphansHtml).not.toContain("/wiki/wiki/target");
   });
 
+  it("matches DokuWiki recent-change grouping, filters, and hidden-page pagination", async () => {
+    env = createEnv({ HIDE_PAGES: "hidden" });
+    for (const id of [
+      "wiki:visible",
+      "wiki:second",
+      "wiki:hidden",
+      "wiki:minor",
+      "other:visible"
+    ]) {
+      await seedPage(env.DB, {
+        id,
+        title: id,
+        content: `====== ${id} ======\n\nRecent fixture.`
+      });
+    }
+    await insertPageChangelog(env.DB, {
+      id: "wiki:visible",
+      changeType: "edit",
+      summary: "Latest visible edit",
+      createdAt: "2026-05-08T12:00:00.000Z"
+    });
+    await insertPageChangelog(env.DB, {
+      id: "wiki:hidden",
+      changeType: "edit",
+      summary: "Hidden edit",
+      createdAt: "2026-05-08T11:00:00.000Z"
+    });
+    await insertPageChangelog(env.DB, {
+      id: "wiki:second",
+      changeType: "edit",
+      summary: "Second visible edit",
+      createdAt: "2026-05-08T10:00:00.000Z"
+    });
+    await insertPageChangelog(env.DB, {
+      id: "wiki:minor",
+      changeType: "minor",
+      summary: "Minor edit",
+      createdAt: "2026-05-08T09:00:00.000Z"
+    });
+    await insertPageChangelog(env.DB, {
+      id: "other:visible",
+      changeType: "edit",
+      summary: "Other namespace edit",
+      createdAt: "2026-05-08T08:00:00.000Z"
+    });
+    await insertPageChangelog(env.DB, {
+      id: "wiki:visible",
+      changeType: "create",
+      summary: "Older duplicate visible edit",
+      createdAt: "2026-05-07T12:00:00.000Z"
+    });
+
+    const firstPage = await handleRequest(
+      new Request("https://example.com/recent?ns=wiki&limit=1"),
+      env
+    );
+    const firstHtml = await firstPage.text();
+    const secondPage = await handleRequest(
+      new Request("https://example.com/recent?ns=wiki&limit=1&first%5B1%5D=1"),
+      env
+    );
+    const secondHtml = await secondPage.text();
+    const noMinor = await handleRequest(
+      new Request("https://example.com/recent?ns=wiki&show_minor=0"),
+      env
+    );
+    const noMinorHtml = await noMinor.text();
+
+    expect(firstPage.status).toBe(200);
+    expect(firstHtml).toContain("Latest visible edit");
+    expect(firstHtml).toContain('name="first[1]"');
+    expect(firstHtml).not.toContain("Hidden edit");
+    expect(firstHtml).not.toContain("Older duplicate visible edit");
+    expect(firstHtml).not.toContain("Other namespace edit");
+    expect(secondPage.status).toBe(200);
+    expect(secondHtml).toContain("Second visible edit");
+    expect(secondHtml).not.toContain("Hidden edit");
+    expect(noMinor.status).toBe(200);
+    expect(noMinorHtml).not.toContain("/wiki/wiki/minor");
+  });
+
   it("allows admin users to purge global render and discovery caches", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -1843,6 +1924,29 @@ async function insertPageMetadata(d1, id, key, value) {
        values ('page', ?, ?, ?, ?)`
     )
     .bind(id, key, JSON.stringify(value), "2026-05-07T00:00:00.000Z")
+    .run();
+}
+
+async function insertPageChangelog(d1, { id, changeType, summary, createdAt, sizeChange = 12 }) {
+  await d1
+    .prepare(
+      `insert into changelog (
+         id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+         change_type, summary, size_change, created_at
+       ) values (?, 'page', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      `page:${id}@${createdAt}:${changeType}`,
+      id,
+      `${id}@${createdAt}`,
+      null,
+      "Seeder",
+      "127.0.0.1",
+      changeType,
+      summary,
+      sizeChange,
+      createdAt
+    )
     .run();
 }
 

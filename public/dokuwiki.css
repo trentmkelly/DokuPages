@@ -920,6 +920,17 @@ form.search button {
   background: transparent;
 }
 
+.dokuwiki .changeType {
+  margin-bottom: 0.5em;
+}
+
+.dokuwiki form.changes .changeType label,
+.dokuwiki form.changes .changeType select,
+.dokuwiki form.changes .changeType input,
+.dokuwiki form.changes .changeType button {
+  margin-right: 0.35em;
+}
+
 .dokuwiki form.changes ul {
   padding-left: 0;
 }
@@ -957,6 +968,32 @@ form.search button {
 
 .dokuwiki form.changes li span.sum {
   font-weight: bold;
+}
+
+.dokuwiki form.changes li .sizechange {
+  padding: 0.1em 0.2em;
+  border-radius: 0.2em;
+  background: #ddd;
+  font-size: 80%;
+}
+
+.dokuwiki form.changes li .sizechange.positive {
+  background: #cfc;
+}
+
+.dokuwiki form.changes li .sizechange.negative {
+  background: #fdd;
+}
+
+.dokuwiki div.pagenav {
+  margin: 1.4em 0;
+  text-align: center;
+}
+
+.dokuwiki div.pagenav-prev,
+.dokuwiki div.pagenav-next {
+  display: inline;
+  margin: 0 0.5em;
 }
 
 .dokuwiki table.diff {
