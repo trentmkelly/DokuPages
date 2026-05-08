@@ -1,0 +1,190 @@
+#!/usr/bin/env node
+
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+const DEFAULT_BASE_URL = "https://dokutest.pages.dev";
+const DEFAULT_BASELINE = "test/visual-baselines.json";
+const DEFAULT_OUTPUT_DIR = ".wrangler/visual-regression";
+const CASES = [
+  {
+    name: "welcome-desktop",
+    path: "/wiki/wiki/welcome",
+    width: 1280,
+    height: 900
+  },
+  {
+    name: "welcome-mobile",
+    path: "/wiki/wiki/welcome",
+    width: 390,
+    height: 844
+  },
+  {
+    name: "login-desktop",
+    path: "/login",
+    width: 1024,
+    height: 768
+  }
+];
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const chromium = args.chromium || (await findChromium());
+
+  if (!chromium) {
+    throw new Error("Unable to find Chromium. Pass --chromium /path/to/chromium.");
+  }
+
+  await mkdir(args.outputDir, { recursive: true });
+
+  const results = [];
+  for (const item of CASES) {
+    const screenshotPath = path.join(args.outputDir, `${item.name}.png`);
+    const url = new URL(item.path, args.baseUrl);
+    await captureScreenshot(chromium, url.href, screenshotPath, item.width, item.height);
+    results.push(await screenshotResult(item, screenshotPath));
+  }
+
+  if (args.update) {
+    await writeFile(args.baseline, `${JSON.stringify({ version: 1, cases: results }, null, 2)}\n`);
+    console.log(`updated ${args.baseline}`);
+    return;
+  }
+
+  const baseline = JSON.parse(await readFile(args.baseline, "utf8"));
+  compareResults(baseline.cases ?? [], results);
+  console.log(
+    `visual regression passed for ${results.length} screenshot${results.length === 1 ? "" : "s"}`
+  );
+}
+
+function parseArgs(argv) {
+  const args = {
+    baseUrl: process.env.BASE_URL || DEFAULT_BASE_URL,
+    baseline: DEFAULT_BASELINE,
+    outputDir: DEFAULT_OUTPUT_DIR,
+    chromium: process.env.CHROMIUM_BIN || "",
+    update: false
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--base-url") {
+      args.baseUrl = argv[++index];
+    } else if (arg === "--baseline") {
+      args.baseline = argv[++index];
+    } else if (arg === "--output-dir") {
+      args.outputDir = argv[++index];
+    } else if (arg === "--chromium") {
+      args.chromium = argv[++index];
+    } else if (arg === "--update") {
+      args.update = true;
+    }
+  }
+
+  return args;
+}
+
+async function findChromium() {
+  const candidates = ["chromium", "chromium-browser", "google-chrome", "/snap/bin/chromium"];
+
+  for (const candidate of candidates) {
+    try {
+      await execFilePromise(candidate, ["--version"]);
+      return candidate;
+    } catch {
+      // Try the next common executable name.
+    }
+  }
+
+  return "";
+}
+
+async function captureScreenshot(chromium, url, screenshotPath, width, height) {
+  await execFilePromise(chromium, [
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--hide-scrollbars",
+    `--window-size=${width},${height}`,
+    `--screenshot=${screenshotPath}`,
+    url
+  ]);
+}
+
+async function screenshotResult(item, screenshotPath) {
+  const buffer = await readFile(screenshotPath);
+  const dimensions = pngDimensions(buffer);
+
+  if (dimensions.width !== item.width || dimensions.height !== item.height) {
+    throw new Error(
+      `${item.name} dimensions were ${dimensions.width}x${dimensions.height}; expected ${item.width}x${item.height}`
+    );
+  }
+
+  return {
+    name: item.name,
+    path: item.path,
+    viewport: {
+      width: item.width,
+      height: item.height
+    },
+    byteLength: buffer.byteLength,
+    sha256: createHash("sha256").update(buffer).digest("hex")
+  };
+}
+
+function pngDimensions(buffer) {
+  const signature = buffer.subarray(0, 8).toString("hex");
+  if (signature !== "89504e470d0a1a0a") {
+    throw new Error("Screenshot was not a PNG.");
+  }
+
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
+function compareResults(expectedCases, actualCases) {
+  const expectedByName = new Map(expectedCases.map((item) => [item.name, item]));
+
+  for (const actual of actualCases) {
+    const expected = expectedByName.get(actual.name);
+    if (!expected) {
+      throw new Error(`Missing visual baseline for ${actual.name}.`);
+    }
+
+    if (JSON.stringify(expected.viewport) !== JSON.stringify(actual.viewport)) {
+      throw new Error(`Viewport changed for ${actual.name}.`);
+    }
+
+    if (expected.sha256 !== actual.sha256) {
+      throw new Error(
+        `Visual hash changed for ${actual.name}. Run npm run test:visual -- --update after reviewing the screenshot.`
+      );
+    }
+  }
+}
+
+function execFilePromise(command, args) {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { timeout: 60_000 }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(`${command} ${args.join(" ")} failed\n${stderr || stdout}`));
+        return;
+      }
+
+      resolve(stdout);
+    });
+  });
+}
+
+try {
+  await main();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}

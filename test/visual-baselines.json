@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "welcome-desktop",
+      "path": "/wiki/wiki/welcome",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "byteLength": 131569,
+      "sha256": "c213a16a3a6ef1698c2778722c6ec674eff9dd0ea7f27210a936fa3f6c9419ec"
+    },
+    {
+      "name": "welcome-mobile",
+      "path": "/wiki/wiki/welcome",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "byteLength": 78076,
+      "sha256": "0401194828e73681636fffda88c4a0815ad3946a87f414aad0acfecbeef2b2ce"
+    },
+    {
+      "name": "login-desktop",
+      "path": "/login",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "byteLength": 46717,
+      "sha256": "fd48207e00000fe484a6028ca3e8cac0882e652cd54536607a94df21996d60c3"
+    }
+  ]
+}

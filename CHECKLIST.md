@@ -663,7 +663,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add URL compatibility tests.
 - [x] Add API compatibility tests if APIs are supported.
 - [x] Add accessibility tests.
-- [ ] Add visual regression tests.
+- [x] Add visual regression tests.
 - [x] Add mobile viewport tests.
 - [ ] Add performance tests.
 - [ ] Add load tests within Workers limits.

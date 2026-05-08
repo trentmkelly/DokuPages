@@ -25,6 +25,7 @@
     "cache:warm": "node scripts/warm-cache.mjs",
     "smoke": "node scripts/smoke-pages.mjs",
     "test:e2e": "node scripts/smoke-pages.mjs",
+    "test:visual": "node scripts/visual-regression.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

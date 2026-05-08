@@ -9,6 +9,7 @@ npm run lint
 npm run format:check
 npm run audit
 npm run scan:secrets
+npm run test:visual -- --base-url https://dokutest.pages.dev
 npm run test:e2e -- --base-url https://dokutest.pages.dev
 ```
 
@@ -37,6 +38,12 @@ icon-only page tools.
 Responsive CSS tests cover the mobile navigation breakpoints, narrow-viewport
 header controls, long-word wrapping, diagnostic/media detail overflow behavior,
 and fixed-size font rules.
+
+Visual regression checks use local Chromium to capture desktop welcome, mobile
+welcome, and desktop login screenshots from a deployed Pages URL. The committed
+`test/visual-baselines.json` records viewport sizes and screenshot hashes; run
+`npm run test:visual -- --base-url <url> --update` only after reviewing changed
+screenshots in `.wrangler/visual-regression/`.
 
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
