@@ -38,6 +38,7 @@ export interface RenderWikiTextOptions {
   maxTocLevel?: number;
   maxSectionEditLevel?: number;
   camelCaseLinks?: boolean;
+  typographyMode?: number;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -170,6 +171,7 @@ export function renderWikiText(
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
     maxSectionEditLevel: clampHeadingLevel(options.maxSectionEditLevel, 5, 0),
     camelCaseLinks: options.camelCaseLinks ?? false,
+    typographyMode: clampTypographyMode(options.typographyMode),
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -400,6 +402,7 @@ interface RenderContext {
   maxTocLevel: number;
   maxSectionEditLevel: number;
   camelCaseLinks: boolean;
+  typographyMode: number;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -719,6 +722,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             maxTocLevel: context.maxTocLevel,
             maxSectionEditLevel: context.maxSectionEditLevel,
             camelCaseLinks: context.camelCaseLinks,
+            typographyMode: context.typographyMode,
             sectionIndex: context.sectionIndex,
             anchorIds: context.anchorIds
           }
@@ -756,11 +760,11 @@ function renderInline(source: string, context: RenderContext): string {
   });
 
   rendered = escapeHtml(rendered);
-  rendered = renderTypography(rendered);
   rendered = renderMedia(rendered, context, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
+  rendered = renderTypography(rendered, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
   rendered = renderSmileys(rendered, protectHtml);
   rendered = renderAcronyms(rendered, protectHtml);
@@ -794,8 +798,8 @@ function renderInline(source: string, context: RenderContext): string {
   return rendered;
 }
 
-function renderTypography(source: string): string {
-  return source
+function renderTypography(source: string, typographyMode: number): string {
+  let rendered = source
     .replace(/&lt;-&gt;/g, "&harr;")
     .replace(/&lt;=&gt;/g, "&hArr;")
     .replace(/-&gt;/g, "&rarr;")
@@ -810,6 +814,22 @@ function renderTypography(source: string): string {
     .replace(/\.\.\./g, "&hellip;")
     .replace(/---/g, "&mdash;")
     .replace(/--/g, "&ndash;");
+
+  if (typographyMode > 0) {
+    rendered = rendered
+      .replace(/\b([1-9]|\d{2,})[xX](\d+)\b/g, "$1&times;$2")
+      .replace(/(^|[\s/#~:+=&%@\-()[\]{}><"'])&quot;(?=[^\s/#~:+=&%@\-()[\]{}><"';,.?!])/g, "$1“")
+      .replace(/&quot;/g, "”");
+  }
+
+  if (typographyMode === 2) {
+    rendered = rendered
+      .replace(/(^|[\s/#~:+=&%@\-()[\]{}><"'])&#39;(?=[^\s/#~:+=&%@\-()[\]{}><"';,.?!])/g, "$1‘")
+      .replace(/&#39;(?=$|[\s/#~:+=&%@\-()[\]{}><"';,.?!])/g, "’")
+      .replace(/&#39;/g, "’");
+  }
+
+  return rendered;
 }
 
 function renderSmileys(source: string, protectHtml: (html: string) => string): string {
@@ -1150,6 +1170,12 @@ function clampHeadingLevel(value: number | undefined, fallback: number, min = 1)
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) return fallback;
   return Math.max(min, Math.min(5, parsed));
+}
+
+function clampTypographyMode(value: number | undefined): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return 1;
+  return Math.max(0, Math.min(2, parsed));
 }
 
 function escapeHtml(value: string): string {

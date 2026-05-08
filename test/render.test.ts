@@ -81,8 +81,10 @@ describe("renderWikiText", () => {
 
   it("renders forced line breaks, entities, and typography replacements", () => {
     const rendered = renderWikiText(
-      "first \\\\\nsecond (c) (tm) -> <- <-> => <= <=> >> << ... --- --"
+      'first \\\\\nsecond (c) (tm) -> <- <-> => <= <=> >> << ... --- -- 640x480 "quoted"'
     );
+    const disabled = renderWikiText('"quoted" 640x480', { typographyMode: 0 });
+    const singleQuotes = renderWikiText("'quoted' don't", { typographyMode: 2 });
 
     expect(rendered.html).toContain("first <br>second");
     expect(rendered.html).toContain("&copy;");
@@ -98,6 +100,10 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain("&hellip;");
     expect(rendered.html).toContain("&mdash;");
     expect(rendered.html).toContain("&ndash;");
+    expect(rendered.html).toContain("640&times;480");
+    expect(rendered.html).toContain("“quoted”");
+    expect(disabled.html).toContain("&quot;quoted&quot; 640x480");
+    expect(singleQuotes.html).toContain("‘quoted’ don’t");
   });
 
   it("renders horizontal rules for the DokuWiki template", () => {

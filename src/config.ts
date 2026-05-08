@@ -33,6 +33,7 @@ export interface RuntimeConfig {
   maxSectionEditLevel: number;
   useHeading: boolean;
   camelCaseLinks: boolean;
+  typographyMode: number;
   appVersion: string;
 }
 
@@ -89,6 +90,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     maxSectionEditLevel: integerConfig(env.MAX_SECTION_EDIT_LEVEL, 3, 0, 5),
     useHeading: truthy(env.USE_HEADING),
     camelCaseLinks: truthy(env.CAMELCASE),
+    typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -108,6 +110,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("TOC_MIN_HEADS", env.TOC_MIN_HEADS, 0, 99, issues);
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("MAX_SECTION_EDIT_LEVEL", env.MAX_SECTION_EDIT_LEVEL, 0, 5, issues);
+  validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateAppVersion(env.APP_VERSION, issues);
   validateApiBearerToken(env.API_BEARER_TOKEN, issues);
   validateEmailProvider(env.EMAIL_PROVIDER, issues);
@@ -155,6 +158,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     ),
     configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
+    configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",

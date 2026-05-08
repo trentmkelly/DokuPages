@@ -21,6 +21,7 @@ export interface Env {
   MAX_SECTION_EDIT_LEVEL?: string;
   USE_HEADING?: string;
   CAMELCASE?: string;
+  TYPOGRAPHY?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

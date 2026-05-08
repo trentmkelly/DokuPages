@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 19;
+const RENDER_CACHE_VERSION = 20;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1075,7 +1075,8 @@ async function handlePagePreview(
   const rendered = renderWikiText(content, {
     pageId: pageId || undefined,
     existingPageIds,
-    camelCaseLinks: config.camelCaseLinks
+    camelCaseLinks: config.camelCaseLinks,
+    typographyMode: config.typographyMode
   });
 
   if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
@@ -2527,7 +2528,8 @@ function usesDefaultRenderControls(config: ReturnType<typeof getRuntimeConfig>):
     config.tocMinHeads === 3 &&
     config.maxTocLevel === 3 &&
     config.maxSectionEditLevel === 3 &&
-    !config.camelCaseLinks
+    !config.camelCaseLinks &&
+    config.typographyMode === 1
   );
 }
 
@@ -2608,7 +2610,8 @@ async function renderPageHtml(
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
-    camelCaseLinks: config.camelCaseLinks
+    camelCaseLinks: config.camelCaseLinks,
+    typographyMode: config.typographyMode
   });
   const title = displayPageTitle(config, rendered.title, page?.title, id);
 
@@ -2666,7 +2669,8 @@ async function renderPageExport(
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
-    camelCaseLinks: config.camelCaseLinks
+    camelCaseLinks: config.camelCaseLinks,
+    typographyMode: config.typographyMode
   });
   const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
   const language = config.language;
