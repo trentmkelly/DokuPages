@@ -98,6 +98,7 @@ describe("handleRequest", () => {
     env.AUTOPLURAL = undefined;
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
+    env.MEDIAREVISIONS = undefined;
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
@@ -1322,6 +1323,85 @@ describe("handleRequest", () => {
       media_id: "wiki:logo.svg",
       change_type: "edit"
     });
+  });
+
+  it("matches disabled media revision overwrite, history, delete, and revert behavior", async () => {
+    env.MEDIAREVISIONS = "0";
+    const initialRevisionCount = state.mediaRevisions.length;
+    const uploadForm = new FormData();
+    uploadForm.set("ns", "wiki");
+    uploadForm.set("overwrite", "1");
+    uploadForm.set("file", new File(["replacement"], "logo.svg", { type: "image/svg+xml" }));
+
+    state.aclRules = [aclRule("*", "all", "@ALL", 8)];
+    const deniedOverwrite = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: uploadForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(deniedOverwrite.status).toBe(403);
+    await expect(deniedOverwrite.json()).resolves.toMatchObject({
+      requiredPermission: 16
+    });
+
+    state.aclRules = seedAclRules();
+    const overwrite = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: uploadForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+    const revisions = await handleRequest(
+      new Request("https://example.com/api/v1/media/revisions?id=wiki:logo.svg", {
+        headers: { authorization: "Bearer test-token" }
+      }),
+      env
+    );
+    const detail = await handleRequest(
+      new Request("https://example.com/media-detail/wiki/logo.svg"),
+      env
+    );
+    const revertForm = new FormData();
+    revertForm.set("id", "wiki:logo.svg");
+    revertForm.set("revisionId", "media-rev-1");
+    const revert = await handleRequest(
+      new Request("https://example.com/api/media/revert", {
+        method: "POST",
+        body: revertForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+    const deleteForm = new FormData();
+    deleteForm.set("id", "wiki:logo.svg");
+    const deleted = await handleRequest(
+      new Request("https://example.com/api/media/delete", {
+        method: "POST",
+        body: deleteForm,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(overwrite.status).toBe(200);
+    expect(state.media.find((media) => media.id === "wiki:logo.svg")).toMatchObject({
+      byte_length: 11,
+      is_deleted: 1
+    });
+    expect(state.mediaRevisions).toHaveLength(initialRevisionCount);
+    await expect(revisions.json()).resolves.toMatchObject({ ok: true, revisions: [] });
+    await expect(detail.text()).resolves.not.toContain("media__revert");
+    expect(revert.status).toBe(404);
+    await expect(revert.json()).resolves.toMatchObject({
+      error: "Media revisions are disabled."
+    });
+    expect(deleted.status).toBe(200);
   });
 
   it("rejects unsafe media uploads before writing R2 objects", async () => {
@@ -3546,7 +3626,7 @@ function createD1Stub(state: D1StubState): D1Database {
         });
       }
 
-      if (mediaStatement && mediaRevisionStatement) {
+      if (mediaStatement) {
         const [
           id,
           namespace,
@@ -3558,18 +3638,6 @@ function createD1Stub(state: D1StubState): D1Database {
           createdAt,
           updatedAt
         ] = mediaStatement.values;
-        const [
-          revisionId,
-          mediaId,
-          revisionObjectKey,
-          revisionMimeType,
-          revisionByteLength,
-          revisionContentHash,
-          authorId,
-          summary,
-          changeType,
-          revisionCreatedAt
-        ] = mediaRevisionStatement.values;
         const existingMedia = state.media.find((media) => media.id === id);
 
         if (existingMedia) {
@@ -3596,34 +3664,37 @@ function createD1Stub(state: D1StubState): D1Database {
           });
         }
 
-        state.mediaRevisions.unshift({
-          id: revisionId,
-          media_id: mediaId,
-          object_key: revisionObjectKey,
-          mime_type: revisionMimeType,
-          byte_length: revisionByteLength,
-          content_hash: revisionContentHash,
-          author_id: authorId,
-          summary,
-          change_type: changeType,
-          created_at: revisionCreatedAt
-        });
+        if (mediaRevisionStatement) {
+          const [
+            revisionId,
+            mediaId,
+            revisionObjectKey,
+            revisionMimeType,
+            revisionByteLength,
+            revisionContentHash,
+            authorId,
+            summary,
+            changeType,
+            revisionCreatedAt
+          ] = mediaRevisionStatement.values;
+
+          state.mediaRevisions.unshift({
+            id: revisionId,
+            media_id: mediaId,
+            object_key: revisionObjectKey,
+            mime_type: revisionMimeType,
+            byte_length: revisionByteLength,
+            content_hash: revisionContentHash,
+            author_id: authorId,
+            summary,
+            change_type: changeType,
+            created_at: revisionCreatedAt
+          });
+        }
       }
 
-      if (mediaDeleteStatement && mediaRevisionStatement) {
+      if (mediaDeleteStatement) {
         const [currentRevisionId, updatedAt, id] = mediaDeleteStatement.values;
-        const [
-          revisionId,
-          mediaId,
-          revisionObjectKey,
-          revisionMimeType,
-          revisionByteLength,
-          revisionContentHash,
-          authorId,
-          summary,
-          changeType,
-          revisionCreatedAt
-        ] = mediaRevisionStatement.values;
         const existingMedia = state.media.find((media) => media.id === id);
 
         if (existingMedia) {
@@ -3632,18 +3703,33 @@ function createD1Stub(state: D1StubState): D1Database {
           existingMedia.updated_at = updatedAt;
         }
 
-        state.mediaRevisions.unshift({
-          id: revisionId,
-          media_id: mediaId,
-          object_key: revisionObjectKey,
-          mime_type: revisionMimeType,
-          byte_length: revisionByteLength,
-          content_hash: revisionContentHash,
-          author_id: authorId,
-          summary,
-          change_type: changeType,
-          created_at: revisionCreatedAt
-        });
+        if (mediaRevisionStatement) {
+          const [
+            revisionId,
+            mediaId,
+            revisionObjectKey,
+            revisionMimeType,
+            revisionByteLength,
+            revisionContentHash,
+            authorId,
+            summary,
+            changeType,
+            revisionCreatedAt
+          ] = mediaRevisionStatement.values;
+
+          state.mediaRevisions.unshift({
+            id: revisionId,
+            media_id: mediaId,
+            object_key: revisionObjectKey,
+            mime_type: revisionMimeType,
+            byte_length: revisionByteLength,
+            content_hash: revisionContentHash,
+            author_id: authorId,
+            summary,
+            change_type: changeType,
+            created_at: revisionCreatedAt
+          });
+        }
       }
 
       for (const statement of statements) {

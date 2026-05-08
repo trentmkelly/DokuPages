@@ -31,6 +31,7 @@ export interface Env {
   AUTOPLURAL?: string;
   REL_NOFOLLOW?: string;
   REFCHECK?: string;
+  MEDIAREVISIONS?: string;
   DEACCENT?: string;
   FNENCODE?: string;
   SEPCHAR?: string;

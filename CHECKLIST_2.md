@@ -106,7 +106,7 @@ are not fixed by this checklist.
 - [x] Implement resized media responses for `w`, `h`, `tok`, and cache-busting parameters accepted by `lib/exe/fetch.php`.
 - [x] Implement DokuWiki's media token and anti-hotlink checks where applicable.
 - [x] Implement DokuWiki's `refcheck` behavior before media deletion.
-- [ ] Match upstream media overwrite, delete, and revision behavior when `mediarevisions` is disabled.
+- [x] Match upstream media overwrite, delete, and revision behavior when `mediarevisions` is disabled.
 - [ ] Match upstream media detail UI from `lib/tpl/dokuwiki/detail.php` and `inc/Ui/MediaRevisions.php`.
 - [ ] Match upstream media manager tabs, namespace tree behavior, file list behavior, upload progress, and selection callbacks from `lib/exe/mediamanager.php` and `lib/scripts/media.js`.
 - [x] Match upstream row and thumbnail media-manager modes, sorting, and pagination from `inc/Ui/Media/DisplayRow.php` and `DisplayTile.php`.

@@ -42,6 +42,7 @@ export interface SaveMediaUploadInput {
   mimeType?: string | null;
   summary: string;
   overwrite?: boolean;
+  mediaRevisions?: boolean;
   authorId?: string | null;
   authorName?: string | null;
   ip?: string | null;
@@ -64,6 +65,7 @@ export interface DeleteMediaInput {
   id: string;
   summary: string;
   refcheck?: boolean;
+  mediaRevisions?: boolean;
   authorId?: string | null;
   authorName?: string | null;
   ip?: string | null;
@@ -379,6 +381,7 @@ export async function saveMediaUpload(
   const changeType = current ? "edit" : "create";
   const summary = input.summary;
   const sizeChange = byteLength - (current?.byteLength ?? 0);
+  const mediaRevisions = input.mediaRevisions ?? true;
 
   await bucket.put(objectKey, input.body, {
     httpMetadata: {
@@ -410,25 +413,29 @@ export async function saveMediaUpload(
              updated_at = excluded.updated_at`
         )
         .bind(id, namespace, objectKey, mimeType, byteLength, contentHash, revisionId, now, now),
-      db
-        .prepare(
-          `insert into media_revisions (
-             id, media_id, object_key, mime_type, byte_length, content_hash,
-             author_id, summary, change_type, created_at
-           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .bind(
-          revisionId,
-          id,
-          objectKey,
-          mimeType,
-          byteLength,
-          contentHash,
-          input.authorId ?? null,
-          summary,
-          changeType,
-          now
-        ),
+      ...(mediaRevisions
+        ? [
+            db
+              .prepare(
+                `insert into media_revisions (
+                   id, media_id, object_key, mime_type, byte_length, content_hash,
+                   author_id, summary, change_type, created_at
+                 ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              )
+              .bind(
+                revisionId,
+                id,
+                objectKey,
+                mimeType,
+                byteLength,
+                contentHash,
+                input.authorId ?? null,
+                summary,
+                changeType,
+                now
+              )
+          ]
+        : []),
       db
         .prepare(
           `insert into changelog (
@@ -511,6 +518,7 @@ export async function deleteMedia(
   const now = (input.now ?? new Date()).toISOString();
   const revisionId = `${id}@${now}`;
   const summary = input.summary || "Deleted media";
+  const mediaRevisions = input.mediaRevisions ?? true;
 
   await db.batch([
     db
@@ -520,25 +528,29 @@ export async function deleteMedia(
          where id = ?`
       )
       .bind(revisionId, now, id),
-    db
-      .prepare(
-        `insert into media_revisions (
-           id, media_id, object_key, mime_type, byte_length, content_hash,
-           author_id, summary, change_type, created_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        revisionId,
-        id,
-        current.objectKey,
-        current.mimeType,
-        current.byteLength,
-        current.contentHash,
-        input.authorId ?? null,
-        summary,
-        "delete",
-        now
-      ),
+    ...(mediaRevisions
+      ? [
+          db
+            .prepare(
+              `insert into media_revisions (
+                 id, media_id, object_key, mime_type, byte_length, content_hash,
+                 author_id, summary, change_type, created_at
+               ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(
+              revisionId,
+              id,
+              current.objectKey,
+              current.mimeType,
+              current.byteLength,
+              current.contentHash,
+              input.authorId ?? null,
+              summary,
+              "delete",
+              now
+            )
+        ]
+      : []),
     db
       .prepare(
         `insert into changelog (

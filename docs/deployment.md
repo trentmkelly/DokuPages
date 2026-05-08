@@ -67,6 +67,8 @@ Optional Pages environment variables:
   DokuWiki install. It signs DokuWiki-compatible media resize tokens.
 - `REFCHECK`: set to `0` to disable DokuWiki-style media delete reference
   checks. Default: enabled.
+- `MEDIAREVISIONS`: set to `0` to disable media revision history, restore,
+  and old-revision fetches. Default: enabled.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.

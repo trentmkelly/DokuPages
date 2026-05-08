@@ -1621,6 +1621,10 @@ async function handleNativeApiMediaRevisions(
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
   if (denied) return denied;
 
+  if (!getRuntimeConfig(env).mediaRevisions) {
+    return jsonResponse({ ok: true, revisions: [] });
+  }
+
   const revisions = await listMediaRevisions(
     env.DB,
     id,
@@ -1656,7 +1660,16 @@ async function handleNativeApiMediaUpload(
     return jsonResponse({ error: "Missing media id." }, { status: 400 });
   }
 
-  const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
+  const config = getRuntimeConfig(env);
+  const overwrite = Boolean(form.get("overwrite"));
+  const existing = overwrite && !config.mediaRevisions ? await getCurrentMedia(env.DB, id) : null;
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    existing ? ACL_DELETE : ACL_UPLOAD
+  );
   if (denied) return denied;
 
   const rateLimited = await uploadRateLimitResponse(request, env, principal);
@@ -1681,7 +1694,8 @@ async function handleNativeApiMediaUpload(
     body: mediaBody,
     mimeType: file.type || null,
     summary: String(form.get("summary") ?? ""),
-    overwrite: Boolean(form.get("overwrite")),
+    overwrite,
+    mediaRevisions: config.mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
     ip: getClientIp(request)
@@ -1735,6 +1749,7 @@ async function handleNativeApiMediaDelete(
     id,
     summary: String(body.value.summary ?? ""),
     refcheck: getRuntimeConfig(env).refcheck,
+    mediaRevisions: getRuntimeConfig(env).mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
     ip: getClientIp(request)
@@ -1765,6 +1780,10 @@ async function handleNativeApiMediaRevert(
 
   if (!id || !revisionId) {
     return jsonResponse({ error: "Missing media id or revision id." }, { status: 400 });
+  }
+
+  if (!getRuntimeConfig(env).mediaRevisions) {
+    return jsonResponse({ error: "Media revisions are disabled." }, { status: 404 });
   }
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
@@ -2239,6 +2258,10 @@ async function handleMediaFetch(
   if (denied) return denied;
 
   const revisionId = url.searchParams.get("rev");
+  if (revisionId && !getRuntimeConfig(env).mediaRevisions) {
+    return notFoundResponse(`Media revision '${revisionId}' was not found.`);
+  }
+
   const media = revisionId
     ? await getMediaRevision(env.DB, revisionId)
     : await getCurrentMedia(env.DB, id);
@@ -2488,13 +2511,31 @@ async function renderMediaDetailPage(
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
   if (denied) return denied;
 
+  const mediaRevisions = getRuntimeConfig(env).mediaRevisions;
   if (url.searchParams.get("mediado") === "diff" || url.searchParams.get("do") === "diff") {
+    if (!mediaRevisions) {
+      return htmlShell(env, "Media revisions disabled", "<p>Media revisions are disabled.</p>", {
+        principal
+      });
+    }
     return renderMediaDiffPage(env, id, media, url, principal);
   }
 
   const preview = media.mimeType.startsWith("image/")
     ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}" loading="lazy" decoding="async"></a></p>`
     : `<p><a href="${mediaPath(id)}">Download ${escapeHtml(mediaName(id))}</a></p>`;
+
+  const revertForm = mediaRevisions
+    ? `<form class="media__revert" method="post" action="/api/media/revert">
+        ${csrfInput(csrfToken)}
+        <input type="hidden" name="id" value="${escapeAttribute(id)}">
+        <label for="media__revert_revision">Revision ID</label>
+        <input id="media__revert_revision" name="revisionId" type="text" required>
+        <label for="media__revert_summary">Revert summary</label>
+        <input id="media__revert_summary" name="summary" type="text">
+        <button type="submit">Revert media</button>
+      </form>`
+    : "";
 
   return htmlShell(
     env,
@@ -2513,15 +2554,7 @@ async function renderMediaDetailPage(
           <dt>Hash</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
         </dl>
       </div>
-      <form class="media__revert" method="post" action="/api/media/revert">
-        ${csrfInput(csrfToken)}
-        <input type="hidden" name="id" value="${escapeAttribute(id)}">
-        <label for="media__revert_revision">Revision ID</label>
-        <input id="media__revert_revision" name="revisionId" type="text" required>
-        <label for="media__revert_summary">Revert summary</label>
-        <input id="media__revert_summary" name="summary" type="text">
-        <button type="submit">Revert media</button>
-      </form>
+      ${revertForm}
       <form class="media__delete" method="post" action="/api/media/delete">
         ${csrfInput(csrfToken)}
         <input type="hidden" name="id" value="${escapeAttribute(id)}">
@@ -8504,7 +8537,16 @@ async function handleMediaUpload(
     return jsonResponse({ error: "Missing media id." }, { status: 400 });
   }
 
-  const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);
+  const config = getRuntimeConfig(env);
+  const overwrite = Boolean(form.get("overwrite"));
+  const existing = overwrite && !config.mediaRevisions ? await getCurrentMedia(env.DB, id) : null;
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    existing ? ACL_DELETE : ACL_UPLOAD
+  );
   if (denied) return denied;
 
   const rateLimited = await uploadRateLimitResponse(request, env, principal);
@@ -8536,7 +8578,8 @@ async function handleMediaUpload(
     body,
     mimeType: file.type || null,
     summary: String(form.get("summary") ?? ""),
-    overwrite: Boolean(form.get("overwrite")),
+    overwrite,
+    mediaRevisions: config.mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
     ip: getClientIp(request)
@@ -8600,6 +8643,7 @@ async function handleMediaDelete(
     id,
     summary: String(form.get("summary") ?? ""),
     refcheck: getRuntimeConfig(env).refcheck,
+    mediaRevisions: getRuntimeConfig(env).mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
     ip: getClientIp(request)
@@ -8707,6 +8751,16 @@ async function handleMediaRevert(
 
   if (!id || !revisionId) {
     return jsonResponse({ error: "Missing media id or revision id." }, { status: 400 });
+  }
+
+  if (!getRuntimeConfig(env).mediaRevisions) {
+    const message = "Media revisions are disabled.";
+    if (acceptsJson(request)) {
+      return jsonResponse({ error: message }, { status: 404 });
+    }
+    return htmlResponse(htmlShell(env, "Media revert disabled", `<p>${escapeHtml(message)}</p>`), {
+      status: 404
+    });
   }
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_UPLOAD);

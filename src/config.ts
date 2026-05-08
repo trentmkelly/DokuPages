@@ -43,6 +43,7 @@ export interface RuntimeConfig {
   autoPluralLinks: boolean;
   relNofollow: boolean;
   refcheck: boolean;
+  mediaRevisions: boolean;
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
@@ -128,6 +129,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     autoPluralLinks: truthy(env.AUTOPLURAL),
     relNofollow: booleanConfig(env.REL_NOFOLLOW, true),
     refcheck: booleanConfig(env.REFCHECK, true),
+    mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
     pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
@@ -219,6 +221,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("AUTOPLURAL", env.AUTOPLURAL, String(config.autoPluralLinks), "false"),
     configEntry("REL_NOFOLLOW", env.REL_NOFOLLOW, String(config.relNofollow), "true"),
     configEntry("REFCHECK", env.REFCHECK, String(config.refcheck), "true"),
+    configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
     configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
     configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),
