@@ -17,7 +17,7 @@ path.
 | `popularity`   | Removed. The port does not phone home usage statistics.                                           |
 | `revert`       | Replaced by native page and media revision revert routes.                                         |
 | `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                          |
-| `styling`      | Replaced by build-time theme assets and checked-in CSS.                                           |
+| `styling`      | Replaced by build-time theme assets and checked-in CSS; no runtime styling popup is loaded.       |
 | `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.            |
 | `authad`       | Deferred to an external identity or sync bridge.                                                  |
 | `authldap`     | Deferred to an external identity or sync bridge.                                                  |

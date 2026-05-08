@@ -33,7 +33,7 @@ of full PHP DokuWiki runtime compatibility.
 - Email delivery, subscriptions, digests, password reset emails, and registration notifications.
 - Server-side ImageMagick/GD thumbnail generation. The current media strategy serves originals and documents derivative policy headers.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
-- Thumbnail cache, cache warming, and stale fallback.
+- Thumbnail cache and stale fallback.
 - Scheduled production backup automation and final launch rehearsal verification.
 
 ## Plugin Compatibility
@@ -51,6 +51,7 @@ PHP modules to execute. Current decisions:
 - `popularity`: unsupported.
 - `revert`: replaced by native page/media revert routes.
 - `safefnrecode`: migration-only if needed.
-- `styling`: build-time theme configuration unless a native styling UI is added.
+- `styling`: build-time checked-in theme CSS; runtime styling editor is not
+  loaded on Pages.
 - `usermanager`: replaced by native `/admin/users` user management.
 - `authad`, `authldap`, `authpdo`: deferred to external identity/sync bridges.

@@ -94,6 +94,15 @@ The default warming set requests the site root, welcome page, syntax page,
 sitemap, and RSS feed. Operators can add `--path /wiki/custom/page` arguments
 for release-specific pages.
 
+## Stale Fallback Decision
+
+The Pages port does not serve stale rendered page HTML after cache validation
+fails. Rendered cache entries include revision ID and renderer version checks,
+and private pages bypass shared cache entirely. Falling back to stale HTML after
+edits, ACL changes, or renderer updates could expose outdated content or the
+wrong visibility state, so the safer behavior is to re-render or return the
+storage error mapped by the route.
+
 ## Metadata Cache Decision
 
 No separate metadata cache is used for launch. Page and media saves write

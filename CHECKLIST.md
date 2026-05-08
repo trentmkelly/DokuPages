@@ -369,7 +369,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement global purge behavior.
 - [x] Implement user-sensitive cache bypass for private pages.
 - [x] Implement cache warming for important pages.
-- [ ] Implement stale cache fallback if appropriate.
+- [x] Implement stale cache fallback if appropriate.
 - [x] Add cache hit and miss metrics.
 - [x] Add cache invalidation tests.
 
@@ -396,7 +396,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port login UI.
 - [x] Port profile UI if supported.
 - [x] Port user manager UI if supported.
-- [ ] Port styling plugin behavior if supported.
+- [x] Port styling plugin behavior if supported.
 - [x] Port configuration UI if supported.
 - [ ] Ensure responsive behavior.
 - [ ] Ensure keyboard accessibility.
