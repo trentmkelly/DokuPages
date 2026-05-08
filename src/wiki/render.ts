@@ -30,6 +30,9 @@ export interface ExtractedCodeBlock {
   filename: string | null;
 }
 
+export type LinkTargetKind = "wiki" | "interwiki" | "extern" | "media" | "windows";
+export type LinkTargets = Readonly<Partial<Record<LinkTargetKind, string | null>>>;
+
 export interface RenderWikiTextOptions {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
@@ -39,6 +42,7 @@ export interface RenderWikiTextOptions {
   interwikiTemplates?: InterwikiTemplates;
   linkSchemes?: ReadonlyArray<string> | ReadonlySet<string>;
   relNofollow?: boolean;
+  linkTargets?: LinkTargets;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -191,6 +195,7 @@ export function renderWikiText(
     interwikiTemplates: options.interwikiTemplates,
     linkSchemes: normalizeLinkSchemes(options.linkSchemes),
     relNofollow: options.relNofollow ?? true,
+    linkTargets: normalizeLinkTargets(options.linkTargets),
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -428,6 +433,7 @@ interface RenderContext {
   interwikiTemplates?: InterwikiTemplates;
   linkSchemes: ReadonlySet<string>;
   relNofollow: boolean;
+  linkTargets: Required<Record<LinkTargetKind, string | null>>;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -754,6 +760,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             interwikiTemplates: context.interwikiTemplates,
             linkSchemes: context.linkSchemes,
             relNofollow: context.relNofollow,
+            linkTargets: context.linkTargets,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -803,6 +810,7 @@ function renderInline(source: string, context: RenderContext): string {
     rendered,
     context.linkSchemes,
     context.relNofollow,
+    context.linkTargets,
     protectHtml
   );
   rendered = renderEmailAutolinks(rendered, protectHtml);
@@ -941,8 +949,10 @@ function renderMedia(
 
     if (parsed.linking === "linkonly" || !isImageMedia(parsed.id)) {
       const label = title || mediaName(parsed.id);
+      const target = targetAttribute(context.linkTargets.media);
+      const rel = context.linkTargets.media ? ' rel="noopener"' : "";
       return protectHtml(
-        `<a href="${mediaPath(parsed.id)}" class="media" title="${linkTitle}">${escapeHtml(label)}</a>`,
+        `<a href="${mediaPath(parsed.id)}" class="media" title="${linkTitle}"${target}${rel}>${escapeHtml(label)}</a>`,
         { linkLabelHtml: escapeHtml(label) }
       );
     }
@@ -963,9 +973,14 @@ function renderMedia(
     }
 
     const href = parsed.linking === "direct" ? mediaPath(parsed.id) : mediaDetailPath(parsed.id);
-    return protectHtml(`<a href="${href}" class="media" title="${linkTitle}">${image}</a>`, {
-      linkLabelHtml: image
-    });
+    const target = targetAttribute(context.linkTargets.media);
+    const rel = context.linkTargets.media ? ' rel="noopener"' : "";
+    return protectHtml(
+      `<a href="${href}" class="media" title="${linkTitle}"${target}${rel}>${image}</a>`,
+      {
+        linkLabelHtml: image
+      }
+    );
   });
 }
 
@@ -1065,14 +1080,35 @@ function renderLinks(
       internalMissing,
       windowsShare: Boolean(windowsShare)
     });
-    const rel = external ? externalLinkRelAttribute(context.relNofollow) : "";
+    const targetKind = linkTargetKind(
+      external,
+      interwiki?.external ?? null,
+      internal,
+      Boolean(windowsShare)
+    );
+    const targetName = targetKind ? context.linkTargets[targetKind] : null;
+    const rel = linkRelAttribute(targetKind, targetName, context.relNofollow);
     const classAttribute = classNames.length > 0 ? ` class="${classNames.join(" ")}"` : "";
     const titleAttribute = internalMissing ? ' title="This topic does not exist yet"' : "";
+    const targetAttributeText = targetAttribute(targetName);
 
     return protectHtml(
-      `<a href="${escapeAttribute(href)}"${classAttribute}${titleAttribute}${rel}>${renderLinkLabel(label)}</a>`
+      `<a href="${escapeAttribute(href)}"${classAttribute}${titleAttribute}${targetAttributeText}${rel}>${renderLinkLabel(label)}</a>`
     );
   });
+}
+
+function linkTargetKind(
+  external: boolean,
+  interwikiExternal: boolean | null,
+  internal: boolean,
+  windowsShare: boolean
+): LinkTargetKind | null {
+  if (external) return "extern";
+  if (windowsShare) return "windows";
+  if (interwikiExternal !== null) return interwikiExternal ? "interwiki" : "wiki";
+  if (internal) return "wiki";
+  return null;
 }
 
 function linkClassNames(options: {
@@ -1108,8 +1144,24 @@ function isExternalLinkTarget(target: string, linkSchemes: ReadonlySet<string>):
   return Boolean(match && linkSchemes.has(match[1].toLowerCase()));
 }
 
-function externalLinkRelAttribute(relNofollow: boolean): string {
-  return relNofollow ? ' rel="ugc nofollow"' : "";
+function linkRelAttribute(
+  targetKind: LinkTargetKind | null,
+  targetName: string | null,
+  relNofollow: boolean
+): string {
+  const rels: string[] = [];
+  if (targetKind === "extern" && relNofollow) rels.push("ugc", "nofollow");
+  if (
+    (targetKind === "extern" || targetKind === "interwiki" || targetKind === "media") &&
+    targetName
+  ) {
+    rels.push("noopener");
+  }
+  return rels.length > 0 ? ` rel="${rels.join(" ")}"` : "";
+}
+
+function targetAttribute(targetName: string | null): string {
+  return targetName ? ` target="${escapeAttribute(targetName)}"` : "";
 }
 
 function renderEmailAutolinks(source: string, protectHtml: (html: string) => string): string {
@@ -1148,6 +1200,7 @@ function renderExternalAutolinks(
   source: string,
   linkSchemes: ReadonlySet<string>,
   relNofollow: boolean,
+  linkTargets: Required<Record<LinkTargetKind, string | null>>,
   protectHtml: (html: string) => string
 ): string {
   const pattern = externalAutolinkPattern(linkSchemes);
@@ -1162,7 +1215,7 @@ function renderExternalAutolinks(
         : decoded;
 
     return `${protectHtml(
-      `<a href="${escapeAttribute(href)}" class="urlextern"${externalLinkRelAttribute(relNofollow)}>${escapeHtml(decoded)}</a>`
+      `<a href="${escapeAttribute(href)}" class="urlextern"${targetAttribute(linkTargets.extern)}${linkRelAttribute("extern", linkTargets.extern, relNofollow)}>${escapeHtml(decoded)}</a>`
     )}${suffix}`;
   });
 }
@@ -1196,6 +1249,23 @@ function normalizeLinkSchemes(
 
 function isSafeUrlScheme(scheme: string): boolean {
   return /^[a-z][a-z0-9+.-]*$/.test(scheme);
+}
+
+function normalizeLinkTargets(
+  linkTargets: LinkTargets | undefined
+): Required<Record<LinkTargetKind, string | null>> {
+  return {
+    wiki: normalizeLinkTarget(linkTargets?.wiki),
+    interwiki: normalizeLinkTarget(linkTargets?.interwiki),
+    extern: normalizeLinkTarget(linkTargets?.extern),
+    media: normalizeLinkTarget(linkTargets?.media),
+    windows: normalizeLinkTarget(linkTargets?.windows)
+  };
+}
+
+function normalizeLinkTarget(value: string | null | undefined): string | null {
+  const target = value?.trim();
+  return target || null;
 }
 
 function splitTrailingLinkPunctuation(value: string): { linkText: string; suffix: string } {

@@ -71,7 +71,7 @@ are not fixed by this checklist.
 - [x] Load interwiki shortcuts from imported D1 metadata at render time instead of only using the built-in TypeScript map.
 - [x] Match DokuWiki's `scheme.conf` protocol handling for external links and autolinks.
 - [x] Match DokuWiki's `relnofollow` behavior, including `ugc nofollow` distinctions for external user content.
-- [ ] Match DokuWiki's configurable link targets for wiki, interwiki, external, media, and Windows-share links.
+- [x] Match DokuWiki's configurable link targets for wiki, interwiki, external, media, and Windows-share links.
 - [x] Match DokuWiki's section edit limits from `maxseclevel`.
 - [x] Match DokuWiki's TOC thresholds from `toptoclevel`, `tocminheads`, and `maxtoclevel`.
 - [x] Match DokuWiki's first-heading title behavior controlled by `useheading`.
@@ -177,7 +177,7 @@ are not fixed by this checklist.
 - [ ] Use imported `conf/local.php` and `conf/local.protected.php` values where runtime-safe instead of only environment variables.
 - [ ] Support `title`, `tagline`, `sidebar`, and `license` with DokuWiki-compatible names and defaults.
 - [ ] Support `recent`, `recent_days`, `breadcrumbs`, `fullpath`, `typography`, `dformat`, and `signature` display settings.
-- [ ] Support `target` link settings for wiki, interwiki, extern, media, and windows.
+- [x] Support `target` link settings for wiki, interwiki, extern, media, and windows.
 - [ ] Support `mailprefix`, `htmlmail`, `notify`, and upstream mail template settings more closely.
 - [ ] Support `rss_type`, `rss_linkto`, `rss_content`, `rss_media`, `rss_show_summary`, and `rss_show_deleted`.
 - [ ] Support `sitemap` frequency instead of always exposing sitemap output.

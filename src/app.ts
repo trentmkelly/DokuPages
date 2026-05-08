@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 26;
+const RENDER_CACHE_VERSION = 27;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1072,6 +1072,7 @@ async function handlePagePreview(
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
   const relNofollow = await relNofollowForRender(env, config.relNofollow);
+  const linkTargets = await linkTargetsForRender(env, config.linkTargets);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
@@ -1087,6 +1088,7 @@ async function handlePagePreview(
     interwikiTemplates,
     linkSchemes,
     relNofollow,
+    linkTargets,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2620,6 +2622,7 @@ async function renderPageHtml(
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
   const relNofollow = await relNofollowForRender(env, config.relNofollow);
+  const linkTargets = await linkTargetsForRender(env, config.linkTargets);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
@@ -2630,6 +2633,7 @@ async function renderPageHtml(
     interwikiTemplates,
     linkSchemes,
     relNofollow,
+    linkTargets,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2693,6 +2697,7 @@ async function renderPageExport(
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
   const relNofollow = await relNofollowForRender(env, config.relNofollow);
+  const linkTargets = await linkTargetsForRender(env, config.linkTargets);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
@@ -2702,6 +2707,7 @@ async function renderPageExport(
     interwikiTemplates,
     linkSchemes,
     relNofollow,
+    linkTargets,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2866,6 +2872,25 @@ async function relNofollowForRender(env: Env, fallback: boolean): Promise<boolea
   return imported ?? fallback;
 }
 
+async function linkTargetsForRender(
+  env: Env,
+  fallback: ReturnType<typeof getRuntimeConfig>["linkTargets"]
+): Promise<ReturnType<typeof getRuntimeConfig>["linkTargets"]> {
+  const wiki = await importedDokuWikiStringConfig(env, "target.wiki");
+  const interwiki = await importedDokuWikiStringConfig(env, "target.interwiki");
+  const extern = await importedDokuWikiStringConfig(env, "target.extern");
+  const media = await importedDokuWikiStringConfig(env, "target.media");
+  const windows = await importedDokuWikiStringConfig(env, "target.windows");
+
+  return {
+    wiki: wiki !== undefined ? wiki : fallback.wiki,
+    interwiki: interwiki !== undefined ? interwiki : fallback.interwiki,
+    extern: extern !== undefined ? extern : fallback.extern,
+    media: media !== undefined ? media : fallback.media,
+    windows: windows !== undefined ? windows : fallback.windows
+  };
+}
+
 async function importedDokuWikiBooleanConfig(env: Env, key: string): Promise<boolean | null> {
   const result = await env.DB.prepare(
     `select key, value_json
@@ -2879,6 +2904,24 @@ async function importedDokuWikiBooleanConfig(env: Env, key: string): Promise<boo
   if (!row) return null;
 
   return parseDokuWikiBooleanConfigMetadata(row.value_json);
+}
+
+async function importedDokuWikiStringConfig(
+  env: Env,
+  key: string
+): Promise<string | null | undefined> {
+  const result = await env.DB.prepare(
+    `select key, value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?`
+  )
+    .bind("config", "dokuwiki")
+    .all<{ key: string; value_json: string }>();
+  const row = result.results.find((entry) => entry.key === `conf:${key}`);
+  if (!row) return undefined;
+
+  return parseDokuWikiStringConfigMetadata(row.value_json);
 }
 
 function parseEntityMetadata(
@@ -2954,6 +2997,16 @@ function parseDokuWikiBooleanConfigMetadata(value: string): boolean | null {
       if (["0", "false", "no", "off", ""].includes(normalized)) return false;
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseDokuWikiStringConfigMetadata(value: string): string | null {
+  try {
+    const parsed = JSON.parse(value) as { value?: unknown };
+    if (typeof parsed.value !== "string") return null;
+    return parsed.value.trim() || null;
   } catch {
     return null;
   }

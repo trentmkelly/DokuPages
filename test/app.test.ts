@@ -89,6 +89,11 @@ describe("handleRequest", () => {
     env.CAMELCASE = undefined;
     env.TYPOGRAPHY = undefined;
     env.REL_NOFOLLOW = undefined;
+    env.TARGET_WIKI = undefined;
+    env.TARGET_INTERWIKI = undefined;
+    env.TARGET_EXTERN = undefined;
+    env.TARGET_MEDIA = undefined;
+    env.TARGET_WINDOWS = undefined;
   });
 
   it("returns health information for the API health route", async () => {
@@ -272,6 +277,20 @@ describe("handleRequest", () => {
       value_json: JSON.stringify({ key: "relnofollow", value: 0 }),
       updated_at: "2026-05-07T00:00:00.000Z"
     });
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "dokuwiki",
+      key: "conf:target.extern",
+      value_json: JSON.stringify({ key: "target.extern", value: "_blank" }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "dokuwiki",
+      key: "conf:target.interwiki",
+      value_json: JSON.stringify({ key: "target.interwiki", value: "_blank" }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
     state.row = {
       ...currentPageRow(),
       content:
@@ -286,9 +305,11 @@ describe("handleRequest", () => {
     expect(html).toContain('<img src="/images/smileys/custom.svg"');
     expect(html).toContain('<abbr title="Custom API">API</abbr>');
     expect(html).toContain(
-      '<a href="https://docs.example/Guide" class="interwiki iw_docs">Docs</a>'
+      '<a href="https://docs.example/Guide" class="interwiki iw_docs" target="_blank" rel="noopener">Docs</a>'
     );
-    expect(html).toContain('<a href="foo://service/path" class="urlextern">Foo</a>');
+    expect(html).toContain(
+      '<a href="foo://service/path" class="urlextern" target="_blank" rel="noopener">Foo</a>'
+    );
     expect(cachePuts).not.toContain("page:wiki:welcome");
   });
 
@@ -1322,7 +1343,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 26,
+        rendererVersion: 27,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1344,7 +1365,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 26,
+        rendererVersion: 27,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",

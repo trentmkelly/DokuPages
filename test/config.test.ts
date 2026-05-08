@@ -31,6 +31,13 @@ describe("runtime config", () => {
       camelCaseLinks: false,
       typographyMode: 1,
       relNofollow: true,
+      linkTargets: {
+        wiki: null,
+        interwiki: null,
+        extern: null,
+        media: null,
+        windows: null
+      },
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -58,7 +65,12 @@ describe("runtime config", () => {
       USE_HEADING: "1",
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
-      REL_NOFOLLOW: "0"
+      REL_NOFOLLOW: "0",
+      TARGET_WIKI: "_self",
+      TARGET_INTERWIKI: "_blank",
+      TARGET_EXTERN: "_blank",
+      TARGET_MEDIA: "_media",
+      TARGET_WINDOWS: "_windows"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
@@ -79,6 +91,13 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
     expect(getRuntimeConfig(env).relNofollow).toBe(false);
+    expect(getRuntimeConfig(env).linkTargets).toEqual({
+      wiki: "_self",
+      interwiki: "_blank",
+      extern: "_blank",
+      media: "_media",
+      windows: "_windows"
+    });
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -156,6 +175,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "REL_NOFOLLOW",
           effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "TARGET_EXTERN",
+          effectiveValue: null
         }),
         expect.objectContaining({
           key: "EMAIL_PROVIDER",

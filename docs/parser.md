@@ -50,6 +50,8 @@ fresh render.
 - optional CamelCase links
 - DokuWiki-style `rel="ugc nofollow"` external-link policy, including imported
   `relnofollow` disablement
+- configurable link targets for wiki, interwiki, external, media, and
+  Windows-share links
 - section edit anchors
 - DokuWiki-template link classes for internal, external, interwiki, mail, media,
   and Windows-share links

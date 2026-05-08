@@ -35,7 +35,16 @@ export interface RuntimeConfig {
   camelCaseLinks: boolean;
   typographyMode: number;
   relNofollow: boolean;
+  linkTargets: RuntimeLinkTargets;
   appVersion: string;
+}
+
+export interface RuntimeLinkTargets {
+  wiki: string | null;
+  interwiki: string | null;
+  extern: string | null;
+  media: string | null;
+  windows: string | null;
 }
 
 export interface RuntimeConfigEntry {
@@ -93,6 +102,13 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     camelCaseLinks: truthy(env.CAMELCASE),
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
     relNofollow: booleanConfig(env.REL_NOFOLLOW, true),
+    linkTargets: {
+      wiki: normalizedLinkTarget(env.TARGET_WIKI),
+      interwiki: normalizedLinkTarget(env.TARGET_INTERWIKI),
+      extern: normalizedLinkTarget(env.TARGET_EXTERN),
+      media: normalizedLinkTarget(env.TARGET_MEDIA),
+      windows: normalizedLinkTarget(env.TARGET_WINDOWS)
+    },
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -162,6 +178,11 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),
     configEntry("REL_NOFOLLOW", env.REL_NOFOLLOW, String(config.relNofollow), "true"),
+    configEntry("TARGET_WIKI", env.TARGET_WIKI, config.linkTargets.wiki, null),
+    configEntry("TARGET_INTERWIKI", env.TARGET_INTERWIKI, config.linkTargets.interwiki, null),
+    configEntry("TARGET_EXTERN", env.TARGET_EXTERN, config.linkTargets.extern, null),
+    configEntry("TARGET_MEDIA", env.TARGET_MEDIA, config.linkTargets.media, null),
+    configEntry("TARGET_WINDOWS", env.TARGET_WINDOWS, config.linkTargets.windows, null),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",
@@ -608,6 +629,10 @@ function normalizedBaseDir(value: string | undefined): string {
   const baseDir = nonEmpty(value);
   if (!baseDir || !baseDir.startsWith("/") || baseDir.includes("..")) return "";
   return `/${baseDir.split("/").filter(Boolean).join("/")}`;
+}
+
+function normalizedLinkTarget(value: string | undefined): string | null {
+  return nonEmpty(value) ?? null;
 }
 
 function validCookieName(value: string): boolean {

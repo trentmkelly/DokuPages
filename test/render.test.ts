@@ -167,6 +167,9 @@ describe("renderWikiText", () => {
       linkSchemes: ["foo"]
     });
     const noRel = renderWikiText("[[https://example.test|No rel]]", { relNofollow: false });
+    const targeted = renderWikiText("[[wiki:syntax|Syntax]] [[https://example.test|Example]]", {
+      linkTargets: { wiki: "_self", extern: "_blank" }
+    });
 
     expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">Syntax</a>');
     expect(rendered.html).toContain(
@@ -185,6 +188,12 @@ describe("renderWikiText", () => {
       '<a href="/wiki/irc/irc.example" class="wikilink1">IRC</a>'
     );
     expect(noRel.html).toContain('<a href="https://example.test" class="urlextern">No rel</a>');
+    expect(targeted.html).toContain(
+      '<a href="/wiki/wiki/syntax" class="wikilink1" target="_self">Syntax</a>'
+    );
+    expect(targeted.html).toContain(
+      '<a href="https://example.test" class="urlextern" target="_blank" rel="ugc nofollow noopener">Example</a>'
+    );
     expect(rendered.html).not.toContain("http:<em>");
     expect(rendered.html).toContain(
       '<a href="/media-detail/wiki/dokuwiki.svg" class="media" title="wiki:dokuwiki.svg"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
@@ -199,6 +208,9 @@ describe("renderWikiText", () => {
     const rendered = renderWikiText(
       "{{ wiki:dokuwiki-128.png?200x50 |Caption}} {{wiki:dokuwiki-128.png?linkonly}} [[https://example.test|{{wiki:dokuwiki.svg?nolink|Logo}}]]"
     );
+    const targeted = renderWikiText("{{wiki:dokuwiki.svg|Logo}}", {
+      linkTargets: { media: "_media" }
+    });
 
     expect(rendered.html).toContain(
       '<img src="/media/wiki/dokuwiki-128.png" class="mediacenter" loading="lazy" title="Caption" alt="Caption" width="200" height="50">'
@@ -208,6 +220,9 @@ describe("renderWikiText", () => {
     );
     expect(rendered.html).toContain(
       '<a href="https://example.test" class="urlextern" rel="ugc nofollow"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+    );
+    expect(targeted.html).toContain(
+      '<a href="/media-detail/wiki/dokuwiki.svg" class="media" title="wiki:dokuwiki.svg" target="_media" rel="noopener"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
     );
   });
 
@@ -219,6 +234,9 @@ describe("renderWikiText", () => {
       linkSchemes: ["foo"]
     });
     const noRel = renderWikiText("Visit http://example.test", { relNofollow: false });
+    const targeted = renderWikiText("Visit http://example.test", {
+      linkTargets: { extern: "_blank" }
+    });
 
     expect(rendered.html).toContain(
       '<a href="http://www.google.com" class="urlextern" rel="ugc nofollow">http://www.google.com</a>'
@@ -235,6 +253,9 @@ describe("renderWikiText", () => {
     expect(custom.html).toContain("http://example.test");
     expect(custom.html).not.toContain('href="http://example.test"');
     expect(noRel.html).toContain('<a href="http://example.test" class="urlextern">');
+    expect(targeted.html).toContain(
+      '<a href="http://example.test" class="urlextern" target="_blank" rel="ugc nofollow noopener">'
+    );
   });
 
   it("renders namespace-relative internal links from page context", () => {
@@ -305,7 +326,8 @@ describe("renderWikiText", () => {
       interwikiTemplates: {
         docs: "https://docs.example/{URL}",
         wp: "https://wiki.example/{NAME}"
-      }
+      },
+      linkTargets: { interwiki: "_blank" }
     });
 
     expect(rendered.html).toContain(
@@ -321,17 +343,23 @@ describe("renderWikiText", () => {
       '<a href="/doku.php?do=admin&amp;page=config" class="interwiki iw_this">config</a>'
     );
     expect(custom.html).toContain(
-      '<a href="https://docs.example/Quick%20Start" class="interwiki iw_docs">Docs</a>'
+      '<a href="https://docs.example/Quick%20Start" class="interwiki iw_docs" target="_blank" rel="noopener">Docs</a>'
     );
     expect(custom.html).toContain(
-      '<a href="https://wiki.example/Custom_Wiki" class="interwiki iw_wp">Wiki</a>'
+      '<a href="https://wiki.example/Custom_Wiki" class="interwiki iw_wp" target="_blank" rel="noopener">Wiki</a>'
     );
   });
 
   it("renders Windows share links", () => {
     const rendered = renderWikiText(String.raw`[[\\server\share|this]]`);
+    const targeted = renderWikiText(String.raw`[[\\server\share|this]]`, {
+      linkTargets: { windows: "_blank" }
+    });
 
     expect(rendered.html).toContain('<a href="file://///server/share" class="windows">this</a>');
+    expect(targeted.html).toContain(
+      '<a href="file://///server/share" class="windows" target="_blank">this</a>'
+    );
   });
 
   it("renders email links with default hex mailguard obfuscation", () => {

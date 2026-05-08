@@ -23,6 +23,11 @@ export interface Env {
   CAMELCASE?: string;
   TYPOGRAPHY?: string;
   REL_NOFOLLOW?: string;
+  TARGET_WIKI?: string;
+  TARGET_INTERWIKI?: string;
+  TARGET_EXTERN?: string;
+  TARGET_MEDIA?: string;
+  TARGET_WINDOWS?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;
