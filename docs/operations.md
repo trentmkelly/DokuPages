@@ -103,6 +103,6 @@ rollback plan explicitly defines a final sync window.
 - Warm important pages with `npm run cache:warm -- --base-url <base-url>`.
 - Verify Pages bindings for D1, R2, KV, and `PAGE_LOCKS`.
 - Verify runtime environment variables.
-- Run deployed smoke tests and `/api/health`.
+- Run deployed smoke tests, `/api/health`, and `npm run alerts:check`.
 - Spot-check ACL-protected pages, anonymous pages, edits, media upload/download, search, feeds, sitemap, admin diagnostics, and audit logs.
 - Keep rollback routing and the verified backup available through the launch watch period.

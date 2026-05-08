@@ -45,7 +45,26 @@ The runtime emits structured metric events to Cloudflare logs:
 - `/admin`: admin dashboard linking to diagnostics, ACL management, audit logs,
   media manager, and search index rebuild.
 
-## Remaining Work
+## Alerting
 
-Open observability items are production alerting, quota/limit-pressure alerts,
-and deeper per-route storage operation counts.
+Run the diagnostics alert checker from any external monitor or CI schedule:
+
+```sh
+npm run alerts:check
+```
+
+The checker fetches `/api/diagnostics`, emits a JSON alert result, and exits with
+code `2` when alerts are present. It covers unhealthy runtime diagnostics,
+storage check failures, migration status failures, failed import jobs, high
+storage latency, and storage messages that indicate quota, rate-limit, or limit
+pressure. Use `-- --base-url <url>` for a different deployment and
+`-- --storage-latency-ms <ms>` to tune the latency threshold.
+
+Recommended Cloudflare Logs alert filters:
+
+- Error spikes: `event = "request_error"` over the production service.
+- Storage failures: `event = "storage_error"`.
+- Migration failures: `event = "migration_event"` with failed job output, plus
+  `npm run alerts:check` against `/api/diagnostics`.
+- Quota or limit pressure: `storage_error.code = "storage_rate_limited"`,
+  response status `429`, and `auth_event = "login_rate_limited"`.

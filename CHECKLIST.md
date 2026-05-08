@@ -696,7 +696,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Optimize search indexing.
 - [x] Optimize media delivery.
 - [x] Optimize database indexes.
-- [ ] Add alerts for limit pressure.
+- [x] Add alerts for limit pressure.
 
 ## Observability
 
@@ -712,10 +712,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add search metrics.
 - [x] Add media metrics.
 - [x] Add dashboard for production health.
-- [ ] Add alerting for error spikes.
-- [ ] Add alerting for storage failures.
-- [ ] Add alerting for migration failures.
-- [ ] Add alerting for quota or limit pressure.
+- [x] Add alerting for error spikes.
+- [x] Add alerting for storage failures.
+- [x] Add alerting for migration failures.
+- [x] Add alerting for quota or limit pressure.
 
 ## Documentation
 
