@@ -22,14 +22,14 @@ are not fixed by this checklist.
 
 ## Runtime And Architecture
 
-- [ ] Replace the no-PHP-runtime decision with a documented native extension compatibility layer if true DokuWiki plugin compatibility becomes a goal.
-- [ ] Recreate DokuWiki's `inc/Extension/Event.php` and `inc/Extension/EventHandler.php` event model with Pages-native hook points, or document every core event that intentionally has no equivalent.
-- [ ] Add a compatibility map for the upstream plugin types: action, admin, auth, cli, helper, remote, renderer, and syntax plugins.
-- [ ] Decide whether farm/multi-wiki behavior from `inc/farm.php` needs a Pages-native tenant model.
-- [ ] Decide whether DokuWiki's local filesystem semantics need a stricter compatibility layer on top of D1, R2, KV, and Durable Objects for tools that expect page files, attic files, locks, cache files, and index files.
-- [ ] Document every upstream vendor dependency that is replaced rather than ported, including GeSHi, IXR XML-RPC, feed creators, PHP archive libraries, and LESS/CSS helpers.
-- [ ] Decide whether upstream `bin/` CLI behavior should be reimplemented as npm scripts, Workers cron handlers, or operator-only tools.
-- [ ] Add a parity test harness that renders the same fixture pages through upstream DokuWiki and the Pages renderer, then diffs normalized HTML.
+- [x] Replace the no-PHP-runtime decision with a documented native extension compatibility layer if true DokuWiki plugin compatibility becomes a goal.
+- [x] Recreate DokuWiki's `inc/Extension/Event.php` and `inc/Extension/EventHandler.php` event model with Pages-native hook points, or document every core event that intentionally has no equivalent.
+- [x] Add a compatibility map for the upstream plugin types: action, admin, auth, cli, helper, remote, renderer, and syntax plugins.
+- [x] Decide whether farm/multi-wiki behavior from `inc/farm.php` needs a Pages-native tenant model.
+- [x] Decide whether DokuWiki's local filesystem semantics need a stricter compatibility layer on top of D1, R2, KV, and Durable Objects for tools that expect page files, attic files, locks, cache files, and index files.
+- [x] Document every upstream vendor dependency that is replaced rather than ported, including GeSHi, IXR XML-RPC, feed creators, PHP archive libraries, and LESS/CSS helpers.
+- [x] Decide whether upstream `bin/` CLI behavior should be reimplemented as npm scripts, Workers cron handlers, or operator-only tools.
+- [x] Add a parity test harness that renders the same fixture pages through upstream DokuWiki and the Pages renderer, then diffs normalized HTML.
 
 ## Entry Points, Routing, And Actions
 

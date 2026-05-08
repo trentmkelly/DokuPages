@@ -1,0 +1,3 @@
+====== Links ======
+
+Visit [[wiki:syntax|the syntax page]] and https://www.dokuwiki.org/.
