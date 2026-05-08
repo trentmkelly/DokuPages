@@ -508,6 +508,12 @@ describe("auth routes", () => {
       }),
       env
     );
+    const mediaCleanup = await handleRequest(
+      new Request("https://example.com/admin/media-cleanup", {
+        headers: { cookie }
+      }),
+      env
+    );
     const config = await handleRequest(
       new Request("https://example.com/admin/config", {
         headers: { cookie }
@@ -529,6 +535,16 @@ describe("auth routes", () => {
       }),
       env
     );
+    const mediaCleanupForm = new FormData();
+    mediaCleanupForm.set("confirm", "delete");
+    const mediaCleanupPost = await handleRequest(
+      new Request("https://example.com/api/admin/media/cleanup", {
+        method: "POST",
+        body: mediaCleanupForm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
 
     expect(anonymous.status).toBe(403);
     expect(legacy.status).toBe(301);
@@ -538,9 +554,11 @@ describe("auth routes", () => {
     expect(acl.status).toBe(403);
     expect(audit.status).toBe(403);
     expect(users.status).toBe(403);
+    expect(mediaCleanup.status).toBe(403);
     expect(config.status).toBe(403);
     expect(configExport.status).toBe(403);
     expect(cachePurge.status).toBe(403);
+    expect(mediaCleanupPost.status).toBe(403);
   });
 
   it("allows admin users to purge global render and discovery caches", async () => {
@@ -595,6 +613,99 @@ describe("auth routes", () => {
         }
       ]
     });
+  });
+
+  it("allows admin users to clean up unreferenced media objects", async () => {
+    env = createEnv();
+    env.MEDIA_BUCKET = createMediaCleanupR2Stub([
+      ["media/current/wiki/logo.svg", "<svg>current</svg>"],
+      ["media/revisions/wiki/logo.svg/20260506000000", "<svg>old</svg>"],
+      ["media/current/wiki/orphan.svg", "<svg>orphan</svg>"],
+      ["backups/2026-05-07/export.sql", "backup"]
+    ]);
+    await seedUser(env.DB);
+    await seedMediaObjectReferences(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const dashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const scan = await handleRequest(
+      new Request("https://example.com/admin/media-cleanup?scan=1", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const missingCsrf = await handleRequest(
+      new Request("https://example.com/api/admin/media/cleanup", {
+        method: "POST"
+      }),
+      env
+    );
+    const unconfirmed = await handleRequest(
+      new Request("https://example.com/api/admin/media/cleanup", {
+        method: "POST",
+        body: new FormData(),
+        headers: csrfHeaders({ cookie, accept: "application/json" })
+      }),
+      env
+    );
+    const cleanupForm = new FormData();
+    cleanupForm.set("confirm", "delete");
+    const cleanup = await handleRequest(
+      new Request("https://example.com/api/admin/media/cleanup", {
+        method: "POST",
+        body: cleanupForm,
+        headers: csrfHeaders({ cookie, accept: "application/json" })
+      }),
+      env
+    );
+    const rescan = await handleRequest(
+      new Request("https://example.com/admin/media-cleanup?scan=1", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    expect(dashboard.status).toBe(200);
+    await expect(dashboard.text()).resolves.toContain("Media cleanup");
+    expect(scan.status).toBe(200);
+    const scanHtml = await scan.text();
+    expect(scanHtml).toContain("Unreferenced R2 media objects: 1");
+    expect(scanHtml).toContain("media/current/wiki/orphan.svg");
+    expect(scanHtml).not.toContain("backups/2026-05-07/export.sql");
+    expect(missingCsrf.status).toBe(403);
+    expect(unconfirmed.status).toBe(400);
+    await expect(unconfirmed.json()).resolves.toMatchObject({
+      error: "Media cleanup requires delete confirmation."
+    });
+    expect(cleanup.status).toBe(200);
+    await expect(cleanup.json()).resolves.toMatchObject({
+      ok: true,
+      scannedObjectCount: 3,
+      referencedObjectCount: 2,
+      unreferencedObjectCount: 1,
+      deletedObjectCount: 1
+    });
+    await expect(env.MEDIA_BUCKET.head("media/current/wiki/orphan.svg")).resolves.toBeNull();
+    await expect(env.MEDIA_BUCKET.head("media/current/wiki/logo.svg")).resolves.not.toBeNull();
+    await expect(env.MEDIA_BUCKET.head("backups/2026-05-07/export.sql")).resolves.not.toBeNull();
+    await expect(
+      env.DB.prepare("select action, target_type from audit_log where action = ?")
+        .bind("media_cleanup")
+        .all()
+    ).resolves.toMatchObject({
+      results: [
+        {
+          action: "media_cleanup",
+          target_type: "media"
+        }
+      ]
+    });
+    await expect(rescan.text()).resolves.toContain("No unreferenced media objects were found.");
   });
 
   it("allows admin users to inspect and export redacted runtime configuration", async () => {
@@ -909,6 +1020,52 @@ async function seedPage(
     .run();
 }
 
+async function seedMediaObjectReferences(d1) {
+  const now = "2026-05-07T00:00:00.000Z";
+
+  await d1
+    .prepare(
+      `insert into media (
+         id, namespace, object_key, mime_type, byte_length, content_hash,
+         current_revision_id, is_deleted, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      "wiki:logo.svg",
+      "wiki",
+      "media/current/wiki/logo.svg",
+      "image/svg+xml",
+      18,
+      "hash:current-logo",
+      "media-rev-current",
+      0,
+      now,
+      now
+    )
+    .run();
+
+  await d1
+    .prepare(
+      `insert into media_revisions (
+         id, media_id, object_key, mime_type, byte_length, content_hash,
+         author_id, summary, change_type, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      "media-rev-current",
+      "wiki:logo.svg",
+      "media/revisions/wiki/logo.svg/20260506000000",
+      "image/svg+xml",
+      14,
+      "hash:old-logo",
+      null,
+      "Seed media revision",
+      "create",
+      now
+    )
+    .run();
+}
+
 async function seedAclRule(
   d1,
   { id, scope, principalType, principal, permission, createdAt = "2026-05-07T00:00:00.000Z" }
@@ -985,6 +1142,32 @@ async function postLogin(env, username, password, headers = {}) {
     }),
     env
   );
+}
+
+function createMediaCleanupR2Stub(entries) {
+  const objects = new Map(entries);
+
+  return {
+    head: async (key) => (objects.has(key) ? {} : null),
+    list: async ({ prefix = "", cursor } = {}) => {
+      const start = cursor ? Number(cursor) : 0;
+      const matching = [...objects.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .sort(([left], [right]) => left.localeCompare(right));
+
+      return {
+        objects: matching.slice(start).map(([key, value]) => ({
+          key,
+          size: String(value).length
+        })),
+        truncated: false,
+        cursor: undefined
+      };
+    },
+    delete: async (key) => {
+      objects.delete(key);
+    }
+  };
 }
 
 class SqliteD1 {

@@ -117,6 +117,8 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 17;
+const MEDIA_CLEANUP_PREFIX = "media/";
+const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
 const PAGE_LOCK_TOKEN_BYTES = 24;
 const CSRF_COOKIE_NAME = "DW_CSRF_TOKEN";
@@ -322,6 +324,12 @@ export async function handleRequest(
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
+  if (url.pathname === "/admin/media-cleanup" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    const page = await renderMediaCleanupPage(request, env, principal, url, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
   if (url.pathname === "/api/admin/acl" && request.method === "POST") {
     return handleAclRuleUpsert(request, env, principal);
   }
@@ -332,6 +340,10 @@ export async function handleRequest(
 
   if (url.pathname === "/api/admin/users" && request.method === "POST") {
     return handleUserAdminUpdate(request, env, principal);
+  }
+
+  if (url.pathname === "/api/admin/media/cleanup" && request.method === "POST") {
+    return handleMediaCleanup(request, env, principal);
   }
 
   if (url.pathname === "/api/admin/cache/purge" && request.method === "POST") {
@@ -2564,6 +2576,9 @@ function renderAdminDashboardPage(
   const configTool = isAdminPrincipal(principal)
     ? `<li><a href="/admin/config">Configuration manager</a></li>`
     : "";
+  const mediaCleanupTool = isAdminPrincipal(principal)
+    ? `<li><a href="/admin/media-cleanup">Media cleanup</a></li>`
+    : "";
   const adminActions = isAdminPrincipal(principal)
     ? `<form method="post" action="/api/admin/search/rebuild">
         ${csrfInput(csrfToken)}
@@ -2585,6 +2600,7 @@ function renderAdminDashboardPage(
         ${aclTool}
         ${userTool}
         ${configTool}
+        ${mediaCleanupTool}
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`,
@@ -2844,6 +2860,101 @@ async function renderUserAdminPage(
     ${renderPaginationControls(url, pagination, users.length)}`,
     { principal }
   );
+}
+
+interface MediaCleanupObject {
+  key: string;
+  size: number;
+}
+
+interface MediaCleanupResult {
+  prefix: string;
+  referencedObjectCount: number;
+  scannedObjectCount: number;
+  unreferencedObjectCount: number;
+  deletedObjectCount: number;
+  unreferencedObjects: MediaCleanupObject[];
+  sampleLimit: number;
+  truncated: boolean;
+  dryRun: boolean;
+}
+
+async function renderMediaCleanupPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  url: URL,
+  csrfToken: string
+): Promise<string | Response> {
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  if (!env.MEDIA_BUCKET) {
+    return mediaCleanupUnavailableResponse(request, env);
+  }
+
+  const scanned = url.searchParams.get("scan") === "1";
+  const deletedCount = Number(url.searchParams.get("deleted") ?? 0);
+  const deletedNotice =
+    Number.isFinite(deletedCount) && deletedCount > 0
+      ? `<p class="info">Deleted ${deletedCount.toLocaleString("en-US")} unreferenced media object${deletedCount === 1 ? "" : "s"}.</p>`
+      : "";
+  const scanResult = scanned ? await scanMediaCleanup(env) : null;
+  const status = scanResult ? renderMediaCleanupResult(scanResult) : "";
+  const deleteForm =
+    scanResult && scanResult.unreferencedObjectCount > 0
+      ? `<form method="post" action="/api/admin/media/cleanup">
+        ${csrfInput(csrfToken)}
+        <input type="hidden" name="confirm" value="delete">
+        <button type="submit">Delete unreferenced media objects</button>
+      </form>`
+      : "";
+
+  return htmlShell(
+    env,
+    "Media Cleanup",
+    `<h1>Media cleanup</h1>
+    <p>Media cleanup scans R2 objects under <code>${escapeHtml(MEDIA_CLEANUP_PREFIX)}</code> and compares them with D1 media metadata. Current media and immutable media revisions are kept; only unreferenced R2 objects are eligible for deletion.</p>
+    <form method="get" action="/admin/media-cleanup">
+      <input type="hidden" name="scan" value="1">
+      <button type="submit">Scan media objects</button>
+    </form>
+    ${deletedNotice}
+    ${status}
+    ${deleteForm}`,
+    { principal }
+  );
+}
+
+function renderMediaCleanupResult(result: MediaCleanupResult): string {
+  const rows = result.unreferencedObjects
+    .map(
+      (object) => `<tr>
+        <td><code>${escapeHtml(object.key)}</code></td>
+        <td>${object.size.toLocaleString("en-US")}</td>
+      </tr>`
+    )
+    .join("");
+  const table = rows
+    ? `<table class="inline media__cleanup">
+      <thead><tr><th>Unreferenced object</th><th>Bytes</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`
+    : "<p>No unreferenced media objects were found.</p>";
+  const truncated = result.truncated
+    ? `<p>Showing the first ${result.sampleLimit.toLocaleString("en-US")} unreferenced object${result.sampleLimit === 1 ? "" : "s"}.</p>`
+    : "";
+
+  return `<h2>Scan result</h2>
+    <ul>
+      <li>Referenced D1 media objects: ${result.referencedObjectCount.toLocaleString("en-US")}</li>
+      <li>Scanned R2 media objects: ${result.scannedObjectCount.toLocaleString("en-US")}</li>
+      <li>Unreferenced R2 media objects: ${result.unreferencedObjectCount.toLocaleString("en-US")}</li>
+      <li>Deleted R2 media objects: ${result.deletedObjectCount.toLocaleString("en-US")}</li>
+    </ul>
+    ${table}
+    ${truncated}`;
 }
 
 function renderManagedUserRow(
@@ -3277,6 +3388,49 @@ async function handleUserAdminUpdate(
   return redirectResponse("/admin/users");
 }
 
+async function handleMediaCleanup(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await readFormDataOrEmpty(request);
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  if (!env.MEDIA_BUCKET) {
+    return mediaCleanupUnavailableResponse(request, env);
+  }
+
+  const confirmed = String(form.get("confirm") ?? "") === "delete";
+  if (!confirmed) {
+    return mediaCleanupErrorResponse(request, env, "Media cleanup requires delete confirmation.");
+  }
+
+  const result = await scanMediaCleanup(env, { deleteUnreferenced: true });
+  await appendAdminAuditLog(request, env, principal, {
+    action: "media_cleanup",
+    targetType: "media",
+    targetId: null,
+    details: {
+      scannedObjectCount: result.scannedObjectCount,
+      referencedObjectCount: result.referencedObjectCount,
+      unreferencedObjectCount: result.unreferencedObjectCount,
+      deletedObjectCount: result.deletedObjectCount,
+      sampleKeys: result.unreferencedObjects.map((object) => object.key)
+    }
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, ...result });
+  }
+
+  return redirectResponse(`/admin/media-cleanup?deleted=${result.deletedObjectCount}&scan=1`);
+}
+
 async function handleGlobalCachePurge(
   request: Request,
   env: Env,
@@ -3303,6 +3457,106 @@ async function handleGlobalCachePurge(
   }
 
   return redirectResponse("/admin");
+}
+
+async function scanMediaCleanup(
+  env: Env,
+  options: { deleteUnreferenced?: boolean } = {}
+): Promise<MediaCleanupResult> {
+  if (!env.MEDIA_BUCKET) {
+    throw new Error("MEDIA_BUCKET binding is required for media cleanup.");
+  }
+
+  const referencedObjects = await readReferencedMediaObjectKeys(env.DB);
+  const unreferencedObjects: MediaCleanupObject[] = [];
+  let scannedObjectCount = 0;
+  let unreferencedObjectCount = 0;
+  let deletedObjectCount = 0;
+  let cursor: string | undefined;
+
+  do {
+    const listed = await env.MEDIA_BUCKET.list({
+      prefix: MEDIA_CLEANUP_PREFIX,
+      cursor,
+      limit: 1000
+    });
+
+    for (const object of listed.objects) {
+      scannedObjectCount += 1;
+
+      if (referencedObjects.has(object.key)) {
+        continue;
+      }
+
+      unreferencedObjectCount += 1;
+      if (unreferencedObjects.length < MEDIA_CLEANUP_SAMPLE_LIMIT) {
+        unreferencedObjects.push({
+          key: object.key,
+          size: object.size
+        });
+      }
+
+      if (options.deleteUnreferenced) {
+        await env.MEDIA_BUCKET.delete(object.key);
+        deletedObjectCount += 1;
+      }
+    }
+
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  return {
+    prefix: MEDIA_CLEANUP_PREFIX,
+    referencedObjectCount: referencedObjects.size,
+    scannedObjectCount,
+    unreferencedObjectCount,
+    deletedObjectCount,
+    unreferencedObjects,
+    sampleLimit: MEDIA_CLEANUP_SAMPLE_LIMIT,
+    truncated: unreferencedObjectCount > unreferencedObjects.length,
+    dryRun: !options.deleteUnreferenced
+  };
+}
+
+async function readReferencedMediaObjectKeys(db: D1Database): Promise<Set<string>> {
+  const rows = await db
+    .prepare(
+      `select object_key as objectKey
+       from media
+       where object_key is not null and object_key <> ''
+       union
+       select object_key as objectKey
+       from media_revisions
+       where object_key is not null and object_key <> ''`
+    )
+    .all<{ objectKey: string }>();
+
+  return new Set((rows.results ?? []).map((row) => row.objectKey).filter(Boolean));
+}
+
+function mediaCleanupErrorResponse(request: Request, env: Env, message: string): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: message }, { status: 400 });
+  }
+
+  return htmlResponse(htmlShell(env, "Media cleanup rejected", `<p>${escapeHtml(message)}</p>`), {
+    status: 400
+  });
+}
+
+function mediaCleanupUnavailableResponse(request: Request, env: Env): Response {
+  const message = "MEDIA_BUCKET binding is required for media cleanup.";
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: message }, { status: 503 });
+  }
+
+  return htmlResponse(
+    htmlShell(env, "Media cleanup unavailable", `<p>${escapeHtml(message)}</p>`),
+    {
+      status: 503
+    }
+  );
 }
 
 async function readFormDataOrEmpty(request: Request): Promise<FormData> {

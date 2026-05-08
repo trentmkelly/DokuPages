@@ -53,6 +53,19 @@ npm run import:media-upload
 
 `POST /api/media/revert` expects `id`, `revisionId`, and optional `summary`. Revert points the current media row back at the selected immutable R2 object, creates a new `revert` media revision, appends a media changelog row, and records the source revision ID in metadata. Delete revisions cannot be restored directly.
 
+## Cleanup Semantics
+
+`GET /admin/media-cleanup?scan=1` scans R2 objects under `media/` and compares
+them with distinct object keys referenced by D1 `media` and `media_revisions`
+rows. The scan ignores backup and non-media prefixes.
+
+`POST /api/admin/media/cleanup` requires an admin session, CSRF token, and
+`confirm=delete`. It recalculates the scan server-side and deletes only
+unreferenced R2 objects. Current media bodies and immutable media revision bodies
+are preserved as long as D1 references their object keys. Each deletion run is
+recorded in `audit_log` with scanned, referenced, unreferenced, and deleted
+counts plus a bounded sample of deleted keys.
+
 ## Search Semantics
 
 Media manager search is namespace-scoped. The `q` parameter matches active media IDs and MIME types in D1 and excludes deleted media rows.

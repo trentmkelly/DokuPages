@@ -51,6 +51,20 @@ curl https://dokutest.pages.dev/api/health
 For media-heavy restores, compare representative file hashes from the backup
 manifest against downloaded media responses.
 
+## Media Cleanup
+
+Use the admin media cleanup page after failed uploads, failed restore rehearsals,
+or aborted media imports:
+
+```text
+/admin/media-cleanup?scan=1
+```
+
+The scan compares R2 objects under `media/` with object keys referenced by D1
+`media` and `media_revisions` rows. The delete action requires an admin session,
+CSRF token, and explicit confirmation, then writes an audit log entry with the
+cleanup counts. Take or verify a backup before deleting objects in production.
+
 ## Rollback Workflow
 
 Use the smallest rollback that removes the bad state:
