@@ -166,23 +166,25 @@ describe("renderWikiText", () => {
     const customScheme = renderWikiText("[[foo://service/path|Foo]] [[irc://irc.example|IRC]]", {
       linkSchemes: ["foo"]
     });
+    const noRel = renderWikiText("[[https://example.test|No rel]]", { relNofollow: false });
 
     expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">Syntax</a>');
     expect(rendered.html).toContain(
-      '<a href="https://example.test" class="urlextern" rel="nofollow noopener noreferrer">Example</a>'
+      '<a href="https://example.test" class="urlextern" rel="ugc nofollow">Example</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="http://www.google.com" class="urlextern" rel="nofollow noopener noreferrer">Google</a>'
+      '<a href="http://www.google.com" class="urlextern" rel="ugc nofollow">Google</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="irc://irc.example/channel" class="urlextern" rel="nofollow noopener noreferrer">IRC</a>'
+      '<a href="irc://irc.example/channel" class="urlextern" rel="ugc nofollow">IRC</a>'
     );
     expect(customScheme.html).toContain(
-      '<a href="foo://service/path" class="urlextern" rel="nofollow noopener noreferrer">Foo</a>'
+      '<a href="foo://service/path" class="urlextern" rel="ugc nofollow">Foo</a>'
     );
     expect(customScheme.html).toContain(
       '<a href="/wiki/irc/irc.example" class="wikilink1">IRC</a>'
     );
+    expect(noRel.html).toContain('<a href="https://example.test" class="urlextern">No rel</a>');
     expect(rendered.html).not.toContain("http:<em>");
     expect(rendered.html).toContain(
       '<a href="/media-detail/wiki/dokuwiki.svg" class="media" title="wiki:dokuwiki.svg"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
@@ -205,7 +207,7 @@ describe("renderWikiText", () => {
       '<a href="/media/wiki/dokuwiki-128.png" class="media" title="wiki:dokuwiki-128.png">dokuwiki-128.png</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="https://example.test" class="urlextern" rel="nofollow noopener noreferrer"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
+      '<a href="https://example.test" class="urlextern" rel="ugc nofollow"><img src="/media/wiki/dokuwiki.svg" class="media" loading="lazy" title="Logo" alt="Logo"></a>'
     );
   });
 
@@ -216,21 +218,23 @@ describe("renderWikiText", () => {
     const custom = renderWikiText("Visit foo://service/path and http://example.test", {
       linkSchemes: ["foo"]
     });
+    const noRel = renderWikiText("Visit http://example.test", { relNofollow: false });
 
     expect(rendered.html).toContain(
-      '<a href="http://www.google.com" class="urlextern" rel="nofollow noopener noreferrer">http://www.google.com</a>'
+      '<a href="http://www.google.com" class="urlextern" rel="ugc nofollow">http://www.google.com</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="http://www.example.org" class="urlextern" rel="nofollow noopener noreferrer">www.example.org</a>.'
+      '<a href="http://www.example.org" class="urlextern" rel="ugc nofollow">www.example.org</a>.'
     );
     expect(rendered.html).toContain(
-      '<a href="irc://irc.example/channel" class="urlextern" rel="nofollow noopener noreferrer">irc://irc.example/channel</a>.'
+      '<a href="irc://irc.example/channel" class="urlextern" rel="ugc nofollow">irc://irc.example/channel</a>.'
     );
     expect(custom.html).toContain(
-      '<a href="foo://service/path" class="urlextern" rel="nofollow noopener noreferrer">foo://service/path</a>'
+      '<a href="foo://service/path" class="urlextern" rel="ugc nofollow">foo://service/path</a>'
     );
     expect(custom.html).toContain("http://example.test");
     expect(custom.html).not.toContain('href="http://example.test"');
+    expect(noRel.html).toContain('<a href="http://example.test" class="urlextern">');
   });
 
   it("renders namespace-relative internal links from page context", () => {
@@ -305,22 +309,22 @@ describe("renderWikiText", () => {
     });
 
     expect(rendered.html).toContain(
-      '<a href="https://www.dokuwiki.org/newsletter" class="interwiki iw_doku" rel="nofollow noopener noreferrer">doku&gt;newsletter</a>'
+      '<a href="https://www.dokuwiki.org/newsletter" class="interwiki iw_doku">doku&gt;newsletter</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="https://www.dokuwiki.org/faq:sidebar" class="interwiki iw_doku" rel="nofollow noopener noreferrer">FAQ</a>'
+      '<a href="https://www.dokuwiki.org/faq:sidebar" class="interwiki iw_doku">FAQ</a>'
     );
     expect(rendered.html).toContain(
-      '<a href="https://en.wikipedia.org/wiki/Wiki" class="interwiki iw_wp" rel="nofollow noopener noreferrer">Wiki</a>'
+      '<a href="https://en.wikipedia.org/wiki/Wiki" class="interwiki iw_wp">Wiki</a>'
     );
     expect(rendered.html).toContain(
       '<a href="/doku.php?do=admin&amp;page=config" class="interwiki iw_this">config</a>'
     );
     expect(custom.html).toContain(
-      '<a href="https://docs.example/Quick%20Start" class="interwiki iw_docs" rel="nofollow noopener noreferrer">Docs</a>'
+      '<a href="https://docs.example/Quick%20Start" class="interwiki iw_docs">Docs</a>'
     );
     expect(custom.html).toContain(
-      '<a href="https://wiki.example/Custom_Wiki" class="interwiki iw_wp" rel="nofollow noopener noreferrer">Wiki</a>'
+      '<a href="https://wiki.example/Custom_Wiki" class="interwiki iw_wp">Wiki</a>'
     );
   });
 

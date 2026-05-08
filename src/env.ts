@@ -22,6 +22,7 @@ export interface Env {
   USE_HEADING?: string;
   CAMELCASE?: string;
   TYPOGRAPHY?: string;
+  REL_NOFOLLOW?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

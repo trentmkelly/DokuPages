@@ -48,6 +48,8 @@ fresh render.
 - imported acronym, entity, and smiley replacement
 - typography replacement
 - optional CamelCase links
+- DokuWiki-style `rel="ugc nofollow"` external-link policy, including imported
+  `relnofollow` disablement
 - section edit anchors
 - DokuWiki-template link classes for internal, external, interwiki, mail, media,
   and Windows-share links

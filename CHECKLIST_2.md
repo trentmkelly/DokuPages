@@ -70,7 +70,7 @@ are not fixed by this checklist.
 - [x] Load acronyms from `conf/acronyms.conf` and local overrides instead of only the checked-in default map.
 - [x] Load interwiki shortcuts from imported D1 metadata at render time instead of only using the built-in TypeScript map.
 - [x] Match DokuWiki's `scheme.conf` protocol handling for external links and autolinks.
-- [ ] Match DokuWiki's `relnofollow` behavior, including `ugc nofollow` distinctions for external user content.
+- [x] Match DokuWiki's `relnofollow` behavior, including `ugc nofollow` distinctions for external user content.
 - [ ] Match DokuWiki's configurable link targets for wiki, interwiki, external, media, and Windows-share links.
 - [x] Match DokuWiki's section edit limits from `maxseclevel`.
 - [x] Match DokuWiki's TOC thresholds from `toptoclevel`, `tocminheads`, and `maxtoclevel`.
@@ -256,7 +256,7 @@ are not fixed by this checklist.
 
 - [ ] Match DokuWiki's wordblock behavior and config toggles exactly, including local wordblock overrides.
 - [ ] Match upstream email obfuscation modes from `mailguard`: visible, hex, and none.
-- [ ] Match upstream external link `rel` behavior from `relnofollow`.
+- [x] Match upstream external link `rel` behavior from `relnofollow`.
 - [ ] Match upstream upload XSS protection toggles from `iexssprotect`.
 - [ ] Match upstream CSRF token names and behavior where legacy clients rely on `sectok`.
 - [ ] Match upstream cookie path behavior from `cookiedir`.

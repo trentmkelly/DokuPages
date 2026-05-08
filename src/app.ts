@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 25;
+const RENDER_CACHE_VERSION = 26;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1071,6 +1071,7 @@ async function handlePagePreview(
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
+  const relNofollow = await relNofollowForRender(env, config.relNofollow);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
@@ -1085,6 +1086,7 @@ async function handlePagePreview(
     acronyms,
     interwikiTemplates,
     linkSchemes,
+    relNofollow,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2617,6 +2619,7 @@ async function renderPageHtml(
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
+  const relNofollow = await relNofollowForRender(env, config.relNofollow);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
@@ -2626,6 +2629,7 @@ async function renderPageHtml(
     acronyms,
     interwikiTemplates,
     linkSchemes,
+    relNofollow,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2688,6 +2692,7 @@ async function renderPageExport(
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
+  const relNofollow = await relNofollowForRender(env, config.relNofollow);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
@@ -2696,6 +2701,7 @@ async function renderPageExport(
     acronyms,
     interwikiTemplates,
     linkSchemes,
+    relNofollow,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2855,6 +2861,26 @@ async function linkSchemesForRender(env: Env): Promise<string[] | undefined> {
   return entries.length > 0 ? entries : undefined;
 }
 
+async function relNofollowForRender(env: Env, fallback: boolean): Promise<boolean> {
+  const imported = await importedDokuWikiBooleanConfig(env, "relnofollow");
+  return imported ?? fallback;
+}
+
+async function importedDokuWikiBooleanConfig(env: Env, key: string): Promise<boolean | null> {
+  const result = await env.DB.prepare(
+    `select key, value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?`
+  )
+    .bind("config", "dokuwiki")
+    .all<{ key: string; value_json: string }>();
+  const row = result.results.find((entry) => entry.key === `conf:${key}`);
+  if (!row) return null;
+
+  return parseDokuWikiBooleanConfigMetadata(row.value_json);
+}
+
 function parseEntityMetadata(
   value: string
 ): { token: string; replacement: string; order: number } | null {
@@ -2912,6 +2938,22 @@ function parseSchemeMetadata(value: string): { protocol: string } | null {
     const parsed = JSON.parse(value) as { protocol?: unknown };
     if (typeof parsed.protocol !== "string") return null;
     return { protocol: parsed.protocol.toLowerCase() };
+  } catch {
+    return null;
+  }
+}
+
+function parseDokuWikiBooleanConfigMetadata(value: string): boolean | null {
+  try {
+    const parsed = JSON.parse(value) as { value?: unknown };
+    if (typeof parsed.value === "boolean") return parsed.value;
+    if (typeof parsed.value === "number") return parsed.value !== 0;
+    if (typeof parsed.value === "string") {
+      const normalized = parsed.value.trim().toLowerCase();
+      if (["1", "true", "yes", "on"].includes(normalized)) return true;
+      if (["0", "false", "no", "off", ""].includes(normalized)) return false;
+    }
+    return null;
   } catch {
     return null;
   }

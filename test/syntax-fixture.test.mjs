@@ -16,7 +16,7 @@ describe("DokuWiki syntax fixture", () => {
     expect(rendered.html).toContain('<abbr title="HyperText Markup Language">HTML</abbr>');
     expect(rendered.html).toContain('<img src="/images/smileys/lol.svg" class="icon smiley"');
     expect(rendered.html).toContain(
-      '<a href="http://php.net" class="urlextern" rel="nofollow noopener noreferrer"><img src="/media/wiki/dokuwiki-128.png" class="media" loading="lazy" alt=""></a>'
+      '<a href="http://php.net" class="urlextern" rel="ugc nofollow"><img src="/media/wiki/dokuwiki-128.png" class="media" loading="lazy" alt=""></a>'
     );
     expect(rendered.html).toContain(
       "<ul><li>This is a list</li><li>The second item<ul><li>You may have different levels</li></ul></li><li>Another item</li></ul>"

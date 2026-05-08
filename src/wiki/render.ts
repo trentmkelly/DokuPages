@@ -38,6 +38,7 @@ export interface RenderWikiTextOptions {
   acronyms?: Readonly<Record<string, string>>;
   interwikiTemplates?: InterwikiTemplates;
   linkSchemes?: ReadonlyArray<string> | ReadonlySet<string>;
+  relNofollow?: boolean;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -189,6 +190,7 @@ export function renderWikiText(
     acronyms: options.acronyms ?? DEFAULT_ACRONYMS,
     interwikiTemplates: options.interwikiTemplates,
     linkSchemes: normalizeLinkSchemes(options.linkSchemes),
+    relNofollow: options.relNofollow ?? true,
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -425,6 +427,7 @@ interface RenderContext {
   acronyms: Readonly<Record<string, string>>;
   interwikiTemplates?: InterwikiTemplates;
   linkSchemes: ReadonlySet<string>;
+  relNofollow: boolean;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -750,6 +753,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             acronyms: context.acronyms,
             interwikiTemplates: context.interwikiTemplates,
             linkSchemes: context.linkSchemes,
+            relNofollow: context.relNofollow,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -795,7 +799,12 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = escapeHtml(rendered);
   rendered = renderMedia(rendered, context, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
-  rendered = renderExternalAutolinks(rendered, context.linkSchemes, protectHtml);
+  rendered = renderExternalAutolinks(
+    rendered,
+    context.linkSchemes,
+    context.relNofollow,
+    protectHtml
+  );
   rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = renderTypography(rendered, context.entityReplacements, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
@@ -1056,7 +1065,7 @@ function renderLinks(
       internalMissing,
       windowsShare: Boolean(windowsShare)
     });
-    const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
+    const rel = external ? externalLinkRelAttribute(context.relNofollow) : "";
     const classAttribute = classNames.length > 0 ? ` class="${classNames.join(" ")}"` : "";
     const titleAttribute = internalMissing ? ' title="This topic does not exist yet"' : "";
 
@@ -1099,6 +1108,10 @@ function isExternalLinkTarget(target: string, linkSchemes: ReadonlySet<string>):
   return Boolean(match && linkSchemes.has(match[1].toLowerCase()));
 }
 
+function externalLinkRelAttribute(relNofollow: boolean): string {
+  return relNofollow ? ' rel="ugc nofollow"' : "";
+}
+
 function renderEmailAutolinks(source: string, protectHtml: (html: string) => string): string {
   return source.replace(
     /&lt;([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})&gt;/gi,
@@ -1134,6 +1147,7 @@ function renderCamelCaseLinks(
 function renderExternalAutolinks(
   source: string,
   linkSchemes: ReadonlySet<string>,
+  relNofollow: boolean,
   protectHtml: (html: string) => string
 ): string {
   const pattern = externalAutolinkPattern(linkSchemes);
@@ -1148,7 +1162,7 @@ function renderExternalAutolinks(
         : decoded;
 
     return `${protectHtml(
-      `<a href="${escapeAttribute(href)}" class="urlextern" rel="nofollow noopener noreferrer">${escapeHtml(decoded)}</a>`
+      `<a href="${escapeAttribute(href)}" class="urlextern"${externalLinkRelAttribute(relNofollow)}>${escapeHtml(decoded)}</a>`
     )}${suffix}`;
   });
 }

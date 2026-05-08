@@ -88,6 +88,7 @@ describe("handleRequest", () => {
     env.MAINTENANCE_MODE = undefined;
     env.CAMELCASE = undefined;
     env.TYPOGRAPHY = undefined;
+    env.REL_NOFOLLOW = undefined;
   });
 
   it("returns health information for the API health route", async () => {
@@ -264,6 +265,13 @@ describe("handleRequest", () => {
       value_json: JSON.stringify({ protocol: "foo" }),
       updated_at: "2026-05-07T00:00:00.000Z"
     });
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "dokuwiki",
+      key: "conf:relnofollow",
+      value_json: JSON.stringify({ key: "relnofollow", value: 0 }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
     state.row = {
       ...currentPageRow(),
       content:
@@ -278,11 +286,9 @@ describe("handleRequest", () => {
     expect(html).toContain('<img src="/images/smileys/custom.svg"');
     expect(html).toContain('<abbr title="Custom API">API</abbr>');
     expect(html).toContain(
-      '<a href="https://docs.example/Guide" class="interwiki iw_docs" rel="nofollow noopener noreferrer">Docs</a>'
+      '<a href="https://docs.example/Guide" class="interwiki iw_docs">Docs</a>'
     );
-    expect(html).toContain(
-      '<a href="foo://service/path" class="urlextern" rel="nofollow noopener noreferrer">Foo</a>'
-    );
+    expect(html).toContain('<a href="foo://service/path" class="urlextern">Foo</a>');
     expect(cachePuts).not.toContain("page:wiki:welcome");
   });
 
@@ -1316,7 +1322,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 25,
+        rendererVersion: 26,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1338,7 +1344,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 25,
+        rendererVersion: 26,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",

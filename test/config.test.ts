@@ -30,6 +30,7 @@ describe("runtime config", () => {
       useHeading: false,
       camelCaseLinks: false,
       typographyMode: 1,
+      relNofollow: true,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -56,7 +57,8 @@ describe("runtime config", () => {
       MAX_SECTION_EDIT_LEVEL: "2",
       USE_HEADING: "1",
       CAMELCASE: "true",
-      TYPOGRAPHY: "2"
+      TYPOGRAPHY: "2",
+      REL_NOFOLLOW: "0"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
@@ -76,6 +78,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
+    expect(getRuntimeConfig(env).relNofollow).toBe(false);
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -149,6 +152,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "TYPOGRAPHY",
           effectiveValue: "1"
+        }),
+        expect.objectContaining({
+          key: "REL_NOFOLLOW",
+          effectiveValue: "true"
         }),
         expect.objectContaining({
           key: "EMAIL_PROVIDER",
