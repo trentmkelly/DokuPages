@@ -356,6 +356,19 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain('href="javascript:');
   });
 
+  it("escapes raw HTML and PHP-style embedded syntax", () => {
+    const rendered = renderWikiText(
+      "<html>\n<strong>trusted</strong>\n</html>\n\n<php>\necho '<strong>trusted</strong>';\n</php>"
+    );
+
+    expect(rendered.html).toContain("&lt;html&gt;");
+    expect(rendered.html).toContain("&lt;strong&gt;trusted&lt;/strong&gt;");
+    expect(rendered.html).toContain("&lt;php&gt;");
+    expect(rendered.html).not.toContain("<html>");
+    expect(rendered.html).not.toContain("<php>");
+    expect(rendered.html).not.toContain("<strong>trusted</strong>");
+  });
+
   it("flushes unterminated code and file blocks safely at end of input", () => {
     const code = renderWikiText("<code>\n<unsafe>\n**literal**");
     const file = renderWikiText("<file txt example.txt>\n<unsafe>", { pageId: "wiki:welcome" });

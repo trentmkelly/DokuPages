@@ -62,8 +62,8 @@ are not fixed by this checklist.
 - [ ] Implement plugin syntax macros, including the bundled info plugin macro seen in `docs/syntax-inventory.md`.
 - [ ] Implement GeSHi-compatible code highlighting for `<code>` and `<file>` language metadata.
 - [x] Implement downloadable file-block output for DokuWiki file syntax metadata.
-- [ ] Match DokuWiki's raw HTML behavior when `htmlok`-style trusted content is enabled, or document the security-driven mismatch explicitly.
-- [ ] Match DokuWiki's PHP embedding behavior policy, including explicit unsupported rendering if PHP syntax appears.
+- [x] Match DokuWiki's raw HTML behavior when `htmlok`-style trusted content is enabled, or document the security-driven mismatch explicitly.
+- [x] Match DokuWiki's PHP embedding behavior policy, including explicit unsupported rendering if PHP syntax appears.
 - [ ] Match DokuWiki's typography modes from `typography`, including smart quotes where enabled.
 - [ ] Load entity replacements from `conf/entities.conf` and local overrides instead of relying only on hardcoded replacements.
 - [ ] Load smileys from `conf/smileys.conf` and local overrides instead of only the checked-in default map.

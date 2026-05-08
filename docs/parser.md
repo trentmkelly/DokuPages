@@ -65,6 +65,15 @@ section controls:
 | `useheading`     | `USE_HEADING`              | `false` | Prefer the first page heading as the display title. |
 | `camelcase`      | `CAMELCASE`                | `false` | Convert CamelCase words into internal page links.   |
 
+## Raw HTML And PHP
+
+The Pages port intentionally does not enable DokuWiki-style trusted raw HTML or
+embedded PHP execution. Raw tags, `<html>...</html>` blocks, and
+`<php>...</php>` blocks are escaped as page text even if imported source content
+contains them. This keeps rendered pages compatible with the Workers security
+model, avoids introducing an HTML trust boundary inside shared wiki content, and
+reflects that Pages has no PHP runtime for embedded snippets.
+
 ## Still Pending
 
 - full DokuWiki parser mode compatibility
