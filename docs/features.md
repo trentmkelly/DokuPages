@@ -10,6 +10,9 @@ of full PHP DokuWiki runtime compatibility.
 - Page diffs support current/previous defaults, explicit `rev2[...]`
   comparisons, side-by-side and inline output, and DokuWiki-style diff option
   forms. Media detail pages provide a native side-by-side media revision diff.
+- Export actions cover raw source, code blocks, XHTML, XHTML body, HTML aliases,
+  no-body metadata exports, and explicit unsupported-renderer responses for
+  unavailable `export_*` modes.
 - Anonymous and D1-backed native user sessions with imported `authplain` users,
   groups, native registration, profile updates, password changes, and emailed
   password resets.

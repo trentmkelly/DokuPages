@@ -29,6 +29,8 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?id=<page>&do=export_raw`                 | Redirects to the raw export route.                                 |
 | `/doku.php?id=<page>&do=export_code`                | Redirects to the code-block download export route.                 |
 | `/doku.php?id=<page>&do=export_xhtml`               | Redirects to the XHTML export route.                               |
+| `/doku.php?id=<page>&do=export_metadata`            | Redirects to a no-body metadata export response.                   |
+| `/doku.php?id=<page>&do=export_<renderer>`          | Redirects to a deliberate unsupported renderer response.           |
 | `/doku.php?do=admin`                                | Redirects to `/admin`.                                             |
 | `/doku.php?do=admin&page=acl`                       | Redirects to `/admin/acl`.                                         |
 | `/doku.php?do=admin&page=config`                    | Redirects to `/admin/config`.                                      |

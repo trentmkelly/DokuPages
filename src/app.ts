@@ -139,7 +139,7 @@ import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-deri
 import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
-type ExportMode = "raw" | "xhtml" | "xhtmlbody" | "code";
+type ExportMode = "raw" | "xhtml" | "xhtmlbody" | "code" | "metadata" | "unsupported";
 type RenderCacheMode = "shared" | "private";
 
 interface BreadcrumbEntry {
@@ -2842,6 +2842,12 @@ function getMediaTimestamp(media: CurrentMedia | MediaRevision): string {
 }
 
 function normalizeLegacyAction(action: string | null): string | null {
+  if (action?.startsWith("export_")) {
+    if (action === "export_html") return "export_xhtml";
+    if (action === "export_htmlbody") return "export_xhtmlbody";
+    return action;
+  }
+
   switch (action) {
     case null:
     case "":
@@ -2877,15 +2883,7 @@ function normalizeLegacyAction(action: string | null): string | null {
     case "login":
     case "logout":
     case "subscribe":
-    case "export_raw":
-    case "export_code":
-    case "export_xhtml":
-    case "export_xhtmlbody":
       return action;
-    case "export_html":
-      return "export_xhtml";
-    case "export_htmlbody":
-      return "export_xhtmlbody";
     default:
       return null;
   }
@@ -2903,8 +2901,10 @@ function normalizeExportMode(action: string | null): ExportMode | null {
     case "export_xhtmlbody":
     case "export_htmlbody":
       return "xhtmlbody";
+    case "export_metadata":
+      return "metadata";
     default:
-      return null;
+      return action?.startsWith("export_") ? "unsupported" : null;
   }
 }
 
@@ -3103,6 +3103,22 @@ async function renderPageExport(
 
   if (mode === "code") {
     return renderCodeBlockExport(url, content, headers);
+  }
+
+  if (mode === "metadata") {
+    return new Response(null, { status: 204, headers });
+  }
+
+  if (mode === "unsupported") {
+    headers.set("content-type", "text/html; charset=utf-8");
+    return new Response(
+      htmlShell(
+        env,
+        "Unsupported export mode",
+        `<h1>Unsupported export mode</h1><p>This export renderer is not available on Pages.</p>`
+      ),
+      { status: 501, headers }
+    );
   }
 
   const entityReplacements = await entityReplacementsForRender(env);

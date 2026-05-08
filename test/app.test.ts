@@ -470,6 +470,10 @@ describe("handleRequest", () => {
       new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_htmlbody"),
       env
     );
+    const metadataExport = await handleRequest(
+      new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_metadata"),
+      env
+    );
 
     expect(raw.status).toBe(301);
     expect(raw.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_raw");
@@ -477,6 +481,8 @@ describe("handleRequest", () => {
     expect(code.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_code&codeblock=0");
     expect(htmlAlias.status).toBe(301);
     expect(htmlAlias.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_xhtmlbody");
+    expect(metadataExport.status).toBe(301);
+    expect(metadataExport.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_metadata");
   });
 
   it("maps legacy DokuWiki page actions to native Pages behavior", async () => {
@@ -1961,6 +1967,14 @@ describe("handleRequest", () => {
       ),
       env
     );
+    const metadata = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=export_metadata"),
+      env
+    );
+    const unsupported = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=export_text"),
+      env
+    );
 
     expect(raw.status).toBe(200);
     expect(raw.headers.get("content-type")).toBe("text/plain; charset=utf-8");
@@ -1985,6 +1999,15 @@ describe("handleRequest", () => {
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain('<div class="dokuwiki export">');
     expect(html).toContain("<p>Older page.</p>");
+    expect(xhtml.headers.get("x-robots-tag")).toBe("noindex");
+
+    expect(metadata.status).toBe(204);
+    expect(metadata.headers.get("x-robots-tag")).toBe("noindex");
+    await expect(metadata.text()).resolves.toBe("");
+
+    expect(unsupported.status).toBe(501);
+    expect(unsupported.headers.get("x-robots-tag")).toBe("noindex");
+    await expect(unsupported.text()).resolves.toContain("Unsupported export mode");
   });
 
   it("renders page revision history", async () => {
