@@ -7,8 +7,9 @@ DokuWiki port on `https://dokutest.pages.dev`.
 
 - Target: Cloudflare Pages project `dokutest`.
 - Production branch: `main`.
-- Current production deployment: `9602bd18-f59a-4acb-847e-aad78dc196b7`.
-- Current source commit: `fc43dcaaf4d704573f191588a9b6ed4b45b8963e`.
+- Audited production deployment:
+  `01e192f9-5d40-4f57-b71e-def725f71549`.
+- Audited source commit: `70906332729b2df0e87cb7333180768ca9a22a40`.
 - Custom DNS: not configured for this proof of concept.
 - Source DokuWiki cutover: no production traffic cutover was requested, so
   source read-only mode, DNS switching, and old deployment archiving are no-op
@@ -63,7 +64,7 @@ Post-flow remote totals after launch verification:
   the final imported welcome content.
 - `npm run cache:warm -- --base-url https://dokutest.pages.dev`: warmed root,
   welcome, syntax, sitemap, and feed.
-- Wrangler Pages tail on deployment `9602bd18-f59a-4acb-847e-aad78dc196b7`
+- Wrangler Pages tail on deployment `01e192f9-5d40-4f57-b71e-def725f71549`
   connected for a live error-only watch window; no error events were emitted
   while health, page, and media routes were exercised.
 - Deployed auth/content flow: fresh registration, password login, session

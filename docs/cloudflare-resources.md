@@ -8,8 +8,8 @@ Provisioned resources for the `dokutest` Pages project.
 - Production URL: `https://dokutest.pages.dev/`
 - Production branch: `main`
 - Preview branch script: `preview`
-- Current production deployment: `9602bd18-f59a-4acb-847e-aad78dc196b7`
-  from commit `fc43dca`.
+- Latest audited production deployment:
+  `01e192f9-5d40-4f57-b71e-def725f71549` from commit `7090633`.
 
 ## D1
 
