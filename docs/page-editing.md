@@ -58,7 +58,7 @@ Rendered headings include DokuWiki-style section edit anchors when the renderer 
 
 ## Page Templates
 
-Missing-page edits look for DokuWiki page templates before rendering the editor. The resolver checks the current namespace `_template` page first, then inherited `__template` pages from the current namespace toward the root. Supported substitutions are `@ID@`, `@NS@`, `@PAGE@`, `@!PAGE@`, `@!!PAGE@`, and `@!PAGE!@`.
+Missing-page edits look for DokuWiki page templates before rendering the editor. The resolver checks the current namespace `_template` page first, then inherited `__template` pages from the current namespace toward the root. Supported substitutions match upstream DokuWiki: `@ID@`, `@NS@`, `@CURNS@`, `@!CURNS@`, `@!!CURNS@`, `@!CURNS!@`, `@FILE@`, `@!FILE@`, `@!FILE!@`, `@PAGE@`, `@!PAGE@`, `@!!PAGE@`, `@!PAGE!@`, `@USER@`, `@NAME@`, `@MAIL@`, and `@DATE@`, plus DokuWiki-style `%` date tokens in the resulting template text.
 
 ## Verified Against Production
 

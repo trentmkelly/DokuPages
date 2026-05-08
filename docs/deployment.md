@@ -37,6 +37,8 @@ Optional Pages environment variables:
   here" trail. Default: disabled.
 - `FULLPATH`: truthy value makes page info display the logical data path
   instead of the relative page file path. Default: disabled.
+- `DFORMAT`: DokuWiki-style strftime date format used by page template
+  `@DATE@` replacement. Default: `%Y/%m/%d %H:%M`.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.

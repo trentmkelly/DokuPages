@@ -30,6 +30,7 @@ describe("runtime config", () => {
       breadcrumbs: 10,
       youAreHere: false,
       fullPath: false,
+      dateFormat: "%Y/%m/%d %H:%M",
       useHeading: false,
       camelCaseLinks: false,
       typographyMode: 1,
@@ -75,6 +76,7 @@ describe("runtime config", () => {
       BREADCRUMBS: "3",
       YOUAREHERE: "1",
       FULLPATH: "1",
+      DFORMAT: "%F %R",
       USE_HEADING: "1",
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
@@ -108,6 +110,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).breadcrumbs).toBe(3);
     expect(getRuntimeConfig(env).youAreHere).toBe(true);
     expect(getRuntimeConfig(env).fullPath).toBe(true);
+    expect(getRuntimeConfig(env).dateFormat).toBe("%F %R");
     expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
@@ -203,6 +206,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "FULLPATH",
           effectiveValue: "false"
+        }),
+        expect.objectContaining({
+          key: "DFORMAT",
+          effectiveValue: "%Y/%m/%d %H:%M"
         }),
         expect.objectContaining({
           key: "CAMELCASE",

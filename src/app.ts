@@ -32,6 +32,7 @@ import {
   getSecretConfigStatus,
   validateRuntimeConfig,
   type ConfigValidation,
+  type RuntimeConfig,
   type RuntimeConfigEntry,
   type SecretConfigStatus
 } from "./config";
@@ -120,6 +121,7 @@ import {
   type PageRevision
 } from "./wiki/page-service";
 import { extractInternalPageLinks } from "./wiki/page-links";
+import { applyPageTemplate, pageTemplateCandidates } from "./wiki/page-template";
 import {
   extractCodeBlock,
   getWikiRenderDirectives,
@@ -3237,57 +3239,24 @@ function slugForPageHeading(id: string): string {
   return id.replaceAll(":", "-").replaceAll("_", "-") || "page";
 }
 
-async function resolvePageTemplate(db: D1Database, id: string): Promise<string | null> {
-  for (const templateId of pageTemplateCandidates(id)) {
+async function resolvePageTemplate(
+  db: D1Database,
+  id: string,
+  config: RuntimeConfig,
+  principal: AuthPrincipal
+): Promise<string | null> {
+  for (const templateId of pageTemplateCandidates(id, config.pageIdCleanOptions)) {
     const template = await getCurrentPage(db, templateId);
     if (template) {
-      return applyPageTemplate(template.content, id);
+      return applyPageTemplate(template.content, id, {
+        dateFormat: config.dateFormat,
+        pageIdCleanOptions: config.pageIdCleanOptions,
+        principal
+      });
     }
   }
 
   return null;
-}
-
-function pageTemplateCandidates(id: string): string[] {
-  const segments = cleanPageId(id).split(":").filter(Boolean);
-  const namespaceSegments = segments.slice(0, -1);
-  const candidates: string[] = [];
-
-  if (namespaceSegments.length > 0) {
-    candidates.push([...namespaceSegments, "_template"].join(":"));
-  }
-
-  for (let length = namespaceSegments.length; length >= 0; length -= 1) {
-    const namespace = namespaceSegments.slice(0, length);
-    candidates.push([...namespace, "__template"].filter(Boolean).join(":"));
-  }
-
-  return [...new Set(candidates)];
-}
-
-function applyPageTemplate(template: string, id: string): string {
-  const pageId = cleanPageId(id);
-  const segments = pageId.split(":").filter(Boolean);
-  const page = segments.at(-1) ?? pageId;
-  const namespace = segments.slice(0, -1).join(":");
-  const pageLabel = page.replace(/[_-]+/g, " ");
-  const title = titleCase(pageLabel);
-
-  return template
-    .replaceAll("@ID@", pageId)
-    .replaceAll("@NS@", namespace)
-    .replaceAll("@PAGE@", page)
-    .replaceAll("@!PAGE@", capitalize(pageLabel))
-    .replaceAll("@!!PAGE@", pageLabel.toUpperCase())
-    .replaceAll("@!PAGE!@", title);
-}
-
-function titleCase(value: string): string {
-  return value.split(/\s+/).filter(Boolean).map(capitalize).join(" ");
-}
-
-function capitalize(value: string): string {
-  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 }
 
 function renderBreadcrumbs(id: string): string {
@@ -7052,7 +7021,9 @@ async function handleEditPage(
   id: string,
   page: CurrentPage | null
 ): Promise<Response> {
-  if (getRuntimeConfig(env).maintenanceMode) {
+  const config = getRuntimeConfig(env);
+
+  if (config.maintenanceMode) {
     return maintenanceModeResponse(request, env);
   }
 
@@ -7066,7 +7037,8 @@ async function handleEditPage(
   if (denied) return denied;
 
   const draft = await getPageDraft(env.DB, id);
-  const templateContent = !page && !draft ? await resolvePageTemplate(env.DB, id) : null;
+  const templateContent =
+    !page && !draft ? await resolvePageTemplate(env.DB, id, config, principal) : null;
   const cookieName = pageLockCookieName(id);
   const lockToken = readCookie(request, cookieName) || randomPageLockToken();
   const lock = await ensurePageEditLock(request, env, principal, id, lockToken);

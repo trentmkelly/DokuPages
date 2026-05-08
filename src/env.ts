@@ -22,6 +22,7 @@ export interface Env {
   BREADCRUMBS?: string;
   YOUAREHERE?: string;
   FULLPATH?: string;
+  DFORMAT?: string;
   USE_HEADING?: string;
   CAMELCASE?: string;
   TYPOGRAPHY?: string;

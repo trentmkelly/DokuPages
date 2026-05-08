@@ -34,6 +34,7 @@ export interface RuntimeConfig {
   breadcrumbs: number;
   youAreHere: boolean;
   fullPath: boolean;
+  dateFormat: string;
   useHeading: boolean;
   camelCaseLinks: boolean;
   typographyMode: number;
@@ -115,6 +116,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     breadcrumbs: integerConfig(env.BREADCRUMBS, 10, 0, 99),
     youAreHere: truthy(env.YOUAREHERE),
     fullPath: truthy(env.FULLPATH),
+    dateFormat: nonEmpty(env.DFORMAT) ?? "%Y/%m/%d %H:%M",
     useHeading: truthy(env.USE_HEADING),
     camelCaseLinks: truthy(env.CAMELCASE),
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
@@ -201,6 +203,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("BREADCRUMBS", env.BREADCRUMBS, String(config.breadcrumbs), "10"),
     configEntry("YOUAREHERE", env.YOUAREHERE, String(config.youAreHere), "false"),
     configEntry("FULLPATH", env.FULLPATH, String(config.fullPath), "false"),
+    configEntry("DFORMAT", env.DFORMAT, config.dateFormat, "%Y/%m/%d %H:%M"),
     configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),

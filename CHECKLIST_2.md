@@ -86,7 +86,7 @@ are not fixed by this checklist.
 - [x] Support upstream `breadcrumbs` recent-page trail behavior, not only static "You are here" breadcrumbs.
 - [x] Make `youarehere` configurable like upstream instead of always rendering the current breadcrumb style.
 - [x] Match upstream `fullpath` display behavior.
-- [ ] Match upstream page template selection and namespace template inheritance exactly, including all replacement variables.
+- [x] Match upstream page template selection and namespace template inheritance exactly, including all replacement variables.
 - [ ] Match upstream edit conflict pages from `inc/Ui/PageConflict.php` rather than only native optimistic-concurrency messages.
 - [ ] Match upstream locked-page UI and lock refresh timing from `locktime`.
 - [ ] Match upstream draft autosave timing and recovery UI from `inc/Draft.php` and `inc/Ui/PageDraft.php`.

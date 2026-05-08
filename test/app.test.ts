@@ -93,6 +93,7 @@ describe("handleRequest", () => {
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
+    env.DFORMAT = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
     env.TARGET_EXTERN = undefined;
@@ -1777,25 +1778,34 @@ describe("handleRequest", () => {
   });
 
   it("prefills missing page edits from namespace page templates", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-08T12:34:56.000Z"));
     state.row = {
       id: "wiki:_template",
       namespace: "wiki",
       title: "_template",
       revision_id: "wiki:_template@2026-05-07T00:00:00.000Z",
-      content: "====== @!PAGE!@ ======\n\nCreate @ID@ in @NS@.",
+      content:
+        "====== @!!PAGE@ ======\n\nCreate @ID@ in @NS@ / @CURNS@ from @FILE@ by @USER@@NAME@@MAIL@ on @DATE@.",
       updated_at: "2026-05-07T00:00:00.000Z"
     };
 
-    const response = await handleRequest(
-      new Request("https://example.com/wiki/wiki/new_page?do=edit"),
-      env
-    );
+    try {
+      const response = await handleRequest(
+        new Request("https://example.com/wiki/wiki/new_page?do=edit"),
+        env
+      );
 
-    expect(response.status).toBe(200);
-    const html = await response.text();
-    expect(html).toContain('name="baseRevisionId" value=""');
-    expect(html).toContain("====== New Page ======");
-    expect(html).toContain("Create wiki:new_page in wiki.");
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('name="baseRevisionId" value=""');
+      expect(html).toContain("====== New Page ======");
+      expect(html).toContain(
+        "Create wiki:new_page in wiki / wiki from new_page by  on 2026/05/08 12:34."
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns source text for existing pages", async () => {
