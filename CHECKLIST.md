@@ -526,8 +526,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Decide whether email features are in scope.
 - [x] Choose an email provider compatible with Workers.
 - [x] Implement mail sending adapter.
-- [ ] Implement registration notifications.
-- [ ] Implement password reset emails.
+- [x] Implement registration notifications.
+- [x] Implement password reset emails.
 - [ ] Implement page change notifications.
 - [ ] Implement subscriptions.
 - [ ] Implement digest scheduling.

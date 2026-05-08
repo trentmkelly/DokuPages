@@ -24,9 +24,9 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?do=admin&page=popularity`                | Returns explicit `501` JSON.                                        |
 | `/doku.php?do=admin&page=safefnrecode`              | Returns explicit `501` JSON.                                        |
 | `/doku.php?do=admin&page=styling`                   | Returns explicit `501` JSON.                                        |
-| `/doku.php?do=register`                             | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=register`                             | Redirects to `/register`.                                           |
 | `/doku.php?do=profile`                              | Redirects to `/profile`.                                            |
-| `/doku.php?do=resendpwd`                            | Returns explicit `501` JSON.                                        |
+| `/doku.php?do=resendpwd`                            | Redirects to `/resendpwd`.                                          |
 | `/feed.php`, `/feed`, `/feed.xml`                   | Serves RSS.                                                         |
 | `/atom.xml`                                         | Serves Atom.                                                        |
 | `/sitemap.xml`, `/sitemap`                          | Serves sitemap XML.                                                 |
@@ -50,9 +50,10 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/install.php`                                      | Returns explicit `410` JSON; production installs are not supported. |
 | `/profile`                                          | Serves the native profile update form for authenticated users.      |
 | `/api/auth/profile`                                 | Updates display name, email, and password for authenticated users.  |
-| `/register`, `/resendpwd`                           | Returns explicit `501` JSON.                                        |
-| `/api/auth/register`                                | Returns explicit `501` JSON.                                        |
-| `/api/auth/password-reset`                          | Returns explicit `501` JSON.                                        |
+| `/register`, `/resendpwd`, `/password-reset`        | Serve native registration and password reset forms.                 |
+| `/api/auth/register`                                | Creates a native D1 user and session.                               |
+| `/api/auth/password-reset`                          | Requests a password reset email.                                    |
+| `/api/auth/password-reset/confirm`                  | Consumes a reset token and updates the password.                    |
 
 Unsupported legacy executables are handled deliberately so old clients receive a
 stable response instead of an ambiguous 404.

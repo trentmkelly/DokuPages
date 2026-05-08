@@ -33,17 +33,17 @@ status, provider, provider message ID, and error text. Provider errors and
 network failures are recorded as `failed`; missing configuration is recorded as
 `skipped`.
 
-Implemented templates:
+Implemented flows and templates:
 
+- native registration form and `/api/auth/register`
 - registration notification
+- native password reset request and confirmation forms
 - password reset
 - page change notification
 - digest
 
 Deferred DokuWiki behaviors still being wired to routes and scheduled tasks:
 
-- registration notification dispatch
-- password reset email dispatch
 - page change notification dispatch
 - subscription management UI/actions
 - digest scheduling

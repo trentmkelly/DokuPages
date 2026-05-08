@@ -1,4 +1,4 @@
-/* global FormData, Request */
+/* global FormData, Request, Response */
 
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,7 @@ describe("auth routes", () => {
     db?.close();
     db = undefined;
     env = undefined;
+    vi.unstubAllGlobals();
   });
 
   it("renders the login form", async () => {
@@ -47,36 +48,158 @@ describe("auth routes", () => {
     expect(html).toMatch(/name="sectok" value="[^"]+"/);
   });
 
-  it("returns explicit not-supported responses for deferred account flows", async () => {
+  it("renders registration and password reset forms", async () => {
     env = createEnv();
-    const browserUrls = [
-      "https://example.com/register",
-      "https://example.com/resendpwd",
-      "https://example.com/password-reset",
-      "https://example.com/doku.php?do=register",
-      "https://example.com/doku.php?do=resendpwd",
-      "https://example.com/wiki/wiki/welcome?do=register"
-    ];
-    const apiUrls = [
-      "https://example.com/api/auth/register",
-      "https://example.com/api/auth/password-reset"
-    ];
 
-    for (const url of browserUrls) {
-      const response = await handleRequest(new Request(url), env);
-      expect(response.status, url).toBe(501);
-      expect(response.headers.get("content-type"), url).toContain("text/html");
-      await expect(response.text(), url).resolves.toContain("not supported");
-    }
+    const register = await handleRequest(new Request("https://example.com/register"), env);
+    const pageRegister = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=register"),
+      env
+    );
+    const reset = await handleRequest(new Request("https://example.com/resendpwd"), env);
+    const resetAlias = await handleRequest(new Request("https://example.com/password-reset"), env);
+    const legacyRegister = await handleRequest(
+      new Request("https://example.com/doku.php?do=register"),
+      env
+    );
+    const legacyReset = await handleRequest(
+      new Request("https://example.com/doku.php?do=resendpwd"),
+      env
+    );
 
-    for (const url of apiUrls) {
-      const response = await handleRequest(new Request(url), env);
-      expect(response.status, url).toBe(501);
-      expect(response.headers.get("content-type"), url).toContain("application/json");
-      await expect(response.json(), url).resolves.toMatchObject({
-        status: "not_supported"
+    expect(register.status).toBe(200);
+    expect(register.headers.get("set-cookie") ?? "").toContain("DW_CSRF_TOKEN=");
+    await expect(register.text()).resolves.toContain('id="dw__register"');
+    expect(pageRegister.status).toBe(200);
+    await expect(pageRegister.text()).resolves.toContain('id="dw__register"');
+    expect(reset.status).toBe(200);
+    await expect(reset.text()).resolves.toContain('id="dw__resendpwd"');
+    expect(resetAlias.status).toBe(200);
+    await expect(resetAlias.text()).resolves.toContain('id="dw__resendpwd"');
+    expect(legacyRegister.status).toBe(301);
+    expect(legacyRegister.headers.get("location")).toBe("/register");
+    expect(legacyReset.status).toBe(301);
+    expect(legacyReset.headers.get("location")).toBe("/resendpwd");
+  });
+
+  it("registers native users and sends registration notifications when configured", async () => {
+    env = createEnv({
+      EMAIL_FROM: "Wiki <wiki@example.test>",
+      EMAIL_REGISTRATION_NOTIFY: "admin@example.test",
+      RESEND_API_KEY: "resend-token"
+    });
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ id: "email_registration" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
       });
-    }
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const form = new FormData();
+    form.set("username", "newuser");
+    form.set("displayName", "New User");
+    form.set("email", "newuser@example.test");
+    form.set("password", "new correct battery staple");
+    form.set("passwordConfirm", "new correct battery staple");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/auth/register", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("set-cookie") ?? "").toContain("DW_PAGES_SESSION=");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const emailRequest = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(emailRequest).toMatchObject({
+      from: "Wiki <wiki@example.test>",
+      to: ["admin@example.test"],
+      subject: "Test Wiki: new user registration"
+    });
+    expect(emailRequest.html).toContain("newuser@example.test");
+    await expect(
+      env.DB.prepare("select username, display_name, email from users where username = ?")
+        .bind("newuser")
+        .first()
+    ).resolves.toMatchObject({
+      username: "newuser",
+      display_name: "New User",
+      email: "newuser@example.test"
+    });
+    await expect(
+      env.DB.prepare("select status, provider_message_id from email_deliveries").bind().all()
+    ).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({ status: "sent", provider_message_id: "email_registration" })
+      ]
+    });
+  });
+
+  it("sends password reset emails and accepts valid reset tokens", async () => {
+    env = createEnv({
+      EMAIL_FROM: "Wiki <wiki@example.test>",
+      RESEND_API_KEY: "resend-token"
+    });
+    await seedUser(env.DB);
+    let resetToken = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url, init) => {
+        const emailRequest = JSON.parse(String(init.body));
+        const resetUrl = emailRequest.text.match(
+          /https:\/\/example\.com\/password-reset\?token=\S+/
+        )?.[0];
+        resetToken = new URL(resetUrl).searchParams.get("token");
+        return new Response(JSON.stringify({ id: "email_reset" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      })
+    );
+    const requestForm = new FormData();
+    requestForm.set("identifier", "alice");
+
+    const requested = await handleRequest(
+      new Request("https://example.com/api/auth/password-reset/request", {
+        method: "POST",
+        body: requestForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(requested.status).toBe(200);
+    await expect(requested.text()).resolves.toContain("password reset email has been sent");
+    expect(resetToken).toBeTruthy();
+    await expect(
+      env.DB.prepare("select status, provider_message_id from email_deliveries").bind().all()
+    ).resolves.toMatchObject({
+      results: [expect.objectContaining({ status: "sent", provider_message_id: "email_reset" })]
+    });
+
+    const confirmForm = new FormData();
+    confirmForm.set("token", resetToken);
+    confirmForm.set("password", "new correct battery staple");
+    confirmForm.set("passwordConfirm", "new correct battery staple");
+    const confirmed = await handleRequest(
+      new Request("https://example.com/api/auth/password-reset/confirm", {
+        method: "POST",
+        body: confirmForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(confirmed.status).toBe(200);
+    await expect(confirmed.text()).resolves.toContain("Your password has been updated.");
+    const oldLogin = await postLogin(env, "alice", "correct horse battery staple");
+    const newLogin = await postLogin(env, "alice", "new correct battery staple");
+    expect(oldLogin.status).toBe(401);
+    expect(newLogin.status).toBe(303);
   });
 
   it("allows authenticated users to update their profile and password", async () => {
@@ -969,14 +1092,15 @@ describe("auth routes", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
   });
 
-  function createEnv() {
+  function createEnv(overrides = {}) {
     db = new DatabaseSync(":memory:");
     db.exec(migrationSql);
 
     return {
       DB: new SqliteD1(db),
       RENDER_CACHE: new MemoryKv(),
-      SITE_NAME: "Test Wiki"
+      SITE_NAME: "Test Wiki",
+      ...overrides
     };
   }
 });

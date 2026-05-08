@@ -16,6 +16,12 @@ import {
 import { hashPassword } from "./auth/password";
 import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import {
+  emailConfig,
+  passwordResetEmail,
+  registrationNotificationEmail,
+  sendWikiEmail
+} from "./email";
+import {
   createConfigExport,
   getRuntimeConfig,
   getRuntimeConfigEntries,
@@ -127,6 +133,8 @@ const CSRF_TOKEN_BYTES = 32;
 const CSRF_TTL_SECONDS = 60 * 60 * 24;
 const LOGIN_RATE_LIMIT_ATTEMPTS = 5;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+const PASSWORD_RESET_TOKEN_BYTES = 32;
+const PASSWORD_RESET_TTL_SECONDS = 60 * 60;
 const EDIT_RATE_LIMIT_ATTEMPTS = 30;
 const EDIT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const UPLOAD_RATE_LIMIT_ATTEMPTS = 20;
@@ -258,9 +266,27 @@ export async function handleRequest(
     );
   }
 
+  if (url.pathname === "/register" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    return htmlResponseWithCsrf(request, renderRegisterPage(env, url, csrf.token), csrf);
+  }
+
   if (url.pathname === "/logout" && request.method === "GET") {
     const csrf = csrfContext(request);
     return htmlResponseWithCsrf(request, renderLogoutPage(env, url, undefined, csrf.token), csrf);
+  }
+
+  if (
+    (url.pathname === "/resendpwd" ||
+      url.pathname === "/password-reset" ||
+      url.pathname === "/password") &&
+    request.method === "GET"
+  ) {
+    const csrf = csrfContext(request);
+    const page = url.searchParams.get("token")
+      ? renderPasswordResetConfirmPage(env, url, csrf.token)
+      : renderPasswordResetRequestPage(env, url, csrf.token);
+    return htmlResponseWithCsrf(request, page, csrf);
   }
 
   if (url.pathname === "/profile" && request.method === "GET") {
@@ -281,8 +307,24 @@ export async function handleRequest(
     return handleLogin(request, env);
   }
 
+  if (url.pathname === "/api/auth/register" && request.method === "POST") {
+    return handleRegister(request, env);
+  }
+
   if (url.pathname === "/api/auth/logout" && request.method === "POST") {
     return handleLogout(request, env, principal);
+  }
+
+  if (
+    (url.pathname === "/api/auth/password-reset" ||
+      url.pathname === "/api/auth/password-reset/request") &&
+    request.method === "POST"
+  ) {
+    return handlePasswordResetRequest(request, env);
+  }
+
+  if (url.pathname === "/api/auth/password-reset/confirm" && request.method === "POST") {
+    return handlePasswordResetConfirm(request, env);
   }
 
   if (url.pathname === "/api/auth/profile" && request.method === "POST") {
@@ -520,11 +562,29 @@ export async function handleRequest(
       );
     }
 
+    if (url.searchParams.get("do") === "register") {
+      const csrf = csrfContext(request);
+      return htmlResponseWithCsrf(request, renderRegisterPage(env, url, csrf.token), csrf);
+    }
+
     if (url.searchParams.get("do") === "logout") {
       const csrf = csrfContext(request);
       return htmlResponseWithCsrf(
         request,
         renderLogoutPage(env, url, pagePath(id), csrf.token),
+        csrf
+      );
+    }
+
+    if (
+      url.searchParams.get("do") === "resendpwd" ||
+      url.searchParams.get("do") === "password" ||
+      url.searchParams.get("do") === "password_reset"
+    ) {
+      const csrf = csrfContext(request);
+      return htmlResponseWithCsrf(
+        request,
+        renderPasswordResetRequestPage(env, url, csrf.token),
         csrf
       );
     }
@@ -680,6 +740,18 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
 
   if (url.searchParams.get("do") === "profile") {
     return redirectResponse("/profile", 301);
+  }
+
+  if (url.searchParams.get("do") === "register") {
+    return redirectResponse("/register", 301);
+  }
+
+  if (
+    url.searchParams.get("do") === "resendpwd" ||
+    url.searchParams.get("do") === "password" ||
+    url.searchParams.get("do") === "password_reset"
+  ) {
+    return redirectResponse("/resendpwd", 301);
   }
 
   const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
@@ -3892,6 +3964,165 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   });
 }
 
+async function handleRegister(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  const url = new URL(request.url);
+  const csrf = csrfContext(request);
+  const parsed = parseRegistrationForm(form);
+
+  if (!parsed.ok) {
+    return htmlResponseWithCsrf(
+      request,
+      renderRegisterPage(env, url, csrf.token, parsed.error, parsed.values),
+      csrf,
+      { status: 400 }
+    );
+  }
+
+  if (await usernameExists(env.DB, parsed.values.username)) {
+    return htmlResponseWithCsrf(
+      request,
+      renderRegisterPage(env, url, csrf.token, "Username is already registered.", parsed.values),
+      csrf,
+      { status: 409 }
+    );
+  }
+
+  const user = await createRegisteredUser(env.DB, parsed.values);
+  await sendRegistrationNotifications(request, env, user);
+
+  const session = await createLoginSession(env.DB, user.id);
+  const response = acceptsJson(request)
+    ? jsonResponse({ ok: true, user: publicRegisteredUser(user) }, { status: 201 })
+    : redirectResponse(safeReturnPath(String(form.get("returnTo") ?? ""), env));
+  response.headers.append(
+    "set-cookie",
+    sessionCookieHeader(getRuntimeConfig(env).sessionCookieName, session, request)
+  );
+  return response;
+}
+
+async function handlePasswordResetRequest(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  const url = new URL(request.url);
+  const csrf = csrfContext(request);
+  const identifier = String(form.get("identifier") ?? form.get("login") ?? "").trim();
+  const message =
+    "If a matching active account has an email address, a password reset email has been sent.";
+
+  if (identifier) {
+    const user = await findPasswordResetUser(env.DB, identifier);
+    if (user?.email) {
+      const token = await createPasswordResetToken(env.DB, user.id);
+      const resetUrl = absoluteEmailUrl(env, request, `/password-reset?token=${token.token}`);
+      const template = passwordResetEmail({
+        siteName: getRuntimeConfig(env).siteName,
+        resetUrl,
+        displayName: user.displayName || user.username
+      });
+      await sendWikiEmail(env, {
+        kind: "password_reset",
+        to: [user.email],
+        ...template,
+        idempotencyKey: `password-reset:${token.id}`
+      });
+    }
+  }
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, message });
+  }
+
+  return htmlResponseWithCsrf(
+    request,
+    renderPasswordResetRequestPage(env, url, csrf.token, null, identifier, message),
+    csrf
+  );
+}
+
+async function handlePasswordResetConfirm(request: Request, env: Env): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  const url = new URL(request.url);
+  const csrf = csrfContext(request);
+  const token = String(form.get("token") ?? "").trim();
+  const password = String(form.get("password") ?? "");
+  const passwordConfirm = String(form.get("passwordConfirm") ?? "");
+
+  if (!token) {
+    return htmlResponseWithCsrf(
+      request,
+      renderPasswordResetConfirmPage(env, url, csrf.token, "Missing password reset token."),
+      csrf,
+      { status: 400 }
+    );
+  }
+
+  if (password.length < 8) {
+    return htmlResponseWithCsrf(
+      request,
+      renderPasswordResetConfirmPage(
+        env,
+        url,
+        csrf.token,
+        "Password must be at least 8 characters."
+      ),
+      csrf,
+      { status: 400 }
+    );
+  }
+
+  if (password !== passwordConfirm) {
+    return htmlResponseWithCsrf(
+      request,
+      renderPasswordResetConfirmPage(env, url, csrf.token, "Password confirmation does not match."),
+      csrf,
+      { status: 400 }
+    );
+  }
+
+  const reset = await findPasswordResetToken(env.DB, token);
+  if (!reset) {
+    return htmlResponseWithCsrf(
+      request,
+      renderPasswordResetConfirmPage(
+        env,
+        url,
+        csrf.token,
+        "Password reset link is invalid or expired."
+      ),
+      csrf,
+      { status: 400 }
+    );
+  }
+
+  const passwordHash = await hashPassword(password);
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("update users set password_hash = ?, updated_at = ? where id = ?").bind(
+      passwordHash,
+      now,
+      reset.userId
+    ),
+    env.DB.prepare("update password_reset_tokens set used_at = ? where id = ?").bind(now, reset.id),
+    env.DB.prepare("delete from sessions where user_id = ?").bind(reset.userId)
+  ]);
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true });
+  }
+
+  return htmlResponseWithCsrf(request, renderPasswordResetCompletePage(env, csrf.token), csrf);
+}
+
 async function loginRateLimitResponse(
   request: Request,
   env: Env,
@@ -4377,13 +4608,6 @@ function elapsedSince(startedAt: number): number {
 
 function unsupportedAccountFeatureForPath(pathname: string): string | null {
   switch (pathname) {
-    case "/register":
-    case "/api/auth/register":
-      return "registration";
-    case "/resendpwd":
-    case "/password-reset":
-    case "/api/auth/password-reset":
-      return "password_reset";
     default:
       return null;
   }
@@ -4391,12 +4615,6 @@ function unsupportedAccountFeatureForPath(pathname: string): string | null {
 
 function unsupportedAccountFeatureForAction(action: string | null): string | null {
   switch (action) {
-    case "register":
-      return "registration";
-    case "password":
-    case "password_reset":
-    case "resendpwd":
-      return "password_reset";
     default:
       return null;
   }
@@ -4440,6 +4658,336 @@ function accountFeatureLabel(feature: string): string {
     default:
       return "Account feature";
   }
+}
+
+interface RegistrationValues {
+  username: string;
+  displayName: string;
+  email: string | null;
+  password: string;
+}
+
+interface PasswordResetTokenRow {
+  id: string;
+  user_id: string;
+  expires_at: string;
+  used_at: string | null;
+}
+
+function parseRegistrationForm(
+  form: FormData
+):
+  | { ok: true; values: RegistrationValues }
+  | { ok: false; error: string; values: RegistrationValues } {
+  const values: RegistrationValues = {
+    username: String(form.get("username") ?? form.get("login") ?? "")
+      .trim()
+      .toLowerCase(),
+    displayName: String(form.get("displayName") ?? form.get("fullname") ?? "").trim(),
+    email: String(form.get("email") ?? "").trim() || null,
+    password: String(form.get("password") ?? form.get("pass") ?? "")
+  };
+  const passwordConfirm = String(form.get("passwordConfirm") ?? form.get("passchk") ?? "");
+
+  if (!/^[a-z0-9._-]{2,64}$/.test(values.username)) {
+    return {
+      ok: false,
+      error:
+        "Username must be 2 to 64 characters using letters, numbers, dots, dashes, or underscores.",
+      values
+    };
+  }
+
+  if (!values.displayName) {
+    return { ok: false, error: "Display name is required.", values };
+  }
+
+  if (values.email && !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(values.email)) {
+    return { ok: false, error: "Email address is invalid.", values };
+  }
+
+  if (values.password.length < 8) {
+    return { ok: false, error: "Password must be at least 8 characters.", values };
+  }
+
+  if (values.password !== passwordConfirm) {
+    return { ok: false, error: "Password confirmation does not match.", values };
+  }
+
+  return { ok: true, values };
+}
+
+async function usernameExists(db: D1Database, username: string): Promise<boolean> {
+  const row = await db
+    .prepare("select id from users where lower(username) = lower(?)")
+    .bind(username)
+    .first<{ id: string }>();
+  return Boolean(row);
+}
+
+async function createRegisteredUser(
+  db: D1Database,
+  values: RegistrationValues
+): Promise<UserRecord> {
+  const now = new Date().toISOString();
+  const user: UserRecord = {
+    id: crypto.randomUUID(),
+    username: values.username,
+    displayName: values.displayName,
+    email: values.email,
+    passwordHash: await hashPassword(values.password),
+    isDisabled: false,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  await db.batch([
+    db
+      .prepare(
+        `insert into users (
+           id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        user.id,
+        user.username,
+        user.displayName,
+        user.email,
+        user.passwordHash,
+        user.isDisabled ? 1 : 0,
+        user.createdAt,
+        user.updatedAt
+      ),
+    db
+      .prepare("insert or ignore into groups (id, name, created_at) values (?, ?, ?)")
+      .bind("group:user", "user", now),
+    db
+      .prepare("insert or ignore into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
+      .bind(user.id, "group:user", now)
+  ]);
+
+  return user;
+}
+
+function publicRegisteredUser(user: UserRecord): Record<string, unknown> {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    email: user.email
+  };
+}
+
+async function sendRegistrationNotifications(
+  request: Request,
+  env: Env,
+  user: UserRecord
+): Promise<void> {
+  const config = emailConfig(env);
+  if (config.registrationNotify.length === 0) return;
+
+  const template = registrationNotificationEmail({
+    siteName: getRuntimeConfig(env).siteName,
+    baseUrl: absoluteEmailUrl(env, request, "/"),
+    username: user.username,
+    displayName: user.displayName,
+    email: user.email
+  });
+
+  await sendWikiEmail(env, {
+    kind: "registration_notification",
+    to: config.registrationNotify,
+    ...template,
+    idempotencyKey: `registration:${user.id}`
+  });
+}
+
+async function findPasswordResetUser(
+  db: D1Database,
+  identifier: string
+): Promise<UserRecord | null> {
+  const row = await db
+    .prepare(
+      `select id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
+       from users
+       where is_disabled = 0
+         and (lower(username) = lower(?) or lower(email) = lower(?))
+       limit 1`
+    )
+    .bind(identifier, identifier)
+    .first<{
+      id: string;
+      username: string;
+      display_name: string;
+      email: string | null;
+      password_hash: string | null;
+      is_disabled: number;
+      created_at: string;
+      updated_at: string;
+    }>();
+
+  return row
+    ? {
+        id: row.id,
+        username: row.username,
+        displayName: row.display_name,
+        email: row.email,
+        passwordHash: row.password_hash,
+        isDisabled: row.is_disabled === 1,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    : null;
+}
+
+async function createPasswordResetToken(
+  db: D1Database,
+  userId: string,
+  now = new Date()
+): Promise<{ id: string; token: string }> {
+  const id = crypto.randomUUID();
+  const token = randomBase64Url(PASSWORD_RESET_TOKEN_BYTES);
+  const createdAt = now.toISOString();
+  const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_SECONDS * 1000).toISOString();
+
+  await db
+    .prepare(
+      `insert into password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+       values (?, ?, ?, ?, ?)`
+    )
+    .bind(id, userId, await sha256Hex(token), expiresAt, createdAt)
+    .run();
+
+  return { id, token };
+}
+
+async function findPasswordResetToken(
+  db: D1Database,
+  token: string,
+  now = new Date()
+): Promise<{ id: string; userId: string } | null> {
+  const row = await db
+    .prepare(
+      `select id, user_id, expires_at, used_at
+       from password_reset_tokens
+       where token_hash = ?
+       limit 1`
+    )
+    .bind(await sha256Hex(token))
+    .first<PasswordResetTokenRow>();
+
+  if (!row || row.used_at || row.expires_at <= now.toISOString()) return null;
+  return { id: row.id, userId: row.user_id };
+}
+
+function absoluteEmailUrl(env: Env, request: Request, path: string): string {
+  const base = emailConfig(env).baseUrl ?? new URL(request.url).origin;
+  return new URL(path, base.endsWith("/") ? base : `${base}/`).toString();
+}
+
+function renderRegisterPage(
+  env: Env,
+  url: URL,
+  csrfToken: string,
+  error: string | null = null,
+  values: Partial<RegistrationValues> = {}
+): string {
+  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+  const returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env);
+
+  return htmlShell(
+    env,
+    "Register",
+    `<h1>Register</h1>
+    ${message}
+    <form id="dw__register" method="post" action="/api/auth/register">
+      ${csrfInput(csrfToken)}
+      <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
+      <fieldset>
+        <legend>Register</legend>
+        <label for="register__user">Username</label>
+        <input id="register__user" name="username" class="edit" type="text" autocomplete="username" value="${escapeAttribute(values.username ?? "")}" required autofocus>
+        <label for="register__name">Full name</label>
+        <input id="register__name" name="displayName" class="edit" type="text" autocomplete="name" value="${escapeAttribute(values.displayName ?? "")}" required>
+        <label for="register__mail">Email</label>
+        <input id="register__mail" name="email" class="edit" type="email" autocomplete="email" value="${escapeAttribute(values.email ?? "")}">
+        <label for="register__pass">Password</label>
+        <input id="register__pass" name="password" class="edit" type="password" autocomplete="new-password" required>
+        <label for="register__passchk">Confirm password</label>
+        <input id="register__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
+        <button type="submit">Register</button>
+      </fieldset>
+    </form>`
+  );
+}
+
+function renderPasswordResetRequestPage(
+  env: Env,
+  url: URL,
+  csrfToken: string,
+  error: string | null = null,
+  identifier = "",
+  notice: string | null = null
+): string {
+  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+  const success = notice ? `<p class="success">${escapeHtml(notice)}</p>` : "";
+
+  return htmlShell(
+    env,
+    "Password reset",
+    `<h1>Password reset</h1>
+    ${message}
+    ${success}
+    <form id="dw__resendpwd" method="post" action="/api/auth/password-reset/request">
+      ${csrfInput(csrfToken)}
+      <fieldset>
+        <legend>Password reset</legend>
+        <label for="resendpwd__identifier">Username or email</label>
+        <input id="resendpwd__identifier" name="identifier" class="edit" type="text" autocomplete="username" value="${escapeAttribute(identifier || url.searchParams.get("u") || "")}" required autofocus>
+        <button type="submit">Reset password</button>
+      </fieldset>
+    </form>`
+  );
+}
+
+function renderPasswordResetConfirmPage(
+  env: Env,
+  url: URL,
+  csrfToken: string,
+  error: string | null = null
+): string {
+  const token = url.searchParams.get("token") ?? "";
+  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+
+  return htmlShell(
+    env,
+    "Password reset",
+    `<h1>Password reset</h1>
+    ${message}
+    <form id="dw__password_reset" method="post" action="/api/auth/password-reset/confirm">
+      ${csrfInput(csrfToken)}
+      <input type="hidden" name="token" value="${escapeAttribute(token)}">
+      <fieldset>
+        <legend>Choose a new password</legend>
+        <label for="password_reset__pass">New password</label>
+        <input id="password_reset__pass" name="password" class="edit" type="password" autocomplete="new-password" required autofocus>
+        <label for="password_reset__passchk">Confirm new password</label>
+        <input id="password_reset__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
+        <button type="submit">Save password</button>
+      </fieldset>
+    </form>`
+  );
+}
+
+function renderPasswordResetCompletePage(env: Env, csrfToken: string): string {
+  return htmlShell(
+    env,
+    "Password reset",
+    `<h1>Password reset</h1>
+    <p class="success">Your password has been updated.</p>
+    <p><a href="/login">Login</a></p>
+    <form class="a11y" method="get" action="/login">${csrfInput(csrfToken)}</form>`
+  );
 }
 
 function renderLoginPage(
@@ -5820,6 +6368,17 @@ function randomPageLockToken(): string {
   const bytes = new Uint8Array(PAGE_LOCK_TOKEN_BYTES);
   crypto.getRandomValues(bytes);
   return bytesToBase64Url(bytes);
+}
+
+function randomBase64Url(length: number): string {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {

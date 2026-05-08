@@ -29,12 +29,20 @@ Authenticated users can update their display name and email address at
 confirms their current password. Changing a password keeps the current session
 and removes other active sessions for that user.
 
+## Registration And Password Reset
+
+`/register` creates native D1 users and adds them to the `user` group. When
+`EMAIL_REGISTRATION_NOTIFY` is configured, the registration handler sends a
+registration notification through the outbound email adapter.
+
+`/resendpwd` and `/password-reset` request password reset email. Reset tokens are
+stored only as SHA-256 hashes in D1, expire after one hour, and are marked used
+when the password is changed. A successful reset invalidates existing sessions
+for that user.
+
 ## Deferred Account Flows
 
-Registration, password reset, and persistent remember-me tokens are not
-supported for the first Pages launch. Direct native paths, matching
-`/api/auth/*` paths, and legacy DokuWiki actions return explicit `501` JSON
-instead of falling through to unrelated page views.
+Persistent remember-me tokens are not supported for the first Pages launch.
 
 The secure launch replacement for remember-me behavior is the HTTP-only native
 session cookie. Longer-lived persistent login tokens need a separate threat
