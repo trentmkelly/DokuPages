@@ -29,4 +29,46 @@ describe("page id helpers", () => {
     expect(resolvePageLinkId("..:root", "wiki:guide:page")).toBe("wiki:root");
     expect(resolvePageLinkId("wiki:syntax", "wiki:guide:page")).toBe("wiki:syntax");
   });
+
+  it("covers non-ASCII page ID parity fixture inputs", () => {
+    const fixtures = [
+      {
+        raw: "Café Crème",
+        current: "caf_cr_me",
+        upstreamDefault: "café_crème",
+        upstreamDeaccent: "cafe_creme",
+        category: "deaccent"
+      },
+      {
+        raw: "Straße",
+        current: "stra_e",
+        upstreamDefault: "straße",
+        upstreamRomanized: "strasse",
+        category: "romanization"
+      },
+      {
+        raw: "東京:ページ",
+        current: "_:_",
+        upstreamDefault: "東京:ページ",
+        category: "utf8"
+      },
+      {
+        raw: "Cafe\u0301",
+        current: "cafe_",
+        upstreamNormalizedLike: "café",
+        category: "normalization"
+      }
+    ];
+
+    expect(fixtures.map((fixture) => fixture.category)).toEqual([
+      "deaccent",
+      "romanization",
+      "utf8",
+      "normalization"
+    ]);
+    for (const fixture of fixtures) {
+      expect(cleanPageId(fixture.raw)).toBe(fixture.current);
+    }
+    expect(cleanPageId("Café")).not.toBe(cleanPageId("Cafe\u0301"));
+  });
 });

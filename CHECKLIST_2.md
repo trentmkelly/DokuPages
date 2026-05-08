@@ -77,7 +77,7 @@ are not fixed by this checklist.
 - [x] Match DokuWiki's first-heading title behavior controlled by `useheading`.
 - [x] Match DokuWiki's autoplural lookup for nonexistent pages when `autoplural` is enabled.
 - [x] Add parser parity fixtures for malformed nested formatting, nested lists, nested quotes, mixed tables, link labels containing media, and punctuation-heavy autolinks.
-- [ ] Add parser parity fixtures for non-ASCII page IDs, deaccenting, romanization, and UTF-8 normalization.
+- [x] Add parser parity fixtures for non-ASCII page IDs, deaccenting, romanization, and UTF-8 normalization.
 
 ## Page Semantics
 
