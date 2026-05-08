@@ -24,6 +24,10 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "data/meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media_meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
+    await mkdir(path.join(root, "conf/lang/en"), { recursive: true });
+    await mkdir(path.join(root, "lib/tpl/custom"), { recursive: true });
+    await mkdir(path.join(root, "conf/lang/en"), { recursive: true });
+    await mkdir(path.join(root, "lib/tpl/custom/images"), { recursive: true });
 
     await writeFile(path.join(root, "data/pages/wiki/welcome.txt"), "====== Welcome ======\n");
     await writeFile(
@@ -95,6 +99,16 @@ describe("DokuWiki import planner", () => {
     await writeFile(path.join(root, "conf/mime.conf"), "jpg image/jpeg\nzip !application/zip\n");
     await writeFile(path.join(root, "conf/mime.local.conf"), "zip application/x-custom-zip\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
+    await writeFile(
+      path.join(root, "conf/lang/en/lang.php"),
+      "<?php\n$lang['btn_save'] = 'Save it';\n"
+    );
+    await writeFile(path.join(root, "conf/lang/en/sidebar.txt"), "Custom sidebar language\n");
+    await writeFile(
+      path.join(root, "lib/tpl/custom/style.ini"),
+      "[stylesheets]\nscreen.css = screen\n"
+    );
+    await writeFile(path.join(root, "lib/tpl/custom/images/logo.bin"), Buffer.from([0, 1, 2, 3]));
 
     const plan = await buildImportPlan(root);
 
@@ -114,7 +128,9 @@ describe("DokuWiki import planner", () => {
       pluginSettings: 3,
       interwikiTemplates: 2,
       mimeTypes: 2,
-      wordblockPatterns: 2
+      wordblockPatterns: 2,
+      customLanguageFiles: 2,
+      customTemplateFiles: 2
     });
     expect(plan.pages[0]).toMatchObject({ id: "wiki:welcome" });
     expect(plan.pageRevisions[0]).toMatchObject({
@@ -299,6 +315,42 @@ describe("DokuWiki import planner", () => {
       { id: "wordblock:1", pattern: "zoosex" },
       { id: "wordblock:2", pattern: "wow gold" }
     ]);
+    expect(plan.customLanguageFiles).toEqual([
+      expect.objectContaining({
+        kind: "language",
+        language: "en",
+        path: "lang.php",
+        relativePath: "en/lang.php",
+        encoding: "utf8",
+        content: "<?php\n$lang['btn_save'] = 'Save it';\n"
+      }),
+      expect.objectContaining({
+        kind: "language",
+        language: "en",
+        path: "sidebar.txt",
+        relativePath: "en/sidebar.txt",
+        encoding: "utf8",
+        content: "Custom sidebar language\n"
+      })
+    ]);
+    expect(plan.customTemplateFiles).toEqual([
+      expect.objectContaining({
+        kind: "template",
+        template: "custom",
+        path: "images/logo.bin",
+        relativePath: "custom/images/logo.bin",
+        encoding: "base64",
+        content: "AAECAw=="
+      }),
+      expect.objectContaining({
+        kind: "template",
+        template: "custom",
+        path: "style.ini",
+        relativePath: "custom/style.ini",
+        encoding: "utf8",
+        content: "[stylesheets]\nscreen.css = screen\n"
+      })
+    ]);
 
     const manifestOutput = path.join(root, "media-manifest.json");
     await writeMediaManifest(plan, manifestOutput);
@@ -341,6 +393,26 @@ describe("DokuWiki import planner", () => {
         contentHash: plan.media[0].contentHash
       })
     );
+    expect(hashManifest.mediaMetadata).toContainEqual(
+      expect.objectContaining({
+        subjectId: "wiki:logo.svg",
+        contentHash: plan.mediaMetadata[0].contentHash
+      })
+    );
+    expect(hashManifest.customLanguageFiles).toContainEqual(
+      expect.objectContaining({
+        relativePath: "en/lang.php",
+        contentHash: plan.customLanguageFiles[0].contentHash
+      })
+    );
+    expect(hashManifest.customTemplateFiles).toContainEqual(
+      expect.objectContaining({
+        relativePath: "custom/style.ini",
+        contentHash: plan.customTemplateFiles.find(
+          (entry) => entry.relativePath === "custom/style.ini"
+        ).contentHash
+      })
+    );
   });
 
   it("generates idempotent SQL for D1 page imports", async () => {
@@ -352,6 +424,8 @@ describe("DokuWiki import planner", () => {
     await mkdir(path.join(root, "data/meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "data/media_meta/wiki"), { recursive: true });
     await mkdir(path.join(root, "conf"), { recursive: true });
+    await mkdir(path.join(root, "conf/lang/en"), { recursive: true });
+    await mkdir(path.join(root, "lib/tpl/custom"), { recursive: true });
     await writeFile(
       path.join(root, "data/pages/wiki/welcome.txt"),
       "====== Welcome ======\n\nText\n"
@@ -382,6 +456,16 @@ describe("DokuWiki import planner", () => {
       path.join(root, "conf/users.auth.php"),
       "alice:$2y$hash:Alice Example:alice@example.test:user,admin\n"
     );
+    await writeFile(path.join(root, "conf/local.php"), "$conf['title'] = 'SQL Wiki';\n");
+    await writeFile(path.join(root, "conf/plugins.local.php"), "$plugins['acl'] = 1;\n");
+    await writeFile(
+      path.join(root, "conf/interwiki.local.conf"),
+      "docs https://docs.example/{URL}\n"
+    );
+    await writeFile(path.join(root, "conf/mime.local.conf"), "foo text/x-foo\n");
+    await writeFile(path.join(root, "conf/wordblock.conf"), "spam phrase\n");
+    await writeFile(path.join(root, "conf/lang/en/lang.php"), "<?php\n$lang['btn_save']='Save';\n");
+    await writeFile(path.join(root, "lib/tpl/custom/main.php"), "<?php echo tpl_content();\n");
 
     const plan = await buildImportPlan(root);
     const output = path.join(root, "import.sql");
@@ -401,6 +485,17 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'media/current/wiki/logo.svg'");
     expect(sql).toContain("'wiki:logo.svg@2026-01-01T00:00:00.000Z'");
     expect(sql).toContain("insert or replace into metadata");
+    expect(sql).toContain("dokuwiki_language_file");
+    expect(sql).toContain("dokuwiki_template_file");
+    expect(sql).toContain("conf:title");
+    expect(sql).toContain("insert into plugin_settings");
+    expect(sql).toContain("'acl'");
+    expect(sql).toContain("'interwiki'");
+    expect(sql).toContain("'docs'");
+    expect(sql).toContain("'mime'");
+    expect(sql).toContain("'foo'");
+    expect(sql).toContain("'wordblock'");
+    expect(sql).toContain("'wordblock:1'");
     expect(sql).toContain("insert or replace into changelog");
     expect(sql).toContain("'delete'");
     expect(sql).toContain("'Deleted page'");

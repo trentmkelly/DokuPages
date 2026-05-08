@@ -33,7 +33,7 @@ Namespaces are stored as colon-separated IDs in page and media records. They can
 
 ## Metadata
 
-`metadata` stores JSON metadata for pages, media, config, and plugin subjects. This replaces `.meta` files, media metadata files, and imported DokuWiki `$conf` values that are not first-class runtime environment variables.
+`metadata` stores JSON metadata for pages, media, config, and plugin subjects. This replaces `.meta` files, media metadata files, custom language/template preservation records, and imported DokuWiki `$conf` values that are not first-class runtime environment variables.
 
 ## Changelogs
 

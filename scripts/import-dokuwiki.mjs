@@ -63,6 +63,8 @@ export async function buildImportPlan(sourceRoot) {
     path.join(confRoot, "mime.local.conf")
   ]);
   const wordblockPatterns = await discoverWordblockPatterns(path.join(confRoot, "wordblock.conf"));
+  const customLanguageFiles = await discoverCustomLanguageFiles(path.join(confRoot, "lang"));
+  const customTemplateFiles = await discoverCustomTemplateFiles(path.join(root, "lib", "tpl"));
 
   return {
     sourceRoot: root,
@@ -83,7 +85,9 @@ export async function buildImportPlan(sourceRoot) {
       pluginSettings: pluginSettings.length,
       interwikiTemplates: interwikiTemplates.length,
       mimeTypes: mimeTypes.length,
-      wordblockPatterns: wordblockPatterns.length
+      wordblockPatterns: wordblockPatterns.length,
+      customLanguageFiles: customLanguageFiles.length,
+      customTemplateFiles: customTemplateFiles.length
     },
     pages,
     pageRevisions,
@@ -100,7 +104,9 @@ export async function buildImportPlan(sourceRoot) {
     pluginSettings,
     interwikiTemplates,
     mimeTypes,
-    wordblockPatterns
+    wordblockPatterns,
+    customLanguageFiles,
+    customTemplateFiles
   };
 }
 
@@ -242,10 +248,37 @@ on conflict(id) do update set
 
   for (const entry of [...plan.pageMetadata, ...plan.mediaMetadata]) {
     statements.push(
-      `insert or replace into metadata (subject_type, subject_id, key, value_json, updated_at)
-values (${sql(entry.subjectType)}, ${sql(entry.subjectId)}, 'dokuwiki', ${sql(
-        JSON.stringify(entry.value)
-      )}, ${sql(entry.modifiedAt)});`
+      metadataStatement(
+        entry.subjectType,
+        entry.subjectId,
+        "dokuwiki",
+        entry.value,
+        entry.modifiedAt
+      )
+    );
+  }
+
+  for (const entry of plan.customLanguageFiles) {
+    statements.push(
+      metadataStatement(
+        "config",
+        `language:${entry.relativePath}`,
+        "dokuwiki_language_file",
+        customFileMetadataValue(entry),
+        entry.modifiedAt
+      )
+    );
+  }
+
+  for (const entry of plan.customTemplateFiles) {
+    statements.push(
+      metadataStatement(
+        "config",
+        `template:${entry.relativePath}`,
+        "dokuwiki_template_file",
+        customFileMetadataValue(entry),
+        entry.modifiedAt
+      )
     );
   }
 
@@ -258,9 +291,37 @@ values (${sql(entry.subjectType)}, ${sql(entry.subjectId)}, 'dokuwiki', ${sql(
   ${sql(change.id)}, ${sql(change.subjectType)}, ${sql(change.subjectId)}, ${sql(change.revisionId)}, null, ${sql(
     change.userName
   )}, ${sql(change.ip)},
-  ${sql(change.changeType)}, ${sql(change.summary)}, ${sql(change.sizeChange)}, ${sql(change.createdAt)}
+  ${sql(change.changeType)}, ${sql(change.summary)}, ${change.sizeChange ?? 0}, ${sql(change.createdAt)}
 );`
     );
+  }
+
+  for (const setting of plan.configSettings) {
+    statements.push(
+      metadataStatement("config", "dokuwiki", `conf:${setting.key}`, setting, plan.generatedAt)
+    );
+  }
+
+  for (const setting of plan.pluginSettings) {
+    statements.push(pluginSettingStatement(setting.plugin, "enabled", setting, plan.generatedAt));
+  }
+
+  for (const setting of plan.pluginConfigSettings) {
+    statements.push(pluginSettingStatement(setting.plugin, setting.key, setting, plan.generatedAt));
+  }
+
+  for (const entry of plan.interwikiTemplates) {
+    statements.push(
+      metadataStatement("config", "interwiki", entry.shortcut, entry, plan.generatedAt)
+    );
+  }
+
+  for (const entry of plan.mimeTypes) {
+    statements.push(metadataStatement("config", "mime", entry.extension, entry, plan.generatedAt));
+  }
+
+  for (const entry of plan.wordblockPatterns) {
+    statements.push(metadataStatement("config", "wordblock", entry.id, entry, plan.generatedAt));
   }
 
   for (const rule of plan.aclRules) {
@@ -325,6 +386,21 @@ on conflict(user_id, group_id) do nothing;`
   await fs.writeFile(outputFile, `${statements.join("\n\n")}\n`);
 }
 
+function metadataStatement(subjectType, subjectId, key, value, updatedAt) {
+  return `insert or replace into metadata (subject_type, subject_id, key, value_json, updated_at)
+values (${sql(subjectType)}, ${sql(subjectId)}, ${sql(key)}, ${sql(JSON.stringify(value))}, ${sql(
+    updatedAt
+  )});`;
+}
+
+function pluginSettingStatement(plugin, key, value, updatedAt) {
+  return `insert into plugin_settings (plugin, key, value_json, updated_at)
+values (${sql(plugin)}, ${sql(key)}, ${sql(JSON.stringify(value))}, ${sql(updatedAt)})
+on conflict(plugin, key) do update set
+  value_json = excluded.value_json,
+  updated_at = excluded.updated_at;`;
+}
+
 export async function writeMediaManifest(plan, outputFile) {
   const manifest = {
     generatedAt: plan.generatedAt,
@@ -367,6 +443,7 @@ export function buildImportHashManifest(plan) {
         createdAt
       };
     }),
+    pageMetadata: plan.pageMetadata.map(importMetadataHashRecord),
     mediaObjects: mediaImportObjects(plan).map((object) => ({
       role: object.role,
       mediaId: object.mediaId,
@@ -376,7 +453,32 @@ export function buildImportHashManifest(plan) {
       byteLength: object.byteLength,
       contentHash: object.contentHash,
       modifiedAt: object.modifiedAt
-    }))
+    })),
+    mediaMetadata: plan.mediaMetadata.map(importMetadataHashRecord),
+    customLanguageFiles: plan.customLanguageFiles.map(importFileHashRecord),
+    customTemplateFiles: plan.customTemplateFiles.map(importFileHashRecord)
+  };
+}
+
+function importMetadataHashRecord(entry) {
+  return {
+    subjectType: entry.subjectType,
+    subjectId: entry.subjectId,
+    sourcePath: entry.sourcePath,
+    byteLength: entry.byteLength,
+    contentHash: entry.contentHash,
+    modifiedAt: entry.modifiedAt
+  };
+}
+
+function importFileHashRecord(entry) {
+  return {
+    kind: entry.kind,
+    relativePath: entry.relativePath,
+    sourcePath: entry.sourcePath,
+    byteLength: entry.byteLength,
+    contentHash: entry.contentHash,
+    modifiedAt: entry.modifiedAt
   };
 }
 
@@ -615,12 +717,109 @@ export async function discoverSerializedMetadata(root, subjectType) {
       subjectType,
       subjectId: pathWithoutExtensionToId(relative),
       sourcePath: file,
+      byteLength: content.byteLength,
+      contentHash: sha256(content),
       value: parsePhpSerialized(content),
       modifiedAt: stat.mtime.toISOString()
     });
   }
 
   return entries.sort((a, b) => a.subjectId.localeCompare(b.subjectId));
+}
+
+export async function discoverCustomLanguageFiles(root) {
+  return discoverImportFiles(root, (relativePath) => {
+    const [language, ...parts] = relativePath.split("/");
+    if (!language || parts.length === 0) return null;
+
+    return {
+      kind: "language",
+      language,
+      path: parts.join("/")
+    };
+  });
+}
+
+export async function discoverCustomTemplateFiles(root) {
+  return discoverImportFiles(root, (relativePath) => {
+    const [template, ...parts] = relativePath.split("/");
+    if (!template || parts.length === 0) return null;
+
+    return {
+      kind: "template",
+      template,
+      path: parts.join("/")
+    };
+  });
+}
+
+async function discoverImportFiles(root, mapRelativePath) {
+  const files = await walkFiles(root);
+  const entries = [];
+
+  for (const file of files) {
+    if (shouldSkipImportFile(file)) continue;
+
+    const relativePath = normalizeRelativePath(path.relative(root, file));
+    const mapped = mapRelativePath(relativePath);
+    if (!mapped) continue;
+
+    const content = await fs.readFile(file);
+    const stat = await fs.stat(file);
+
+    entries.push({
+      ...mapped,
+      relativePath,
+      sourcePath: file,
+      byteLength: content.byteLength,
+      contentHash: sha256(content),
+      modifiedAt: stat.mtime.toISOString(),
+      ...contentPayload(content)
+    });
+  }
+
+  return entries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+}
+
+function shouldSkipImportFile(file) {
+  const basename = path.basename(file);
+  return basename.startsWith(".") || basename.endsWith("~") || basename === "Thumbs.db";
+}
+
+function customFileMetadataValue(entry) {
+  const value = {
+    kind: entry.kind,
+    relativePath: entry.relativePath,
+    path: entry.path,
+    byteLength: entry.byteLength,
+    contentHash: entry.contentHash,
+    encoding: entry.encoding,
+    content: entry.content
+  };
+
+  if (entry.kind === "language") value.language = entry.language;
+  if (entry.kind === "template") value.template = entry.template;
+
+  return value;
+}
+
+function contentPayload(content) {
+  const text = content.toString("utf8");
+  if (!text.includes("\u0000") && Buffer.from(text, "utf8").equals(content)) {
+    return {
+      encoding: "utf8",
+      content: text
+    };
+  }
+
+  return {
+    encoding: "base64",
+    content: content.toString("base64")
+  };
+}
+
+function normalizeRelativePath(relativePath) {
+  return relativePath.split(path.sep).join("/");
 }
 
 export async function discoverAclRules(file) {

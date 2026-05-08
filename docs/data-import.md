@@ -1,6 +1,6 @@
 # Data Import
 
-The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media manifest. It preserves current page bodies, search postings, current media rows, media revision rows, parsed page/media `.meta` data, ACL rules, authplain users/groups, and page/media changelog rows.
+The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media manifest. It preserves current page bodies, search postings, current media rows, media revision rows, parsed page/media `.meta` data, custom language files, custom template files, ACL rules, authplain users/groups, and page/media changelog rows.
 
 ## Dry Run
 
@@ -8,7 +8,7 @@ The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media m
 npm run import:dry-run
 ```
 
-The dry run prints the import plan and counts discovered pages, page revisions, media, media revisions, metadata, ACL rules, users, config values, plugin settings, interwiki templates, MIME mappings, and wordblock patterns.
+The dry run prints the import plan and counts discovered pages, page revisions, media, media revisions, metadata, custom language files, custom template files, ACL rules, users, config values, plugin settings, interwiki templates, MIME mappings, and wordblock patterns.
 
 ## D1 SQL
 
@@ -17,7 +17,7 @@ npm run import:sql
 npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-import.sql
 ```
 
-The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, changelog rows, ACL rules, users, groups, and group memberships.
+The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships.
 
 Legacy `data/index` files are not migrated directly. The importer rebuilds
 search postings from canonical page source during import, which avoids carrying
