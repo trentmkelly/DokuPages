@@ -144,6 +144,13 @@ parameter matches active media IDs, MIME types, and stored media metadata JSON
 such as imported DokuWiki metadata rows or parsed JPEG title/caption fields.
 Deleted media rows are excluded.
 
+Media is intentionally not inserted into the page fulltext index. Upstream
+`idx_addPage()` indexes page text and page `relation_media` metadata for
+media-usage lookups, while media-manager search scans media IDs with its own
+`search_mediafiles` path. The Pages port keeps the same boundary: page search
+uses `search_terms` and `search_postings`, and media-manager search stays on
+current media rows plus stored media metadata.
+
 ## Changelog And Feeds
 
 Recent changes support the upstream page/media selector. `show_changes=pages`
