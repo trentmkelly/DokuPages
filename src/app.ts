@@ -86,7 +86,7 @@ import {
 } from "./wiki/media-service";
 import { dokuMediaMetadataToJpegMetadata, type ParsedJpegMetadata } from "./wiki/jpeg-metadata";
 import { validateMediaUpload } from "./wiki/media-validation";
-import { shouldForceDownloadMedia } from "./wiki/mime";
+import { extensionFromMediaId, getMimeTypeConfig, shouldForceDownloadMedia } from "./wiki/mime";
 import {
   cleanPageId,
   cleanRoutePageId,
@@ -1682,10 +1682,12 @@ async function handleNativeApiMediaUpload(
   await recordUploadAttempt(request, env, principal);
 
   const mediaBody = await file.arrayBuffer();
+  const mimePolicy = await getMimeTypeConfig(env.DB, extensionFromMediaId(id));
   const validation = validateMediaUpload({
     id,
     body: mediaBody,
-    mimeType: file.type || null
+    mimeType: file.type || null,
+    mimePolicy
   });
 
   if (!validation.ok) {
@@ -8698,10 +8700,12 @@ async function handleMediaUpload(
   await recordUploadAttempt(request, env, principal);
 
   const body = await file.arrayBuffer();
+  const mimePolicy = await getMimeTypeConfig(env.DB, extensionFromMediaId(id));
   const validation = validateMediaUpload({
     id,
     body,
-    mimeType: file.type || null
+    mimeType: file.type || null,
+    mimePolicy
   });
 
   if (!validation.ok) {

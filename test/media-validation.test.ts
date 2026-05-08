@@ -41,6 +41,17 @@ describe("validateMediaUpload", () => {
     });
   });
 
+  it("accepts extensions and MIME types supplied by imported DokuWiki config", () => {
+    expect(
+      validateMediaUpload({
+        id: "wiki:custom.foo",
+        body: encoder.encode("custom").buffer,
+        mimeType: "text/x-foo",
+        mimePolicy: { mimeType: "text/x-foo" }
+      })
+    ).toEqual({ ok: true });
+  });
+
   it("rejects mismatched MIME types", () => {
     expect(
       validateMediaUpload({

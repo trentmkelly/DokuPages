@@ -1424,6 +1424,40 @@ describe("handleRequest", () => {
     expect(html).toContain("<dt>Height:</dt><dd>3</dd>");
   });
 
+  it("accepts media uploads allowed by imported MIME configuration", async () => {
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "mime",
+      key: "foo",
+      value_json: JSON.stringify({
+        extension: "foo",
+        mimeType: "text/x-foo",
+        forceDownload: false
+      }),
+      updated_at: "2026-05-08T00:00:00.000Z"
+    });
+
+    const form = new FormData();
+    form.set("ns", "wiki");
+    form.set("summary", "Upload custom media");
+    form.set("file", new File(["custom"], "custom.foo", { type: "text/x-foo" }));
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(state.media[0]).toMatchObject({
+      id: "wiki:custom.foo",
+      mime_type: "text/x-foo"
+    });
+  });
+
   it("rejects media uploads that would overwrite existing media unless requested", async () => {
     const form = new FormData();
     form.set("ns", "wiki");

@@ -1,4 +1,5 @@
 import { mediaName } from "./media-service";
+import type { MimeTypeConfig } from "./mime";
 
 export const MEDIA_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -49,6 +50,7 @@ export interface ValidateMediaUploadInput {
   id: string;
   body: ArrayBuffer;
   mimeType?: string | null;
+  mimePolicy?: Pick<MimeTypeConfig, "mimeType"> | null;
   maxBytes?: number;
 }
 
@@ -72,8 +74,9 @@ export function validateMediaUpload(input: ValidateMediaUploadInput): MediaUploa
   }
 
   const extension = mediaExtension(input.id);
+  const configuredMimeType = normalizeMimeType(input.mimePolicy?.mimeType);
 
-  if (!extension || !ALLOWED_EXTENSIONS.has(extension)) {
+  if (!extension || (!ALLOWED_EXTENSIONS.has(extension) && !configuredMimeType)) {
     return {
       ok: false,
       error: `Media type '.${extension || "unknown"}' is not allowed.`
@@ -82,7 +85,11 @@ export function validateMediaUpload(input: ValidateMediaUploadInput): MediaUploa
 
   const mimeType = normalizeMimeType(input.mimeType);
 
-  if (mimeType && !isGenericMimeType(mimeType) && !mimeMatchesExtension(extension, mimeType)) {
+  if (
+    mimeType &&
+    !isGenericMimeType(mimeType) &&
+    !mimeMatchesExtension(extension, mimeType, configuredMimeType)
+  ) {
     return {
       ok: false,
       error: `MIME type '${mimeType}' does not match media type '.${extension}'.`
@@ -118,6 +125,12 @@ function isGenericMimeType(mimeType: string): boolean {
   return mimeType === "application/octet-stream" || mimeType === "binary/octet-stream";
 }
 
-function mimeMatchesExtension(extension: string, mimeType: string): boolean {
-  return (EXPECTED_MIME_TYPES[extension] ?? []).includes(mimeType);
+function mimeMatchesExtension(
+  extension: string,
+  mimeType: string,
+  configuredMimeType: string
+): boolean {
+  return new Set(
+    [...(EXPECTED_MIME_TYPES[extension] ?? []), configuredMimeType].filter(Boolean)
+  ).has(mimeType);
 }

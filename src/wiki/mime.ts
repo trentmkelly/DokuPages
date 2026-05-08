@@ -106,11 +106,8 @@ export async function getEffectiveMimeTypeConfig(
   extension: string
 ): Promise<MimeTypeConfig> {
   const normalized = normalizeExtension(extension);
-  const configured = await getImportedMimeTypeConfig(db, normalized);
+  const configured = await getMimeTypeConfig(db, normalized);
   if (configured) return configured;
-
-  const fallback = DEFAULT_MIME_TYPE_MAP.get(normalized);
-  if (fallback) return { ...fallback };
 
   return {
     extension: normalized,
@@ -129,7 +126,7 @@ export function extensionFromMediaId(mediaId: string): string {
   return dot === -1 ? "" : normalizeExtension(name.slice(dot + 1));
 }
 
-async function getImportedMimeTypeConfig(
+export async function getMimeTypeConfig(
   db: D1Database,
   extension: string
 ): Promise<MimeTypeConfig | null> {
@@ -144,7 +141,10 @@ async function getImportedMimeTypeConfig(
     .bind(extension)
     .first<MimeMetadataRow>();
 
-  if (!row) return null;
+  if (!row) {
+    const fallback = DEFAULT_MIME_TYPE_MAP.get(extension);
+    return fallback ? { ...fallback } : null;
+  }
 
   return parseMimeTypeConfig(row.value_json, extension);
 }
