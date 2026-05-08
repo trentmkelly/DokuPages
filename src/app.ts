@@ -2393,7 +2393,14 @@ function exportFileName(id: string): string {
 }
 
 function versionedAssetPath(assetPath: string, env: Env): string {
-  return `${assetPath}?v=${encodeURIComponent(getRuntimeConfig(env).appVersion)}`;
+  return `${assetPath}?v=${encodeURIComponent(staticAssetVersion(env))}`;
+}
+
+function staticAssetVersion(env: Env): string {
+  const appVersion = getRuntimeConfig(env).appVersion;
+  const commitSha = env.CF_PAGES_COMMIT_SHA?.trim();
+
+  return commitSha ? `${appVersion}-${commitSha.slice(0, 12)}` : appVersion;
 }
 
 function renderMissingPage(env: Env, id: string, principal?: AuthPrincipal): string {

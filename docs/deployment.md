@@ -26,6 +26,8 @@ Optional Pages environment variables:
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.
 - `APP_VERSION`: display/build version override. Defaults to the package version.
+  Static asset URLs append the Pages commit SHA prefix when Cloudflare provides
+  it, so CSS/JS cache entries are refreshed on each deployment.
 - `API_CORS_ORIGINS`: comma-separated exact origins allowed to call the native
   `/api/v1` JSON API cross-origin. Default: no cross-origin API access.
 - `EMAIL_PROVIDER`: set to `resend` to enable outbound mail.

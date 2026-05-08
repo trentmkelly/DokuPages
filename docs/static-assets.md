@@ -7,7 +7,9 @@ Static assets live under `public/` and are served directly by Cloudflare Pages.
 No generated asset step is required for launch. The current port checks in the
 CSS, JavaScript, DokuWiki logo, icons, and image assets that Pages serves.
 
-Top-level HTML references use `?v=<APP_VERSION>` fingerprints for cache busting:
+Top-level HTML references use `?v=<APP_VERSION>-<CF_PAGES_COMMIT_SHA prefix>`
+fingerprints for cache busting on Cloudflare Pages, falling back to
+`?v=<APP_VERSION>` when the Pages commit SHA is unavailable:
 
 - `/dokuwiki.css`
 - `/dokuwiki.js`

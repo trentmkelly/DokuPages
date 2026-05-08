@@ -188,6 +188,18 @@ describe("handleRequest", () => {
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
+  it("fingerprints static assets with the Pages commit when available", async () => {
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), {
+      ...env,
+      CF_PAGES_COMMIT_SHA: "abcdef1234567890abcdef1234567890abcdef12"
+    });
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<link rel="stylesheet" href="/dokuwiki.css?v=0.1.0-abcdef123456">');
+    expect(html).toContain('<script src="/dokuwiki.js?v=0.1.0-abcdef123456" defer></script>');
+  });
+
   it("redirects non-canonical wiki paths to normalized page routes", async () => {
     const response = await handleRequest(
       new Request("https://example.com/wiki/Wiki/Welcome?do=edit"),
