@@ -33,6 +33,8 @@ Optional Pages environment variables:
 - `WIKI_LANG`: supported language tag. Defaults to English fallback.
 - `BREADCRUMBS`: number of recent visited pages to keep in the DokuWiki-style
   trace. Default: `10`; set to `0` to disable the trace.
+- `YOUAREHERE`: truthy value enables the DokuWiki-style hierarchical "You are
+  here" trail. Default: disabled.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.

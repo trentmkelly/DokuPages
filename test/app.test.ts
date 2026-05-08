@@ -91,6 +91,7 @@ describe("handleRequest", () => {
     env.AUTOPLURAL = undefined;
     env.REL_NOFOLLOW = undefined;
     env.BREADCRUMBS = undefined;
+    env.YOUAREHERE = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
     env.TARGET_EXTERN = undefined;
@@ -212,6 +213,7 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain('<div class="trace"><span class="bchead">Trace:</span>');
+    expect(html).not.toContain('<div class="youarehere">');
     expect(html).toContain(
       '<a href="/wiki/wiki/syntax" class="breadcrumbs" title="wiki:syntax">Syntax</a>'
     );
@@ -219,6 +221,18 @@ describe("handleRequest", () => {
       '<span class="curid"><bdi><a href="/wiki/wiki/welcome" class="breadcrumbs" title="wiki:welcome">Welcome</a></bdi></span>'
     );
     expect(response.headers.get("set-cookie")).toContain("DW_PAGES_BC=");
+  });
+
+  it("honors the YOUAREHERE setting for hierarchical header breadcrumbs", async () => {
+    env.YOUAREHERE = "1";
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<div class="youarehere"><span>You are here: </span><a href="/wiki/wiki">wiki</a> <span class="bcsep">&raquo;</span> <span>welcome</span></div>'
+    );
   });
 
   it("marks missing internal page links with DokuWiki red-link styling", async () => {

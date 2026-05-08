@@ -32,6 +32,7 @@ export interface RuntimeConfig {
   maxTocLevel: number;
   maxSectionEditLevel: number;
   breadcrumbs: number;
+  youAreHere: boolean;
   useHeading: boolean;
   camelCaseLinks: boolean;
   typographyMode: number;
@@ -111,6 +112,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     maxTocLevel: integerConfig(env.MAX_TOC_LEVEL, 3, 1, 5),
     maxSectionEditLevel: integerConfig(env.MAX_SECTION_EDIT_LEVEL, 3, 0, 5),
     breadcrumbs: integerConfig(env.BREADCRUMBS, 10, 0, 99),
+    youAreHere: truthy(env.YOUAREHERE),
     useHeading: truthy(env.USE_HEADING),
     camelCaseLinks: truthy(env.CAMELCASE),
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
@@ -195,6 +197,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       "3"
     ),
     configEntry("BREADCRUMBS", env.BREADCRUMBS, String(config.breadcrumbs), "10"),
+    configEntry("YOUAREHERE", env.YOUAREHERE, String(config.youAreHere), "false"),
     configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),

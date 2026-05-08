@@ -3308,12 +3308,22 @@ function renderBreadcrumbs(id: string): string {
 function renderHeaderBreadcrumbs(
   pageId: string | undefined,
   startId: string,
-  breadcrumbTrace: readonly BreadcrumbEntry[] | undefined
+  breadcrumbTrace: readonly BreadcrumbEntry[] | undefined,
+  showYouAreHere: boolean
 ): string {
   const trace = renderBreadcrumbTrace(breadcrumbTrace);
+  const youAreHere = showYouAreHere ? renderYouAreHereTrail(pageId, startId) : "";
 
+  if (!youAreHere && !trace) {
+    return "";
+  }
+
+  return `<div class="breadcrumbs">${youAreHere}${trace}</div>`;
+}
+
+function renderYouAreHereTrail(pageId: string | undefined, startId: string): string {
   if (!pageId) {
-    return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span><a href="${pagePath(startId)}">start</a></div>${trace}</div>`;
+    return `<div class="youarehere"><span>You are here: </span><a href="${pagePath(startId)}">start</a></div>`;
   }
 
   const segments = pageId.split(":").filter(Boolean);
@@ -3330,7 +3340,7 @@ function renderHeaderBreadcrumbs(
     })
     .join(' <span class="bcsep">&raquo;</span> ');
 
-  return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span>${crumbs}</div>${trace}</div>`;
+  return `<div class="youarehere"><span>You are here: </span>${crumbs}</div>`;
 }
 
 function renderBreadcrumbTrace(entries: readonly BreadcrumbEntry[] | undefined): string {
@@ -6784,7 +6794,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             </ul>
           </nav>
         </div>
-        ${renderHeaderBreadcrumbs(pageId, startId, options.breadcrumbs)}
+        ${renderHeaderBreadcrumbs(pageId, startId, options.breadcrumbs, config.youAreHere)}
         <hr class="a11y">
         </div>
       </header>

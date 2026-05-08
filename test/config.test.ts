@@ -28,6 +28,7 @@ describe("runtime config", () => {
       maxTocLevel: 3,
       maxSectionEditLevel: 3,
       breadcrumbs: 10,
+      youAreHere: false,
       useHeading: false,
       camelCaseLinks: false,
       typographyMode: 1,
@@ -71,6 +72,7 @@ describe("runtime config", () => {
       MAX_TOC_LEVEL: "4",
       MAX_SECTION_EDIT_LEVEL: "2",
       BREADCRUMBS: "3",
+      YOUAREHERE: "1",
       USE_HEADING: "1",
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
@@ -102,6 +104,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).maxTocLevel).toBe(4);
     expect(getRuntimeConfig(env).maxSectionEditLevel).toBe(2);
     expect(getRuntimeConfig(env).breadcrumbs).toBe(3);
+    expect(getRuntimeConfig(env).youAreHere).toBe(true);
     expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
@@ -189,6 +192,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "BREADCRUMBS",
           effectiveValue: "10"
+        }),
+        expect.objectContaining({
+          key: "YOUAREHERE",
+          effectiveValue: "false"
         }),
         expect.objectContaining({
           key: "CAMELCASE",
