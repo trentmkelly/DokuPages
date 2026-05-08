@@ -32,7 +32,7 @@ fresh render.
 - bold, italic, underline, monospace, subscript, superscript, and deleted text
 - internal links
 - external links through explicit DokuWiki link syntax
-- interwiki links
+- interwiki links with imported shortcut overrides
 - Windows share links
 - email links with mailguard behavior
 - media embeds

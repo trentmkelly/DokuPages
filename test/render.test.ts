@@ -272,6 +272,12 @@ describe("renderWikiText", () => {
     const rendered = renderWikiText(
       "[[doku>newsletter]] [[doku>faq:sidebar|FAQ]] [[wp>Wiki|Wiki]] [[this>doku.php?do=admin&page=config|config]]"
     );
+    const custom = renderWikiText("[[docs>Quick Start|Docs]] [[wp>Custom Wiki|Wiki]]", {
+      interwikiTemplates: {
+        docs: "https://docs.example/{URL}",
+        wp: "https://wiki.example/{NAME}"
+      }
+    });
 
     expect(rendered.html).toContain(
       '<a href="https://www.dokuwiki.org/newsletter" class="interwiki iw_doku" rel="nofollow noopener noreferrer">doku&gt;newsletter</a>'
@@ -284,6 +290,12 @@ describe("renderWikiText", () => {
     );
     expect(rendered.html).toContain(
       '<a href="/doku.php?do=admin&amp;page=config" class="interwiki iw_this">config</a>'
+    );
+    expect(custom.html).toContain(
+      '<a href="https://docs.example/Quick%20Start" class="interwiki iw_docs" rel="nofollow noopener noreferrer">Docs</a>'
+    );
+    expect(custom.html).toContain(
+      '<a href="https://wiki.example/Custom_Wiki" class="interwiki iw_wp" rel="nofollow noopener noreferrer">Wiki</a>'
     );
   });
 

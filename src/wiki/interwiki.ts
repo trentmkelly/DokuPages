@@ -5,6 +5,8 @@ interface InterwikiLink {
   external: boolean;
 }
 
+export type InterwikiTemplates = Readonly<Record<string, string>>;
+
 const INTERWIKI_TEMPLATES = new Map<string, string>([
   ["wp", "https://en.wikipedia.org/wiki/{NAME}"],
   ["wpfr", "https://fr.wikipedia.org/wiki/{NAME}"],
@@ -31,7 +33,10 @@ const INTERWIKI_TEMPLATES = new Map<string, string>([
   ["tel", "tel:{NAME}"]
 ]);
 
-export function resolveInterwikiLink(target: string): InterwikiLink | null {
+export function resolveInterwikiLink(
+  target: string,
+  templates?: InterwikiTemplates
+): InterwikiLink | null {
   const separator = target.indexOf(">");
   if (separator <= 0) return null;
 
@@ -45,7 +50,7 @@ export function resolveInterwikiLink(target: string): InterwikiLink | null {
     };
   }
 
-  const template = INTERWIKI_TEMPLATES.get(shortcut);
+  const template = templates?.[shortcut] ?? INTERWIKI_TEMPLATES.get(shortcut);
   if (!template) return null;
 
   if (template.startsWith(":")) {

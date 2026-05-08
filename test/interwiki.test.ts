@@ -27,4 +27,20 @@ describe("interwiki links", () => {
       external: false
     });
   });
+
+  it("resolves imported interwiki shortcuts and overrides", () => {
+    expect(
+      resolveInterwikiLink("docs>Quick Start", {
+        docs: "https://docs.example/{URL}",
+        wp: "https://wiki.example/{NAME}"
+      })
+    ).toEqual({
+      href: "https://docs.example/Quick%20Start",
+      external: true
+    });
+    expect(resolveInterwikiLink("wp>Custom Wiki", { wp: "https://wiki.example/{NAME}" })).toEqual({
+      href: "https://wiki.example/Custom_Wiki",
+      external: true
+    });
+  });
 });

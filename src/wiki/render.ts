@@ -1,4 +1,4 @@
-import { resolveInterwikiLink } from "./interwiki";
+import { resolveInterwikiLink, type InterwikiTemplates } from "./interwiki";
 import { cleanPageId, pageIdToRoutePath, resolvePageLinkId } from "./page-id";
 import { cleanMediaId, mediaDetailPath, mediaName, mediaPath } from "./media-service";
 
@@ -36,6 +36,7 @@ export interface RenderWikiTextOptions {
   entityReplacements?: ReadonlyArray<readonly [string, string]>;
   smileys?: Readonly<Record<string, string>>;
   acronyms?: Readonly<Record<string, string>>;
+  interwikiTemplates?: InterwikiTemplates;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -174,6 +175,7 @@ export function renderWikiText(
     entityReplacements: options.entityReplacements ?? DEFAULT_ENTITY_REPLACEMENTS,
     smileys: options.smileys ?? DEFAULT_SMILEYS,
     acronyms: options.acronyms ?? DEFAULT_ACRONYMS,
+    interwikiTemplates: options.interwikiTemplates,
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -408,6 +410,7 @@ interface RenderContext {
   entityReplacements: ReadonlyArray<readonly [string, string]>;
   smileys: Readonly<Record<string, string>>;
   acronyms: Readonly<Record<string, string>>;
+  interwikiTemplates?: InterwikiTemplates;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -731,6 +734,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             entityReplacements: context.entityReplacements,
             smileys: context.smileys,
             acronyms: context.acronyms,
+            interwikiTemplates: context.interwikiTemplates,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -1011,7 +1015,7 @@ function renderLinks(
     }
 
     const external = /^https?:\/\//i.test(target);
-    const interwiki = external ? null : resolveInterwikiLink(target);
+    const interwiki = external ? null : resolveInterwikiLink(target, context.interwikiTemplates);
     const windowsShare = external || interwiki ? null : windowsSharePath(target);
     const internal = !external && !interwiki && !windowsShare;
     const internalLink = internal ? resolveInternalLink(target, context.pageId) : null;
