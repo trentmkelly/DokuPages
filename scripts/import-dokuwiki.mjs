@@ -24,31 +24,45 @@ export async function buildImportPlan(sourceRoot) {
   const root = path.resolve(sourceRoot);
   const dataRoot = path.join(root, "data");
   const confRoot = path.join(root, "conf");
+  const { configSettings, pluginConfigSettings } = await discoverConfigSettings([
+    { file: path.join(confRoot, "dokuwiki.php"), layer: "default", locked: false },
+    { file: path.join(confRoot, "local.php"), layer: "local", locked: false },
+    { file: path.join(confRoot, "local.protected.php"), layer: "protected", locked: true }
+  ]);
+  const fileNameEncoding = importedFileNameEncoding(configSettings);
 
-  const pages = await discoverPages(path.join(dataRoot, "pages"));
-  const pageRevisions = await discoverPageRevisions(path.join(dataRoot, "attic"));
+  const pages = await discoverPages(path.join(dataRoot, "pages"), {
+    fnencode: fileNameEncoding
+  });
+  const pageRevisions = await discoverPageRevisions(path.join(dataRoot, "attic"), {
+    fnencode: fileNameEncoding
+  });
   const pageChangelogEntries = await discoverChangelogEntries(
     path.join(dataRoot, "meta", "_dokuwiki.changes"),
     "page"
   );
-  const pageMetadata = await discoverSerializedMetadata(path.join(dataRoot, "meta"), "page");
-  const media = await discoverMedia(path.join(dataRoot, "media"));
-  const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"));
+  const pageMetadata = await discoverSerializedMetadata(path.join(dataRoot, "meta"), "page", {
+    fnencode: fileNameEncoding
+  });
+  const media = await discoverMedia(path.join(dataRoot, "media"), {
+    fnencode: fileNameEncoding
+  });
+  const mediaRevisions = await discoverMediaRevisions(path.join(dataRoot, "media_attic"), {
+    fnencode: fileNameEncoding
+  });
   const mediaChangelogEntries = await discoverChangelogEntries(
     path.join(dataRoot, "meta", "_media.changes"),
     "media"
   );
   const mediaMetadata = await discoverSerializedMetadata(
     path.join(dataRoot, "media_meta"),
-    "media"
+    "media",
+    {
+      fnencode: fileNameEncoding
+    }
   );
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
-  const { configSettings, pluginConfigSettings } = await discoverConfigSettings([
-    { file: path.join(confRoot, "dokuwiki.php"), layer: "default", locked: false },
-    { file: path.join(confRoot, "local.php"), layer: "local", locked: false },
-    { file: path.join(confRoot, "local.protected.php"), layer: "protected", locked: true }
-  ]);
   const pluginSettings = await discoverPluginSettings([
     { file: path.join(confRoot, "plugins.php"), locked: false },
     { file: path.join(confRoot, "plugins.local.php"), locked: false },
@@ -524,7 +538,7 @@ function importFileHashRecord(entry) {
   };
 }
 
-export async function discoverPages(pagesRoot) {
+export async function discoverPages(pagesRoot, options = {}) {
   const files = await walkFiles(pagesRoot);
   const pages = [];
 
@@ -533,7 +547,7 @@ export async function discoverPages(pagesRoot) {
 
     const content = await fs.readFile(file);
     const stat = await fs.stat(file);
-    const id = fileToPageId(pagesRoot, file, ".txt");
+    const id = fileToPageId(pagesRoot, file, ".txt", options);
 
     pages.push({
       id,
@@ -547,7 +561,7 @@ export async function discoverPages(pagesRoot) {
   return pages.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export async function discoverPageRevisions(atticRoot) {
+export async function discoverPageRevisions(atticRoot, options = {}) {
   const files = await walkFiles(atticRoot);
   const revisions = [];
 
@@ -559,7 +573,7 @@ export async function discoverPageRevisions(atticRoot) {
     const pagePath = file
       .slice(atticRoot.length + 1)
       .replace(/\.([0-9]{10,})\.txt(\.gz|\.bz2)?$/, "");
-    const id = pathWithoutExtensionToId(pagePath);
+    const id = pathWithoutExtensionToId(pagePath, options);
     const stat = await fs.stat(file);
     const raw = await readMaybeCompressed(file, compression);
 
@@ -579,7 +593,7 @@ export async function discoverPageRevisions(atticRoot) {
   );
 }
 
-export async function discoverMedia(mediaRoot) {
+export async function discoverMedia(mediaRoot, options = {}) {
   const files = await walkFiles(mediaRoot);
   const media = [];
 
@@ -588,7 +602,7 @@ export async function discoverMedia(mediaRoot) {
 
     const content = await fs.readFile(file);
     const stat = await fs.stat(file);
-    const id = pathWithoutExtensionToId(path.relative(mediaRoot, file));
+    const id = pathWithoutExtensionToId(path.relative(mediaRoot, file), options);
 
     media.push({
       id,
@@ -603,7 +617,7 @@ export async function discoverMedia(mediaRoot) {
   return media.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export async function discoverMediaRevisions(mediaAtticRoot) {
+export async function discoverMediaRevisions(mediaAtticRoot, options = {}) {
   const files = await walkFiles(mediaAtticRoot);
   const revisions = [];
 
@@ -613,7 +627,7 @@ export async function discoverMediaRevisions(mediaAtticRoot) {
     const content = await fs.readFile(file);
     const stat = await fs.stat(file);
     const relative = path.relative(mediaAtticRoot, file);
-    const parsed = parseMediaRevisionPath(relative);
+    const parsed = parseMediaRevisionPath(relative, options);
 
     revisions.push({
       mediaId: parsed.mediaId,
@@ -744,7 +758,7 @@ function dokuChangeType(type) {
   }
 }
 
-export async function discoverSerializedMetadata(root, subjectType) {
+export async function discoverSerializedMetadata(root, subjectType, options = {}) {
   const files = await walkFiles(root);
   const entries = [];
 
@@ -757,7 +771,7 @@ export async function discoverSerializedMetadata(root, subjectType) {
 
     entries.push({
       subjectType,
-      subjectId: pathWithoutExtensionToId(relative),
+      subjectId: pathWithoutExtensionToId(relative, options),
       sourcePath: file,
       byteLength: content.byteLength,
       contentHash: sha256(content),
@@ -1475,17 +1489,19 @@ async function readTextIfExists(file) {
   }
 }
 
-function fileToPageId(root, file, extension) {
+function fileToPageId(root, file, extension, options = {}) {
   const relative = path.relative(root, file).slice(0, -extension.length);
-  return pathWithoutExtensionToId(relative);
+  return pathWithoutExtensionToId(relative, options);
 }
 
-function pathWithoutExtensionToId(relative) {
-  return relative.split(path.sep).join(":").replaceAll("/", ":").toLowerCase();
+function pathWithoutExtensionToId(relative, options = {}) {
+  return decodeDokuWikiFileName(relative.split(path.sep).join("/"), options.fnencode)
+    .replaceAll("/", ":")
+    .toLowerCase();
 }
 
-function parseMediaRevisionPath(relative) {
-  const id = pathWithoutExtensionToId(relative);
+function parseMediaRevisionPath(relative, options = {}) {
+  const id = pathWithoutExtensionToId(relative, options);
   const match = id.match(/^(.*)\.([0-9]{10,})\.([^.]+)$/);
   if (!match) {
     return {
@@ -1498,6 +1514,65 @@ function parseMediaRevisionPath(relative) {
     mediaId: `${match[1]}.${match[3]}`,
     revision: match[2]
   };
+}
+
+function importedFileNameEncoding(configSettings) {
+  const setting = configSettings.find((entry) => entry.key === "fnencode");
+  return normalizeFileNameEncoding(setting?.value);
+}
+
+function normalizeFileNameEncoding(value) {
+  return value === "safe" || value === "utf-8" ? value : "url";
+}
+
+function decodeDokuWikiFileName(filename, fnencode = "url") {
+  if (fnencode === "utf-8") return filename;
+  if (fnencode === "safe") return decodeSafeFileName(filename);
+
+  try {
+    return decodeURIComponent(filename.replace(/\+/g, "%20"));
+  } catch {
+    return filename;
+  }
+}
+
+function decodeSafeFileName(filename) {
+  const safe = filename.toLowerCase();
+  let decoded = "";
+  let converted = false;
+
+  for (let index = 0; index < safe.length; ) {
+    const char = safe[index];
+
+    if (char === "%") {
+      let end = index + 1;
+      while (end < safe.length && safe[end] !== "%" && safe[end] !== "]") {
+        end += 1;
+      }
+
+      if (end === index + 1) {
+        decoded += "%";
+      } else {
+        const codepoint = 32 + Number.parseInt(safe.slice(index + 1, end), 36);
+        decoded += String.fromCodePoint(codepoint);
+      }
+      converted = true;
+      index = end;
+      continue;
+    }
+
+    if (converted && char === "]") {
+      converted = false;
+      index += 1;
+      continue;
+    }
+
+    decoded += char;
+    converted = false;
+    index += 1;
+  }
+
+  return decoded;
 }
 
 function sha256(content) {

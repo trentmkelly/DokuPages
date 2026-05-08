@@ -237,7 +237,8 @@ export function cleanPageId(rawId: string, options: PageIdCleanOptions = {}): st
 }
 
 export function cleanRoutePageId(rawPath: string, options: PageIdCleanOptions = {}): string {
-  return cleanPageId(rawPath.replace(/\/+/g, ":"), { ...options, useslash: true });
+  const decoded = decodeDokuWikiFileName(rawPath, options.fnencode);
+  return cleanPageId(decoded.replace(/\/+/g, ":"), { ...options, useslash: true });
 }
 
 export function pageIdToPath(id: string, options: PageIdCleanOptions = {}): string {
@@ -301,6 +302,16 @@ export function encodeDokuWikiFileName(
   if (fnencode === "safe") return encodeSafeFileName(filename);
 
   return encodeURIComponent(filename).replace(/%2F/gi, "/");
+}
+
+export function decodeDokuWikiFileName(
+  filename: string,
+  fnencode: DokuWikiFnEncode = DEFAULT_PAGE_ID_OPTIONS.fnencode
+): string {
+  if (fnencode === "utf-8") return filename;
+  if (fnencode === "safe") return decodeSafeFileName(filename);
+
+  return safeDecodeUrlFileName(filename);
 }
 
 function pageNamespace(pageId: string): string {
@@ -376,6 +387,57 @@ function encodeSafeFileName(filename: string): string {
 
   if (converted) safe += SAFE_FN_POST_INDICATOR;
   return safe;
+}
+
+function decodeSafeFileName(filename: string): string {
+  const safe = filename.toLowerCase();
+  let decoded = "";
+  let converted = false;
+
+  for (let index = 0; index < safe.length; ) {
+    const char = safe[index];
+
+    if (char === SAFE_FN_PRE_INDICATOR) {
+      let end = index + 1;
+      while (
+        end < safe.length &&
+        safe[end] !== SAFE_FN_PRE_INDICATOR &&
+        safe[end] !== SAFE_FN_POST_INDICATOR
+      ) {
+        end += 1;
+      }
+
+      if (end === index + 1) {
+        decoded += SAFE_FN_PRE_INDICATOR;
+      } else {
+        const codepoint = 32 + Number.parseInt(safe.slice(index + 1, end), 36);
+        decoded += String.fromCodePoint(codepoint);
+      }
+      converted = true;
+      index = end;
+      continue;
+    }
+
+    if (converted && char === SAFE_FN_POST_INDICATOR) {
+      converted = false;
+      index += 1;
+      continue;
+    }
+
+    decoded += char;
+    converted = false;
+    index += 1;
+  }
+
+  return decoded;
+}
+
+function safeDecodeUrlFileName(filename: string): string {
+  try {
+    return decodeURIComponent(filename.replace(/\+/g, "%20"));
+  } catch {
+    return filename;
+  }
 }
 
 function escapeRegExp(value: string): string {

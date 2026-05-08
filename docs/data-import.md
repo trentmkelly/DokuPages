@@ -13,6 +13,11 @@ media, media revisions, metadata, custom language files, custom template files,
 ACL rules, users, config values, plugin settings, interwiki templates, MIME
 mappings, scheme protocols, and wordblock patterns.
 
+The importer reads `fnencode` from the source wiki's DokuWiki configuration
+before walking `data/pages`, `data/attic`, `data/media`, `data/media_attic`, and
+metadata trees. URL-encoded, SafeFN-encoded, and UTF-8 file names are decoded
+back to DokuWiki page/media IDs during import.
+
 ## D1 SQL
 
 ```sh

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cleanPageId,
   cleanRoutePageId,
+  decodeDokuWikiFileName,
   encodeDokuWikiFileName,
   pageIdToPath,
   pageIdToRoutePath,
@@ -24,6 +25,8 @@ describe("page id helpers", () => {
   it("supports useslash route normalization separately from cleanID defaults", () => {
     expect(cleanRoutePageId("Wiki/Welcome")).toBe("wiki:welcome");
     expect(cleanRoutePageId("Wiki//Guide///Start")).toBe("wiki:guide:start");
+    expect(cleanRoutePageId("Wiki/caf%5l]", { deaccent: 0, fnencode: "safe" })).toBe("wiki:café");
+    expect(cleanRoutePageId("Wiki/caf%C3%A9", { deaccent: 0 })).toBe("wiki:café");
     expect(cleanPageId("A/B;C", { useslash: true })).toBe("a:b:c");
   });
 
@@ -104,5 +107,8 @@ describe("page id helpers", () => {
     expect(encodeDokuWikiFileName("wiki/café", "url")).toBe("wiki/caf%C3%A9");
     expect(encodeDokuWikiFileName("wiki/café", "utf-8")).toBe("wiki/café");
     expect(encodeDokuWikiFileName("wiki/café", "safe")).toBe("wiki/caf%5l]");
+    expect(decodeDokuWikiFileName("wiki/caf%C3%A9", "url")).toBe("wiki/café");
+    expect(decodeDokuWikiFileName("wiki/caf%5l]", "safe")).toBe("wiki/café");
+    expect(decodeDokuWikiFileName("wiki/café", "utf-8")).toBe("wiki/café");
   });
 });

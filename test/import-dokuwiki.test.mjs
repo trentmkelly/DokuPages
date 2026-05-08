@@ -448,6 +448,60 @@ describe("DokuWiki import planner", () => {
     );
   });
 
+  it("decodes DokuWiki URL and SafeFN filename modes during import", async () => {
+    const urlRoot = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-url-fn-"));
+    await mkdir(path.join(urlRoot, "data/pages/wiki"), { recursive: true });
+    await mkdir(path.join(urlRoot, "conf"), { recursive: true });
+    await writeFile(path.join(urlRoot, "data/pages/wiki/caf%C3%A9.txt"), "====== URL ======\n");
+
+    const urlPlan = await buildImportPlan(urlRoot);
+    expect(urlPlan.pages).toContainEqual(
+      expect.objectContaining({
+        id: "wiki:café"
+      })
+    );
+
+    const safeRoot = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-safe-fn-"));
+    await mkdir(path.join(safeRoot, "data/pages/wiki"), { recursive: true });
+    await mkdir(path.join(safeRoot, "data/attic/wiki"), { recursive: true });
+    await mkdir(path.join(safeRoot, "data/media/wiki"), { recursive: true });
+    await mkdir(path.join(safeRoot, "data/media_attic/wiki"), { recursive: true });
+    await mkdir(path.join(safeRoot, "data/meta/wiki"), { recursive: true });
+    await mkdir(path.join(safeRoot, "data/media_meta/wiki"), { recursive: true });
+    await mkdir(path.join(safeRoot, "conf"), { recursive: true });
+    await writeFile(path.join(safeRoot, "conf/local.php"), "$conf['fnencode'] = 'safe';\n");
+    await writeFile(path.join(safeRoot, "data/pages/wiki/caf%5l].txt"), "====== Safe ======\n");
+    await writeFile(
+      path.join(safeRoot, "data/attic/wiki/caf%5l].1767225600.txt"),
+      "====== Old Safe ======\n"
+    );
+    await writeFile(path.join(safeRoot, "data/media/wiki/caf%5l].png"), "png");
+    await writeFile(path.join(safeRoot, "data/media_attic/wiki/caf%5l].1767225600.png"), "old");
+    await writeFile(
+      path.join(safeRoot, "data/meta/wiki/caf%5l].meta"),
+      'a:1:{s:7:"current";a:1:{s:5:"title";s:5:"Café";}}'
+    );
+    await writeFile(
+      path.join(safeRoot, "data/media_meta/wiki/caf%5l].png.meta"),
+      'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Cafe";}}'
+    );
+
+    const safePlan = await buildImportPlan(safeRoot);
+
+    expect(safePlan.pages).toContainEqual(expect.objectContaining({ id: "wiki:café" }));
+    expect(safePlan.pageRevisions).toContainEqual(expect.objectContaining({ pageId: "wiki:café" }));
+    expect(safePlan.media).toContainEqual(expect.objectContaining({ id: "wiki:café.png" }));
+    expect(safePlan.mediaRevisions).toContainEqual(
+      expect.objectContaining({ mediaId: "wiki:café.png" })
+    );
+    expect(safePlan.pageMetadata).toContainEqual(
+      expect.objectContaining({ subjectId: "wiki:café" })
+    );
+    expect(safePlan.mediaMetadata).toContainEqual(
+      expect.objectContaining({ subjectId: "wiki:café.png" })
+    );
+  });
+
   it("generates idempotent SQL for D1 page imports", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-sql-"));
     await mkdir(path.join(root, "data/pages/wiki"), { recursive: true });
