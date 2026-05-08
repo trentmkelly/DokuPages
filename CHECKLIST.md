@@ -398,10 +398,10 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Port user manager UI if supported.
 - [x] Port styling plugin behavior if supported.
 - [x] Port configuration UI if supported.
-- [ ] Ensure responsive behavior.
+- [x] Ensure responsive behavior.
 - [x] Ensure keyboard accessibility.
 - [x] Ensure screen reader accessibility.
-- [ ] Ensure text does not overflow in common layouts.
+- [x] Ensure text does not overflow in common layouts.
 - [x] Verify desktop rendering with screenshots.
 - [x] Verify mobile rendering with screenshots.
 
@@ -664,7 +664,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add API compatibility tests if APIs are supported.
 - [x] Add accessibility tests.
 - [ ] Add visual regression tests.
-- [ ] Add mobile viewport tests.
+- [x] Add mobile viewport tests.
 - [ ] Add performance tests.
 - [ ] Add load tests within Workers limits.
 - [x] Add security tests for XSS.

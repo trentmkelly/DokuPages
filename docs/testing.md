@@ -34,6 +34,10 @@ Accessibility tests cover rendered wiki shell landmarks, the keyboard skip link,
 the header search label, the mobile tools label, and accessible names for
 icon-only page tools.
 
+Responsive CSS tests cover the mobile navigation breakpoints, narrow-viewport
+header controls, long-word wrapping, diagnostic/media detail overflow behavior,
+and fixed-size font rules.
+
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
 sizes, and R2 media operation counts.
