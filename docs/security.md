@@ -19,6 +19,16 @@ with the `DOKUWIKI_COOKIE_SALT` secret, matching upstream `media_get_token()`.
 Invalid or unsigned resized-media requests return `412 Precondition Failed`
 before R2 is opened.
 
+## Session Cookies
+
+The Pages port does not issue upstream DokuWiki `rememberme` sticky cookies.
+Login always creates an opaque D1-backed session token with a 24 hour
+HTTP-only, `SameSite=Lax` cookie, and the database stores only the token's
+SHA-256 hash. Longer-lived identity should be provided by an external layer
+such as Cloudflare Access or by a future session policy change that preserves
+server-side revocation; encrypted password-derived persistent cookies are not
+part of the port.
+
 ## Rendered Content
 
 The native wiki renderer escapes raw HTML in headings, paragraphs, link labels,

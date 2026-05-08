@@ -714,6 +714,33 @@ describe("auth routes", () => {
     }
   });
 
+  it("keeps the native session ttl when upstream remember-me fields are submitted", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const login = new FormData();
+    login.set("username", "alice");
+    login.set("password", "correct horse battery staple");
+    login.set("r", "1");
+    login.set("remember", "1");
+    login.set("rememberme", "1");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: login,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+    const cookie = response.headers.get("set-cookie") ?? "";
+
+    expect(response.status).toBe(303);
+    expect(cookie).toContain("DW_PAGES_SESSION=");
+    expect(cookie).toContain("Max-Age=86400");
+    expect(cookie).not.toContain("Max-Age=31536000");
+    expect(cookie).not.toContain("correct horse battery staple");
+  });
+
   it("logs in imported DokuWiki authplain hashes and rehashes them natively", async () => {
     env = createEnv();
     await seedUser(env.DB);

@@ -48,11 +48,17 @@ for that user.
 
 ## Deferred Account Flows
 
-Persistent remember-me tokens are not supported for the first Pages launch.
+Upstream DokuWiki's `rememberme` sticky-cookie format is intentionally not
+implemented in the Pages port. That format persists encrypted password-derived
+credentials in a client cookie for up to one year, which does not match the
+native Workers security model.
 
-The secure launch replacement for remember-me behavior is the HTTP-only native
-session cookie. Longer-lived persistent login tokens need a separate threat
-model before they are enabled.
+The permanent replacement is the native D1-backed session cookie. Sessions use
+random opaque tokens, store only SHA-256 token hashes in D1, expire after 24
+hours, and can be revoked server-side on logout, password reset, password
+change, or account disablement. Login submissions that include upstream
+remember-me fields are accepted for form compatibility but still receive only
+the native session cookie.
 
 ## Password Hashing
 
