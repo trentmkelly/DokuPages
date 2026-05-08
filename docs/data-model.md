@@ -43,6 +43,11 @@ modified date values. Persistent metadata preserves creator/user fields,
 contributors, and the last change record. Saves also refresh `backlinks`
 metadata for the saved page and link targets touched by the edit.
 
+Backlink, wanted-page, and orphan-page reports read those relation and backlink
+metadata rows first, matching DokuWiki's index-backed behavior without reparsing
+current page source on every request. A source scan fallback remains for legacy
+rows that have not been re-saved or imported with relation metadata yet.
+
 ## Changelogs
 
 `changelog` stores both page and media change events with subject type, subject ID, revision ID, user, IP, summary, change type, size change, and timestamp.

@@ -138,6 +138,12 @@ interface PageSearchRow {
   score: number;
 }
 
+interface PageReferenceRow {
+  id: string;
+  title: string | null;
+  updated_at: string;
+}
+
 interface NamespacePageRow {
   id: string;
   namespace: string;
@@ -152,6 +158,13 @@ interface CurrentPageSourceRow {
   updated_at: string;
 }
 
+interface RelationMetadataRow {
+  subject_id: string;
+  value_json: string;
+  title: string | null;
+  updated_at: string;
+}
+
 interface PageDraftRow {
   id: string;
   page_id: string;
@@ -159,6 +172,8 @@ interface PageDraftRow {
   base_revision_id: string | null;
   updated_at: string;
 }
+
+const MAX_METADATA_REFERENCE_ROWS = 1000;
 
 export async function getCurrentPage(db: D1Database, id: string): Promise<CurrentPage | null> {
   const row = await db
@@ -356,6 +371,50 @@ export async function listBacklinks(
   targetPageId: string,
   limit = 200
 ): Promise<PageLinkReference[]> {
+  const metadataBacklinks = await readBacklinkMetadataIds(db, targetPageId);
+  if (metadataBacklinks) {
+    return listPageReferencesByIds(
+      db,
+      metadataBacklinks.filter((pageId) => pageId !== targetPageId),
+      limit
+    );
+  }
+
+  const relationBacklinks = await listBacklinkIdsFromRelationMetadata(db, targetPageId);
+  if (relationBacklinks) {
+    return listPageReferencesByIds(db, relationBacklinks, limit);
+  }
+
+  return listBacklinksFromCurrentSources(db, targetPageId, limit);
+}
+
+export async function listOrphanPages(db: D1Database, limit = 200): Promise<PageLinkReference[]> {
+  const relations = await listRelationMetadataRows(db);
+  if (relations) {
+    const incoming = incomingPageIdsFromRelationMetadata(relations);
+    const pages = await listAllPages(db, MAX_METADATA_REFERENCE_ROWS);
+    return pages
+      .filter((page) => !incoming.has(page.id))
+      .slice(0, Math.max(1, Math.min(limit, 500)));
+  }
+
+  return listOrphanPagesFromCurrentSources(db, limit);
+}
+
+export async function listWantedPages(db: D1Database, limit = 200): Promise<WantedPage[]> {
+  const relations = await listRelationMetadataRows(db);
+  if (relations) {
+    return listWantedPagesFromRelationMetadata(db, relations, limit);
+  }
+
+  return listWantedPagesFromCurrentSources(db, limit);
+}
+
+async function listBacklinksFromCurrentSources(
+  db: D1Database,
+  targetPageId: string,
+  limit = 200
+): Promise<PageLinkReference[]> {
   const pages = await listCurrentPageSources(db, limit);
 
   return pages
@@ -368,7 +427,10 @@ export async function listBacklinks(
     }));
 }
 
-export async function listOrphanPages(db: D1Database, limit = 200): Promise<PageLinkReference[]> {
+async function listOrphanPagesFromCurrentSources(
+  db: D1Database,
+  limit = 200
+): Promise<PageLinkReference[]> {
   const pages = await listCurrentPageSources(db, limit);
   const incoming = new Set(
     pages.flatMap((page) => extractInternalPageLinks(page.content, page.id))
@@ -383,7 +445,10 @@ export async function listOrphanPages(db: D1Database, limit = 200): Promise<Page
     }));
 }
 
-export async function listWantedPages(db: D1Database, limit = 200): Promise<WantedPage[]> {
+async function listWantedPagesFromCurrentSources(
+  db: D1Database,
+  limit = 200
+): Promise<WantedPage[]> {
   const pages = await listCurrentPageSources(db, limit);
   const existing = new Set(pages.map((page) => page.id));
   const wanted = new Map<string, PageLinkReference[]>();
@@ -406,6 +471,186 @@ export async function listWantedPages(db: D1Database, limit = 200): Promise<Want
     .map(([id, referrers]) => ({ id, referrers }))
     .sort((a, b) => b.referrers.length - a.referrers.length || a.id.localeCompare(b.id))
     .slice(0, Math.max(1, Math.min(limit, 500)));
+}
+
+async function readBacklinkMetadataIds(
+  db: D1Database,
+  targetPageId: string
+): Promise<string[] | null> {
+  const row = await db
+    .prepare(
+      `select value_json
+       from metadata
+       where subject_type = 'page'
+         and subject_id = ?
+         and key = 'backlinks'`
+    )
+    .bind(targetPageId)
+    .first<{ value_json: string }>();
+
+  if (!row || typeof row.value_json !== "string") return null;
+
+  return parsePageIdArray(row.value_json);
+}
+
+async function listBacklinkIdsFromRelationMetadata(
+  db: D1Database,
+  targetPageId: string
+): Promise<string[] | null> {
+  const relations = await listRelationMetadataRows(db);
+  if (!relations) return null;
+
+  return relations
+    .filter((row) => row.subject_id !== targetPageId)
+    .filter((row) =>
+      Object.prototype.hasOwnProperty.call(relationReferences(row.value_json), targetPageId)
+    )
+    .map((row) => row.subject_id);
+}
+
+async function listRelationMetadataRows(db: D1Database): Promise<RelationMetadataRow[] | null> {
+  const result = await db
+    .prepare(
+      `select m.subject_id, m.value_json, p.title, p.updated_at
+       from metadata m
+       join pages p on p.id = m.subject_id
+       where m.subject_type = 'page'
+         and m.key = 'relation'
+         and p.is_deleted = 0
+       order by m.subject_id
+       limit ?`
+    )
+    .bind(MAX_METADATA_REFERENCE_ROWS)
+    .all<RelationMetadataRow>();
+
+  return result.results.length > 0 ? result.results : null;
+}
+
+async function listPageReferencesByIds(
+  db: D1Database,
+  pageIds: readonly string[],
+  limit: number
+): Promise<PageLinkReference[]> {
+  const ids = uniquePageIds(pageIds).slice(0, MAX_METADATA_REFERENCE_ROWS);
+  if (ids.length === 0) return [];
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `select id, title, updated_at
+       from pages
+       where is_deleted = 0 and id in (${placeholders})`
+    )
+    .bind(...ids)
+    .all<PageReferenceRow>();
+  const order = new Map(ids.map((id, index) => [id, index]));
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+
+  return result.results
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0) || a.id.localeCompare(b.id))
+    .slice(0, safeLimit)
+    .map(mapPageReferenceRow);
+}
+
+async function listWantedPagesFromRelationMetadata(
+  db: D1Database,
+  relations: RelationMetadataRow[],
+  limit: number
+): Promise<WantedPage[]> {
+  const existing = new Set(
+    (await listAllPages(db, MAX_METADATA_REFERENCE_ROWS)).map((page) => page.id)
+  );
+  const wanted = new Map<string, PageLinkReference[]>();
+
+  for (const row of relations) {
+    const referrer = mapRelationMetadataReference(row);
+    for (const pageId of Object.keys(relationReferences(row.value_json))) {
+      const clean = cleanPageId(pageId);
+      if (!clean || existing.has(clean)) continue;
+
+      const referrers = wanted.get(clean) ?? [];
+      referrers.push(referrer);
+      wanted.set(clean, referrers);
+    }
+  }
+
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  return [...wanted.entries()]
+    .map(([id, referrers]) => ({
+      id,
+      referrers: uniquePageReferences(referrers)
+    }))
+    .sort((a, b) => b.referrers.length - a.referrers.length || a.id.localeCompare(b.id))
+    .slice(0, safeLimit);
+}
+
+function incomingPageIdsFromRelationMetadata(relations: RelationMetadataRow[]): Set<string> {
+  const incoming = new Set<string>();
+
+  for (const row of relations) {
+    for (const pageId of Object.keys(relationReferences(row.value_json))) {
+      const clean = cleanPageId(pageId);
+      if (clean && clean !== row.subject_id) incoming.add(clean);
+    }
+  }
+
+  return incoming;
+}
+
+function relationReferences(valueJson: string): Record<string, unknown> {
+  const parsed = parseJsonObject(valueJson);
+  const relation = objectValue(parsed.relation);
+  const source = Object.keys(relation).length > 0 ? relation : parsed;
+  return objectValue(source.references);
+}
+
+function parsePageIdArray(valueJson: string): string[] {
+  try {
+    const parsed = JSON.parse(valueJson);
+    if (!Array.isArray(parsed)) return [];
+    return uniquePageIds(parsed.filter((value): value is string => typeof value === "string"));
+  } catch {
+    return [];
+  }
+}
+
+function parseJsonObject(valueJson: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(valueJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function uniquePageIds(pageIds: readonly string[]): string[] {
+  return [...new Set(pageIds.map((pageId) => cleanPageId(pageId)).filter(Boolean))];
+}
+
+function uniquePageReferences(referrers: readonly PageLinkReference[]): PageLinkReference[] {
+  const unique = new Map<string, PageLinkReference>();
+  for (const referrer of referrers) {
+    if (!unique.has(referrer.id)) unique.set(referrer.id, referrer);
+  }
+  return [...unique.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function mapRelationMetadataReference(row: RelationMetadataRow): PageLinkReference {
+  return {
+    id: row.subject_id,
+    title: row.title,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapPageReferenceRow(row: PageReferenceRow): PageLinkReference {
+  return {
+    id: row.id,
+    title: row.title,
+    updatedAt: row.updated_at
+  };
 }
 
 export async function getPageDraft(db: D1Database, pageId: string): Promise<PageDraft | null> {

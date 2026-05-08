@@ -1227,6 +1227,65 @@ describe("auth routes", () => {
     expect(targetMetadata.backlinks).toEqual(["wiki:meta"]);
   });
 
+  it("uses relation metadata for backlink, wanted, and orphan reports", async () => {
+    env = createEnv();
+    await seedPage(env.DB, {
+      id: "wiki:target",
+      title: "Target",
+      content: "====== Target ======\n\nNo source body points here."
+    });
+    await seedPage(env.DB, {
+      id: "wiki:source",
+      title: "Source",
+      content: "====== Source ======\n\nThe metadata row, not this body, defines links."
+    });
+    await seedPage(env.DB, {
+      id: "wiki:orphan",
+      title: "Orphan",
+      content: "====== Orphan ======\n\nNo incoming relation metadata."
+    });
+    await insertPageMetadata(env.DB, "wiki:source", "relation", {
+      references: {
+        "wiki:target": true,
+        "wiki:wanted": false
+      },
+      media: {},
+      firstimage: ""
+    });
+    await insertPageMetadata(env.DB, "wiki:target", "backlinks", ["wiki:source"]);
+    await insertPageMetadata(env.DB, "wiki:target", "relation", {
+      references: {},
+      media: {},
+      firstimage: ""
+    });
+    await insertPageMetadata(env.DB, "wiki:orphan", "relation", {
+      references: {},
+      media: {},
+      firstimage: ""
+    });
+
+    const backlinks = await handleRequest(
+      new Request("https://example.com/wiki/wiki/target?do=backlink"),
+      env
+    );
+    const wanted = await handleRequest(new Request("https://example.com/wanted"), env);
+    const orphans = await handleRequest(new Request("https://example.com/orphans"), env);
+
+    const backlinksHtml = await backlinks.text();
+    const wantedHtml = await wanted.text();
+    const orphansHtml = await orphans.text();
+
+    expect(backlinks.status).toBe(200);
+    expect(backlinksHtml).toContain("Backlinks for wiki:target");
+    expect(backlinksHtml).toContain("/wiki/wiki/source");
+    expect(wanted.status).toBe(200);
+    expect(wantedHtml).toContain("wiki:wanted");
+    expect(wantedHtml).toContain("/wiki/wiki/source");
+    expect(orphans.status).toBe(200);
+    expect(orphansHtml).toContain("/wiki/wiki/orphan");
+    expect(orphansHtml).not.toContain("/wiki/wiki/target");
+  });
+
   it("allows admin users to purge global render and discovery caches", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -1775,6 +1834,16 @@ async function pageMetadata(d1, id) {
     .all();
 
   return Object.fromEntries(rows.results.map((row) => [row.key, JSON.parse(row.value_json)]));
+}
+
+async function insertPageMetadata(d1, id, key, value) {
+  await d1
+    .prepare(
+      `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+       values ('page', ?, ?, ?, ?)`
+    )
+    .bind(id, key, JSON.stringify(value), "2026-05-07T00:00:00.000Z")
+    .run();
 }
 
 async function seedMediaObjectReferences(d1) {
