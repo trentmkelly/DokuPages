@@ -1469,7 +1469,7 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain("<p><strong>Old revision:</strong> 2026-05-06T00:00:00.000Z</p>");
+    expect(html).toContain("<p><strong>This is an old revision of the document!</strong></p>");
     expect(html).toContain("Cached older body.");
     expect(html).not.toContain("Older page.");
     expect(cachePuts).toHaveLength(0);
@@ -1653,12 +1653,36 @@ describe("handleRequest", () => {
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
     const html = await response.text();
-    expect(html).toContain("This topic does not exist yet.");
+    expect(html).toContain("This topic does not exist yet");
+    expect(html).toContain("You've followed a link to a topic that doesn't exist yet.");
     expect(html).toContain(
       '<a class="action create" href="/wiki/missing/page?do=edit" rel="nofollow" title="Create this page">Create this page</a>'
     );
     expect(html).not.toContain('class="wikilink2" href="/wiki/missing/page?do=edit"');
     expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');
+  });
+
+  it("renders DokuWiki once-existed and no-revision pages", async () => {
+    state.deleted = true;
+
+    const deleted = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(deleted.status).toBe(404);
+    const deletedHtml = await deleted.text();
+    expect(deletedHtml).toContain("This page does not exist anymore");
+    expect(deletedHtml).toContain("You've followed a link to a page that no longer exists.");
+    expect(deletedHtml).toContain('href="/wiki/wiki/welcome?do=revisions"');
+
+    const missingRevision = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?rev=wiki%3Awelcome%40does-not-exist"),
+      env
+    );
+
+    expect(missingRevision.status).toBe(404);
+    const missingRevisionHtml = await missingRevision.text();
+    expect(missingRevisionHtml).toContain("No such revision");
+    expect(missingRevisionHtml).toContain("The specified revision doesn't exist.");
+    expect(missingRevisionHtml).toContain('href="/wiki/wiki/welcome?do=revisions"');
   });
 
   it("honors SEND404 and canonical URL settings for missing pages", async () => {
@@ -1989,7 +2013,8 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain("Old revision:");
+    expect(html).toContain("This is an old revision of the document!");
+    expect(html).not.toContain("Old revision:");
     expect(html).toContain("Older page.");
   });
 

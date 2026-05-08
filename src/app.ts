@@ -808,7 +808,7 @@ export async function handleRequest(
       if (denied) return denied;
       const revision = await getPageRevision(env.DB, revisionId);
       if (!revision || revision.pageId !== id) {
-        return notFoundResponse(`Revision '${revisionId}' was not found.`);
+        return htmlResponse(renderNoRevisionPage(env, id, revisionId, principal), { status: 404 });
       }
       const cacheMode = await renderCacheModeForPage(env, id);
       return htmlResponse(
@@ -876,7 +876,8 @@ export async function handleRequest(
     if (!page) {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
-      return htmlResponse(renderMissingPage(env, id, principal), {
+      const oldRevisions = await listPageRevisions(env.DB, id, 1, 0);
+      return htmlResponse(renderMissingPage(env, id, oldRevisions.length > 0, principal), {
         status: getRuntimeConfig(env).send404 ? 404 : 200
       });
     }
@@ -2744,7 +2745,7 @@ async function renderPageHtml(
   const sectionEdit = !isActionDisabled(env, "edit");
   const cacheableRenderControls = sectionEdit && usesDefaultRenderControls(config);
   const revisionNotice = revisionDate
-    ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
+    ? `<p><strong>This is an old revision of the document!</strong></p><hr>`
     : "";
   const cached =
     directives.noCache || privateCache || !cacheableRenderControls
@@ -3326,18 +3327,49 @@ function staticAssetVersion(env: Env): string {
   return commitSha ? `${appVersion}-${commitSha.slice(0, 12)}` : appVersion;
 }
 
-function renderMissingPage(env: Env, id: string, principal?: AuthPrincipal): string {
-  return htmlShell(
-    env,
-    id,
-    `${renderBreadcrumbs(id)}
-    <h1 id="${escapeAttribute(slugForPageHeading(id))}">${escapeHtml(id)}</h1>
-    <p>This topic does not exist yet.</p>
+function renderMissingPage(
+  env: Env,
+  id: string,
+  onceExisted: boolean,
+  principal?: AuthPrincipal
+): string {
+  const body = onceExisted
+    ? `<h1 id="this-page-does-not-exist-anymore">This page does not exist anymore</h1>
+    <p>You've followed a link to a page that no longer exists. You can check the list of <strong>Old revisions</strong> to see when and why it was deleted, access old revisions or restore it.</p>
+    <p>
+      <a href="${pagePath(id)}?do=revisions">Old revisions</a>
+      <span class="sep"> · </span>
+      <a class="action create" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
+    </p>`
+    : `<h1 id="this-topic-does-not-exist-yet">This topic does not exist yet</h1>
+    <p>You've followed a link to a topic that doesn't exist yet. If permissions allow, you may create it by clicking on <strong>Create this page</strong>.</p>
     <p>
       <a class="action create" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
       <span class="sep"> · </span>
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
-    </p>`,
+    </p>`;
+
+  return htmlShell(env, id, `${renderBreadcrumbs(id)}${body}`, { pageId: id, principal });
+}
+
+function renderNoRevisionPage(
+  env: Env,
+  id: string,
+  revisionId: string,
+  principal?: AuthPrincipal
+): string {
+  return htmlShell(
+    env,
+    `No such revision for ${id}`,
+    `${renderBreadcrumbs(id)}
+    <h1 id="no-such-revision">No such revision</h1>
+    <p>The specified revision doesn't exist. Click on "Old revisions" for a list of old revisions of this document.</p>
+    <p>
+      <a href="${pagePath(id)}?do=revisions">Old revisions</a>
+      <span class="sep"> · </span>
+      <a href="${pagePath(id)}">Back to current page</a>
+    </p>
+    <p><code>${escapeHtml(revisionId)}</code></p>`,
     { pageId: id, principal }
   );
 }
@@ -3368,10 +3400,6 @@ function isStaticAssetPath(pathname: string): boolean {
     pathname === "/dokuwiki-logo.png" ||
     pathname.startsWith("/images/")
   );
-}
-
-function slugForPageHeading(id: string): string {
-  return id.replaceAll(":", "-").replaceAll("_", "-") || "page";
 }
 
 async function resolvePageTemplate(
