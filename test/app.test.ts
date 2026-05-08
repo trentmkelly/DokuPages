@@ -2784,6 +2784,19 @@ describe("handleRequest", () => {
 
     expect(deleteResponse.status).toBe(303);
     expect(state.deleted).toBe(true);
+    expect(state.revisions[0]).toMatchObject({
+      page_id: "wiki:new",
+      content: "====== New ======\n\nCreated.",
+      change_type: "delete",
+      summary: "removed",
+      size_change: -"====== New ======\n\nCreated.".length
+    });
+    expect(state.changelog[0]).toMatchObject({
+      subject_id: "wiki:new",
+      change_type: "delete",
+      summary: "removed",
+      size_change: -"====== New ======\n\nCreated.".length
+    });
     expect(state.searchPostings.some((posting) => posting.page_id === "wiki:new")).toBe(false);
   });
 

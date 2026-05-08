@@ -471,17 +471,23 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   const now = (input.now ?? new Date()).toISOString();
   const revisionId = `${input.id}@${now}`;
   const namespace = input.id.includes(":") ? input.id.slice(0, input.id.lastIndexOf(":")) : "";
-  const title =
-    extractTitle(input.content) ??
-    (input.id.includes(":") ? input.id.slice(input.id.lastIndexOf(":") + 1) : input.id);
   const isDelete = input.content.trim() === "";
+  const fallbackTitle = input.id.includes(":")
+    ? input.id.slice(input.id.lastIndexOf(":") + 1)
+    : input.id;
+  const title =
+    isDelete && current
+      ? (current.title ?? fallbackTitle)
+      : (extractTitle(input.content) ?? fallbackTitle);
   const defaultChangeType = isDelete ? "delete" : current ? "edit" : "create";
   const changeType =
     input.changeType === "minor" && defaultChangeType !== "edit"
       ? defaultChangeType
       : (input.changeType ?? defaultChangeType);
+  const summary = input.summary || (isDelete ? "removed" : "");
   const sizeChange = input.content.length - (current?.content.length ?? 0);
-  const contentHash = await sha256(input.content);
+  const revisionContent = isDelete && current ? current.content : input.content;
+  const contentHash = await sha256(revisionContent);
   const indexedTerms = await listIndexedTerms(db, input.id);
   const searchTerms = isDelete
     ? new Map<string, number>()
@@ -511,11 +517,11 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
       .bind(
         revisionId,
         input.id,
-        input.content,
+        revisionContent,
         contentHash,
         input.authorId ?? null,
         input.authorName ?? null,
-        input.summary,
+        summary,
         changeType,
         sizeChange,
         now
@@ -535,7 +541,7 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
         input.authorName ?? null,
         input.ip ?? null,
         changeType,
-        input.summary,
+        summary,
         sizeChange,
         now
       ),

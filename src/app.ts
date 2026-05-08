@@ -1443,7 +1443,10 @@ async function handleNativeApiPageWrite(
 
   const id = cleanPageId(String(body.value.id ?? ""), getRuntimeConfig(env).pageIdCleanOptions);
   const content = String(body.value.content ?? "");
-  const summary = String(body.value.summary ?? "");
+  let summary = String(body.value.summary ?? "");
+  if (content.trim() === "" && !summary) {
+    summary = "removed";
+  }
 
   if (!id) {
     return jsonResponse({ error: "Missing page id." }, { status: 400 });
@@ -7254,9 +7257,12 @@ async function handleSave(
 
   const id = cleanPageId(String(form.get("id") || overrideId || ""));
   let content = normalizeWikiTextInput(String(form.get("content") ?? ""));
-  const summary = String(form.get("summary") ?? "");
+  let summary = String(form.get("summary") ?? "");
   const baseRevisionId = String(form.get("baseRevisionId") || "") || null;
   const sectionNumber = parseSectionNumber(String(form.get("section") ?? ""));
+  if (!sectionNumber && content.trim() === "" && !summary) {
+    summary = "removed";
+  }
   let redirectFragment: string | null = null;
   const submittedLockToken = String(form.get("lockToken") ?? "");
   const lockToken = submittedLockToken || randomPageLockToken();
