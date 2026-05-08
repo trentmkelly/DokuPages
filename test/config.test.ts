@@ -27,6 +27,7 @@ describe("runtime config", () => {
       tocMinHeads: 3,
       maxTocLevel: 3,
       maxSectionEditLevel: 3,
+      useHeading: false,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -50,7 +51,8 @@ describe("runtime config", () => {
       TOP_TOC_LEVEL: "2",
       TOC_MIN_HEADS: "4",
       MAX_TOC_LEVEL: "4",
-      MAX_SECTION_EDIT_LEVEL: "2"
+      MAX_SECTION_EDIT_LEVEL: "2",
+      USE_HEADING: "1"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
@@ -67,6 +69,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).tocMinHeads).toBe(4);
     expect(getRuntimeConfig(env).maxTocLevel).toBe(4);
     expect(getRuntimeConfig(env).maxSectionEditLevel).toBe(2);
+    expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -128,6 +131,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "TOC_MIN_HEADS",
           effectiveValue: "3"
+        }),
+        expect.objectContaining({
+          key: "USE_HEADING",
+          effectiveValue: "false"
         }),
         expect.objectContaining({
           key: "EMAIL_PROVIDER",

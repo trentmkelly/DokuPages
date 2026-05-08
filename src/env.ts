@@ -19,6 +19,7 @@ export interface Env {
   TOC_MIN_HEADS?: string;
   MAX_TOC_LEVEL?: string;
   MAX_SECTION_EDIT_LEVEL?: string;
+  USE_HEADING?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

@@ -31,6 +31,7 @@ export interface RuntimeConfig {
   tocMinHeads: number;
   maxTocLevel: number;
   maxSectionEditLevel: number;
+  useHeading: boolean;
   appVersion: string;
 }
 
@@ -85,6 +86,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     tocMinHeads: integerConfig(env.TOC_MIN_HEADS, 3, 0, 99),
     maxTocLevel: integerConfig(env.MAX_TOC_LEVEL, 3, 1, 5),
     maxSectionEditLevel: integerConfig(env.MAX_SECTION_EDIT_LEVEL, 3, 0, 5),
+    useHeading: truthy(env.USE_HEADING),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -149,6 +151,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       String(config.maxSectionEditLevel),
       "3"
     ),
+    configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",

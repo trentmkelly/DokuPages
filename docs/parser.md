@@ -55,12 +55,13 @@ fresh render.
 The renderer accepts Pages runtime settings that mirror DokuWiki's heading and
 section controls:
 
-| DokuWiki setting | Pages environment variable | Default | Behavior                                           |
-| ---------------- | -------------------------- | ------- | -------------------------------------------------- |
-| `toptoclevel`    | `TOP_TOC_LEVEL`            | `1`     | Lowest heading level included in generated TOCs.   |
-| `tocminheads`    | `TOC_MIN_HEADS`            | `3`     | Minimum heading count required before TOC display. |
-| `maxtoclevel`    | `MAX_TOC_LEVEL`            | `3`     | Deepest heading level included in generated TOCs.  |
-| `maxseclevel`    | `MAX_SECTION_EDIT_LEVEL`   | `3`     | Deepest heading level with section edit links.     |
+| DokuWiki setting | Pages environment variable | Default | Behavior                                            |
+| ---------------- | -------------------------- | ------- | --------------------------------------------------- |
+| `toptoclevel`    | `TOP_TOC_LEVEL`            | `1`     | Lowest heading level included in generated TOCs.    |
+| `tocminheads`    | `TOC_MIN_HEADS`            | `3`     | Minimum heading count required before TOC display.  |
+| `maxtoclevel`    | `MAX_TOC_LEVEL`            | `3`     | Deepest heading level included in generated TOCs.   |
+| `maxseclevel`    | `MAX_SECTION_EDIT_LEVEL`   | `3`     | Deepest heading level with section edit links.      |
+| `useheading`     | `USE_HEADING`              | `false` | Prefer the first page heading as the display title. |
 
 ## Still Pending
 

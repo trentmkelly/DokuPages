@@ -1403,6 +1403,28 @@ describe("handleRequest", () => {
     expect(html).not.toContain('href="/wiki/wiki/welcome?do=edit&amp;section=2"');
   });
 
+  it("honors the DokuWiki useheading title setting", async () => {
+    state.row = {
+      ...currentPageRow(),
+      title: "Stored title",
+      content: "====== Heading title ======\n\nBody."
+    };
+
+    const defaultTitle = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome"),
+      env
+    );
+    const headingTitle = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), {
+      ...env,
+      USE_HEADING: "1"
+    } satisfies Env);
+
+    await expect(defaultTitle.text()).resolves.toContain("<title>Stored title - Test Wiki</title>");
+    await expect(headingTitle.text()).resolves.toContain(
+      "<title>Heading title - Test Wiki</title>"
+    );
+  });
+
   it("honors page render control macros", async () => {
     state.row = {
       ...currentPageRow(),

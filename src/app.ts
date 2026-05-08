@@ -2488,6 +2488,29 @@ function startPageId(env: Env): string {
   return getRuntimeConfig(env).startPage;
 }
 
+function displayPageTitle(
+  config: ReturnType<typeof getRuntimeConfig>,
+  headingTitle: string | null,
+  storedTitle: string | null | undefined,
+  fallback: string
+): string {
+  if (config.useHeading) {
+    return headingTitle ?? storedTitle ?? fallback;
+  }
+
+  return storedTitle ?? headingTitle ?? fallback;
+}
+
+function usesDefaultRenderControls(config: ReturnType<typeof getRuntimeConfig>): boolean {
+  return (
+    !config.useHeading &&
+    config.topTocLevel === 1 &&
+    config.tocMinHeads === 3 &&
+    config.maxTocLevel === 3 &&
+    config.maxSectionEditLevel === 3
+  );
+}
+
 async function renderPageHtml(
   env: Env,
   id: string,
@@ -2503,11 +2526,12 @@ async function renderPageHtml(
   const directives = getWikiRenderDirectives(content);
   const config = getRuntimeConfig(env);
   const sectionEdit = !isActionDisabled(env, "edit");
+  const cacheableRenderControls = sectionEdit && usesDefaultRenderControls(config);
   const revisionNotice = revisionDate
     ? `<p><strong>Old revision:</strong> ${escapeHtml(revisionDate)}</p>`
     : "";
   const cached =
-    directives.noCache || privateCache || !sectionEdit
+    directives.noCache || privateCache || !cacheableRenderControls
       ? null
       : await readRenderCache(env, cacheKey, revisionId);
 
@@ -2565,9 +2589,9 @@ async function renderPageHtml(
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel
   });
-  const title = rendered.title ?? page?.title ?? id;
+  const title = displayPageTitle(config, rendered.title, page?.title, id);
 
-  if (!rendered.noCache && !privateCache && sectionEdit) {
+  if (!rendered.noCache && !privateCache && cacheableRenderControls) {
     await writeRenderCache(env, cacheKey, {
       rendererVersion: RENDER_CACHE_VERSION,
       revisionId,
@@ -2610,7 +2634,7 @@ async function renderPageExport(
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel
   });
-  const title = rendered.title ?? ("title" in page ? page.title : null) ?? id;
+  const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
   const headers = securityHeaders({ "x-robots-tag": "noindex" });
   const language = config.language;
 
