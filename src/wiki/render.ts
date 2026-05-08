@@ -35,6 +35,7 @@ export interface RenderWikiTextOptions {
   existingPageIds?: ReadonlySet<string>;
   entityReplacements?: ReadonlyArray<readonly [string, string]>;
   smileys?: Readonly<Record<string, string>>;
+  acronyms?: Readonly<Record<string, string>>;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -155,13 +156,6 @@ const DEFAULT_ACRONYMS: Record<string, string> = {
   YMMV: "Your mileage may vary"
 };
 const ACRONYM_BOUNDARY = "[\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7f]";
-const ACRONYM_PATTERN = new RegExp(
-  `(^|${ACRONYM_BOUNDARY})(${Object.keys(DEFAULT_ACRONYMS)
-    .sort((a, b) => b.length - a.length)
-    .map(escapeRegExp)
-    .join("|")})(?=$|${ACRONYM_BOUNDARY})`,
-  "g"
-);
 const IMAGE_MEDIA_EXTENSIONS = new Set(["gif", "jpg", "jpeg", "png", "svg", "webp", "avif"]);
 type ListType = "ul" | "ol";
 
@@ -179,6 +173,7 @@ export function renderWikiText(
     existingPageIds: options.existingPageIds,
     entityReplacements: options.entityReplacements ?? DEFAULT_ENTITY_REPLACEMENTS,
     smileys: options.smileys ?? DEFAULT_SMILEYS,
+    acronyms: options.acronyms ?? DEFAULT_ACRONYMS,
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -412,6 +407,7 @@ interface RenderContext {
   existingPageIds?: ReadonlySet<string>;
   entityReplacements: ReadonlyArray<readonly [string, string]>;
   smileys: Readonly<Record<string, string>>;
+  acronyms: Readonly<Record<string, string>>;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -734,6 +730,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             pageId: context.pageId,
             entityReplacements: context.entityReplacements,
             smileys: context.smileys,
+            acronyms: context.acronyms,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -784,7 +781,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderTypography(rendered, context.entityReplacements, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
   rendered = renderSmileys(rendered, context.smileys, protectHtml);
-  rendered = renderAcronyms(rendered, protectHtml);
+  rendered = renderAcronyms(rendered, context.acronyms, protectHtml);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\/\/([^/]+)\/\//g, "<em>$1</em>")
@@ -873,14 +870,34 @@ function smileyPattern(smileys: Readonly<Record<string, string>>): RegExp | null
   );
 }
 
-function renderAcronyms(source: string, protectHtml: (html: string) => string): string {
-  return source.replace(ACRONYM_PATTERN, (_match, prefix: string, acronym: string) => {
-    const title = DEFAULT_ACRONYMS[acronym];
+function renderAcronyms(
+  source: string,
+  acronyms: Readonly<Record<string, string>>,
+  protectHtml: (html: string) => string
+): string {
+  const pattern = acronymPattern(acronyms);
+  if (!pattern) return source;
+
+  return source.replace(pattern, (_match, prefix: string, acronym: string) => {
+    const title = acronyms[acronym];
 
     return `${prefix}${protectHtml(
       `<abbr title="${escapeAttribute(title)}">${escapeHtml(acronym)}</abbr>`
     )}`;
   });
+}
+
+function acronymPattern(acronyms: Readonly<Record<string, string>>): RegExp | null {
+  const tokens = Object.keys(acronyms);
+  if (tokens.length === 0) return null;
+
+  return new RegExp(
+    `(^|${ACRONYM_BOUNDARY})(${tokens
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp)
+      .join("|")})(?=$|${ACRONYM_BOUNDARY})`,
+    "g"
+  );
 }
 
 function renderMedia(

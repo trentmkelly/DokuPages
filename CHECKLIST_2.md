@@ -67,7 +67,7 @@ are not fixed by this checklist.
 - [x] Match DokuWiki's typography modes from `typography`, including smart quotes where enabled.
 - [x] Load entity replacements from `conf/entities.conf` and local overrides instead of relying only on hardcoded replacements.
 - [x] Load smileys from `conf/smileys.conf` and local overrides instead of only the checked-in default map.
-- [ ] Load acronyms from `conf/acronyms.conf` and local overrides instead of only the checked-in default map.
+- [x] Load acronyms from `conf/acronyms.conf` and local overrides instead of only the checked-in default map.
 - [ ] Load interwiki shortcuts from imported D1 metadata at render time instead of only using the built-in TypeScript map.
 - [ ] Match DokuWiki's `scheme.conf` protocol handling for external links and autolinks.
 - [ ] Match DokuWiki's `relnofollow` behavior, including `ugc nofollow` distinctions for external user content.

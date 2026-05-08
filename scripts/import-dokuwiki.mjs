@@ -70,6 +70,10 @@ export async function buildImportPlan(sourceRoot) {
     path.join(confRoot, "smileys.conf"),
     path.join(confRoot, "smileys.local.conf")
   ]);
+  const acronymMappings = await discoverAcronymMappings([
+    path.join(confRoot, "acronyms.conf"),
+    path.join(confRoot, "acronyms.local.conf")
+  ]);
   const wordblockPatterns = await discoverWordblockPatterns(path.join(confRoot, "wordblock.conf"));
   const customLanguageFiles = await discoverCustomLanguageFiles(path.join(confRoot, "lang"));
   const customTemplateFiles = await discoverCustomTemplateFiles(path.join(root, "lib", "tpl"));
@@ -95,6 +99,7 @@ export async function buildImportPlan(sourceRoot) {
       mimeTypes: mimeTypes.length,
       entityReplacements: entityReplacements.length,
       smileyMappings: smileyMappings.length,
+      acronymMappings: acronymMappings.length,
       wordblockPatterns: wordblockPatterns.length,
       customLanguageFiles: customLanguageFiles.length,
       customTemplateFiles: customTemplateFiles.length
@@ -116,6 +121,7 @@ export async function buildImportPlan(sourceRoot) {
     mimeTypes,
     entityReplacements,
     smileyMappings,
+    acronymMappings,
     wordblockPatterns,
     customLanguageFiles,
     customTemplateFiles
@@ -338,6 +344,12 @@ on conflict(id) do update set
 
   for (const entry of plan.smileyMappings) {
     statements.push(metadataStatement("config", "smileys", entry.token, entry, plan.generatedAt));
+  }
+
+  for (const entry of plan.acronymMappings) {
+    statements.push(
+      metadataStatement("config", "acronyms", entry.acronym, entry, plan.generatedAt)
+    );
   }
 
   for (const entry of plan.wordblockPatterns) {
@@ -1190,6 +1202,31 @@ export async function discoverSmileyMappings(files) {
   }
 
   return [...entries.values()].sort((a, b) => a.token.localeCompare(b.token));
+}
+
+export async function discoverAcronymMappings(files) {
+  const entries = new Map();
+
+  for (const file of files) {
+    const text = await readTextIfExists(file);
+    if (!text) continue;
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const match = line.match(/^(\S+)\s+(.+)$/);
+      if (!match) continue;
+
+      entries.set(match[1], {
+        acronym: match[1],
+        title: match[2],
+        source: path.basename(file)
+      });
+    }
+  }
+
+  return [...entries.values()].sort((a, b) => a.acronym.localeCompare(b.acronym));
 }
 
 function decodeConfigEntities(value) {

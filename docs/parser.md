@@ -45,7 +45,8 @@ fresh render.
 - file blocks with filename download links through `export_code`
 - nowiki spans
 - simple tables
-- acronym, typography, imported entity, and imported smiley replacement
+- imported acronym, entity, and smiley replacement
+- typography replacement
 - optional CamelCase links
 - section edit anchors
 - DokuWiki-template link classes for internal, external, interwiki, mail, media,

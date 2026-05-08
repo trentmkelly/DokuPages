@@ -102,6 +102,11 @@ describe("DokuWiki import planner", () => {
     await writeFile(path.join(root, "conf/entities.local.conf"), "(c) COPY\n?? ‽\n");
     await writeFile(path.join(root, "conf/smileys.conf"), ":-) smile.svg\nLOL lol.svg\n");
     await writeFile(path.join(root, "conf/smileys.local.conf"), ":-) custom.svg\n");
+    await writeFile(
+      path.join(root, "conf/acronyms.conf"),
+      "API Application Programming Interface\nHTML HyperText Markup Language\n"
+    );
+    await writeFile(path.join(root, "conf/acronyms.local.conf"), "API Custom API\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
     await writeFile(
       path.join(root, "conf/lang/en/lang.php"),
@@ -134,6 +139,7 @@ describe("DokuWiki import planner", () => {
       mimeTypes: 2,
       entityReplacements: 3,
       smileyMappings: 2,
+      acronymMappings: 2,
       wordblockPatterns: 2,
       customLanguageFiles: 2,
       customTemplateFiles: 2
@@ -326,6 +332,10 @@ describe("DokuWiki import planner", () => {
       { token: ":-)", filename: "custom.svg", source: "smileys.local.conf" },
       { token: "LOL", filename: "lol.svg", source: "smileys.conf" }
     ]);
+    expect(plan.acronymMappings).toEqual([
+      { acronym: "API", title: "Custom API", source: "acronyms.local.conf" },
+      { acronym: "HTML", title: "HyperText Markup Language", source: "acronyms.conf" }
+    ]);
     expect(plan.wordblockPatterns).toEqual([
       { id: "wordblock:1", pattern: "zoosex" },
       { id: "wordblock:2", pattern: "wow gold" }
@@ -480,6 +490,7 @@ describe("DokuWiki import planner", () => {
     await writeFile(path.join(root, "conf/mime.local.conf"), "foo text/x-foo\n");
     await writeFile(path.join(root, "conf/entities.local.conf"), "?? ‽\n");
     await writeFile(path.join(root, "conf/smileys.local.conf"), ":-) custom.svg\n");
+    await writeFile(path.join(root, "conf/acronyms.local.conf"), "API Custom API\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "spam phrase\n");
     await writeFile(path.join(root, "conf/lang/en/lang.php"), "<?php\n$lang['btn_save']='Save';\n");
     await writeFile(path.join(root, "lib/tpl/custom/main.php"), "<?php echo tpl_content();\n");
@@ -515,6 +526,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'??'");
     expect(sql).toContain("'smileys'");
     expect(sql).toContain('"filename":"custom.svg"');
+    expect(sql).toContain("'acronyms'");
+    expect(sql).toContain('"title":"Custom API"');
     expect(sql).toContain("'wordblock'");
     expect(sql).toContain("'wordblock:1'");
     expect(sql).toContain("insert or replace into changelog");

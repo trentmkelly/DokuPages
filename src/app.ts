@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 22;
+const RENDER_CACHE_VERSION = 23;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1068,6 +1068,7 @@ async function handlePagePreview(
   const config = getRuntimeConfig(env);
   const entityReplacements = await entityReplacementsForRender(env);
   const smileys = await smileysForRender(env);
+  const acronyms = await acronymsForRender(env);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
@@ -1079,6 +1080,7 @@ async function handlePagePreview(
     existingPageIds,
     entityReplacements,
     smileys,
+    acronyms,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2608,12 +2610,14 @@ async function renderPageHtml(
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const entityReplacements = await entityReplacementsForRender(env);
   const smileys = await smileysForRender(env);
+  const acronyms = await acronymsForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
     existingPageIds,
     entityReplacements,
     smileys,
+    acronyms,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2673,11 +2677,13 @@ async function renderPageExport(
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const entityReplacements = await entityReplacementsForRender(env);
   const smileys = await smileysForRender(env);
+  const acronyms = await acronymsForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
     entityReplacements,
     smileys,
+    acronyms,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2784,6 +2790,24 @@ async function smileysForRender(env: Env): Promise<Record<string, string> | unde
     : undefined;
 }
 
+async function acronymsForRender(env: Env): Promise<Record<string, string> | undefined> {
+  const result = await env.DB.prepare(
+    `select value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?`
+  )
+    .bind("config", "acronyms")
+    .all<{ value_json: string }>();
+  const entries = result.results
+    .map((row) => parseAcronymMetadata(row.value_json))
+    .filter((entry): entry is { acronym: string; title: string } => Boolean(entry));
+
+  return entries.length > 0
+    ? Object.fromEntries(entries.map((entry) => [entry.acronym, entry.title]))
+    : undefined;
+}
+
 function parseEntityMetadata(
   value: string
 ): { token: string; replacement: string; order: number } | null {
@@ -2811,6 +2835,16 @@ function parseSmileyMetadata(value: string): { token: string; filename: string }
     const parsed = JSON.parse(value) as { token?: unknown; filename?: unknown };
     if (typeof parsed.token !== "string" || typeof parsed.filename !== "string") return null;
     return { token: parsed.token, filename: parsed.filename };
+  } catch {
+    return null;
+  }
+}
+
+function parseAcronymMetadata(value: string): { acronym: string; title: string } | null {
+  try {
+    const parsed = JSON.parse(value) as { acronym?: unknown; title?: unknown };
+    if (typeof parsed.acronym !== "string" || typeof parsed.title !== "string") return null;
+    return { acronym: parsed.acronym, title: parsed.title };
   } catch {
     return null;
   }

@@ -144,6 +144,7 @@ describe("renderWikiText", () => {
 
   it("renders default DokuWiki acronyms after smileys", () => {
     const rendered = renderWikiText("HTML FOSS TL;DR specification spec LOL wordHTML %%HTML%%");
+    const custom = renderWikiText("API HTML", { acronyms: { API: "Custom API" } });
 
     expect(rendered.html).toContain('<abbr title="HyperText Markup Language">HTML</abbr>');
     expect(rendered.html).toContain('<abbr title="Free &amp; Open-Source Software">FOSS</abbr>');
@@ -153,6 +154,8 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<img src="/images/smileys/lol.svg"');
     expect(rendered.html).toContain("wordHTML");
     expect(rendered.html).toContain("HTML</p>");
+    expect(custom.html).toContain('<abbr title="Custom API">API</abbr>');
+    expect(custom.html).toContain("HTML</p>");
   });
 
   it("renders internal links, external links, and media embeds", () => {
