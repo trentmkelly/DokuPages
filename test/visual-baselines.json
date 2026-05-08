@@ -8,8 +8,8 @@
         "width": 1280,
         "height": 900
       },
-      "byteLength": 131569,
-      "sha256": "c213a16a3a6ef1698c2778722c6ec674eff9dd0ea7f27210a936fa3f6c9419ec"
+      "byteLength": 135321,
+      "sha256": "d86fc28c18c3768641ebdcf1d1decc16e9792febf6f2a1343f436ec96b749284"
     },
     {
       "name": "welcome-mobile",
@@ -28,8 +28,8 @@
         "width": 1024,
         "height": 768
       },
-      "byteLength": 46717,
-      "sha256": "fd48207e00000fe484a6028ca3e8cac0882e652cd54536607a94df21996d60c3"
+      "byteLength": 46994,
+      "sha256": "5fb1434f6fc8dadace42772eecd646ca1fec65185ae236be2fcc17afaf9e6169"
     }
   ]
 }
