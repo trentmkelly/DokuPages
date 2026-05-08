@@ -48,6 +48,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/robots.txt`                                       | Serves robots policy with sitemap pointer.                         |
 | `/lib/exe/fetch.php?media=<media>`                  | Redirects to `/media/<media>`.                                     |
 | `/lib/exe/detail.php?id=<media>`                    | Redirects to `/media-detail/<media>`.                              |
+| `/media-detail/<media>?mediado=diff`                | Serves the native side-by-side media revision diff view.           |
 | `/lib/exe/mediamanager.php?ns=<namespace>`          | Redirects to `/media-manager`.                                     |
 | `/lib/exe/ajax.php?call=qsearch`                    | Serves native quick search markup.                                 |
 | `/lib/exe/ajax.php?call=suggestions`                | Serves DokuWiki-compatible suggestion JSON.                        |

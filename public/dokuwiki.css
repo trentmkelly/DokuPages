@@ -1001,6 +1001,25 @@ form.search button {
   border-width: 0;
 }
 
+.dokuwiki .diffoptions {
+  margin-bottom: 1em;
+}
+
+.dokuwiki .diffoptions form {
+  float: left;
+}
+
+.dokuwiki .diffoptions p {
+  float: right;
+  margin: 0;
+}
+
+.dokuwiki .diffoptions::after {
+  display: block;
+  clear: both;
+  content: "";
+}
+
 .dokuwiki table.diff th,
 .dokuwiki table.diff td {
   padding: 0.15em 0.35em;
@@ -1055,6 +1074,21 @@ form.search button {
 .dokuwiki table.diff td.diff-addedline ins,
 .dokuwiki table.diff td.diff-deletedline del {
   color: #000;
+}
+
+.dokuwiki table.media_diff {
+  width: 100%;
+}
+
+.dokuwiki table.media_diff th,
+.dokuwiki table.media_diff td {
+  width: 50%;
+  vertical-align: top;
+}
+
+.dokuwiki table.media_diff img.media {
+  max-width: 100%;
+  height: auto;
 }
 
 #dokuwiki__detail {

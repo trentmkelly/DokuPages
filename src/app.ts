@@ -2365,6 +2365,10 @@ async function renderMediaDetailPage(
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
   if (denied) return denied;
 
+  if (url.searchParams.get("mediado") === "diff" || url.searchParams.get("do") === "diff") {
+    return renderMediaDiffPage(env, id, media, url, principal);
+  }
+
   const preview = media.mimeType.startsWith("image/")
     ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}" loading="lazy" decoding="async"></a></p>`
     : `<p><a href="${mediaPath(id)}">Download ${escapeHtml(mediaName(id))}</a></p>`;
@@ -2405,6 +2409,200 @@ async function renderMediaDetailPage(
     </div>`,
     { principal }
   );
+}
+
+interface MediaDiffSide {
+  revisionId: string;
+  mediaId: string;
+  mimeType: string;
+  byteLength: number;
+  contentHash: string;
+  createdAt: string;
+  summary: string;
+  isCurrent: boolean;
+}
+
+interface MediaDiffPair {
+  left: MediaDiffSide;
+  right: MediaDiffSide;
+}
+
+async function renderMediaDiffPage(
+  env: Env,
+  id: string,
+  current: CurrentMedia,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<string> {
+  const pair = await resolveMediaDiffPair(env, id, current, url);
+  if (!pair) {
+    return htmlShell(env, "Media diff not found", "<p>Media diff source not found.</p>", {
+      principal
+    });
+  }
+
+  return htmlShell(
+    env,
+    `Media diff for ${id}`,
+    `<h1>Media diff</h1>
+    ${renderMediaDiffOptions(id, pair, mediaDiffType(url))}
+    <div id="mediamanager__diff">
+      <table class="media_diff">
+        <thead>
+          <tr>
+            <th>${renderMediaDiffTitle(pair.left)}</th>
+            <th>${renderMediaDiffTitle(pair.right)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="image">
+            <td>${renderMediaDiffPreview(pair.left)}</td>
+            <td>${renderMediaDiffPreview(pair.right)}</td>
+          </tr>
+          <tr>
+            <td>${renderMediaDiffMetadata(pair.left)}</td>
+            <td>${renderMediaDiffMetadata(pair.right)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`,
+    { principal }
+  );
+}
+
+async function resolveMediaDiffPair(
+  env: Env,
+  id: string,
+  current: CurrentMedia,
+  url: URL
+): Promise<MediaDiffPair | null> {
+  const requested = pageDiffRevisionRequest(url);
+
+  if (!requested) {
+    const revisions = await listMediaRevisions(env.DB, id, 2);
+    if (revisions.length < 2) return null;
+    return {
+      left: mediaRevisionDiffSide(revisions[1], current.currentRevisionId === revisions[1].id),
+      right: currentMediaDiffSide(current)
+    };
+  }
+
+  const leftRevision = await mediaDiffSourceForRevision(env, current, requested.left);
+  const rightSource = requested.right
+    ? await mediaDiffSourceForRevision(env, current, requested.right)
+    : current;
+  if (
+    !leftRevision ||
+    !rightSource ||
+    getComparableMediaId(leftRevision) !== id ||
+    getComparableMediaId(rightSource) !== id
+  ) {
+    return null;
+  }
+
+  const left =
+    "currentRevisionId" in leftRevision
+      ? currentMediaDiffSide(leftRevision)
+      : mediaRevisionDiffSide(leftRevision, current.currentRevisionId === leftRevision.id);
+  const right =
+    "currentRevisionId" in rightSource
+      ? currentMediaDiffSide(rightSource)
+      : mediaRevisionDiffSide(rightSource, current.currentRevisionId === rightSource.id);
+
+  if (left.revisionId === right.revisionId) return null;
+
+  return new Date(left.createdAt).getTime() <= new Date(right.createdAt).getTime()
+    ? { left, right }
+    : { left: right, right: left };
+}
+
+async function mediaDiffSourceForRevision(
+  env: Env,
+  current: CurrentMedia,
+  revisionId: string
+): Promise<CurrentMedia | MediaRevision | null> {
+  return revisionId === current.currentRevisionId ? current : getMediaRevision(env.DB, revisionId);
+}
+
+function mediaDiffType(url: URL): "both" | "opacity" | "portions" {
+  const value = url.searchParams.get("difftype");
+  return value === "opacity" || value === "portions" ? value : "both";
+}
+
+function mediaRevisionDiffSide(revision: MediaRevision, isCurrent: boolean): MediaDiffSide {
+  return {
+    revisionId: revision.id,
+    mediaId: revision.mediaId,
+    mimeType: revision.mimeType,
+    byteLength: revision.byteLength,
+    contentHash: revision.contentHash,
+    createdAt: revision.createdAt,
+    summary: revision.summary,
+    isCurrent
+  };
+}
+
+function currentMediaDiffSide(media: CurrentMedia): MediaDiffSide {
+  return {
+    revisionId: media.currentRevisionId ?? media.id,
+    mediaId: media.id,
+    mimeType: media.mimeType,
+    byteLength: media.byteLength,
+    contentHash: media.contentHash,
+    createdAt: media.updatedAt,
+    summary: "Current media",
+    isCurrent: true
+  };
+}
+
+function renderMediaDiffOptions(
+  id: string,
+  pair: MediaDiffPair,
+  diffType: "both" | "opacity" | "portions"
+): string {
+  return `<div class="diffoptions group">
+    <form id="mediamanager__form_diffview" class="diffView" method="get" action="${mediaDetailPath(id)}">
+      <input type="hidden" name="mediado" value="diff">
+      <input type="hidden" name="rev2[0]" value="${escapeAttribute(pair.left.revisionId)}">
+      <input type="hidden" name="rev2[1]" value="${escapeAttribute(pair.right.revisionId)}">
+      <label for="media__difftype">View differences:</label>
+      <select id="media__difftype" name="difftype" class="quickselect">
+        <option value="both"${diffType === "both" ? " selected" : ""}>Side by Side</option>
+        <option value="opacity"${diffType === "opacity" ? " selected" : ""}>Shine-through</option>
+        <option value="portions"${diffType === "portions" ? " selected" : ""}>Swipe</option>
+      </select>
+      <button type="submit">Go</button>
+    </form>
+  </div>`;
+}
+
+function renderMediaDiffTitle(side: MediaDiffSide): string {
+  const label = side.isCurrent ? `Current media (${side.createdAt})` : side.createdAt;
+  const summary = side.summary ? ` <span class="sum"> - ${escapeHtml(side.summary)}</span>` : "";
+  return `<a href="${mediaDiffSideUrl(side)}">${escapeHtml(label)}</a>${summary}`;
+}
+
+function renderMediaDiffPreview(side: MediaDiffSide): string {
+  const url = mediaDiffSideUrl(side);
+  if (side.mimeType.startsWith("image/")) {
+    return `<a href="${url}"><img class="media" src="${url}" alt="${escapeAttribute(mediaName(side.mediaId))}" loading="lazy" decoding="async"></a>`;
+  }
+
+  return `<a href="${url}">Download ${escapeHtml(mediaName(side.mediaId))}</a>`;
+}
+
+function mediaDiffSideUrl(side: MediaDiffSide): string {
+  return side.isCurrent
+    ? mediaPath(side.mediaId)
+    : `${mediaPath(side.mediaId)}?rev=${encodeURIComponent(side.revisionId)}`;
+}
+
+function renderMediaDiffMetadata(side: MediaDiffSide): string {
+  return `<dl class="img_tags">
+    <dt>MIME type</dt><dd>${escapeHtml(side.mimeType)}</dd>
+    <dt>Size</dt><dd>${escapeHtml(formatMediaByteLength(side.byteLength))}</dd>
+    <dt>Hash</dt><dd><code>${escapeHtml(side.contentHash)}</code></dd>
+  </dl>`;
 }
 
 async function renderMediaManagerPage(
@@ -3555,37 +3753,175 @@ async function renderRevisionsPage(env: Env, id: string, url: URL): Promise<stri
 }
 
 async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
-  const rev = url.searchParams.get("rev");
-  const rev2 = url.searchParams.get("rev2");
-
-  if (!rev) {
-    return htmlShell(env, "Missing revision", "<p>Missing revision.</p>");
-  }
-
-  const left = await getPageRevision(env.DB, rev);
-  const right = rev2 ? await getPageRevision(env.DB, rev2) : await getCurrentPage(env.DB, id);
-
-  if (!left || !right || left.pageId !== id || getComparablePageId(right) !== id) {
+  const pair = await resolvePageDiffPair(env, id, url);
+  if (!pair) {
     return htmlShell(env, "Diff not found", "<p>Diff source not found.</p>");
   }
 
-  const rows = renderLineDiff(left.content, right.content);
+  const diffType = pageDiffType(url);
+  const rows =
+    diffType === "inline"
+      ? renderInlineDiffRows(pair.left.content, pair.right.content)
+      : renderLineDiff(pair.left.content, pair.right.content);
+  const header =
+    diffType === "inline"
+      ? `<tr>
+          <th class="diff-lineheader">-</th>
+          <th>${renderPageDiffTitle(pair.left)}</th>
+        </tr>
+        <tr>
+          <th class="diff-lineheader">+</th>
+          <th>${renderPageDiffTitle(pair.right)}</th>
+        </tr>`
+      : `<tr>
+          <th colspan="2">${renderPageDiffTitle(pair.left)}</th>
+          <th colspan="2">${renderPageDiffTitle(pair.right)}</th>
+        </tr>`;
 
   return htmlShell(
     env,
     `Diff for ${id}`,
     `<h1>Diff for ${escapeHtml(id)}</h1>
-    <table class="diff diff_sidebyside">
+    ${renderPageDiffOptions(id, pair, diffType)}
+    <table class="diff diff_${diffType}">
       <thead>
-        <tr>
-          <th colspan="2"><a href="${pagePath(id)}?rev=${encodeURIComponent(left.id)}">${escapeHtml(left.createdAt)}</a></th>
-          <th colspan="2">${"revisionId" in right ? "Current revision" : escapeHtml(right.createdAt)}</th>
-        </tr>
+        ${header}
       </thead>
       <tbody>${rows}</tbody>
     </table>`,
     { pageId: id }
   );
+}
+
+interface PageDiffSide {
+  revisionId: string;
+  pageId: string;
+  content: string;
+  createdAt: string;
+  label: string;
+  summary: string;
+  changeType: string;
+  isCurrent: boolean;
+}
+
+interface PageDiffPair {
+  left: PageDiffSide;
+  right: PageDiffSide;
+}
+
+async function resolvePageDiffPair(env: Env, id: string, url: URL): Promise<PageDiffPair | null> {
+  const requested = pageDiffRevisionRequest(url);
+  const current = await getCurrentPage(env.DB, id);
+
+  if (!requested) {
+    const revisions = await listPageRevisions(env.DB, id, 2, 0);
+    if (!current || revisions.length < 2) return null;
+    return {
+      left: pageRevisionDiffSide(revisions[1], false),
+      right: currentPageDiffSide(current)
+    };
+  }
+
+  const leftRevision = await getPageRevision(env.DB, requested.left);
+  const rightSource = requested.right ? await getPageRevision(env.DB, requested.right) : current;
+
+  if (
+    !leftRevision ||
+    !rightSource ||
+    leftRevision.pageId !== id ||
+    getComparablePageId(rightSource) !== id
+  ) {
+    return null;
+  }
+
+  const left = pageRevisionDiffSide(leftRevision, current?.revisionId === leftRevision.id);
+  const right =
+    "revisionId" in rightSource
+      ? currentPageDiffSide(rightSource)
+      : pageRevisionDiffSide(rightSource, current?.revisionId === rightSource.id);
+
+  if (left.revisionId === right.revisionId) return null;
+
+  return new Date(left.createdAt).getTime() <= new Date(right.createdAt).getTime()
+    ? { left, right }
+    : { left: right, right: left };
+}
+
+function pageDiffRevisionRequest(url: URL): { left: string; right: string | null } | null {
+  const rev2Left = url.searchParams.get("rev2[0]");
+  const rev2Right = url.searchParams.get("rev2[1]");
+  if (rev2Left && rev2Right) {
+    return { left: rev2Left, right: rev2Right };
+  }
+
+  const rev = url.searchParams.get("rev");
+  if (!rev) return null;
+
+  return {
+    left: rev,
+    right: url.searchParams.get("rev2")
+  };
+}
+
+function pageDiffType(url: URL): "sidebyside" | "inline" {
+  return url.searchParams.get("difftype") === "inline" ? "inline" : "sidebyside";
+}
+
+function pageRevisionDiffSide(revision: PageRevision, isCurrent: boolean): PageDiffSide {
+  return {
+    revisionId: revision.id,
+    pageId: revision.pageId,
+    content: revision.content,
+    createdAt: revision.createdAt,
+    label: revision.createdAt,
+    summary: revision.summary,
+    changeType: revision.changeType,
+    isCurrent
+  };
+}
+
+function currentPageDiffSide(page: CurrentPage): PageDiffSide {
+  return {
+    revisionId: page.revisionId,
+    pageId: page.id,
+    content: page.content,
+    createdAt: page.updatedAt,
+    label: "Current revision",
+    summary: "",
+    changeType: "edit",
+    isCurrent: true
+  };
+}
+
+function renderPageDiffTitle(side: PageDiffSide): string {
+  const label = side.isCurrent
+    ? `${escapeHtml(side.label)} (${escapeHtml(side.createdAt)})`
+    : `<a href="${pagePath(side.pageId)}?rev=${encodeURIComponent(side.revisionId)}">${escapeHtml(side.label)}</a>`;
+  const summary = side.summary ? ` <span class="sum"> - ${escapeHtml(side.summary)}</span>` : "";
+  return `${label}${summary}`;
+}
+
+function renderPageDiffOptions(
+  id: string,
+  pair: PageDiffPair,
+  diffType: "sidebyside" | "inline"
+): string {
+  const exactUrl = `${pagePath(id)}?do=diff&rev2%5B0%5D=${encodeURIComponent(pair.left.revisionId)}&rev2%5B1%5D=${encodeURIComponent(pair.right.revisionId)}&difftype=${diffType}`;
+
+  return `<div class="diffoptions group">
+    <form method="get" action="${pagePath(id)}">
+      <input type="hidden" name="do" value="diff">
+      <input type="hidden" name="rev2[0]" value="${escapeAttribute(pair.left.revisionId)}">
+      <input type="hidden" name="rev2[1]" value="${escapeAttribute(pair.right.revisionId)}">
+      <label for="diff__type">View differences:</label>
+      <select id="diff__type" name="difftype" class="quickselect">
+        <option value="sidebyside"${diffType === "sidebyside" ? " selected" : ""}>Side by Side</option>
+        <option value="inline"${diffType === "inline" ? " selected" : ""}>Inline</option>
+      </select>
+      <button type="submit" name="do[diff]" value="1">Go</button>
+    </form>
+    <p><a href="${escapeAttribute(exactUrl)}">Link to this comparison view</a></p>
+  </div>`;
 }
 
 async function renderRevertPage(
@@ -7326,6 +7662,47 @@ function renderLineDiff(left: string, right: string): string {
       <td class="diff-lineheader">${index + 1}</td>
       <td class="${changed ? "diff-addedline" : "diff-context"}">${changed ? `<ins>${escapeHtml(newLine)}</ins>` : escapeHtml(newLine)}</td>
     </tr>`);
+  }
+
+  return rows.join("");
+}
+
+function renderInlineDiffRows(left: string, right: string): string {
+  const oldLines = left.split("\n");
+  const newLines = right.split("\n");
+  const max = Math.max(oldLines.length, newLines.length);
+  const rows: string[] = [];
+
+  for (let index = 0; index < max; index += 1) {
+    const oldLine = oldLines[index] ?? "";
+    const newLine = newLines[index] ?? "";
+    if (oldLine === newLine) {
+      rows.push(
+        `<tr>
+          <td class="diff-lineheader"> </td>
+          <td class="diff-context">${escapeHtml(oldLine)}</td>
+        </tr>`
+      );
+      continue;
+    }
+
+    if (oldLine) {
+      rows.push(
+        `<tr>
+          <td class="diff-lineheader">-</td>
+          <td class="diff-deletedline"><del>${escapeHtml(oldLine)}</del></td>
+        </tr>`
+      );
+    }
+
+    if (newLine) {
+      rows.push(
+        `<tr>
+          <td class="diff-lineheader">+</td>
+          <td class="diff-addedline"><ins>${escapeHtml(newLine)}</ins></td>
+        </tr>`
+      );
+    }
   }
 
   return rows.join("");

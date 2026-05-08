@@ -7,6 +7,9 @@ of full PHP DokuWiki runtime compatibility.
 
 - DokuWiki-compatible page and media IDs, namespaces, and route redirects for the implemented route surface.
 - Page view, source, edit, preview, save, delete-by-empty-content, revision list, diff, and revert workflows.
+- Page diffs support current/previous defaults, explicit `rev2[...]`
+  comparisons, side-by-side and inline output, and DokuWiki-style diff option
+  forms. Media detail pages provide a native side-by-side media revision diff.
 - Anonymous and D1-backed native user sessions with imported `authplain` users,
   groups, native registration, profile updates, password changes, and emailed
   password resets.

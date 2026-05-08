@@ -1040,6 +1040,10 @@ describe("handleRequest", () => {
       new Request("https://example.com/media-detail/wiki/logo.svg"),
       env
     );
+    const mediaDiff = await handleRequest(
+      new Request("https://example.com/media-detail/wiki/logo.svg?mediado=diff&rev=media-rev-1"),
+      env
+    );
     const manager = await handleRequest(
       new Request("https://example.com/media-manager?ns=wiki"),
       env
@@ -1066,6 +1070,12 @@ describe("handleRequest", () => {
     expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
     await expect(detail.text()).resolves.toContain("Media detail");
+    const mediaDiffHtml = await mediaDiff.text();
+    expect(mediaDiff.status).toBe(200);
+    expect(mediaDiffHtml).toContain("Media diff");
+    expect(mediaDiffHtml).toContain('id="mediamanager__diff"');
+    expect(mediaDiffHtml).toContain("media-rev-1");
+    expect(mediaDiffHtml).toContain("media-rev-current");
     const managerHtml = await manager.text();
     expect(managerHtml).toContain('id="media__manager"');
     expect(managerHtml).toContain('id="mediamgr__aside"');
@@ -2030,10 +2040,43 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("Diff for wiki:welcome");
     expect(html).toContain('class="diff diff_sidebyside"');
+    expect(html).toContain('name="rev2[0]"');
+    expect(html).toContain("Link to this comparison view");
     expect(html).toContain('class="diff-deletedline"');
     expect(html).toContain('class="diff-addedline"');
     expect(html).toContain("<del>Older page.</del>");
     expect(html).toContain("<ins>Imported page.</ins>");
+
+    const inline = await handleRequest(
+      new Request(
+        "https://example.com/wiki/wiki/welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z&difftype=inline"
+      ),
+      env
+    );
+    const inlineHtml = await inline.text();
+    expect(inline.status).toBe(200);
+    expect(inlineHtml).toContain('class="diff diff_inline"');
+    expect(inlineHtml).toContain('<td class="diff-lineheader">-</td>');
+    expect(inlineHtml).toContain('<td class="diff-lineheader">+</td>');
+
+    const reversed = await handleRequest(
+      new Request(
+        "https://example.com/wiki/wiki/welcome?do=diff&rev2%5B0%5D=wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z&rev2%5B1%5D=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z"
+      ),
+      env
+    );
+    const reversedHtml = await reversed.text();
+    expect(reversed.status).toBe(200);
+    expect(reversedHtml.indexOf("2026-05-06T00:00:00.000Z")).toBeLessThan(
+      reversedHtml.indexOf("2026-05-07T00:00:00.000Z")
+    );
+
+    const latest = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=diff"),
+      env
+    );
+    expect(latest.status).toBe(200);
+    await expect(latest.text()).resolves.toContain("Diff for wiki:welcome");
   });
 
   it("renders a revert form for an old page revision", async () => {
