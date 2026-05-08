@@ -1104,6 +1104,10 @@ form.search button {
   background-image: url("/images/pagetools/04_show.png");
 }
 
+#dokuwiki__pagetools .subscribe span.icon {
+  background-image: url("/images/pagetools/04_show.png");
+}
+
 #dokuwiki__pagetools .top span.icon {
   background-image: url("/images/pagetools/10_top.png");
 }

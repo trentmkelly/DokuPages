@@ -18,6 +18,10 @@ npm run test:e2e -- --base-url https://dokutest.pages.dev
 `test/email.test.mjs` covers the Resend-compatible adapter, disabled-provider
 behavior, provider failure logging, and escaped notification templates.
 
+`test/auth-routes.test.mjs` covers registration, password reset, subscription
+updates, immediate page-change notification delivery, and scheduled digest
+delivery.
+
 CI runs `npm run audit`, which maps to `npm audit --audit-level=high`, on every push and pull request.
 CI also runs `npm run scan:secrets`, which scans tracked files for high-signal private keys and service tokens.
 

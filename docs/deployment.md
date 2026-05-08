@@ -35,6 +35,8 @@ Optional Pages environment variables:
 - `EMAIL_RETURN_PATH`: optional fixed return-path header value.
 - `EMAIL_BASE_URL`: optional public base URL for email links.
 - `EMAIL_REGISTRATION_NOTIFY`: optional comma-separated registration notification recipients.
+- `EMAIL_TASK_TOKEN`: bearer token required by the scheduled email digest
+  endpoint.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.
@@ -135,6 +137,18 @@ After deployment:
 
 ```sh
 npm run test:e2e -- --base-url https://dokutest.pages.dev
+```
+
+When email digests are enabled, schedule an authenticated POST to the digest
+task endpoint. Run the default daily task from a daily schedule, and run the
+weekly interval from a weekly schedule:
+
+```sh
+curl -X POST https://dokutest.pages.dev/api/tasks/email-digests \
+  -H "Authorization: Bearer $EMAIL_TASK_TOKEN"
+
+curl -X POST 'https://dokutest.pages.dev/api/tasks/email-digests?interval=weekly' \
+  -H "Authorization: Bearer $EMAIL_TASK_TOKEN"
 ```
 
 ## Backup And Restore

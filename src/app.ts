@@ -2,7 +2,8 @@ import {
   anonymousPrincipal,
   principalAuthor,
   publicPrincipal,
-  type AuthPrincipal
+  type AuthPrincipal,
+  type PrincipalAuthor
 } from "./auth/principal";
 import { resolveRequestPrincipal } from "./auth/request";
 import {
@@ -16,7 +17,9 @@ import {
 import { hashPassword } from "./auth/password";
 import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import {
+  digestEmail,
   emailConfig,
+  pageChangeEmail,
   passwordResetEmail,
   registrationNotificationEmail,
   sendWikiEmail
@@ -331,6 +334,14 @@ export async function handleRequest(
     return handleProfileUpdate(request, env, principal);
   }
 
+  if (url.pathname === "/api/subscriptions" && request.method === "POST") {
+    return handleSubscriptionUpdate(request, env, principal);
+  }
+
+  if (url.pathname === "/api/tasks/email-digests" && request.method === "POST") {
+    return handleEmailDigestTask(request, env);
+  }
+
   if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
     const csrf = csrfContext(request);
     const page = renderAdminDashboardPage(request, env, principal, csrf.token);
@@ -591,6 +602,12 @@ export async function handleRequest(
 
     if (url.searchParams.get("do") === "profile") {
       return redirectResponse("/profile", 302);
+    }
+
+    if (url.searchParams.get("do") === "subscribe") {
+      const csrf = csrfContext(request);
+      const page = await renderSubscriptionPage(request, env, principal, id, csrf.token);
+      return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
     }
 
     const unsupportedAccountAction = unsupportedAccountFeatureForAction(url.searchParams.get("do"));
@@ -2049,6 +2066,7 @@ function normalizeLegacyAction(action: string | null): string | null {
     case "diff":
     case "login":
     case "logout":
+    case "subscribe":
     case "export_raw":
     case "export_xhtml":
     case "export_xhtmlbody":
@@ -4160,6 +4178,73 @@ async function loginRateLimitResponse(
   );
 }
 
+async function handleSubscriptionUpdate(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  if (principal.type !== "user") {
+    return accountLoginRequiredResponse(request, env, "/");
+  }
+
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  const subjectType = String(form.get("subjectType") ?? "");
+  const subjectId = cleanPageId(String(form.get("subjectId") ?? ""));
+  const digestInterval = normalizeDigestInterval(String(form.get("digestInterval") ?? ""));
+  const action = String(form.get("subscriptionAction") ?? "subscribe");
+  const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
+
+  if ((subjectType !== "page" && subjectType !== "namespace") || !subjectId) {
+    return jsonResponse({ error: "Invalid subscription subject." }, { status: 400 });
+  }
+
+  if (!digestInterval) {
+    return jsonResponse({ error: "Invalid digest interval." }, { status: 400 });
+  }
+
+  if (action === "unsubscribe") {
+    await deleteSubscription(env.DB, principal.id, subjectType, subjectId);
+  } else {
+    await upsertSubscription(env.DB, {
+      id: stableSubscriptionId(principal.id, subjectType, subjectId),
+      subjectType,
+      subjectId,
+      userId: principal.id,
+      digestInterval
+    });
+  }
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true });
+  }
+
+  return redirectResponse(returnTo);
+}
+
+async function handleEmailDigestTask(request: Request, env: Env): Promise<Response> {
+  const expectedToken = env.EMAIL_TASK_TOKEN?.trim();
+  if (!expectedToken) {
+    return jsonResponse({ error: "Email digest task token is not configured." }, { status: 503 });
+  }
+
+  const actualToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  if (!constantTimeEqual(actualToken, expectedToken)) {
+    return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const interval = normalizeDigestTaskInterval(url.searchParams.get("interval") ?? "daily");
+  if (!interval) {
+    return jsonResponse({ error: "Invalid digest interval." }, { status: 400 });
+  }
+
+  const result = await sendDueEmailDigests(request, env, interval);
+  return jsonResponse({ ok: true, interval, ...result });
+}
+
 async function readLoginFailureCount(
   request: Request,
   env: Env,
@@ -4674,6 +4759,41 @@ interface PasswordResetTokenRow {
   used_at: string | null;
 }
 
+type DigestInterval = "immediate" | "daily" | "weekly";
+type DigestTaskInterval = "daily" | "weekly" | "all";
+
+interface SubscriptionRecord {
+  id: string;
+  subjectType: "page" | "namespace";
+  subjectId: string;
+  userId: string;
+  digestInterval: DigestInterval;
+  createdAt?: string;
+}
+
+interface SubscriptionRecipient {
+  id: string;
+  subjectType: "page" | "namespace";
+  subjectId: string;
+  userId: string;
+  digestInterval: DigestInterval;
+  email: string;
+  username: string;
+  displayName: string;
+  createdAt: string;
+}
+
+interface EmailNotificationEventRecord {
+  id: string;
+  pageId: string;
+  revisionId: string;
+  changeType: string;
+  summary: string;
+  actorId: string | null;
+  actorName: string | null;
+  createdAt: string;
+}
+
 function parseRegistrationForm(
   form: FormData
 ):
@@ -4885,6 +5005,400 @@ function absoluteEmailUrl(env: Env, request: Request, path: string): string {
   return new URL(path, base.endsWith("/") ? base : `${base}/`).toString();
 }
 
+function normalizeDigestInterval(value: string): DigestInterval | null {
+  switch (value) {
+    case "immediate":
+    case "daily":
+    case "weekly":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeDigestTaskInterval(value: string): DigestTaskInterval | null {
+  switch (value) {
+    case "daily":
+    case "weekly":
+    case "all":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function stableSubscriptionId(
+  userId: string,
+  subjectType: "page" | "namespace",
+  subjectId: string
+): string {
+  return `subscription:${encodeURIComponent(userId)}:${subjectType}:${encodeURIComponent(subjectId)}`;
+}
+
+async function upsertSubscription(db: D1Database, subscription: SubscriptionRecord): Promise<void> {
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `insert into subscriptions (
+         id, subject_type, subject_id, user_id, digest_interval, created_at
+       ) values (?, ?, ?, ?, ?, ?)
+       on conflict(id) do update set
+         digest_interval = excluded.digest_interval`
+    )
+    .bind(
+      subscription.id,
+      subscription.subjectType,
+      subscription.subjectId,
+      subscription.userId,
+      subscription.digestInterval,
+      subscription.createdAt ?? now
+    )
+    .run();
+}
+
+async function deleteSubscription(
+  db: D1Database,
+  userId: string,
+  subjectType: "page" | "namespace",
+  subjectId: string
+): Promise<void> {
+  const subscriptionId = stableSubscriptionId(userId, subjectType, subjectId);
+  await db
+    .prepare("delete from email_digest_deliveries where subscription_id = ?")
+    .bind(subscriptionId)
+    .run();
+  await db
+    .prepare("delete from subscriptions where id = ? and user_id = ?")
+    .bind(subscriptionId, userId)
+    .run();
+}
+
+async function listUserSubscriptions(
+  db: D1Database,
+  userId: string
+): Promise<SubscriptionRecord[]> {
+  const result = await db
+    .prepare(
+      `select id, subject_type, subject_id, user_id, digest_interval, created_at
+       from subscriptions
+       where user_id = ?
+       order by subject_type asc, subject_id asc`
+    )
+    .bind(userId)
+    .all<{
+      id: string;
+      subject_type: "page" | "namespace";
+      subject_id: string;
+      user_id: string;
+      digest_interval: DigestInterval;
+      created_at: string;
+    }>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    subjectType: row.subject_type,
+    subjectId: row.subject_id,
+    userId: row.user_id,
+    digestInterval: row.digest_interval,
+    createdAt: row.created_at
+  }));
+}
+
+async function recordAndSendPageChangeNotifications(
+  request: Request,
+  env: Env,
+  page: CurrentPage,
+  changeType: string,
+  summary: string,
+  actor: PrincipalAuthor
+): Promise<void> {
+  const event = await recordPageChangeEvent(env.DB, page, changeType, summary, actor);
+  const recipients = await listPageChangeRecipients(env.DB, page.id, actor.authorId, "immediate");
+  const siteName = getRuntimeConfig(env).siteName;
+
+  for (const recipient of recipients) {
+    const template = pageChangeEmail({
+      siteName,
+      pageId: page.id,
+      pageUrl: absoluteEmailUrl(env, request, pagePath(page.id)),
+      actorName: actor.authorName,
+      changeType,
+      summary
+    });
+    const result = await sendWikiEmail(env, {
+      kind: "page_change",
+      to: [recipient.email],
+      ...template,
+      idempotencyKey: `page-change:${event.id}:${recipient.id}`
+    });
+
+    if (result.ok) {
+      await markDigestDelivered(env.DB, recipient.id, event.id);
+    }
+  }
+}
+
+async function recordPageChangeEvent(
+  db: D1Database,
+  page: CurrentPage,
+  changeType: string,
+  summary: string,
+  actor: PrincipalAuthor
+): Promise<EmailNotificationEventRecord> {
+  const createdAt = page.updatedAt;
+  const event: EmailNotificationEventRecord = {
+    id: `email-event:${page.revisionId}`,
+    pageId: page.id,
+    revisionId: page.revisionId,
+    changeType,
+    summary,
+    actorId: actor.authorId,
+    actorName: actor.authorName,
+    createdAt
+  };
+
+  await db
+    .prepare(
+      `insert or ignore into email_notification_events (
+         id, subject_type, subject_id, revision_id, change_type, summary,
+         actor_id, actor_name, created_at
+       ) values (?, 'page', ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      event.id,
+      event.pageId,
+      event.revisionId,
+      event.changeType,
+      event.summary,
+      event.actorId,
+      event.actorName,
+      event.createdAt
+    )
+    .run();
+
+  return event;
+}
+
+async function listPageChangeRecipients(
+  db: D1Database,
+  pageId: string,
+  actorId: string | null,
+  interval: DigestInterval
+): Promise<SubscriptionRecipient[]> {
+  const namespace = pageId.includes(":") ? pageId.slice(0, pageId.lastIndexOf(":")) : "";
+  const result = await db
+    .prepare(
+      `select s.id, s.subject_type, s.subject_id, s.user_id, s.digest_interval, s.created_at,
+              u.username, u.display_name, u.email
+       from subscriptions s
+       join users u on u.id = s.user_id
+       where s.digest_interval = ?
+         and u.is_disabled = 0
+         and u.email is not null
+         and u.email <> ''
+         and (? is null or s.user_id <> ?)
+         and (
+           (s.subject_type = 'page' and s.subject_id = ?)
+           or
+           (s.subject_type = 'namespace' and (
+             s.subject_id = ? or ? like s.subject_id || ':%'
+           ))
+         )
+       order by s.created_at asc`
+    )
+    .bind(interval, actorId, actorId, pageId, namespace, pageId)
+    .all<{
+      id: string;
+      subject_type: "page" | "namespace";
+      subject_id: string;
+      user_id: string;
+      digest_interval: DigestInterval;
+      created_at: string;
+      username: string;
+      display_name: string;
+      email: string;
+    }>();
+
+  return result.results.map(mapSubscriptionRecipient);
+}
+
+async function sendDueEmailDigests(
+  request: Request,
+  env: Env,
+  interval: DigestTaskInterval
+): Promise<{ subscriptionsChecked: number; digestsSent: number; eventsDelivered: number }> {
+  const recipients = await listDigestRecipients(env.DB, interval);
+  let digestsSent = 0;
+  let eventsDelivered = 0;
+
+  for (const recipient of recipients) {
+    const events = await listUndeliveredDigestEvents(env.DB, recipient);
+    if (events.length === 0) continue;
+
+    const template = digestEmail({
+      siteName: getRuntimeConfig(env).siteName,
+      baseUrl: absoluteEmailUrl(env, request, "/"),
+      displayName: recipient.displayName || recipient.username,
+      events: events.map((event) => ({
+        pageId: event.pageId,
+        pageUrl: absoluteEmailUrl(env, request, pagePath(event.pageId)),
+        actorName: event.actorName,
+        changeType: event.changeType,
+        summary: event.summary,
+        createdAt: event.createdAt
+      }))
+    });
+    const result = await sendWikiEmail(env, {
+      kind: "digest",
+      to: [recipient.email],
+      ...template,
+      idempotencyKey: `digest:${recipient.id}:${events.at(-1)?.id ?? "none"}`
+    });
+
+    if (result.ok) {
+      digestsSent += 1;
+      eventsDelivered += events.length;
+      for (const event of events) {
+        await markDigestDelivered(env.DB, recipient.id, event.id);
+      }
+    }
+  }
+
+  return {
+    subscriptionsChecked: recipients.length,
+    digestsSent,
+    eventsDelivered
+  };
+}
+
+async function listDigestRecipients(
+  db: D1Database,
+  interval: DigestTaskInterval
+): Promise<SubscriptionRecipient[]> {
+  const result = await db
+    .prepare(
+      `select s.id, s.subject_type, s.subject_id, s.user_id, s.digest_interval, s.created_at,
+              u.username, u.display_name, u.email
+       from subscriptions s
+       join users u on u.id = s.user_id
+       where s.digest_interval in ('daily', 'weekly')
+         and (? = 'all' or s.digest_interval = ?)
+         and u.is_disabled = 0
+         and u.email is not null
+         and u.email <> ''
+       order by s.created_at asc`
+    )
+    .bind(interval, interval)
+    .all<{
+      id: string;
+      subject_type: "page" | "namespace";
+      subject_id: string;
+      user_id: string;
+      digest_interval: DigestInterval;
+      created_at: string;
+      username: string;
+      display_name: string;
+      email: string;
+    }>();
+
+  return result.results.map(mapSubscriptionRecipient);
+}
+
+async function listUndeliveredDigestEvents(
+  db: D1Database,
+  subscription: SubscriptionRecipient,
+  limit = 50
+): Promise<EmailNotificationEventRecord[]> {
+  const result = await db
+    .prepare(
+      `select e.id, e.subject_id, e.revision_id, e.change_type, e.summary,
+              e.actor_id, e.actor_name, e.created_at
+       from email_notification_events e
+       left join email_digest_deliveries d
+         on d.event_id = e.id and d.subscription_id = ?
+       where d.event_id is null
+         and e.created_at >= ?
+         and (
+           (? = 'page' and e.subject_id = ?)
+           or
+           (? = 'namespace' and (
+             e.subject_id = ? or e.subject_id like ? || ':%'
+           ))
+         )
+       order by e.created_at asc
+       limit ?`
+    )
+    .bind(
+      subscription.id,
+      subscription.createdAt,
+      subscription.subjectType,
+      subscription.subjectId,
+      subscription.subjectType,
+      subscription.subjectId,
+      subscription.subjectId,
+      limit
+    )
+    .all<{
+      id: string;
+      subject_id: string;
+      revision_id: string;
+      change_type: string;
+      summary: string;
+      actor_id: string | null;
+      actor_name: string | null;
+      created_at: string;
+    }>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    pageId: row.subject_id,
+    revisionId: row.revision_id,
+    changeType: row.change_type,
+    summary: row.summary,
+    actorId: row.actor_id,
+    actorName: row.actor_name,
+    createdAt: row.created_at
+  }));
+}
+
+async function markDigestDelivered(
+  db: D1Database,
+  subscriptionId: string,
+  eventId: string
+): Promise<void> {
+  await db
+    .prepare(
+      `insert or ignore into email_digest_deliveries (subscription_id, event_id, delivered_at)
+       values (?, ?, ?)`
+    )
+    .bind(subscriptionId, eventId, new Date().toISOString())
+    .run();
+}
+
+function mapSubscriptionRecipient(row: {
+  id: string;
+  subject_type: "page" | "namespace";
+  subject_id: string;
+  user_id: string;
+  digest_interval: DigestInterval;
+  created_at: string;
+  username: string;
+  display_name: string;
+  email: string;
+}): SubscriptionRecipient {
+  return {
+    id: row.id,
+    subjectType: row.subject_type,
+    subjectId: row.subject_id,
+    userId: row.user_id,
+    digestInterval: row.digest_interval,
+    createdAt: row.created_at,
+    username: row.username,
+    displayName: row.display_name,
+    email: row.email
+  };
+}
+
 function renderRegisterPage(
   env: Env,
   url: URL,
@@ -4988,6 +5502,78 @@ function renderPasswordResetCompletePage(env: Env, csrfToken: string): string {
     <p><a href="/login">Login</a></p>
     <form class="a11y" method="get" action="/login">${csrfInput(csrfToken)}</form>`
   );
+}
+
+async function renderSubscriptionPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  pageId: string,
+  csrfToken: string
+): Promise<string | Response> {
+  if (principal.type !== "user") {
+    return accountLoginRequiredResponse(request, env, `${pagePath(pageId)}?do=subscribe`);
+  }
+
+  const subscriptions = await listUserSubscriptions(env.DB, principal.id);
+  const namespace = pageId.includes(":") ? pageId.slice(0, pageId.lastIndexOf(":")) : pageId;
+  const pageSubscription = subscriptions.find(
+    (subscription) => subscription.subjectType === "page" && subscription.subjectId === pageId
+  );
+  const namespaceSubscription = subscriptions.find(
+    (subscription) =>
+      subscription.subjectType === "namespace" && subscription.subjectId === namespace
+  );
+
+  return htmlShell(
+    env,
+    "Subscriptions",
+    `<h1>Subscriptions</h1>
+    ${renderSubscriptionForm(pageId, "page", pageId, pageSubscription, csrfToken)}
+    ${renderSubscriptionForm(pageId, "namespace", namespace, namespaceSubscription, csrfToken)}`,
+    { pageId, principal }
+  );
+}
+
+function renderSubscriptionForm(
+  pageId: string,
+  subjectType: "page" | "namespace",
+  subjectId: string,
+  subscription: SubscriptionRecord | undefined,
+  csrfToken: string
+): string {
+  const label = subjectType === "page" ? `Page ${subjectId}` : `Namespace ${subjectId}`;
+  const action = subscription ? "Update subscription" : "Subscribe";
+
+  return `<section class="subscription">
+    <h2>${escapeHtml(label)}</h2>
+    <form method="post" action="/api/subscriptions">
+      ${csrfInput(csrfToken)}
+      <input type="hidden" name="returnTo" value="${escapeAttribute(`${pagePath(pageId)}?do=subscribe`)}">
+      <input type="hidden" name="subjectType" value="${subjectType}">
+      <input type="hidden" name="subjectId" value="${escapeAttribute(subjectId)}">
+      <label for="subscription__${subjectType}">Delivery</label>
+      <select id="subscription__${subjectType}" name="digestInterval">
+        ${renderDigestOption("immediate", "Immediate email", subscription?.digestInterval)}
+        ${renderDigestOption("daily", "Daily digest", subscription?.digestInterval)}
+        ${renderDigestOption("weekly", "Weekly digest", subscription?.digestInterval)}
+      </select>
+      <button type="submit" name="subscriptionAction" value="subscribe">${action}</button>
+      ${
+        subscription
+          ? '<button type="submit" name="subscriptionAction" value="unsubscribe">Unsubscribe</button>'
+          : ""
+      }
+    </form>
+  </section>`;
+}
+
+function renderDigestOption(
+  value: DigestInterval,
+  label: string,
+  selected?: DigestInterval
+): string {
+  return `<option value="${value}"${selected === value ? " selected" : ""}>${escapeHtml(label)}</option>`;
 }
 
 function renderLoginPage(
@@ -5202,7 +5788,8 @@ function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
     ? `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>
       <option value="${pagePath(pageId)}?do=source">Show source</option>
       <option value="${pagePath(pageId)}?do=revisions">Old revisions</option>
-      <option value="${pagePath(pageId)}?do=backlink">Backlinks</option>`
+      <option value="${pagePath(pageId)}?do=backlink">Backlinks</option>
+      <option value="${pagePath(pageId)}?do=subscribe">Subscribe</option>`
     : "";
   const accountOptions =
     principal?.type === "user"
@@ -5260,6 +5847,7 @@ function renderPageTools(pageId: string): string {
         <li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="Old revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>
         <li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="Backlinks"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>
         <li class="purge"><a href="${pagePath(pageId)}?do=purge" aria-label="Purge cache"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="subscribe"><a href="${pagePath(pageId)}?do=subscribe" aria-label="Manage subscriptions"><span class="label">Subscribe</span><span class="icon" aria-hidden="true"></span></a></li>
         <li class="top"><a href="#dokuwiki__top" aria-label="Back to top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
       </ul>
     </div>
@@ -5460,6 +6048,14 @@ async function handleSave(request: Request, env: Env, principal: AuthPrincipal):
   await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
   await deletePageDraft(env.DB, id);
   await releaseHeldPageLock(env, principal, id, lockToken);
+  await recordAndSendPageChangeNotifications(
+    request,
+    env,
+    result.page,
+    result.changeType,
+    summary,
+    author
+  );
 
   const response = redirectResponse(pagePath(id));
   response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
@@ -5748,6 +6344,14 @@ async function handleRevert(
 
   await purgePageCache(env, id, result.page.revisionId, new URL(request.url).origin);
   await releaseHeldPageLock(env, principal, id, lockToken);
+  await recordAndSendPageChangeNotifications(
+    request,
+    env,
+    result.page,
+    result.changeType,
+    String(form.get("summary") || "") || `Reverted to ${revision.createdAt}`,
+    author
+  );
 
   const response = redirectResponse(pagePath(id));
   response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));

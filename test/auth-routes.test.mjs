@@ -202,6 +202,248 @@ describe("auth routes", () => {
     expect(newLogin.status).toBe(303);
   });
 
+  it("allows subscriptions and sends immediate page change notifications", async () => {
+    env = createEnv({
+      EMAIL_FROM: "Wiki <wiki@example.test>",
+      RESEND_API_KEY: "resend-token"
+    });
+    await seedUser(env.DB);
+    await seedAuthUser(env.DB, {
+      userId: "user-2",
+      username: "bob",
+      password: "bob password",
+      displayName: "Bob Example",
+      email: "bob@example.test",
+      groups: ["user"]
+    });
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nInitial."
+    });
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ id: "email_page_change" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const aliceCookie = await loginAsAlice(env);
+    const subscription = new FormData();
+    subscription.set("subjectType", "page");
+    subscription.set("subjectId", "wiki:welcome");
+    subscription.set("digestInterval", "immediate");
+    subscription.set("returnTo", "/wiki/wiki/welcome?do=subscribe");
+
+    const subscribed = await handleRequest(
+      new Request("https://example.com/api/subscriptions", {
+        method: "POST",
+        body: subscription,
+        headers: csrfHeaders({ cookie: aliceCookie })
+      }),
+      env
+    );
+
+    expect(subscribed.status).toBe(303);
+    expect(subscribed.headers.get("location")).toBe("/wiki/wiki/welcome?do=subscribe");
+
+    const bobCookie = await loginAs(env, "bob", "bob password");
+    const edit = new FormData();
+    edit.set("id", "wiki:welcome");
+    edit.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    edit.set("content", "====== Welcome ======\n\nChanged.");
+    edit.set("summary", "Updated page");
+    const saved = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: edit,
+        headers: csrfHeaders({ cookie: bobCookie })
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const emailRequest = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(emailRequest).toMatchObject({
+      to: ["alice@example.test"],
+      subject: "Test Wiki: wiki:welcome changed"
+    });
+    expect(emailRequest.text).toContain("Summary: Updated page");
+    await expect(
+      env.DB.prepare("select subject_id, change_type, summary from email_notification_events")
+        .bind()
+        .all()
+    ).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({
+          subject_id: "wiki:welcome",
+          change_type: "edit",
+          summary: "Updated page"
+        })
+      ]
+    });
+    await expect(
+      env.DB.prepare("select subscription_id, event_id from email_digest_deliveries").bind().all()
+    ).resolves.toMatchObject({ results: [expect.objectContaining({})] });
+
+    subscription.set("subscriptionAction", "unsubscribe");
+    const unsubscribed = await handleRequest(
+      new Request("https://example.com/api/subscriptions", {
+        method: "POST",
+        body: subscription,
+        headers: csrfHeaders({ cookie: aliceCookie })
+      }),
+      env
+    );
+
+    expect(unsubscribed.status).toBe(303);
+    await expect(
+      env.DB.prepare("select id from subscriptions where user_id = ?").bind("user-1").all()
+    ).resolves.toEqual({ results: [] });
+    await expect(
+      env.DB.prepare("select subscription_id from email_digest_deliveries").bind().all()
+    ).resolves.toEqual({ results: [] });
+  });
+
+  it("sends scheduled digest emails for deferred subscription events", async () => {
+    env = createEnv({
+      EMAIL_FROM: "Wiki <wiki@example.test>",
+      RESEND_API_KEY: "resend-token",
+      EMAIL_TASK_TOKEN: "task-token"
+    });
+    await seedUser(env.DB);
+    await seedAuthUser(env.DB, {
+      userId: "user-2",
+      username: "bob",
+      password: "bob password",
+      displayName: "Bob Example",
+      email: "bob@example.test",
+      groups: ["user"]
+    });
+    await seedAuthUser(env.DB, {
+      userId: "user-3",
+      username: "cara",
+      password: "cara password",
+      displayName: "Cara Example",
+      email: "cara@example.test",
+      groups: ["user"]
+    });
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nInitial."
+    });
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ id: "email_digest" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const aliceCookie = await loginAsAlice(env);
+    const subscription = new FormData();
+    subscription.set("subjectType", "namespace");
+    subscription.set("subjectId", "wiki");
+    subscription.set("digestInterval", "daily");
+    subscription.set("returnTo", "/wiki/wiki/welcome?do=subscribe");
+    await handleRequest(
+      new Request("https://example.com/api/subscriptions", {
+        method: "POST",
+        body: subscription,
+        headers: csrfHeaders({ cookie: aliceCookie })
+      }),
+      env
+    );
+    const caraCookie = await loginAs(env, "cara", "cara password");
+    const weeklySubscription = new FormData();
+    weeklySubscription.set("subjectType", "namespace");
+    weeklySubscription.set("subjectId", "wiki");
+    weeklySubscription.set("digestInterval", "weekly");
+    weeklySubscription.set("returnTo", "/wiki/wiki/welcome?do=subscribe");
+    await handleRequest(
+      new Request("https://example.com/api/subscriptions", {
+        method: "POST",
+        body: weeklySubscription,
+        headers: csrfHeaders({ cookie: caraCookie })
+      }),
+      env
+    );
+
+    const bobCookie = await loginAs(env, "bob", "bob password");
+    const edit = new FormData();
+    edit.set("id", "wiki:welcome");
+    edit.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    edit.set("content", "====== Welcome ======\n\nDigest change.");
+    edit.set("summary", "Digest update");
+    await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: edit,
+        headers: csrfHeaders({ cookie: bobCookie })
+      }),
+      env
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const digest = await handleRequest(
+      new Request("https://example.com/api/tasks/email-digests", {
+        method: "POST",
+        headers: { authorization: "Bearer task-token" }
+      }),
+      env
+    );
+
+    expect(digest.status).toBe(200);
+    await expect(digest.json()).resolves.toMatchObject({
+      ok: true,
+      interval: "daily",
+      subscriptionsChecked: 1,
+      digestsSent: 1,
+      eventsDelivered: 1
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const emailRequest = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(emailRequest).toMatchObject({
+      to: ["alice@example.test"],
+      subject: "Test Wiki: page change digest"
+    });
+    expect(emailRequest.text).toContain("wiki:welcome");
+
+    const secondDigest = await handleRequest(
+      new Request("https://example.com/api/tasks/email-digests", {
+        method: "POST",
+        headers: { authorization: "Bearer task-token" }
+      }),
+      env
+    );
+    await expect(secondDigest.json()).resolves.toMatchObject({
+      digestsSent: 0,
+      eventsDelivered: 0
+    });
+
+    const weeklyDigest = await handleRequest(
+      new Request("https://example.com/api/tasks/email-digests?interval=weekly", {
+        method: "POST",
+        headers: { authorization: "Bearer task-token" }
+      }),
+      env
+    );
+    await expect(weeklyDigest.json()).resolves.toMatchObject({
+      ok: true,
+      interval: "weekly",
+      subscriptionsChecked: 1,
+      digestsSent: 1,
+      eventsDelivered: 1
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const weeklyEmailRequest = JSON.parse(String(fetchMock.mock.calls[1][1].body));
+    expect(weeklyEmailRequest).toMatchObject({
+      to: ["cara@example.test"],
+      subject: "Test Wiki: page change digest"
+    });
+  });
+
   it("allows authenticated users to update their profile and password", async () => {
     env = createEnv();
     await seedUser(env.DB);

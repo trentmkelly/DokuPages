@@ -40,10 +40,19 @@ Implemented flows and templates:
 - native password reset request and confirmation forms
 - password reset
 - page change notification
+- page and namespace subscription management from `?do=subscribe`
+- immediate page-change dispatch from page save and revert workflows
 - digest
 
-Deferred DokuWiki behaviors still being wired to routes and scheduled tasks:
+Subscription and digest routes:
 
-- page change notification dispatch
-- subscription management UI/actions
-- digest scheduling
+- `/api/subscriptions`: authenticated CSRF-protected form endpoint for
+  subscribing, updating delivery cadence, or unsubscribing.
+- `/api/tasks/email-digests`: token-protected JSON endpoint for scheduled
+  daily/weekly digest execution. Send `Authorization: Bearer <EMAIL_TASK_TOKEN>`
+  from the scheduler. The default task processes `daily` subscriptions; use
+  `?interval=weekly` for weekly schedules or `?interval=all` for manual catch-up.
+
+Subscription state is stored in `subscriptions`. Page saves and reverts append
+`email_notification_events`; immediate deliveries and digest deliveries are
+deduplicated through `email_digest_deliveries`.

@@ -528,9 +528,9 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement mail sending adapter.
 - [x] Implement registration notifications.
 - [x] Implement password reset emails.
-- [ ] Implement page change notifications.
-- [ ] Implement subscriptions.
-- [ ] Implement digest scheduling.
+- [x] Implement page change notifications.
+- [x] Implement subscriptions.
+- [x] Implement digest scheduling.
 - [x] Implement bounce-safe sender configuration.
 - [x] Add email template tests.
 - [x] Add email delivery failure handling.

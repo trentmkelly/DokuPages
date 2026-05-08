@@ -12,6 +12,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?id=<page>&do=revisions`                  | Redirects to the page revision list.                                |
 | `/doku.php?id=<page>&do=backlink`                   | Redirects to the page backlinks view.                               |
 | `/doku.php?id=<page>&do=source`                     | Redirects to the page source view.                                  |
+| `/doku.php?id=<page>&do=subscribe`                  | Redirects to the page subscription view.                            |
 | `/doku.php?id=<page>&do=export_raw`                 | Redirects to the raw export route.                                  |
 | `/doku.php?id=<page>&do=export_xhtml`               | Redirects to the XHTML export route.                                |
 | `/doku.php?do=admin`                                | Redirects to `/admin`.                                              |
@@ -54,6 +55,9 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/api/auth/register`                                | Creates a native D1 user and session.                               |
 | `/api/auth/password-reset`                          | Requests a password reset email.                                    |
 | `/api/auth/password-reset/confirm`                  | Consumes a reset token and updates the password.                    |
+| `/wiki/<page>?do=subscribe`                         | Serves page and namespace subscription management.                  |
+| `/api/subscriptions`                                | Updates authenticated user subscriptions.                           |
+| `/api/tasks/email-digests`                          | Runs token-protected scheduled daily/weekly digest delivery.        |
 
 Unsupported legacy executables are handled deliberately so old clients receive a
 stable response instead of an ambiguous 404.
