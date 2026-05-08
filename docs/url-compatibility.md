@@ -27,6 +27,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `POST /doku.php?id=<page>&do=preview`               | Renders through the native preview handler.                        |
 | `POST /doku.php?id=<page>&do=draft`                 | Saves through the native draft handler.                            |
 | `/doku.php?id=<page>&do=export_raw`                 | Redirects to the raw export route.                                 |
+| `/doku.php?id=<page>&do=export_code`                | Redirects to the code-block download export route.                 |
 | `/doku.php?id=<page>&do=export_xhtml`               | Redirects to the XHTML export route.                               |
 | `/doku.php?do=admin`                                | Redirects to `/admin`.                                             |
 | `/doku.php?do=admin&page=acl`                       | Redirects to `/admin/acl`.                                         |

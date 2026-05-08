@@ -42,7 +42,7 @@ fresh render.
 - quote blocks
 - footnotes
 - indented code blocks
-- file blocks
+- file blocks with filename download links through `export_code`
 - nowiki spans
 - simple tables
 - acronym, entity, smiley, and typography replacement

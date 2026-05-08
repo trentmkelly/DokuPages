@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderWikiText } from "../src/wiki/render";
+import { extractCodeBlock, renderWikiText } from "../src/wiki/render";
 
 describe("renderWikiText", () => {
   it("renders headings, title metadata, and a table of contents", () => {
@@ -300,12 +300,20 @@ describe("renderWikiText", () => {
 
   it("renders DokuWiki file blocks, quotes, and footnotes", () => {
     const rendered = renderWikiText(
-      "<file txt example.txt>\n<unsafe>\n</file>\n\n> quoted **text**\n\nText((foot **note**))."
+      "<file txt example.txt>\n<unsafe>\n</file>\n\n> quoted **text**\n\nText((foot **note**)).",
+      { pageId: "wiki:welcome" }
     );
 
     expect(rendered.html).toContain(
-      '<dl class="file"><dt>example.txt</dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
+      '<dl class="file"><dt><a href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0" title="Download" class="mediafile mf_txt">example.txt</a></dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
     );
+    expect(extractCodeBlock("<file txt example.txt>\n<unsafe>\n</file>", 0)).toEqual({
+      type: "file",
+      index: 0,
+      text: "<unsafe>",
+      language: "txt",
+      filename: "example.txt"
+    });
     expect(rendered.html).toContain("<blockquote><p>quoted <strong>text</strong></p></blockquote>");
     expect(rendered.html).toContain('<sup><a href="#fn__1" id="fnt__1">1)</a></sup>');
     expect(rendered.html).toContain('<div class="footnotes">');
@@ -350,12 +358,13 @@ describe("renderWikiText", () => {
 
   it("flushes unterminated code and file blocks safely at end of input", () => {
     const code = renderWikiText("<code>\n<unsafe>\n**literal**");
-    const file = renderWikiText("<file txt example.txt>\n<unsafe>");
+    const file = renderWikiText("<file txt example.txt>\n<unsafe>", { pageId: "wiki:welcome" });
 
     expect(code.html).toContain('<pre class="code"><code>&lt;unsafe&gt;\n**literal**</code></pre>');
     expect(file.html).toContain(
-      '<dl class="file"><dt>example.txt</dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
+      '<dl class="file"><dt><a href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0" title="Download" class="mediafile mf_txt">example.txt</a></dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
     );
+    expect(extractCodeBlock("<file txt example.txt>\n<unsafe>", 0)?.text).toBe("<unsafe>");
   });
 
   it("renders simple DokuWiki tables", () => {

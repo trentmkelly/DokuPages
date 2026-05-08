@@ -22,6 +22,14 @@ export interface RenderedWikiText {
   noToc: boolean;
 }
 
+export interface ExtractedCodeBlock {
+  type: "code" | "file";
+  index: number;
+  text: string;
+  language: string | null;
+  filename: string | null;
+}
+
 export interface RenderWikiTextOptions {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
@@ -172,7 +180,8 @@ export function renderWikiText(
     code: [],
     table: [],
     quote: [],
-    specialBlock: null
+    specialBlock: null,
+    codeBlockIndex: 0
   };
 
   for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
@@ -182,7 +191,7 @@ export function renderWikiText(
 
     if (state.specialBlock) {
       if (line.trim().toLowerCase() === `</${state.specialBlock.type}>`) {
-        flushSpecialBlock(blocks, state);
+        flushSpecialBlock(blocks, state, context);
       } else {
         state.specialBlock.lines.push(line);
       }
@@ -193,14 +202,15 @@ export function renderWikiText(
     if (specialBlockStart) {
       flushAll(blocks, state, context);
       const type = specialBlockStart[1].toLowerCase() as "code" | "file";
-      const meta = specialBlockStart[2]?.trim() || "";
-      const metaParts = meta.split(/\s+/).filter(Boolean);
+      const metadata = parseSpecialBlockMetadata(type, specialBlockStart[2]?.trim() || "");
       state.specialBlock = {
         type,
-        title:
-          type === "file" && metaParts.length > 1 ? metaParts.slice(1).join(" ") : meta || null,
+        index: state.codeBlockIndex,
+        language: metadata.language,
+        filename: metadata.filename,
         lines: []
       };
+      state.codeBlockIndex += 1;
       continue;
     }
 
@@ -285,7 +295,7 @@ export function renderWikiText(
   }
 
   flushAll(blocks, state, context);
-  flushSpecialBlock(blocks, state);
+  flushSpecialBlock(blocks, state, context);
   flushFootnotes(blocks, context);
 
   return {
@@ -296,6 +306,42 @@ export function renderWikiText(
     noCache: directives.noCache,
     noToc: directives.noToc
   };
+}
+
+export function extractCodeBlock(source: string, index: number): ExtractedCodeBlock | null {
+  const wantedIndex = Number.isInteger(index) && index >= 0 ? index : -1;
+  let current: SpecialBlock | null = null;
+  let codeBlockIndex = 0;
+
+  for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
+    if (current) {
+      if (line.trim().toLowerCase() === `</${current.type}>`) {
+        if (current.index === wantedIndex) {
+          return specialBlockToExtracted(current);
+        }
+        current = null;
+      } else {
+        current.lines.push(line);
+      }
+      continue;
+    }
+
+    const specialBlockStart = line.match(/^<(code|file)(?:\s+([^>]+))?>\s*$/i);
+    if (!specialBlockStart) continue;
+
+    const type = specialBlockStart[1].toLowerCase() as "code" | "file";
+    const metadata = parseSpecialBlockMetadata(type, specialBlockStart[2]?.trim() || "");
+    current = {
+      type,
+      index: codeBlockIndex,
+      language: metadata.language,
+      filename: metadata.filename,
+      lines: []
+    };
+    codeBlockIndex += 1;
+  }
+
+  return current?.index === wantedIndex ? specialBlockToExtracted(current) : null;
 }
 
 export function getWikiRenderDirectives(source: string): { noCache: boolean; noToc: boolean } {
@@ -322,6 +368,7 @@ interface ParserState {
   table: string[];
   quote: QuoteItem[];
   specialBlock: SpecialBlock | null;
+  codeBlockIndex: number;
 }
 
 interface ListItem {
@@ -337,7 +384,9 @@ interface QuoteItem {
 
 interface SpecialBlock {
   type: "code" | "file";
-  title: string | null;
+  index: number;
+  language: string | null;
+  filename: string | null;
   lines: string[];
 }
 
@@ -584,16 +633,22 @@ function renderQuotes(items: QuoteItem[], context: RenderContext): string {
   return html;
 }
 
-function flushSpecialBlock(blocks: string[], state: ParserState): void {
+function flushSpecialBlock(blocks: string[], state: ParserState, context: RenderContext): void {
   if (!state.specialBlock) return;
 
   const block = state.specialBlock;
   const code = `<pre><code>${escapeHtml(block.lines.join("\n"))}</code></pre>`;
 
-  if (block.title) {
-    blocks.push(
-      `<dl class="${block.type}"><dt>${escapeHtml(block.title)}</dt><dd>${code}</dd></dl>`
-    );
+  if (block.filename) {
+    const href = context.pageId
+      ? `${pageIdToRoutePath(context.pageId)}?do=export_code&codeblock=${block.index}`
+      : null;
+    const title = escapeHtml(block.filename);
+    const label = href
+      ? `<a href="${escapeAttribute(href)}" title="Download" class="${fileDownloadClass(block.filename)}">${title}</a>`
+      : title;
+
+    blocks.push(`<dl class="${block.type}"><dt>${label}</dt><dd>${code}</dd></dl>`);
   } else {
     blocks.push(
       `<pre class="${block.type}"><code>${escapeHtml(block.lines.join("\n"))}</code></pre>`
@@ -601,6 +656,50 @@ function flushSpecialBlock(blocks: string[], state: ParserState): void {
   }
 
   state.specialBlock = null;
+}
+
+function parseSpecialBlockMetadata(
+  type: "code" | "file",
+  meta: string
+): { language: string | null; filename: string | null } {
+  const cleaned = meta.replace(/\[.*\]/, "").trim();
+  if (!cleaned) return { language: null, filename: null };
+
+  const [rawLanguage = "", rawFilename = ""] = cleaned.split(/\s+(.+)/, 2);
+  const language = normalizeSpecialBlockLanguage(rawLanguage);
+  const filename = rawFilename.trim() || null;
+
+  return {
+    language,
+    filename: type === "file" || type === "code" ? filename : null
+  };
+}
+
+function normalizeSpecialBlockLanguage(value: string): string | null {
+  if (!value || value === "-") return null;
+  const language = value === "html" ? "html4strict" : value;
+  const normalized = language.replace(/[^A-Za-z0-9_-]+/g, "");
+  return normalized || null;
+}
+
+function specialBlockToExtracted(block: SpecialBlock): ExtractedCodeBlock {
+  return {
+    type: block.type,
+    index: block.index,
+    text: block.lines.join("\n").replace(/^\n/, "").replace(/\n$/, ""),
+    language: block.language,
+    filename: block.filename
+  };
+}
+
+function fileDownloadClass(filename: string): string {
+  const extension =
+    filename
+      .split(".")
+      .pop()
+      ?.toLowerCase()
+      .replace(/[^A-Za-z0-9_-]+/g, "_") || "txt";
+  return `mediafile mf_${extension}`;
 }
 
 function flushFootnotes(blocks: string[], context: RenderContext): void {

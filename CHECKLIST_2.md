@@ -61,7 +61,7 @@ are not fixed by this checklist.
 - [ ] Implement RSS feed aggregation syntax from upstream `ParserMode/Rss.php`.
 - [ ] Implement plugin syntax macros, including the bundled info plugin macro seen in `docs/syntax-inventory.md`.
 - [ ] Implement GeSHi-compatible code highlighting for `<code>` and `<file>` language metadata.
-- [ ] Implement downloadable file-block output for DokuWiki file syntax metadata.
+- [x] Implement downloadable file-block output for DokuWiki file syntax metadata.
 - [ ] Match DokuWiki's raw HTML behavior when `htmlok`-style trusted content is enabled, or document the security-driven mismatch explicitly.
 - [ ] Match DokuWiki's PHP embedding behavior policy, including explicit unsupported rendering if PHP syntax appears.
 - [ ] Match DokuWiki's typography modes from `typography`, including smart quotes where enabled.

@@ -115,6 +115,7 @@ import {
 } from "./wiki/page-service";
 import { extractInternalPageLinks } from "./wiki/page-links";
 import {
+  extractCodeBlock,
   getWikiRenderDirectives,
   renderWikiText,
   type CacheDependency,
@@ -125,12 +126,12 @@ import { hasRequestedMediaSize, mediaDerivativeHeaders } from "./wiki/media-deri
 import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interfaces";
 
 type AssetFallback = () => Promise<Response>;
-type ExportMode = "raw" | "xhtml" | "xhtmlbody";
+type ExportMode = "raw" | "xhtml" | "xhtmlbody" | "code";
 type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 18;
+const RENDER_CACHE_VERSION = 19;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -871,6 +872,7 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
   const action = normalizeLegacyAction(url.searchParams.get("do"));
   const revisionId = url.searchParams.get("rev");
   const secondRevisionId = url.searchParams.get("rev2");
+  const codeBlock = url.searchParams.get("codeblock");
 
   if (action) {
     target.searchParams.set("do", action);
@@ -882,6 +884,10 @@ function redirectLegacyDokuPhp(request: Request, url: URL, env: Env): Response {
 
   if (secondRevisionId) {
     target.searchParams.set("rev2", secondRevisionId);
+  }
+
+  if (codeBlock && action === "export_code") {
+    target.searchParams.set("codeblock", codeBlock);
   }
 
   return redirectResponse(`${target.pathname}${target.search}`, 301);
@@ -2467,6 +2473,7 @@ function normalizeLegacyAction(action: string | null): string | null {
     case "logout":
     case "subscribe":
     case "export_raw":
+    case "export_code":
     case "export_xhtml":
     case "export_xhtmlbody":
       return action;
@@ -2483,6 +2490,8 @@ function normalizeExportMode(action: string | null): ExportMode | null {
   switch (action) {
     case "export_raw":
       return "raw";
+    case "export_code":
+      return "code";
     case "export_xhtml":
     case "export_html":
       return "xhtml";
@@ -2638,6 +2647,18 @@ async function renderPageExport(
   const content = page.content;
   const revisionId = "revisionId" in page ? page.revisionId : page.id;
   const config = getRuntimeConfig(env);
+  const headers = securityHeaders({ "x-robots-tag": "noindex" });
+
+  if (mode === "raw") {
+    headers.set("content-type", "text/plain; charset=utf-8");
+    headers.set("content-disposition", `attachment; filename=${exportFileName(id)}.txt`);
+    return new Response(content, { headers });
+  }
+
+  if (mode === "code") {
+    return renderCodeBlockExport(url, content, headers);
+  }
+
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const rendered = renderWikiText(content, {
     pageId: id,
@@ -2648,14 +2669,7 @@ async function renderPageExport(
     camelCaseLinks: config.camelCaseLinks
   });
   const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
-  const headers = securityHeaders({ "x-robots-tag": "noindex" });
   const language = config.language;
-
-  if (mode === "raw") {
-    headers.set("content-type", "text/plain; charset=utf-8");
-    headers.set("content-disposition", `attachment; filename=${exportFileName(id)}.txt`);
-    return new Response(content, { headers });
-  }
 
   headers.set("content-type", "text/html; charset=utf-8");
 
@@ -2689,6 +2703,28 @@ ${rendered.html}
 function exportFileName(id: string): string {
   const name = id.split(":").filter(Boolean).at(-1) || "page";
   return name.replace(/[^a-z0-9._-]+/gi, "_");
+}
+
+function renderCodeBlockExport(url: URL, content: string, headers: Headers): Response {
+  const requestedIndex = url.searchParams.get("codeblock") ?? "0";
+  const block = extractCodeBlock(content, Number(requestedIndex));
+
+  if (!block) {
+    return notFoundResponse(`Code block '${requestedIndex}' was not found.`);
+  }
+
+  const filename = sanitizedCodeBlockFilename(block.filename, block.language);
+
+  headers.set("content-type", "text/plain; charset=utf-8");
+  headers.set("content-disposition", `attachment; filename=${filename}`);
+
+  return new Response(block.text.replace(/^[\r\n]+|[\r\n]+$/g, ""), { headers });
+}
+
+function sanitizedCodeBlockFilename(filename: string | null, language: string | null): string {
+  const fallback = `snippet.${language || "txt"}`;
+  const baseName = (filename || fallback).split(/[\\/]/).filter(Boolean).at(-1) || fallback;
+  return baseName.replace(/[^A-Za-z0-9._-]+/g, "_") || fallback;
 }
 
 async function existingPageIdsForContent(

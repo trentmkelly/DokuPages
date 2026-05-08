@@ -293,6 +293,10 @@ describe("handleRequest", () => {
       new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_raw"),
       env
     );
+    const code = await handleRequest(
+      new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_code&codeblock=0"),
+      env
+    );
     const htmlAlias = await handleRequest(
       new Request("https://example.com/doku.php?id=Wiki:Welcome&do=export_htmlbody"),
       env
@@ -300,6 +304,8 @@ describe("handleRequest", () => {
 
     expect(raw.status).toBe(301);
     expect(raw.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_raw");
+    expect(code.status).toBe(301);
+    expect(code.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_code&codeblock=0");
     expect(htmlAlias.status).toBe(301);
     expect(htmlAlias.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_xhtmlbody");
   });
@@ -606,6 +612,11 @@ describe("handleRequest", () => {
       ["/doku.php?id=Wiki:Welcome&do=plugin", 301, "/wiki/wiki/welcome?do=plugin"],
       ["/doku.php?id=Wiki:Welcome&do=media", 301, "/wiki/wiki/welcome?do=media"],
       ["/doku.php?id=Wiki:Welcome&do=export_raw", 301, "/wiki/wiki/welcome?do=export_raw"],
+      [
+        "/doku.php?id=Wiki:Welcome&do=export_code&codeblock=0",
+        301,
+        "/wiki/wiki/welcome?do=export_code&codeblock=0"
+      ],
       [
         "/doku.php?id=Wiki:Welcome&do=export_htmlbody",
         301,
@@ -1245,7 +1256,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 18,
+        rendererVersion: 19,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1267,7 +1278,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 18,
+        rendererVersion: 19,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",
@@ -1632,8 +1643,16 @@ describe("handleRequest", () => {
   });
 
   it("exports pages as raw text and rendered HTML modes", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content: "====== Welcome ======\n\n<file txt example.txt>\n<unsafe>\n</file>"
+    };
     const raw = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=export_raw"),
+      env
+    );
+    const code = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=export_code&codeblock=0"),
       env
     );
     const xhtmlBody = await handleRequest(
@@ -1651,11 +1670,19 @@ describe("handleRequest", () => {
     expect(raw.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(raw.headers.get("content-disposition")).toBe("attachment; filename=welcome.txt");
     expect(raw.headers.get("x-robots-tag")).toBe("noindex");
-    await expect(raw.text()).resolves.toContain("Imported page.");
+    await expect(raw.text()).resolves.toContain("example.txt");
+
+    expect(code.status).toBe(200);
+    expect(code.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(code.headers.get("content-disposition")).toBe("attachment; filename=example.txt");
+    expect(code.headers.get("x-robots-tag")).toBe("noindex");
+    await expect(code.text()).resolves.toBe("<unsafe>");
 
     expect(xhtmlBody.status).toBe(200);
     expect(xhtmlBody.headers.get("content-type")).toBe("text/html; charset=utf-8");
-    await expect(xhtmlBody.text()).resolves.toContain("<p>Imported page.</p>");
+    await expect(xhtmlBody.text()).resolves.toContain(
+      'href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0"'
+    );
 
     expect(xhtml.status).toBe(200);
     const html = await xhtml.text();
