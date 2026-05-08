@@ -1979,6 +1979,14 @@ async function renderMediaManagerPage(
   const media = query
     ? await searchMedia(env.DB, namespace, query, pagination.limit, pagination.offset)
     : await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset);
+  const aclRules = await listAclRules(env);
+  const namespaces = (await listMediaNamespaces(env.DB)).filter((item) =>
+    canListNamespace(env, aclRules, principal, item)
+  );
+  const canUpload = hasAclPermission(
+    resolveAclPermission(aclRules, namespace ? `${namespace}:*` : "*", principal),
+    ACL_UPLOAD
+  );
   logMetric("media_metric", {
     operation: query ? "manager_search" : "manager_list",
     namespace: namespace || null,
@@ -1986,51 +1994,190 @@ async function renderMediaManagerPage(
     resultCount: media.length,
     durationMs: elapsedSince(startedAt)
   });
-  const emptyState = media.length === 0 ? "<p>No media found.</p>" : "";
-  const items = media
-    .map(
-      (item) => `<li>
-        <a href="${mediaDetailPath(item.id)}">${escapeHtml(mediaName(item.id))}</a>
-        <span>${escapeHtml(item.mimeType)}</span>
-        <small>${item.byteLength.toLocaleString("en-US")} bytes</small>
-      </li>`
-    )
-    .join("");
+  const namespaceTitle = namespace ? namespace : "root";
+  const mediaItems =
+    media.length === 0
+      ? `<p class="media-manager__empty">No media found.</p>`
+      : `<ul class="idx media__manager media-grid">${media.map(renderMediaManagerItem).join("")}</ul>`;
+  const uploadPanel = canUpload
+    ? `<form id="media__upload" class="media-manager__upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
+        ${csrfInput(csrfToken)}
+        <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
+        <div class="media-manager__form-grid">
+          <label for="media__file">File</label>
+          <input id="media__file" name="file" type="file" required>
+          <label for="media__id">Media ID</label>
+          <input id="media__id" name="id" type="text" placeholder="${escapeAttribute(namespace ? `${namespace}:example.png` : "example.png")}">
+          <label for="media__summary">Summary</label>
+          <input id="media__summary" name="summary" type="text">
+        </div>
+        <div class="media-manager__form-actions">
+          <label class="media-manager__check" for="media__overwrite">
+            <input id="media__overwrite" name="overwrite" type="checkbox" value="1">
+            Overwrite existing media
+          </label>
+          <button type="submit">Upload</button>
+        </div>
+      </form>`
+    : `<section id="media__upload" class="media-manager__upload media-manager__upload--disabled">
+        <p>Upload access is not available for this namespace.</p>
+      </section>`;
 
   return htmlShell(
     env,
     `Media manager ${namespace}`,
-    `<h1>Media manager</h1>
-    <form class="search" method="get" action="/media-manager">
-      <label for="media__ns">Namespace</label>
-      <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
-      <label for="media__q">Search</label>
-      <input id="media__q" name="q" type="search" value="${escapeAttribute(query)}">
-      <button type="submit">Search</button>
-    </form>
-    <form class="upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
-      ${csrfInput(csrfToken)}
-      <input type="hidden" name="ns" value="${escapeAttribute(namespace)}">
-      <fieldset>
-        <legend>Upload</legend>
-        <label for="media__file">File</label>
-        <input id="media__file" name="file" type="file" required>
-        <label for="media__id">Media ID</label>
-        <input id="media__id" name="id" type="text" placeholder="${escapeAttribute(namespace ? `${namespace}:example.png` : "example.png")}">
-        <label for="media__summary">Summary</label>
-        <input id="media__summary" name="summary" type="text">
-        <label for="media__overwrite">
-          <input id="media__overwrite" name="overwrite" type="checkbox" value="1">
-          Overwrite existing media
-        </label>
-        <button type="submit">Upload</button>
-      </fieldset>
-    </form>
-    ${emptyState}
-    <ul class="idx media__manager">${items}</ul>
-    ${renderPaginationControls(url, pagination, media.length)}`,
+    `<div id="media__manager" class="media-manager">
+      <h1>Media manager</h1>
+      <div class="media-manager__layout">
+        <aside id="mediamgr__aside" class="media-manager__aside">
+          <div class="media-manager__side-tab">Namespaces</div>
+          <div class="media-manager__side-head">Choose namespace</div>
+          ${renderMediaNamespaceTree(namespaces, namespace)}
+        </aside>
+        <section id="mediamgr__content" class="media-manager__content">
+          <nav class="media-manager__tabs" aria-label="Media manager sections">
+            <a class="media-manager__tab media-manager__tab--active" href="#media__files">Media Files</a>
+            <a class="media-manager__tab" href="#media__upload">Upload</a>
+            <a class="media-manager__tab" href="#media__search">Search</a>
+          </nav>
+          <section id="media__files" class="media-manager__files">
+            <div class="media-manager__toolbar">
+              <div class="media-manager__crumb">Files in <strong>${escapeHtml(namespaceTitle)}</strong></div>
+              <div class="media-manager__view" aria-label="Media view">
+                <span class="media-manager__view-active">Thumbnails</span>
+                <span>Rows</span>
+                <span>Name</span>
+                <span>Date</span>
+              </div>
+            </div>
+            ${query ? `<p class="media-manager__query">Search results for <strong>${escapeHtml(query)}</strong></p>` : ""}
+            ${mediaItems}
+            ${renderPaginationControls(url, pagination, media.length)}
+          </section>
+          <section id="media__search" class="media-manager__search-panel">
+            <form class="media-manager__search" method="get" action="/media-manager">
+              <label for="media__ns">Namespace</label>
+              <input id="media__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
+              <label for="media__q">Search</label>
+              <input id="media__q" name="q" type="search" value="${escapeAttribute(query)}">
+              <button type="submit">Search</button>
+            </form>
+          </section>
+          ${uploadPanel}
+        </section>
+      </div>
+    </div>`,
     { principal }
   );
+}
+
+async function listMediaNamespaces(db: D1Database): Promise<string[]> {
+  const result = await db
+    .prepare(
+      `select distinct namespace
+       from media
+       where is_deleted = 0
+       order by namespace asc`
+    )
+    .all<{ namespace: string }>();
+  const namespaces = result.results.map((row) => cleanMediaId(row.namespace ?? ""));
+  return [...new Set(["", ...namespaces])];
+}
+
+function renderMediaNamespaceTree(namespaces: string[], activeNamespace: string): string {
+  const entries = collectMediaNamespaceEntries(namespaces, activeNamespace);
+  const items = entries
+    .map((namespace) => {
+      const label = namespace ? namespace.slice(namespace.lastIndexOf(":") + 1) : "[root]";
+      const depth = Math.min(namespace ? namespace.split(":").length - 1 : 0, 6);
+      const activeClass = namespace === activeNamespace ? " media-tree__item--active" : "";
+      const indent = '<span class="media-tree__indent" aria-hidden="true"></span>'.repeat(depth);
+      return `<li class="media-tree__item media-tree__item--depth-${depth}${activeClass}">
+        ${indent}<span class="media-tree__toggle" aria-hidden="true">${namespace ? "+" : ""}</span>
+        <a href="${escapeAttribute(mediaManagerNamespacePath(namespace))}">${escapeHtml(label)}</a>
+      </li>`;
+    })
+    .join("");
+
+  return `<ul class="media-tree">${items}</ul>`;
+}
+
+function collectMediaNamespaceEntries(namespaces: string[], activeNamespace: string): string[] {
+  const entries = new Set<string>(["", activeNamespace]);
+
+  for (const namespace of namespaces) {
+    const parts = namespace.split(":").filter(Boolean);
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}:${part}` : part;
+      entries.add(current);
+    }
+  }
+
+  return [...entries].sort((a, b) => {
+    if (a === b) return 0;
+    if (a === "") return -1;
+    if (b === "") return 1;
+    return a.localeCompare(b);
+  });
+}
+
+function mediaManagerNamespacePath(namespace: string): string {
+  return namespace ? `/media-manager?ns=${encodeURIComponent(namespace)}` : "/media-manager";
+}
+
+function renderMediaManagerItem(item: CurrentMedia): string {
+  const name = mediaName(item.id);
+  const detailPath = mediaDetailPath(item.id);
+  const preview = isPreviewableImage(item)
+    ? `<a class="media-tile__thumb" href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(mediaPath(item.id))}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a>`
+    : `<a class="media-tile__thumb media-tile__thumb--file" href="${escapeAttribute(detailPath)}"><span>${escapeHtml(mediaFileExtension(name))}</span></a>`;
+
+  return `<li class="media-tile">
+    ${preview}
+    <a class="media-tile__name" href="${escapeAttribute(detailPath)}" title="${escapeAttribute(item.id)}">${escapeHtml(name)}</a>
+    <span class="media-tile__meta">${escapeHtml(item.mimeType)}</span>
+    <span class="media-tile__meta">${escapeHtml(formatMediaDate(item.updatedAt))}</span>
+    <span class="media-tile__meta">${escapeHtml(formatMediaByteLength(item.byteLength))}</span>
+  </li>`;
+}
+
+function isPreviewableImage(item: CurrentMedia): boolean {
+  return item.mimeType.startsWith("image/");
+}
+
+function mediaFileExtension(name: string): string {
+  const index = name.lastIndexOf(".");
+  if (index <= 0 || index === name.length - 1) return "FILE";
+  return name.slice(index + 1, index + 7).toUpperCase();
+}
+
+function formatMediaDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${year}/${month}/${day} ${hour}:${minute}`;
+}
+
+function formatMediaByteLength(byteLength: number): string {
+  if (byteLength < 1024) {
+    return `${byteLength.toLocaleString("en-US")} bytes`;
+  }
+
+  const units = ["KB", "MB", "GB"];
+  let value = byteLength / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = value >= 10 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
 function mediaIdFromPath(url: URL, prefix: string): string {

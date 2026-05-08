@@ -1041,19 +1041,249 @@ form.search button {
   overflow-wrap: anywhere;
 }
 
-.dokuwiki ul.media__manager {
-  padding-left: 0;
+#media__manager {
+  max-width: 100%;
 }
 
-.dokuwiki ul.media__manager li {
-  margin: 0 0 0.45em;
+.media-manager__layout {
+  display: grid;
+  grid-template-columns: 13em minmax(0, 1fr);
+  gap: 0.8em;
+  align-items: start;
+}
+
+.media-manager__aside,
+.media-manager__content {
+  min-width: 0;
+}
+
+.media-manager__side-tab,
+.media-manager__tab {
+  display: inline-block;
+  margin: 0 0.25em -1px 0;
+  padding: 0.45em 0.8em;
+  border: 1px solid var(--dw-border);
+  border-bottom-color: var(--dw-background-site);
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  background: linear-gradient(var(--dw-background-alt), var(--dw-background-neutral));
+  color: var(--dw-text);
+}
+
+.media-manager__side-tab,
+.media-manager__tab--active {
+  background: var(--dw-background-site);
+  color: var(--dw-text);
+}
+
+.media-manager__tabs {
+  margin: 0;
+  padding-left: 0.35em;
+  border-bottom: 1px solid var(--dw-border);
+}
+
+.media-manager__tab:hover,
+.media-manager__tab:focus {
+  text-decoration: none;
+  background: var(--dw-background);
+}
+
+.media-manager__side-head,
+.media-manager__toolbar {
+  padding: 0.5em 0.7em;
+  background: var(--dw-background-alt);
+}
+
+.media-manager__side-head {
+  margin-bottom: 0.6em;
+}
+
+.media-tree {
+  margin: 0;
+  padding: 0;
+  font-size: 0.875em;
   list-style: none;
 }
 
-.dokuwiki ul.media__manager span,
-.dokuwiki ul.media__manager small {
-  margin-left: 0.5em;
+.media-tree__item {
+  display: flex;
+  align-items: baseline;
+  min-height: 1.45em;
+  margin: 0;
+  padding: 0;
+}
+
+.media-tree__item a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.media-tree__item--active a {
+  font-weight: bold;
+}
+
+.media-tree__indent,
+.media-tree__toggle {
+  flex: 0 0 1em;
+}
+
+.media-tree__toggle {
   color: var(--dw-text-neutral);
+  text-align: center;
+}
+
+.media-manager__files {
+  padding-top: 0;
+}
+
+.media-manager__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em 1em;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--dw-border);
+}
+
+.media-manager__crumb strong {
+  font-weight: bold;
+}
+
+.media-manager__view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: 0.875em;
+}
+
+.media-manager__view span {
+  padding: 0.2em 0.55em;
+  border: 1px solid var(--dw-border);
+  border-left-width: 0;
+  background: linear-gradient(var(--dw-background), var(--dw-background-alt));
+  color: var(--dw-text-neutral);
+}
+
+.media-manager__view span:first-child {
+  border-left-width: 1px;
+}
+
+.media-manager__view .media-manager__view-active {
+  background: var(--dw-background);
+  color: var(--dw-text);
+}
+
+.media-manager__query,
+.media-manager__empty {
+  margin: 0.8em 0 0;
+}
+
+.dokuwiki ul.media__manager.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.75em, 8.75em));
+  gap: 0.8em;
+  justify-content: start;
+  margin: 0.8em 0 1.4em;
+  padding: 0;
+  list-style: none;
+}
+
+.dokuwiki ul.media__manager.media-grid li.media-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 14.2em;
+  margin: 0;
+  padding: 0.55em;
+  overflow: hidden;
+  background: var(--dw-background-neutral);
+  list-style: none;
+  text-align: center;
+}
+
+.media-tile__thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7.2em;
+  margin-bottom: 0.45em;
+  border: 1px solid var(--dw-border);
+  background: var(--dw-background);
+}
+
+.media-tile__thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.media-tile__thumb--file span {
+  color: var(--dw-text-neutral);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.media-tile__name {
+  min-height: 2.4em;
+  overflow-wrap: anywhere;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.media-tile__meta {
+  display: block;
+  margin-top: 0.12em;
+  color: var(--dw-text-neutral);
+  font-size: 0.875em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.media-manager__search-panel,
+.dokuwiki .page form.media-manager__upload,
+.media-manager__upload--disabled {
+  margin-top: 1.2em;
+  padding: 0.9em;
+  border: 1px solid var(--dw-border);
+  background: var(--dw-background-site);
+}
+
+.dokuwiki .page .media-manager__search-panel form {
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.media-manager__search,
+.media-manager__form-grid {
+  display: grid;
+  grid-template-columns: 7em minmax(0, 1fr);
+  gap: 0.45em 0.6em;
+  align-items: center;
+}
+
+.media-manager__search button {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.media-manager__form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 1em;
+  align-items: center;
+  margin-top: 0.7em;
+}
+
+.media-manager__check {
+  display: inline-flex;
+  gap: 0.35em;
+  align-items: center;
+}
+
+.media-manager__check input {
+  flex: 0 0 auto;
 }
 
 .dokuwiki .page del {
@@ -1253,6 +1483,28 @@ form.search button {
 
   #dokuwiki__pagetools {
     display: none;
+  }
+
+  .media-manager__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .media-manager__aside {
+    border-bottom: 1px solid var(--dw-border);
+    padding-bottom: 0.8em;
+  }
+
+  .dokuwiki ul.media__manager.media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr));
+  }
+
+  .media-manager__search,
+  .media-manager__form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .media-manager__search button {
+    grid-column: 1;
   }
 }
 

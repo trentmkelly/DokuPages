@@ -547,7 +547,12 @@ describe("handleRequest", () => {
     expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
     await expect(detail.text()).resolves.toContain("Media detail");
-    await expect(manager.text()).resolves.toContain("logo.svg");
+    const managerHtml = await manager.text();
+    expect(managerHtml).toContain('id="media__manager"');
+    expect(managerHtml).toContain('id="mediamgr__aside"');
+    expect(managerHtml).toContain("Media Files");
+    expect(managerHtml).toContain("logo.svg");
+    expect(managerHtml).toContain('class="idx media__manager media-grid"');
     const pagedManager = await handleRequest(
       new Request("https://example.com/media-manager?ns=wiki&limit=1"),
       env
@@ -2023,6 +2028,21 @@ function createDurableObjectStateStub(): DurableObjectState {
 function createD1Stub(state: D1StubState): D1Database {
   return {
     prepare: (sql: string) => ({
+      all: async () => {
+        if (sql.includes("select distinct namespace") && sql.includes("from media")) {
+          return {
+            results: [
+              ...new Set(
+                state.media
+                  .filter((media) => media.is_deleted === 0)
+                  .map((media) => String(media.namespace ?? ""))
+              )
+            ].map((namespace) => ({ namespace }))
+          };
+        }
+
+        return { results: [] };
+      },
       bind: (...values: unknown[]) => ({
         sql,
         values,
