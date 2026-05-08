@@ -33,17 +33,17 @@ are not fixed by this checklist.
 
 ## Entry Points, Routing, And Actions
 
-- [ ] Implement or explicitly map upstream `do=check` behavior from `inc/Action/Check.php`.
-- [ ] Implement or explicitly map upstream `do=denied` behavior from `inc/Action/Denied.php`.
-- [ ] Implement or explicitly map upstream `do=locked` behavior from `inc/Action/Locked.php`.
-- [ ] Implement or explicitly map upstream `do=conflict` behavior from `inc/Action/Conflict.php`.
-- [ ] Implement or explicitly map upstream `do=cancel` behavior from `inc/Action/Cancel.php`.
-- [ ] Implement or explicitly map upstream `do=recover` behavior from `inc/Action/Recover.php`.
-- [ ] Implement or explicitly map upstream `do=draftdel` behavior from `inc/Action/Draftdel.php`.
-- [ ] Implement or explicitly map upstream `do=authtoken` behavior from `inc/Action/Authtoken.php`.
-- [ ] Implement or explicitly map upstream `do=plugin` dispatch from `inc/Action/Plugin.php`.
-- [ ] Match upstream `do=media` routing behavior instead of relying only on `/media-manager` and `/media-detail`.
-- [ ] Match upstream POST action routing for `do=save`, `do=preview`, and `do=draft` instead of only supporting native JSON/form endpoints where URLs differ.
+- [x] Implement or explicitly map upstream `do=check` behavior from `inc/Action/Check.php`.
+- [x] Implement or explicitly map upstream `do=denied` behavior from `inc/Action/Denied.php`.
+- [x] Implement or explicitly map upstream `do=locked` behavior from `inc/Action/Locked.php`.
+- [x] Implement or explicitly map upstream `do=conflict` behavior from `inc/Action/Conflict.php`.
+- [x] Implement or explicitly map upstream `do=cancel` behavior from `inc/Action/Cancel.php`.
+- [x] Implement or explicitly map upstream `do=recover` behavior from `inc/Action/Recover.php`.
+- [x] Implement or explicitly map upstream `do=draftdel` behavior from `inc/Action/Draftdel.php`.
+- [x] Implement or explicitly map upstream `do=authtoken` behavior from `inc/Action/Authtoken.php`.
+- [x] Implement or explicitly map upstream `do=plugin` dispatch from `inc/Action/Plugin.php`.
+- [x] Match upstream `do=media` routing behavior instead of relying only on `/media-manager` and `/media-detail`.
+- [x] Match upstream POST action routing for `do=save`, `do=preview`, and `do=draft` instead of only supporting native JSON/form endpoints where URLs differ.
 - [ ] Support the upstream `disableactions` configuration so disabled actions disappear from menus and reject requests.
 - [ ] Make missing-page HTTP status configurable like upstream `send404`; the port currently returns an HTML 404 for missing pages.
 - [ ] Match DokuWiki's `userewrite` and `useslash` modes, or document the Pages-only URL policy as intentionally fixed.

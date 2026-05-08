@@ -283,6 +283,131 @@ describe("handleRequest", () => {
     expect(htmlAlias.headers.get("location")).toBe("/wiki/wiki/welcome?do=export_xhtmlbody");
   });
 
+  it("maps legacy DokuWiki page actions to native Pages behavior", async () => {
+    const check = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=check"),
+      env
+    );
+    const denied = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=denied"),
+      env
+    );
+    const locked = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=locked"),
+      env
+    );
+    const conflict = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=conflict"),
+      env
+    );
+    const cancel = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=cancel"),
+      env
+    );
+    const recover = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=recover"),
+      env
+    );
+    const draftDelete = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=draftdel"),
+      env
+    );
+    const authToken = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=authtoken"),
+      env
+    );
+    const plugin = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=plugin"),
+      env
+    );
+    const media = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=media"),
+      env
+    );
+
+    expect(check.status).toBe(200);
+    await expect(check.text()).resolves.toContain("<h1>Diagnostics</h1>");
+    expect(denied.status).toBe(403);
+    await expect(denied.text()).resolves.toContain("<h1>Permission denied</h1>");
+    expect(locked.status).toBe(200);
+    await expect(locked.text()).resolves.toContain("does not currently have an active edit lock");
+    expect(conflict.status).toBe(409);
+    await expect(conflict.text()).resolves.toContain("<h1>Edit conflict</h1>");
+    expect(cancel.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(recover.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
+    expect(draftDelete.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
+    expect(authToken.status).toBe(501);
+    await expect(authToken.text()).resolves.toContain("Authentication token");
+    expect(plugin.status).toBe(501);
+    await expect(plugin.text()).resolves.toContain("DokuWiki action plugin dispatch");
+    expect(media.headers.get("location")).toBe("/media-manager?ns=wiki");
+  });
+
+  it("accepts legacy POST action routing for save, preview, draft, and cancel", async () => {
+    const saveForm = new FormData();
+    saveForm.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    saveForm.set("content", "====== Saved through do=save ======\n\nUpdated.");
+    saveForm.set("summary", "Legacy save");
+
+    const saved = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=save", {
+        method: "POST",
+        body: saveForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    expect(saved.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(state.row?.content).toContain("Saved through do=save");
+
+    const previewForm = new FormData();
+    previewForm.set("content", "====== Previewed ======\n\nText.");
+
+    const preview = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=preview", {
+        method: "POST",
+        body: previewForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(preview.status).toBe(200);
+    await expect(preview.text()).resolves.toContain("<h1>Preview</h1>");
+
+    const draftForm = new FormData();
+    draftForm.set("baseRevisionId", String(state.row?.revision_id));
+    draftForm.set("content", "====== Draft through doku.php ======");
+
+    const draft = await handleRequest(
+      new Request("https://example.com/doku.php?id=wiki:welcome&do=draft", {
+        method: "POST",
+        body: draftForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(draft.status).toBe(303);
+    expect(draft.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
+    expect(state.drafts).toHaveLength(1);
+
+    const cancel = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=cancel", {
+        method: "POST",
+        body: new FormData(),
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(cancel.status).toBe(303);
+    expect(cancel.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(state.drafts).toHaveLength(0);
+  });
+
   it("serves DokuWiki-compatible AJAX search and index endpoints", async () => {
     const quick = await handleRequest(
       new Request("https://example.com/lib/exe/ajax.php?call=qsearch&q=welcome"),

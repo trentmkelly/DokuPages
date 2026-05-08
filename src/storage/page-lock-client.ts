@@ -59,6 +59,29 @@ export async function releasePageLock(
   return Boolean(body.released);
 }
 
+export async function getPageLockStatus(
+  namespace: DurableObjectNamespace,
+  subjectType: LockRecord["subjectType"],
+  subjectId: string
+): Promise<PageLockInfo | null> {
+  const id = namespace.idFromName(`${subjectType}:${subjectId}`);
+  const stub = namespace.get(id);
+  const response = await stub.fetch("https://page-lock.local/", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ action: "status" })
+  });
+  const body = (await response.json()) as { lock?: PageLockInfo | null };
+
+  if (!response.ok) {
+    throw new Error(`Page lock status failed with status ${response.status}.`);
+  }
+
+  return body.lock ?? null;
+}
+
 async function lockRequest(
   namespace: DurableObjectNamespace,
   action: "acquire" | "refresh",

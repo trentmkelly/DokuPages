@@ -56,6 +56,7 @@ import {
 } from "./http/responses";
 import { D1AclStore, D1AuditLogStore } from "./storage/d1";
 import {
+  getPageLockStatus,
   refreshPageLock,
   releasePageLock,
   type PageLockInfo,
@@ -182,6 +183,12 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/doku.php") {
+    if (request.method === "POST") {
+      const id = cleanPageId(url.searchParams.get("id") ?? startPageId(env));
+      const response = await handleWikiPostAction(request, env, url, principal, id);
+      if (response) return response;
+    }
+
     return redirectLegacyDokuPhp(request, url, env);
   }
 
@@ -522,11 +529,7 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/api/pages/preview" && request.method === "POST") {
-    const form = await request.formData();
-    const content = String(form.get("content") ?? "");
-    const pageId = cleanPageId(String(form.get("id") ?? ""));
-    const existingPageIds = await existingPageIdsForContent(env, content, pageId || undefined);
-    return jsonResponse(renderWikiText(content, { pageId: pageId || undefined, existingPageIds }));
+    return handlePagePreview(request, env);
   }
 
   if (url.pathname.startsWith("/wiki/")) {
@@ -537,6 +540,11 @@ export async function handleRequest(
       return notFoundResponse("Missing wiki page id.");
     }
 
+    if (request.method === "POST") {
+      const response = await handleWikiPostAction(request, env, url, principal, id);
+      if (response) return response;
+    }
+
     if (request.method !== "GET") {
       return jsonResponse({ error: "Method not allowed." }, { status: 405 });
     }
@@ -544,6 +552,64 @@ export async function handleRequest(
     const canonicalPath = pagePath(id);
     if (url.pathname !== canonicalPath) {
       return redirectResponse(`${canonicalPath}${url.search}`, 301);
+    }
+
+    if (url.searchParams.get("do") === "check") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
+      return htmlResponse(await renderDiagnosticsPage(env));
+    }
+
+    if (url.searchParams.get("do") === "denied") {
+      return aclDeniedResponse(request, env, id, ACL_NONE, ACL_READ);
+    }
+
+    if (url.searchParams.get("do") === "locked") {
+      const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+      if (denied) return denied;
+      const lock = env.PAGE_LOCKS ? await getPageLockStatus(env.PAGE_LOCKS, "page", id) : null;
+      return htmlResponse(renderLockedPage(env, id, lock), { status: lock ? 423 : 200 });
+    }
+
+    if (url.searchParams.get("do") === "conflict") {
+      const page = await getCurrentPage(env.DB, id);
+      const denied = await requireAclPermission(
+        request,
+        env,
+        principal,
+        id,
+        page ? ACL_EDIT : ACL_CREATE
+      );
+      if (denied) return denied;
+      return htmlResponse(renderConflictPage(env, id, "", page), { status: 409 });
+    }
+
+    if (url.searchParams.get("do") === "cancel") {
+      return redirectResponse(pagePath(id));
+    }
+
+    if (url.searchParams.get("do") === "recover") {
+      return redirectResponse(`${pagePath(id)}?do=edit`);
+    }
+
+    if (url.searchParams.get("do") === "draftdel") {
+      return redirectResponse(`${pagePath(id)}?do=edit`);
+    }
+
+    if (url.searchParams.get("do") === "authtoken") {
+      return authFeatureNotSupportedResponse(request, env, "auth_token");
+    }
+
+    if (url.searchParams.get("do") === "plugin") {
+      return legacyActionNotAvailableResponse(env, "DokuWiki action plugin dispatch", id);
+    }
+
+    if (url.searchParams.get("do") === "media") {
+      return redirectResponse(`/media-manager?ns=${encodeURIComponent(namespaceForIndex(id))}`);
+    }
+
+    if (url.searchParams.get("do") === "redirect") {
+      return redirectResponse(pagePath(id));
     }
 
     if (url.searchParams.get("do") === "revisions") {
@@ -871,6 +937,70 @@ function remoteApiNotImplementedResponse(apiName: string): Response {
       status: "not_implemented"
     },
     { status: 501 }
+  );
+}
+
+function legacyActionNotAvailableResponse(env: Env, actionName: string, pageId: string): Response {
+  return htmlResponse(
+    htmlShell(
+      env,
+      actionName,
+      `<h1>${escapeHtml(actionName)}</h1>
+      <p>${escapeHtml(actionName)} is not available in this Pages port.</p>
+      <p><a href="${pagePath(pageId)}">Back to ${escapeHtml(pageId)}</a></p>`,
+      { pageId }
+    ),
+    { status: 501 }
+  );
+}
+
+async function handleWikiPostAction(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  id: string
+): Promise<Response | null> {
+  switch (url.searchParams.get("do")) {
+    case "save":
+      return handleSave(request, env, principal, id);
+    case "preview":
+      return handlePagePreview(request, env, id);
+    case "draft":
+      return handleSaveDraft(request, env, principal, id);
+    case "draftdel":
+      return handleDeleteDraft(request, env, principal, id, `${pagePath(id)}?do=edit`);
+    case "cancel":
+      return handleDeleteDraft(request, env, principal, id, pagePath(id));
+    default:
+      return null;
+  }
+}
+
+async function handlePagePreview(
+  request: Request,
+  env: Env,
+  overrideId?: string
+): Promise<Response> {
+  const form = await request.formData();
+  const content = String(form.get("content") ?? "");
+  const pageId = cleanPageId(String(form.get("id") || overrideId || ""));
+  const existingPageIds = await existingPageIdsForContent(env, content, pageId || undefined);
+  const rendered = renderWikiText(content, { pageId: pageId || undefined, existingPageIds });
+
+  if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
+    return jsonResponse(rendered);
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      pageId ? `Preview ${pageId}` : "Preview",
+      `<h1>Preview</h1>
+      <div class="preview group">${rendered.html}</div>
+      ${pageId ? `<p><a href="${pagePath(pageId)}?do=edit">Back to editor</a></p>` : ""}`,
+      pageId ? { pageId } : undefined
+    )
   );
 }
 
@@ -2206,6 +2336,19 @@ function normalizeLegacyAction(action: string | null): string | null {
     case "show":
       return null;
     case "edit":
+    case "check":
+    case "denied":
+    case "locked":
+    case "conflict":
+    case "cancel":
+    case "recover":
+    case "draftdel":
+    case "authtoken":
+    case "plugin":
+    case "media":
+    case "save":
+    case "preview":
+    case "redirect":
     case "source":
     case "revisions":
     case "recent":
@@ -4973,6 +5116,8 @@ function accountFeatureLabel(feature: string): string {
       return "Profile";
     case "password_reset":
       return "Password reset";
+    case "auth_token":
+      return "Authentication token";
     default:
       return "Account feature";
   }
@@ -6258,12 +6403,17 @@ async function handleEditPage(
   return response;
 }
 
-async function handleSave(request: Request, env: Env, principal: AuthPrincipal): Promise<Response> {
+async function handleSave(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  overrideId?: string
+): Promise<Response> {
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  const id = cleanPageId(String(form.get("id") ?? ""));
+  const id = cleanPageId(String(form.get("id") || overrideId || ""));
   const content = String(form.get("content") ?? "");
   const summary = String(form.get("summary") ?? "");
   const submittedLockToken = String(form.get("lockToken") ?? "");
@@ -6813,13 +6963,14 @@ function renderWordblockPage(
 async function handleSaveDraft(
   request: Request,
   env: Env,
-  principal: AuthPrincipal
+  principal: AuthPrincipal,
+  overrideId?: string
 ): Promise<Response> {
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  const id = cleanPageId(String(form.get("id") ?? ""));
+  const id = cleanPageId(String(form.get("id") || overrideId || ""));
   const lockToken = String(form.get("lockToken") ?? "");
   const author = principalAuthor(principal);
 
@@ -7162,13 +7313,15 @@ function isUploadFile(value: FormDataEntryValue | null): value is File {
 async function handleDeleteDraft(
   request: Request,
   env: Env,
-  principal: AuthPrincipal
+  principal: AuthPrincipal,
+  overrideId?: string,
+  redirectTarget?: string
 ): Promise<Response> {
   const form = await request.formData();
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  const id = cleanPageId(String(form.get("id") ?? ""));
+  const id = cleanPageId(String(form.get("id") || overrideId || ""));
   const lockToken = String(form.get("lockToken") ?? "");
 
   if (!id) {
@@ -7188,23 +7341,22 @@ async function handleDeleteDraft(
   await deletePageDraft(env.DB, id);
   await releaseHeldPageLock(env, principal, id, lockToken);
 
-  const response = redirectResponse(`${pagePath(id)}?do=edit`);
+  const response = redirectResponse(redirectTarget ?? `${pagePath(id)}?do=edit`);
   response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
   return response;
 }
 
 function renderLockedPage(env: Env, id: string, lock: PageLockInfo | null): string {
-  const owner = lock?.ownerName || "another editor";
-  const expiresAt = lock?.expiresAt
-    ? `<p>The current lock expires at ${escapeHtml(lock.expiresAt)}.</p>`
-    : "";
+  const lockDetails = lock
+    ? `<p>${escapeHtml(id)} is currently being edited by ${escapeHtml(lock.ownerName || "another editor")}.</p>
+      <p>The current lock expires at ${escapeHtml(lock.expiresAt)}.</p>`
+    : `<p>${escapeHtml(id)} does not currently have an active edit lock.</p>`;
 
   return htmlShell(
     env,
     `Page locked for ${id}`,
     `<h1>Page locked</h1>
-    <p>${escapeHtml(id)} is currently being edited by ${escapeHtml(owner)}.</p>
-    ${expiresAt}
+    ${lockDetails}
     <p><a href="${pagePath(id)}">View current page</a></p>`,
     { pageId: id }
   );
