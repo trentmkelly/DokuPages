@@ -34,6 +34,15 @@ media link with `class="select"` is chosen.
 
 The upload path writes the R2 object first, then stores current media metadata, an immutable `media_revisions` row, changelog row, and technical metadata rows in D1. If the D1 write fails after the object write, the newly written R2 object is deleted.
 
+JPEG uploads are parsed in the Worker for the default DokuWiki
+`conf/mediameta.php` field set. The parser reads SOF dimensions, EXIF TIFF
+fields, IPTC APP13 records, and common XMP fields, then stores a `jpeg`
+metadata row with display fields for title, date, filename, caption,
+photographer, copyright, format, file size, dimensions, camera, and keywords.
+`GET /media-detail/:id` renders those fields in the media detail panel. Imported
+DokuWiki `data/media_meta/*.meta` rows stored under the `dokuwiki` metadata key
+are adapted to the same display fields when a native `jpeg` row is not present.
+
 Uploads are validated before R2 writes. The native validator enforces a 25 MiB body limit, allows only a conservative extension set, checks non-generic MIME types against the file extension, and rejects SVG content containing scripts, event handlers, doctypes, entities, foreign objects, or `javascript:` links.
 
 Authorized upload submissions are rate limited in KV by client IP and actor. Twenty attempts in a 15 minute window block additional attempts for that pair and return `429` with `Retry-After: 900`.
@@ -137,4 +146,5 @@ SVG and unsupported image formats are served as originals because upstream
 `lib/exe/fetch.php` also skips SVG modification. Responses include
 `x-dokuwiki-thumbnail-policy`, `x-dokuwiki-resize-policy`, and
 `x-dokuwiki-exif-policy` headers so generated, unsupported, failed, and original
-paths remain observable. JPEG EXIF metadata is not parsed in the request path.
+paths remain observable. JPEG EXIF/IPTC metadata parsing happens during upload
+and is rendered from D1 metadata on detail pages, rather than during every fetch.

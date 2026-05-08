@@ -1316,6 +1316,60 @@ describe("handleRequest", () => {
     await expect(fetch.text()).resolves.toBe("uploaded media");
   });
 
+  it("uploads and displays parsed JPEG EXIF/IPTC metadata", async () => {
+    const form = new FormData();
+    form.set("ns", "wiki");
+    form.set("summary", "Upload photo");
+    form.set(
+      "file",
+      new File([uint8ArrayToArrayBuffer(jpegWithIptcMetadata())], "photo.jpg", {
+        type: "image/jpeg"
+      })
+    );
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    const metadataRow = state.metadata.find(
+      (record) =>
+        record.subject_type === "media" &&
+        record.subject_id === "wiki:photo.jpg" &&
+        record.key === "jpeg"
+    );
+    const parsed = JSON.parse(String(metadataRow?.value_json));
+
+    expect(parsed.tags).toMatchObject({
+      "Iptc.Headline": "Uploaded headline",
+      "Iptc.Caption": "Uploaded caption",
+      "File.Width": "2",
+      "File.Height": "3"
+    });
+    expect(parsed.display).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Title", value: "Uploaded headline" }),
+        expect.objectContaining({ label: "Caption", value: "Uploaded caption" })
+      ])
+    );
+
+    const detail = await handleRequest(
+      new Request("https://example.com/media-detail/wiki/photo.jpg"),
+      env
+    );
+    const html = await detail.text();
+
+    expect(html).toContain("<dt>Title:</dt><dd>Uploaded headline</dd>");
+    expect(html).toContain("<dt>Caption:</dt><dd>Uploaded caption</dd>");
+    expect(html).toContain("<dt>Width:</dt><dd>2</dd>");
+    expect(html).toContain("<dt>Height:</dt><dd>3</dd>");
+  });
+
   it("rejects media uploads that would overwrite existing media unless requested", async () => {
     const form = new FormData();
     form.set("ns", "wiki");
@@ -3295,6 +3349,18 @@ function createD1Stub(state: D1StubState): D1Database {
             return state.mediaRevisions.find((revision) => revision.id === id) ?? null;
           }
 
+          if (sql.includes("from metadata")) {
+            const [subjectId, key] = values;
+            return (
+              state.metadata.find(
+                (record) =>
+                  record.subject_type === "media" &&
+                  record.subject_id === subjectId &&
+                  record.key === key
+              ) ?? null
+            );
+          }
+
           if (sql.includes("from media")) {
             return state.media.find((media) => media.id === id && media.is_deleted === 0) ?? null;
           }
@@ -4028,6 +4094,55 @@ function seedAclRules(): Record<string, unknown>[] {
 
 function base64Bytes(value: string): Uint8Array {
   return Uint8Array.from(globalThis.atob(value), (character) => character.charCodeAt(0));
+}
+
+function jpegWithIptcMetadata(): Uint8Array {
+  return new Uint8Array([
+    0xff,
+    0xd8,
+    ...jpegSegment(0xed, [
+      ...asciiBytes("Photoshop 3.0\0"),
+      ...iptcRecordBytes(105, "Uploaded headline"),
+      ...iptcRecordBytes(120, "Uploaded caption")
+    ]),
+    ...jpegSof0(2, 3),
+    0xff,
+    0xd9
+  ]);
+}
+
+function jpegSegment(marker: number, data: number[]): number[] {
+  const length = data.length + 2;
+  return [0xff, marker, (length >> 8) & 0xff, length & 0xff, ...data];
+}
+
+function jpegSof0(width: number, height: number): number[] {
+  return jpegSegment(0xc0, [
+    8,
+    (height >> 8) & 0xff,
+    height & 0xff,
+    (width >> 8) & 0xff,
+    width & 0xff,
+    3,
+    1,
+    0x11,
+    0,
+    2,
+    0x11,
+    0,
+    3,
+    0x11,
+    0
+  ]);
+}
+
+function iptcRecordBytes(dataset: number, value: string): number[] {
+  const data = asciiBytes(value);
+  return [0x1c, 0x02, dataset, (data.length >> 8) & 0xff, data.length & 0xff, ...data];
+}
+
+function asciiBytes(value: string): number[] {
+  return [...value].map((character) => character.charCodeAt(0));
 }
 
 function uint8ArrayToArrayBuffer(bytes: Uint8Array): ArrayBuffer {

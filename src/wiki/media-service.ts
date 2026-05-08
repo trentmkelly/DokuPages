@@ -1,5 +1,6 @@
 import { cleanPageId, cleanRoutePageId } from "./page-id";
 import { getMimeTypeForExtension } from "./mime";
+import { parseJpegMetadata } from "./jpeg-metadata";
 
 export interface CurrentMedia {
   id: string;
@@ -145,6 +146,10 @@ interface MediaUsageReferenceRow {
   value_json: string;
   title: string | null;
   updated_at: string;
+}
+
+interface MetadataRow {
+  value_json: string;
 }
 
 const MAX_MEDIA_USAGE_REFERENCES = 500;
@@ -351,6 +356,29 @@ export async function searchMedia(
   return result.results.map(mapCurrentMedia);
 }
 
+export async function getMediaMetadata<T = unknown>(
+  db: D1Database,
+  id: string,
+  key: string
+): Promise<T | null> {
+  const row = await db
+    .prepare(
+      `select value_json
+       from metadata
+       where subject_type = 'media' and subject_id = ? and key = ?`
+    )
+    .bind(cleanMediaId(id), key)
+    .first<MetadataRow>();
+
+  if (!row) return null;
+
+  try {
+    return JSON.parse(row.value_json) as T;
+  } catch {
+    return null;
+  }
+}
+
 function mediaOrderBySql(options: MediaListOptions): string {
   const direction = options.order === "desc" ? "desc" : "asc";
   if (options.sort === "date") {
@@ -382,6 +410,7 @@ export async function saveMediaUpload(
   const summary = input.summary;
   const sizeChange = byteLength - (current?.byteLength ?? 0);
   const mediaRevisions = input.mediaRevisions ?? true;
+  const jpegMetadata = parseJpegMetadata(id, input.body, mimeType);
 
   await bucket.put(objectKey, input.body, {
     httpMetadata: {
@@ -461,7 +490,8 @@ export async function saveMediaUpload(
         objectKey,
         mimeType,
         contentHash,
-        size: byteLength
+        size: byteLength,
+        ...(jpegMetadata ? { jpeg: jpegMetadata } : {})
       })
     ]);
   } catch (error) {

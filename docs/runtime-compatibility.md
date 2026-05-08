@@ -152,7 +152,7 @@ is a future architecture extension, not a hidden filesystem compatibility mode.
 | `data/media`             | R2 media objects plus D1 current media metadata.                                      |
 | `data/media_attic`       | R2 old media objects plus D1 `media_revisions`.                                       |
 | `data/meta`              | D1 metadata rows with DokuWiki-shaped page metadata plus compatibility helper keys.   |
-| `data/media_meta`        | D1 metadata rows; EXIF/IPTC display remains separate.                                 |
+| `data/media_meta`        | D1 metadata rows plus native JPEG EXIF/IPTC/XMP display metadata for uploaded media.  |
 | `data/cache`             | KV rendered payloads, Cache API candidates, and D1 cache dependency rows.             |
 | `data/index`             | D1 search postings and term tables.                                                   |
 | `data/locks`             | Durable Object edit/media locks.                                                      |

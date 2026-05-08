@@ -65,13 +65,14 @@ import {
 } from "./storage/page-lock-client";
 import {
   cleanMediaId,
+  cleanMediaRouteId,
   deleteMedia,
   getCurrentMedia,
+  getMediaMetadata,
   getMediaRevision,
   listMediaRevisions,
   listMediaUsageReferences,
   listNamespaceMedia,
-  cleanMediaRouteId,
   mediaDetailPath,
   mediaName,
   mediaNamespace,
@@ -83,6 +84,7 @@ import {
   type MediaRevision,
   type MediaUsageReference
 } from "./wiki/media-service";
+import { dokuMediaMetadataToJpegMetadata, type ParsedJpegMetadata } from "./wiki/jpeg-metadata";
 import { validateMediaUpload } from "./wiki/media-validation";
 import {
   cleanPageId,
@@ -2522,10 +2524,14 @@ async function renderMediaDetailPage(
     return renderMediaDiffPage(env, id, media, url, principal);
   }
 
-  const [references, revisions] = await Promise.all([
+  const [references, revisions, jpegMetadata, dokuMediaMetadata] = await Promise.all([
     filterReadablePageItems(env, principal, await listMediaUsageReferences(env.DB, id)),
-    mediaRevisions ? listMediaRevisions(env.DB, id, 50) : Promise.resolve([])
+    mediaRevisions ? listMediaRevisions(env.DB, id, 50) : Promise.resolve([]),
+    getMediaMetadata<ParsedJpegMetadata>(env.DB, id, "jpeg"),
+    getMediaMetadata<unknown>(env.DB, id, "dokuwiki")
   ]);
+  const displayMetadata =
+    jpegMetadata ?? dokuMediaMetadataToJpegMetadata(id, media.byteLength, dokuMediaMetadata);
   const title = mediaName(id);
   const preview = media.mimeType.startsWith("image/")
     ? `<p><a href="${mediaPath(id)}"><img class="media" src="${escapeAttribute(mediaThumbnailPath(env, id, 900))}" alt="${escapeAttribute(title)}" loading="lazy" decoding="async"></a></p>`
@@ -2553,7 +2559,7 @@ async function renderMediaDetailPage(
         <h1>${escapeHtml(title)}</h1>
         ${preview}
         <div class="img_detail">
-          ${renderMediaDetailMetadata(media, references)}
+          ${renderMediaDetailMetadata(media, references, displayMetadata)}
           <p>Media permissions are checked against the containing namespace.</p>
         </div>
         ${renderMediaRevisionPanel(id, media, revisions, mediaRevisions)}
@@ -2580,7 +2586,11 @@ function renderMediaDetailTabs(id: string, mediaRevisions: boolean): string {
   </ul>`;
 }
 
-function renderMediaDetailMetadata(media: CurrentMedia, references: MediaUsageReference[]): string {
+function renderMediaDetailMetadata(
+  media: CurrentMedia,
+  references: MediaUsageReference[],
+  jpegMetadata?: ParsedJpegMetadata | null
+): string {
   return `<dl>
     <dt>Media ID:</dt><dd><code>${escapeHtml(media.id)}</code></dd>
     <dt>Namespace:</dt><dd>${escapeHtml(media.namespace || "(root)")}</dd>
@@ -2589,8 +2599,20 @@ function renderMediaDetailMetadata(media: CurrentMedia, references: MediaUsageRe
     <dt>Updated:</dt><dd>${escapeHtml(media.updatedAt)}</dd>
     <dt>Current revision:</dt><dd><code>${escapeHtml(media.currentRevisionId ?? "")}</code></dd>
     <dt>Hash:</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
+    ${renderJpegMetadataDefinitions(jpegMetadata)}
     <dt>Reference:</dt>${renderMediaReferenceDefinitions(references)}
   </dl>`;
+}
+
+function renderJpegMetadataDefinitions(metadata?: ParsedJpegMetadata | null): string {
+  if (!metadata?.display?.length) return "";
+
+  return metadata.display
+    .map(
+      (field) =>
+        `<dt>${escapeHtml(field.label)}:</dt><dd>${escapeHtml(field.value).replaceAll("\n", "<br>")}</dd>`
+    )
+    .join("");
 }
 
 function renderMediaReferenceDefinitions(references: MediaUsageReference[]): string {
