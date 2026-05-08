@@ -665,8 +665,8 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Add accessibility tests.
 - [x] Add visual regression tests.
 - [x] Add mobile viewport tests.
-- [ ] Add performance tests.
-- [ ] Add load tests within Workers limits.
+- [x] Add performance tests.
+- [x] Add load tests within Workers limits.
 - [x] Add security tests for XSS.
 - [x] Add security tests for CSRF.
 - [x] Add security tests for ACL bypass.
@@ -678,15 +678,15 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 ## Performance And Limits
 
 - [ ] Measure cold start time.
-- [ ] Measure warm request time.
-- [ ] Measure page render time.
-- [ ] Measure edit save time.
+- [x] Measure warm request time.
+- [x] Measure page render time.
+- [x] Measure edit save time.
 - [x] Measure media fetch time.
 - [x] Measure search time.
 - [ ] Measure migration time.
-- [ ] Measure D1 query counts per route.
+- [x] Measure D1 query counts per route.
 - [x] Measure R2 operation counts per route.
-- [ ] Measure KV operation counts per route if used.
+- [x] Measure KV operation counts per route if used.
 - [ ] Measure Worker CPU usage per route.
 - [ ] Measure Worker memory usage per route.
 - [ ] Measure bundle size.

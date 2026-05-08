@@ -70,6 +70,14 @@ deleted-page indexes, page revision primary-key lookups, and search posting
 primary-key lookups. They also assert one D1 read per search call and clamp raw
 posting searches to 100 results.
 
+## Route Performance Guardrails
+
+Local route performance tests measure representative warm page render time,
+concurrent page read load, edit-save time, and D1/KV operation counts. Guardrails
+keep warm page renders and edit saves under one second in the in-memory harness,
+keep 25 concurrent cached page reads under three seconds, prevent warm reads from
+writing KV, and bound storage calls for the render and save paths.
+
 ## Parser Cache Equivalent
 
 The port uses revision-aware rendered HTML cache entries instead of DokuWiki's

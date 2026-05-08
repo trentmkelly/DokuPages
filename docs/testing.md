@@ -49,6 +49,10 @@ Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
 sizes, and R2 media operation counts.
 
+Route performance tests cover warm page render latency, concurrent page read
+load, edit-save latency, and bounded D1/KV operation counts for those request
+paths.
+
 Search performance tests cover indexed page search query plans, raw posting
 search result clamps, term deduplication, and one-read D1 behavior across large
 fixture corpora.
