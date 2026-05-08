@@ -34,6 +34,7 @@ export interface RenderWikiTextOptions {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
   entityReplacements?: ReadonlyArray<readonly [string, string]>;
+  smileys?: Readonly<Record<string, string>>;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -90,13 +91,6 @@ const DEFAULT_SMILEYS: Record<string, string> = {
   FIXME: "fixme.svg",
   DELETEME: "deleteme.svg"
 };
-const SMILEY_PATTERN = new RegExp(
-  `(^|[^A-Za-z0-9_])(${Object.keys(DEFAULT_SMILEYS)
-    .sort((a, b) => b.length - a.length)
-    .map(escapeRegExp)
-    .join("|")})(?=$|[^A-Za-z0-9_])`,
-  "g"
-);
 // Default mapping from DokuWiki's conf/acronyms.conf.
 const DEFAULT_ACRONYMS: Record<string, string> = {
   ACL: "Access Control List",
@@ -184,6 +178,7 @@ export function renderWikiText(
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
     existingPageIds: options.existingPageIds,
     entityReplacements: options.entityReplacements ?? DEFAULT_ENTITY_REPLACEMENTS,
+    smileys: options.smileys ?? DEFAULT_SMILEYS,
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -416,6 +411,7 @@ interface RenderContext {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
   entityReplacements: ReadonlyArray<readonly [string, string]>;
+  smileys: Readonly<Record<string, string>>;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -737,6 +733,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             dependencies: context.dependencies,
             pageId: context.pageId,
             entityReplacements: context.entityReplacements,
+            smileys: context.smileys,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -786,7 +783,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderEmailAutolinks(rendered, protectHtml);
   rendered = renderTypography(rendered, context.entityReplacements, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
-  rendered = renderSmileys(rendered, protectHtml);
+  rendered = renderSmileys(rendered, context.smileys, protectHtml);
   rendered = renderAcronyms(rendered, protectHtml);
   rendered = rendered
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
@@ -846,14 +843,34 @@ function renderTypography(
   return rendered;
 }
 
-function renderSmileys(source: string, protectHtml: (html: string) => string): string {
-  return source.replace(SMILEY_PATTERN, (_match, prefix: string, smiley: string) => {
-    const filename = DEFAULT_SMILEYS[smiley];
+function renderSmileys(
+  source: string,
+  smileys: Readonly<Record<string, string>>,
+  protectHtml: (html: string) => string
+): string {
+  const pattern = smileyPattern(smileys);
+  if (!pattern) return source;
+
+  return source.replace(pattern, (_match, prefix: string, smiley: string) => {
+    const filename = smileys[smiley];
 
     return `${prefix}${protectHtml(
       `<img src="${SMILEY_IMAGE_BASE}/${filename}" class="icon smiley" alt="${escapeAttribute(smiley)}">`
     )}`;
   });
+}
+
+function smileyPattern(smileys: Readonly<Record<string, string>>): RegExp | null {
+  const tokens = Object.keys(smileys);
+  if (tokens.length === 0) return null;
+
+  return new RegExp(
+    `(^|[^A-Za-z0-9_])(${tokens
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp)
+      .join("|")})(?=$|[^A-Za-z0-9_])`,
+    "g"
+  );
 }
 
 function renderAcronyms(source: string, protectHtml: (html: string) => string): string {

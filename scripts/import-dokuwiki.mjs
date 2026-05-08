@@ -66,6 +66,10 @@ export async function buildImportPlan(sourceRoot) {
     path.join(confRoot, "entities.conf"),
     path.join(confRoot, "entities.local.conf")
   ]);
+  const smileyMappings = await discoverSmileyMappings([
+    path.join(confRoot, "smileys.conf"),
+    path.join(confRoot, "smileys.local.conf")
+  ]);
   const wordblockPatterns = await discoverWordblockPatterns(path.join(confRoot, "wordblock.conf"));
   const customLanguageFiles = await discoverCustomLanguageFiles(path.join(confRoot, "lang"));
   const customTemplateFiles = await discoverCustomTemplateFiles(path.join(root, "lib", "tpl"));
@@ -90,6 +94,7 @@ export async function buildImportPlan(sourceRoot) {
       interwikiTemplates: interwikiTemplates.length,
       mimeTypes: mimeTypes.length,
       entityReplacements: entityReplacements.length,
+      smileyMappings: smileyMappings.length,
       wordblockPatterns: wordblockPatterns.length,
       customLanguageFiles: customLanguageFiles.length,
       customTemplateFiles: customTemplateFiles.length
@@ -110,6 +115,7 @@ export async function buildImportPlan(sourceRoot) {
     interwikiTemplates,
     mimeTypes,
     entityReplacements,
+    smileyMappings,
     wordblockPatterns,
     customLanguageFiles,
     customTemplateFiles
@@ -328,6 +334,10 @@ on conflict(id) do update set
 
   for (const entry of plan.entityReplacements) {
     statements.push(metadataStatement("config", "entities", entry.token, entry, plan.generatedAt));
+  }
+
+  for (const entry of plan.smileyMappings) {
+    statements.push(metadataStatement("config", "smileys", entry.token, entry, plan.generatedAt));
   }
 
   for (const entry of plan.wordblockPatterns) {
@@ -1155,6 +1165,31 @@ export async function discoverEntityReplacements(files) {
   }
 
   return [...entries.values()].sort((a, b) => a.order - b.order);
+}
+
+export async function discoverSmileyMappings(files) {
+  const entries = new Map();
+
+  for (const file of files) {
+    const text = await readTextIfExists(file);
+    if (!text) continue;
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const match = line.match(/^(\S+)\s+(\S+)$/);
+      if (!match) continue;
+
+      entries.set(match[1], {
+        token: match[1],
+        filename: match[2],
+        source: path.basename(file)
+      });
+    }
+  }
+
+  return [...entries.values()].sort((a, b) => a.token.localeCompare(b.token));
 }
 
 function decodeConfigEntities(value) {

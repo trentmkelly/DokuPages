@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 21;
+const RENDER_CACHE_VERSION = 22;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1067,6 +1067,7 @@ async function handlePagePreview(
   const pageId = cleanPageId(String(form.get("id") || overrideId || ""));
   const config = getRuntimeConfig(env);
   const entityReplacements = await entityReplacementsForRender(env);
+  const smileys = await smileysForRender(env);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
@@ -1077,6 +1078,7 @@ async function handlePagePreview(
     pageId: pageId || undefined,
     existingPageIds,
     entityReplacements,
+    smileys,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2605,11 +2607,13 @@ async function renderPageHtml(
 
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const entityReplacements = await entityReplacementsForRender(env);
+  const smileys = await smileysForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
     existingPageIds,
     entityReplacements,
+    smileys,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2668,10 +2672,12 @@ async function renderPageExport(
 
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const entityReplacements = await entityReplacementsForRender(env);
+  const smileys = await smileysForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
     entityReplacements,
+    smileys,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2760,6 +2766,24 @@ async function entityReplacementsForRender(
     : undefined;
 }
 
+async function smileysForRender(env: Env): Promise<Record<string, string> | undefined> {
+  const result = await env.DB.prepare(
+    `select value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?`
+  )
+    .bind("config", "smileys")
+    .all<{ value_json: string }>();
+  const entries = result.results
+    .map((row) => parseSmileyMetadata(row.value_json))
+    .filter((entry): entry is { token: string; filename: string } => Boolean(entry));
+
+  return entries.length > 0
+    ? Object.fromEntries(entries.map((entry) => [entry.token, entry.filename]))
+    : undefined;
+}
+
 function parseEntityMetadata(
   value: string
 ): { token: string; replacement: string; order: number } | null {
@@ -2777,6 +2801,16 @@ function parseEntityMetadata(
       replacement: parsed.replacement,
       order: typeof parsed.order === "number" ? parsed.order : Number.MAX_SAFE_INTEGER
     };
+  } catch {
+    return null;
+  }
+}
+
+function parseSmileyMetadata(value: string): { token: string; filename: string } | null {
+  try {
+    const parsed = JSON.parse(value) as { token?: unknown; filename?: unknown };
+    if (typeof parsed.token !== "string" || typeof parsed.filename !== "string") return null;
+    return { token: parsed.token, filename: parsed.filename };
   } catch {
     return null;
   }

@@ -126,6 +126,7 @@ describe("renderWikiText", () => {
   it("renders default DokuWiki smileys", () => {
     const rendered = renderWikiText("Hello :-) LOL wordLOL [[wiki:syntax|LOL]]");
     const literal = renderWikiText("%%:-)%%");
+    const custom = renderWikiText("Hello :-)", { smileys: { ":-)": "custom.svg" } });
 
     expect(rendered.html).toContain(
       '<img src="/images/smileys/smile.svg" class="icon smiley" alt=":-)">'
@@ -136,6 +137,9 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain("wordLOL");
     expect(rendered.html).toContain('<a href="/wiki/wiki/syntax" class="wikilink1">LOL</a>');
     expect(literal.html).toBe("<p>:-)</p>");
+    expect(custom.html).toContain(
+      '<img src="/images/smileys/custom.svg" class="icon smiley" alt=":-)">'
+    );
   });
 
   it("renders default DokuWiki acronyms after smileys", () => {

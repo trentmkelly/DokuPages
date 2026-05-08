@@ -236,9 +236,16 @@ describe("handleRequest", () => {
       value_json: JSON.stringify({ token: "??", replacement: "‽", order: 0 }),
       updated_at: "2026-05-07T00:00:00.000Z"
     });
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "smileys",
+      key: ":-)",
+      value_json: JSON.stringify({ token: ":-)", filename: "custom.svg" }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
     state.row = {
       ...currentPageRow(),
-      content: "====== Welcome ======\n\n'quoted' don't and 640x480??"
+      content: "====== Welcome ======\n\n'quoted' don't and 640x480?? :-)"
     };
 
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
@@ -246,6 +253,7 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("‘quoted’ don’t and 640&times;480‽");
+    expect(html).toContain('<img src="/images/smileys/custom.svg"');
     expect(cachePuts).not.toContain("page:wiki:welcome");
   });
 
@@ -1279,7 +1287,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 21,
+        rendererVersion: 22,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1301,7 +1309,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 21,
+        rendererVersion: 22,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",
