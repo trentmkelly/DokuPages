@@ -285,12 +285,19 @@ describe("renderWikiText", () => {
       "[[wiki:welcome|Welcome]] [[missing:page|Missing]] [[#local section|Local]]",
       { pageId: "wiki:welcome", existingPageIds: new Set(["wiki:welcome"]) }
     );
+    const plural = renderWikiText("[[cat|Cat]] [[guides|Guides]]", {
+      pageId: "wiki:cats",
+      existingPageIds: new Set(["wiki:cats", "wiki:guide"]),
+      autoPluralLinks: true
+    });
 
     expect(rendered.html).toContain('<a href="/wiki/wiki/welcome" class="wikilink1">Welcome</a>');
     expect(rendered.html).toContain(
       '<a href="/wiki/missing/page" class="wikilink2" title="This topic does not exist yet">Missing</a>'
     );
     expect(rendered.html).toContain('<a href="#local-section" class="wikilink1">Local</a>');
+    expect(plural.html).toContain('<a href="/wiki/wiki/cats" class="wikilink1">Cat</a>');
+    expect(plural.html).toContain('<a href="/wiki/wiki/guide" class="wikilink1">Guides</a>');
   });
 
   it("renders CamelCase links only when enabled", () => {

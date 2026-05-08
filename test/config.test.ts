@@ -30,6 +30,7 @@ describe("runtime config", () => {
       useHeading: false,
       camelCaseLinks: false,
       typographyMode: 1,
+      autoPluralLinks: false,
       relNofollow: true,
       linkTargets: {
         wiki: null,
@@ -65,6 +66,7 @@ describe("runtime config", () => {
       USE_HEADING: "1",
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
+      AUTOPLURAL: "1",
       REL_NOFOLLOW: "0",
       TARGET_WIKI: "_self",
       TARGET_INTERWIKI: "_blank",
@@ -90,6 +92,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
+    expect(getRuntimeConfig(env).autoPluralLinks).toBe(true);
     expect(getRuntimeConfig(env).relNofollow).toBe(false);
     expect(getRuntimeConfig(env).linkTargets).toEqual({
       wiki: "_self",
@@ -171,6 +174,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "TYPOGRAPHY",
           effectiveValue: "1"
+        }),
+        expect.objectContaining({
+          key: "AUTOPLURAL",
+          effectiveValue: "false"
         }),
         expect.objectContaining({
           key: "REL_NOFOLLOW",

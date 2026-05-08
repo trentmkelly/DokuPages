@@ -43,6 +43,7 @@ export interface RenderWikiTextOptions {
   linkSchemes?: ReadonlyArray<string> | ReadonlySet<string>;
   relNofollow?: boolean;
   linkTargets?: LinkTargets;
+  autoPluralLinks?: boolean;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -196,6 +197,7 @@ export function renderWikiText(
     linkSchemes: normalizeLinkSchemes(options.linkSchemes),
     relNofollow: options.relNofollow ?? true,
     linkTargets: normalizeLinkTargets(options.linkTargets),
+    autoPluralLinks: options.autoPluralLinks ?? false,
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -434,6 +436,7 @@ interface RenderContext {
   linkSchemes: ReadonlySet<string>;
   relNofollow: boolean;
   linkTargets: Required<Record<LinkTargetKind, string | null>>;
+  autoPluralLinks: boolean;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -761,6 +764,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             linkSchemes: context.linkSchemes,
             relNofollow: context.relNofollow,
             linkTargets: context.linkTargets,
+            autoPluralLinks: context.autoPluralLinks,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -1057,7 +1061,9 @@ function renderLinks(
     const interwiki = external ? null : resolveInterwikiLink(target, context.interwikiTemplates);
     const windowsShare = external || interwiki ? null : windowsSharePath(target);
     const internal = !external && !interwiki && !windowsShare;
-    const internalLink = internal ? resolveInternalLink(target, context.pageId) : null;
+    const internalLink = internal
+      ? resolveAutoPluralInternalLink(resolveInternalLink(target, context.pageId), context)
+      : null;
 
     if (internalLink?.pageId) {
       addCacheDependency(context, "page", internalLink.pageId);
@@ -1129,6 +1135,33 @@ function isMissingInternalPage(context: RenderContext, pageId: string): boolean 
   return Boolean(context.existingPageIds && !context.existingPageIds.has(pageId));
 }
 
+function resolveAutoPluralInternalLink(
+  link: { href: string; pageId: string | null; fragment: string },
+  context: RenderContext
+): { href: string; pageId: string | null; fragment: string } {
+  if (
+    !context.autoPluralLinks ||
+    !link.pageId ||
+    !context.existingPageIds ||
+    context.existingPageIds.has(link.pageId)
+  ) {
+    return link;
+  }
+
+  const alternatePageId = autoPluralPageId(link.pageId);
+  if (!context.existingPageIds.has(alternatePageId)) return link;
+
+  return {
+    href: `${pageIdToRoutePath(alternatePageId)}${link.fragment}`,
+    pageId: alternatePageId,
+    fragment: link.fragment
+  };
+}
+
+function autoPluralPageId(pageId: string): string {
+  return pageId.endsWith("s") ? pageId.slice(0, -1) : `${pageId}s`;
+}
+
 function interwikiShortcut(target: string): string | null {
   const separator = target.indexOf(">");
   if (separator <= 0) return null;
@@ -1179,7 +1212,10 @@ function renderCamelCaseLinks(
   if (!context.camelCaseLinks) return source;
 
   return source.replace(/\b[A-Z]+[a-z]+[A-Z][A-Za-z]*\b/g, (linkText: string) => {
-    const internalLink = resolveInternalLink(linkText, context.pageId);
+    const internalLink = resolveAutoPluralInternalLink(
+      resolveInternalLink(linkText, context.pageId),
+      context
+    );
 
     if (!internalLink.pageId) {
       return linkText;
@@ -1300,14 +1336,15 @@ function windowsSharePath(target: string): string | null {
 function resolveInternalLink(
   target: string,
   currentPageId: string | undefined
-): { href: string; pageId: string | null } {
+): { href: string; pageId: string | null; fragment: string } {
   const [rawPageId = "", rawFragment] = target.split("#", 2);
   const fragment = rawFragment ? `#${slugify(rawFragment)}` : "";
 
   if (!rawPageId) {
     return {
       href: fragment || "#",
-      pageId: currentPageId ? cleanPageId(currentPageId) : null
+      pageId: currentPageId ? cleanPageId(currentPageId) : null,
+      fragment
     };
   }
 
@@ -1315,7 +1352,8 @@ function resolveInternalLink(
 
   return {
     href: `${pageIdToRoutePath(pageId)}${fragment}`,
-    pageId
+    pageId,
+    fragment
   };
 }
 

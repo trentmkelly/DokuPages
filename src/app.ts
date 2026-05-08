@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 27;
+const RENDER_CACHE_VERSION = 28;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1073,11 +1073,13 @@ async function handlePagePreview(
   const linkSchemes = await linkSchemesForRender(env);
   const relNofollow = await relNofollowForRender(env, config.relNofollow);
   const linkTargets = await linkTargetsForRender(env, config.linkTargets);
+  const autoPluralLinks = await autoPluralForRender(env, config.autoPluralLinks);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
     pageId || undefined,
-    config.camelCaseLinks
+    config.camelCaseLinks,
+    autoPluralLinks
   );
   const rendered = renderWikiText(content, {
     pageId: pageId || undefined,
@@ -1089,6 +1091,7 @@ async function handlePagePreview(
     linkSchemes,
     relNofollow,
     linkTargets,
+    autoPluralLinks,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2543,6 +2546,7 @@ function usesDefaultRenderControls(config: ReturnType<typeof getRuntimeConfig>):
     config.maxTocLevel === 3 &&
     config.maxSectionEditLevel === 3 &&
     !config.camelCaseLinks &&
+    !config.autoPluralLinks &&
     config.typographyMode === 1
   );
 }
@@ -2615,7 +2619,6 @@ async function renderPageHtml(
     });
   }
 
-  const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const entityReplacements = await entityReplacementsForRender(env);
   const smileys = await smileysForRender(env);
   const acronyms = await acronymsForRender(env);
@@ -2623,6 +2626,14 @@ async function renderPageHtml(
   const linkSchemes = await linkSchemesForRender(env);
   const relNofollow = await relNofollowForRender(env, config.relNofollow);
   const linkTargets = await linkTargetsForRender(env, config.linkTargets);
+  const autoPluralLinks = await autoPluralForRender(env, config.autoPluralLinks);
+  const existingPageIds = await existingPageIdsForContent(
+    env,
+    content,
+    id,
+    config.camelCaseLinks,
+    autoPluralLinks
+  );
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
@@ -2634,6 +2645,7 @@ async function renderPageHtml(
     linkSchemes,
     relNofollow,
     linkTargets,
+    autoPluralLinks,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2690,7 +2702,6 @@ async function renderPageExport(
     return renderCodeBlockExport(url, content, headers);
   }
 
-  const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
   const entityReplacements = await entityReplacementsForRender(env);
   const smileys = await smileysForRender(env);
   const acronyms = await acronymsForRender(env);
@@ -2698,6 +2709,14 @@ async function renderPageExport(
   const linkSchemes = await linkSchemesForRender(env);
   const relNofollow = await relNofollowForRender(env, config.relNofollow);
   const linkTargets = await linkTargetsForRender(env, config.linkTargets);
+  const autoPluralLinks = await autoPluralForRender(env, config.autoPluralLinks);
+  const existingPageIds = await existingPageIdsForContent(
+    env,
+    content,
+    id,
+    config.camelCaseLinks,
+    autoPluralLinks
+  );
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
@@ -2708,6 +2727,7 @@ async function renderPageExport(
     linkSchemes,
     relNofollow,
     linkTargets,
+    autoPluralLinks,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2872,6 +2892,11 @@ async function relNofollowForRender(env: Env, fallback: boolean): Promise<boolea
   return imported ?? fallback;
 }
 
+async function autoPluralForRender(env: Env, fallback: boolean): Promise<boolean> {
+  const imported = await importedDokuWikiBooleanConfig(env, "autoplural");
+  return imported ?? fallback;
+}
+
 async function linkTargetsForRender(
   env: Env,
   fallback: ReturnType<typeof getRuntimeConfig>["linkTargets"]
@@ -3016,15 +3041,19 @@ async function existingPageIdsForContent(
   env: Env,
   content: string,
   sourcePageId?: string,
-  camelCaseLinks = false
+  camelCaseLinks = false,
+  autoPluralLinks = false
 ): Promise<Set<string>> {
   const sourceId = sourcePageId ? cleanPageId(sourcePageId) : "";
   const linkedPageIds = extractInternalPageLinks(content, sourceId || undefined, {
     camelCaseLinks
   });
+  const candidatePageIds = autoPluralLinks
+    ? [...new Set([...linkedPageIds, ...linkedPageIds.map(autoPluralPageId)])]
+    : linkedPageIds;
   const existingPageIds = await listExistingPageIds(
     env.DB,
-    sourceId ? [...linkedPageIds, sourceId] : linkedPageIds
+    sourceId ? [...candidatePageIds, sourceId] : candidatePageIds
   );
 
   if (sourceId) {
@@ -3032,6 +3061,10 @@ async function existingPageIdsForContent(
   }
 
   return existingPageIds;
+}
+
+function autoPluralPageId(pageId: string): string {
+  return pageId.endsWith("s") ? pageId.slice(0, -1) : `${pageId}s`;
 }
 
 function versionedAssetPath(assetPath: string, env: Env): string {

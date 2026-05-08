@@ -75,7 +75,7 @@ are not fixed by this checklist.
 - [x] Match DokuWiki's section edit limits from `maxseclevel`.
 - [x] Match DokuWiki's TOC thresholds from `toptoclevel`, `tocminheads`, and `maxtoclevel`.
 - [x] Match DokuWiki's first-heading title behavior controlled by `useheading`.
-- [ ] Match DokuWiki's autoplural lookup for nonexistent pages when `autoplural` is enabled.
+- [x] Match DokuWiki's autoplural lookup for nonexistent pages when `autoplural` is enabled.
 - [ ] Add parser parity fixtures for malformed nested formatting, nested lists, nested quotes, mixed tables, link labels containing media, and punctuation-heavy autolinks.
 - [ ] Add parser parity fixtures for non-ASCII page IDs, deaccenting, romanization, and UTF-8 normalization.
 

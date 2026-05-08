@@ -22,6 +22,7 @@ export interface Env {
   USE_HEADING?: string;
   CAMELCASE?: string;
   TYPOGRAPHY?: string;
+  AUTOPLURAL?: string;
   REL_NOFOLLOW?: string;
   TARGET_WIKI?: string;
   TARGET_INTERWIKI?: string;

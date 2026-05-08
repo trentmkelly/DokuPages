@@ -88,6 +88,7 @@ describe("handleRequest", () => {
     env.MAINTENANCE_MODE = undefined;
     env.CAMELCASE = undefined;
     env.TYPOGRAPHY = undefined;
+    env.AUTOPLURAL = undefined;
     env.REL_NOFOLLOW = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
@@ -231,6 +232,30 @@ describe("handleRequest", () => {
       '<a href="/wiki/wiki/existingpage" class="wikilink2" title="This topic does not exist yet">ExistingPage</a>'
     );
     expect(cachePuts).not.toContain("page:wiki:welcome");
+  });
+
+  it("honors imported AUTOPLURAL behavior for missing page links", async () => {
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "dokuwiki",
+      key: "conf:autoplural",
+      value_json: JSON.stringify({ key: "autoplural", value: 1 }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
+    state.row = {
+      ...currentPageRow(),
+      id: "wiki:cats",
+      namespace: "wiki",
+      title: "Cats",
+      content: "====== Cats ======\n\n[[cat|Cat]] and [[guides|Guides]]."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/cats"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<a href="/wiki/wiki/cats" class="wikilink1">Cat</a>');
+    expect(html).toContain('<a href="/wiki/wiki/guide" class="wikilink1">Guides</a>');
   });
 
   it("honors the TYPOGRAPHY parser setting for page views", async () => {
@@ -1343,7 +1368,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 27,
+        rendererVersion: 28,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1365,7 +1390,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 27,
+        rendererVersion: 28,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",

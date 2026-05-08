@@ -52,6 +52,7 @@ fresh render.
   `relnofollow` disablement
 - configurable link targets for wiki, interwiki, external, media, and
   Windows-share links
+- optional DokuWiki autoplural lookup for missing internal links
 - section edit anchors
 - DokuWiki-template link classes for internal, external, interwiki, mail, media,
   and Windows-share links
