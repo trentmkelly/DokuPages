@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("public assets", () => {
   it("keeps the create-page action out of missing wiki-link styling", async () => {
-    const css = await readFile(new URL("../public/dokuwiki.css", import.meta.url), "utf8");
+    const css = await readFile("public/dokuwiki.css", "utf8");
     const missingLinkRule = css.indexOf(".dokuwiki a.wikilink2");
     const createActionRule = css.indexOf(".dokuwiki .page a.action.create:not(.wikilink2)");
 
