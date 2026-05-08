@@ -44,6 +44,8 @@
     "wrangler": "^4.88.0"
   },
   "dependencies": {
-    "@cf-wasm/photon": "^0.3.5"
+    "@cf-wasm/photon": "^0.3.5",
+    "bcryptjs": "^3.0.3",
+    "unix-crypt-td-js": "^1.1.4"
   }
 }

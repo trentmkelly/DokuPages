@@ -66,4 +66,10 @@ Cloudflare Workers currently caps PBKDF2 at 100000 iterations, so new native
 hashes use that value. Higher-iteration native hashes are treated as unsupported
 credentials instead of throwing a runtime error.
 
-The importer migrates `users.auth.php` rows into D1 users, groups, and user-group memberships using DokuWiki `authplain` escaping rules. Migrated legacy hashes are preserved for auditability, but the native verifier rejects unsupported hash formats without throwing until a reset or rehash path converts those accounts.
+The importer migrates `users.auth.php` rows into D1 users, groups, and user-group
+memberships using DokuWiki `authplain` escaping rules. The login verifier accepts
+the DokuWiki `passcrypt` formats needed for imported accounts: `bcrypt`, `smd5`,
+`md5`, `sha1`, `ssha`, DES `crypt`, pre-4.1 MySQL `mysql`, and MySQL 4.1+
+`my411`. A successful legacy-hash login immediately rewrites that user's
+`password_hash` to the native PBKDF2 format; new registrations, profile password
+changes, and password resets never create legacy hashes.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashPassword, verifyPassword } from "../src/auth/password";
+import { hashPassword, verifyPassword, verifyPasswordDetailed } from "../src/auth/password";
 
 describe("password hashing", () => {
   it("hashes passwords with PBKDF2-SHA256 and verifies matches", async () => {
@@ -43,5 +43,36 @@ describe("password hashing", () => {
         "pbkdf2-sha256$100001$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
       )
     ).resolves.toBe(false);
+  });
+
+  it("verifies imported DokuWiki authplain passcrypt hashes", async () => {
+    const hashes = [
+      "$2y$10$usesomesillystringfore1kzg2rHWaz.ECl0R1vh1mrxeBkDbTI2",
+      "$1$salt1234$U4DE1tCkda9p2NZpiBnLR0",
+      "b6d4f14cc8fd48b20e3f23f5f81d9a61",
+      "faeb5f917545ae86dad3e363f0c758b2ff94777c",
+      "{SSHA}T76CDCLq7uPO/cZGzWtqbNtHlhtzYWx0",
+      "abnd5bXd5P5B.",
+      "352e590a251a7800",
+      "*30496D7C6A25AB7CB42828401D94D1BB86E24CB8"
+    ];
+
+    for (const legacyHash of hashes) {
+      await expect(verifyPassword("legacy password", legacyHash), legacyHash).resolves.toBe(true);
+      await expect(verifyPassword("wrong password", legacyHash), legacyHash).resolves.toBe(false);
+      await expect(
+        verifyPasswordDetailed("legacy password", legacyHash),
+        legacyHash
+      ).resolves.toMatchObject({
+        ok: true,
+        needsRehash: true
+      });
+    }
+  });
+
+  it("verifies DokuWiki upgraded legacy hashes with the U prefix", async () => {
+    await expect(
+      verifyPassword("legacy password", "U$1$salt1234$aQ7G2HPRMxdM2Va8KPYZJ0")
+    ).resolves.toBe(true);
   });
 });

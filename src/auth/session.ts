@@ -1,5 +1,5 @@
 import type { UserRecord } from "../storage/interfaces";
-import { verifyPassword } from "./password";
+import { hashPassword, verifyPasswordDetailed } from "./password";
 import { anonymousPrincipal, principalFromUser, type AuthPrincipal } from "./principal";
 
 const SESSION_TOKEN_BYTES = 32;
@@ -56,7 +56,20 @@ export async function authenticateUser(
   const user = await getUserByUsername(db, username);
   if (!user || user.isDisabled || !user.passwordHash) return null;
 
-  return (await verifyPassword(password, user.passwordHash)) ? user : null;
+  const verification = await verifyPasswordDetailed(password, user.passwordHash);
+  if (!verification.ok) return null;
+
+  if (verification.needsRehash) {
+    const passwordHash = await hashPassword(password);
+    const updatedAt = new Date().toISOString();
+    await db
+      .prepare("update users set password_hash = ?, updated_at = ? where id = ?")
+      .bind(passwordHash, updatedAt, user.id)
+      .run();
+    return { ...user, passwordHash, updatedAt };
+  }
+
+  return user;
 }
 
 export async function createLoginSession(

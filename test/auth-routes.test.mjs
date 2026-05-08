@@ -714,6 +714,22 @@ describe("auth routes", () => {
     }
   });
 
+  it("logs in imported DokuWiki authplain hashes and rehashes them natively", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    await env.DB.prepare("update users set password_hash = ? where username = ?")
+      .bind("$1$salt1234$U4DE1tCkda9p2NZpiBnLR0", "alice")
+      .run();
+
+    const loginResponse = await postLogin(env, "alice", "legacy password");
+    const row = await env.DB.prepare("select password_hash from users where username = ?")
+      .bind("alice")
+      .first();
+
+    expect(loginResponse.status).toBe(303);
+    expect(row.password_hash).toMatch(/^pbkdf2-sha256\$100000\$/);
+  });
+
   it("allows admin users to manage ACL rules", async () => {
     env = createEnv();
     await seedUser(env.DB);
