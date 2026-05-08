@@ -67,6 +67,16 @@ mentioned by existing pages.
 
 `POST /api/media/revert` expects `id`, `revisionId`, and optional `summary`. Revert points the current media row back at the selected immutable R2 object, creates a new `revert` media revision, appends a media changelog row, and records the source revision ID in metadata. Delete revisions cannot be restored directly.
 
+## Detail And History UI
+
+`GET /media-detail/:id` renders a DokuWiki-shaped detail page using the default
+template structure from `lib/tpl/dokuwiki/detail.php`: `dokuwiki__detail`,
+`img_detail`, detail tabs, media metadata, relation references, and the media
+ACL warning. When media revisions are enabled, the page also renders a
+`page__revisions` history form with revision checkboxes, diff links, summaries,
+file sizes, and current-revision markers modelled after
+`inc/Ui/MediaRevisions.php`.
+
 ## Cleanup Semantics
 
 `GET /admin/media-cleanup?scan=1` scans R2 objects under `media/` and compares

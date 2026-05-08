@@ -1098,6 +1098,17 @@ describe("handleRequest", () => {
       new Request("https://example.com/media/wiki/logo.svg?rev=media-rev-1"),
       env
     );
+    state.metadata.push({
+      subject_type: "page",
+      subject_id: "wiki:welcome",
+      key: "relation",
+      value_json: JSON.stringify({
+        media: {
+          "wiki:logo.svg": true
+        }
+      }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
     const detail = await handleRequest(
       new Request("https://example.com/media-detail/wiki/logo.svg"),
       env
@@ -1153,7 +1164,14 @@ describe("handleRequest", () => {
     expect(noCacheConditional.status).toBe(200);
     expect(revision.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     await expect(revision.text()).resolves.toBe("<svg>old</svg>");
-    await expect(detail.text()).resolves.toContain("Media detail");
+    const detailHtml = await detail.text();
+    expect(detailHtml).toContain('id="dokuwiki__detail"');
+    expect(detailHtml).toContain('class="img_detail"');
+    expect(detailHtml).toContain('id="page__revisions"');
+    expect(detailHtml).toContain("Reference:");
+    expect(detailHtml).toContain('href="/wiki/wiki/welcome"');
+    expect(detailHtml).toContain("media-rev-current");
+    expect(detailHtml).toContain("media-rev-1");
     const mediaDiffHtml = await mediaDiff.text();
     expect(mediaDiff.status).toBe(200);
     expect(mediaDiffHtml).toContain("Media diff");

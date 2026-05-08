@@ -69,6 +69,7 @@ import {
   getCurrentMedia,
   getMediaRevision,
   listMediaRevisions,
+  listMediaUsageReferences,
   listNamespaceMedia,
   cleanMediaRouteId,
   mediaDetailPath,
@@ -2521,9 +2522,14 @@ async function renderMediaDetailPage(
     return renderMediaDiffPage(env, id, media, url, principal);
   }
 
+  const [references, revisions] = await Promise.all([
+    filterReadablePageItems(env, principal, await listMediaUsageReferences(env.DB, id)),
+    mediaRevisions ? listMediaRevisions(env.DB, id, 50) : Promise.resolve([])
+  ]);
+  const title = mediaName(id);
   const preview = media.mimeType.startsWith("image/")
-    ? `<p><a href="${mediaPath(id)}"><img class="media" src="${mediaPath(id)}" alt="${escapeAttribute(mediaName(id))}" loading="lazy" decoding="async"></a></p>`
-    : `<p><a href="${mediaPath(id)}">Download ${escapeHtml(mediaName(id))}</a></p>`;
+    ? `<p><a href="${mediaPath(id)}"><img class="media" src="${escapeAttribute(mediaThumbnailPath(env, id, 900))}" alt="${escapeAttribute(title)}" loading="lazy" decoding="async"></a></p>`
+    : `<p><a href="${mediaPath(id)}">Download ${escapeHtml(title)}</a></p>`;
 
   const revertForm = mediaRevisions
     ? `<form class="media__revert" method="post" action="/api/media/revert">
@@ -2540,31 +2546,113 @@ async function renderMediaDetailPage(
   return htmlShell(
     env,
     `Media detail for ${id}`,
-    `<h1>Media detail</h1>
-    <div id="dokuwiki__detail">
-      ${preview}
-      <div class="img_detail">
-        <dl>
-          <dt>Media ID</dt><dd>${escapeHtml(id)}</dd>
-          <dt>Namespace</dt><dd>${escapeHtml(media.namespace || "(root)")}</dd>
-          <dt>MIME type</dt><dd>${escapeHtml(media.mimeType)}</dd>
-          <dt>Size</dt><dd>${media.byteLength.toLocaleString("en-US")} bytes</dd>
-          <dt>Updated</dt><dd>${escapeHtml(media.updatedAt)}</dd>
-          <dt>Current revision</dt><dd><code>${escapeHtml(media.currentRevisionId ?? "")}</code></dd>
-          <dt>Hash</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
-        </dl>
+    `<div id="dokuwiki__detail">
+      <div class="pageId"><span>${escapeHtml(id)}</span></div>
+      <div class="page group">
+        ${renderMediaDetailTabs(id, mediaRevisions)}
+        <h1>${escapeHtml(title)}</h1>
+        ${preview}
+        <div class="img_detail">
+          ${renderMediaDetailMetadata(media, references)}
+          <p>Media permissions are checked against the containing namespace.</p>
+        </div>
+        ${renderMediaRevisionPanel(id, media, revisions, mediaRevisions)}
+        ${revertForm}
+        <form class="media__delete" method="post" action="/api/media/delete">
+          ${csrfInput(csrfToken)}
+          <input type="hidden" name="id" value="${escapeAttribute(id)}">
+          <label for="media__delete_summary">Delete summary</label>
+          <input id="media__delete_summary" name="summary" type="text">
+          <button type="submit">Delete media</button>
+        </form>
       </div>
-      ${revertForm}
-      <form class="media__delete" method="post" action="/api/media/delete">
-        ${csrfInput(csrfToken)}
-        <input type="hidden" name="id" value="${escapeAttribute(id)}">
-        <label for="media__delete_summary">Delete summary</label>
-        <input id="media__delete_summary" name="summary" type="text">
-        <button type="submit">Delete media</button>
-      </form>
     </div>`,
     { principal }
   );
+}
+
+function renderMediaDetailTabs(id: string, mediaRevisions: boolean): string {
+  const history = mediaRevisions ? `<li><a href="#media__revisions">History</a></li>` : "";
+
+  return `<ul class="tabs">
+    <li class="active"><a href="${mediaDetailPath(id)}">View</a></li>
+    ${history}
+  </ul>`;
+}
+
+function renderMediaDetailMetadata(media: CurrentMedia, references: MediaUsageReference[]): string {
+  return `<dl>
+    <dt>Media ID:</dt><dd><code>${escapeHtml(media.id)}</code></dd>
+    <dt>Namespace:</dt><dd>${escapeHtml(media.namespace || "(root)")}</dd>
+    <dt>MIME type:</dt><dd>${escapeHtml(media.mimeType)}</dd>
+    <dt>Size:</dt><dd>${media.byteLength.toLocaleString("en-US")} bytes</dd>
+    <dt>Updated:</dt><dd>${escapeHtml(media.updatedAt)}</dd>
+    <dt>Current revision:</dt><dd><code>${escapeHtml(media.currentRevisionId ?? "")}</code></dd>
+    <dt>Hash:</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
+    <dt>Reference:</dt>${renderMediaReferenceDefinitions(references)}
+  </dl>`;
+}
+
+function renderMediaReferenceDefinitions(references: MediaUsageReference[]): string {
+  if (references.length === 0) return "<dd>Nothing found.</dd>";
+
+  return references
+    .map(
+      (reference) =>
+        `<dd><a href="${pagePath(reference.id)}">${escapeHtml(reference.title ?? reference.id)}</a></dd>`
+    )
+    .join("");
+}
+
+function renderMediaRevisionPanel(
+  id: string,
+  media: CurrentMedia,
+  revisions: MediaRevision[],
+  mediaRevisions: boolean
+): string {
+  if (!mediaRevisions) return "";
+
+  const items =
+    revisions.length === 0
+      ? '<li><div class="li">No media revisions found.</div></li>'
+      : revisions
+          .map((revision, index) => renderMediaRevisionListItem(id, media, revision, index))
+          .join("");
+
+  return `<form id="page__revisions" class="changes" method="get" action="${mediaDetailPath(id)}">
+    <fieldset>
+      <legend>Revisions</legend>
+      <input type="hidden" name="mediado" value="diff">
+      <ul>${items}</ul>
+      <button type="submit" name="do[diff]">Show differences between selected revisions</button>
+    </fieldset>
+  </form>`;
+}
+
+function renderMediaRevisionListItem(
+  id: string,
+  media: CurrentMedia,
+  revision: MediaRevision,
+  index: number
+): string {
+  const isCurrent = media.currentRevisionId === revision.id;
+  const checkboxName = index === 0 ? "rev2[1]" : "rev2[0]";
+  const diffPath = `${mediaDetailPath(id)}?mediado=diff&rev=${encodeURIComponent(revision.id)}`;
+  const revisionPath = `${mediaPath(id)}?rev=${encodeURIComponent(revision.id)}`;
+  const current = isCurrent ? ' <span class="sum current">current</span>' : "";
+
+  return `<li class="${revision.changeType}">
+    <div class="li">
+      <input type="checkbox" name="${escapeAttribute(checkboxName)}" value="${escapeAttribute(revision.id)}"${index < 2 ? " checked" : ""}>
+      <span class="date"><a href="${escapeAttribute(revisionPath)}">${escapeHtml(revision.createdAt)}</a></span>
+      <a class="diff_link" href="${escapeAttribute(diffPath)}">diff</a>
+      <span class="mediafile">${escapeHtml(mediaName(revision.mediaId))}</span>
+      <div>
+        <span class="sum">${escapeHtml(revision.summary || revision.changeType)}</span>
+        <span class="sizechange">${escapeHtml(formatMediaByteLength(revision.byteLength))}</span>${current}
+      </div>
+    </div>
+  </li>`;
 }
 
 interface MediaDiffSide {
