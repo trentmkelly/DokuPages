@@ -24,6 +24,7 @@ export interface RenderedWikiText {
 
 export interface RenderWikiTextOptions {
   pageId?: string;
+  existingPageIds?: ReadonlySet<string>;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -150,6 +151,7 @@ export function renderWikiText(
     footnotes: [],
     dependencies: new Map(),
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
+    existingPageIds: options.existingPageIds,
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -330,6 +332,7 @@ interface RenderContext {
   footnotes: string[];
   dependencies: Map<string, CacheDependency>;
   pageId?: string;
+  existingPageIds?: ReadonlySet<string>;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -826,6 +829,9 @@ function renderLinks(
       addCacheDependency(context, "page", internalLink.pageId);
     }
 
+    const internalMissing = Boolean(
+      internal && internalLink?.pageId && isMissingInternalPage(context, internalLink.pageId)
+    );
     const href = external
       ? target
       : interwiki
@@ -837,13 +843,15 @@ function renderLinks(
       external,
       interwikiShortcut: interwiki ? interwikiShortcut(target) : null,
       internal,
+      internalMissing,
       windowsShare: Boolean(windowsShare)
     });
     const rel = external || interwiki?.external ? ' rel="nofollow noopener noreferrer"' : "";
     const classAttribute = classNames.length > 0 ? ` class="${classNames.join(" ")}"` : "";
+    const titleAttribute = internalMissing ? ' title="This topic does not exist yet"' : "";
 
     return protectHtml(
-      `<a href="${escapeAttribute(href)}"${classAttribute}${rel}>${renderLinkLabel(label)}</a>`
+      `<a href="${escapeAttribute(href)}"${classAttribute}${titleAttribute}${rel}>${renderLinkLabel(label)}</a>`
     );
   });
 }
@@ -852,13 +860,18 @@ function linkClassNames(options: {
   external: boolean;
   interwikiShortcut: string | null;
   internal: boolean;
+  internalMissing: boolean;
   windowsShare: boolean;
 }): string[] {
   if (options.windowsShare) return ["windows"];
   if (options.external) return ["urlextern"];
   if (options.interwikiShortcut) return ["interwiki", `iw_${options.interwikiShortcut}`];
-  if (options.internal) return ["wikilink1"];
+  if (options.internal) return [options.internalMissing ? "wikilink2" : "wikilink1"];
   return [];
+}
+
+function isMissingInternalPage(context: RenderContext, pageId: string): boolean {
+  return Boolean(context.existingPageIds && !context.existingPageIds.has(pageId));
 }
 
 function interwikiShortcut(target: string): string | null {

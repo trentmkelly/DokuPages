@@ -188,6 +188,23 @@ describe("handleRequest", () => {
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
+  it("marks missing internal page links with DokuWiki red-link styling", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content:
+        "====== Welcome ======\n\nExisting [[wiki:guide|Guide]] and missing [[missing:page|Missing]]."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<a href="/wiki/wiki/guide" class="wikilink1">Guide</a>');
+    expect(html).toContain(
+      '<a href="/wiki/missing/page" class="wikilink2" title="This topic does not exist yet">Missing</a>'
+    );
+  });
+
   it("fingerprints static assets with the Pages commit when available", async () => {
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), {
       ...env,
@@ -923,7 +940,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 17,
+        rendererVersion: 18,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -945,7 +962,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 17,
+        rendererVersion: 18,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",
@@ -1098,7 +1115,7 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("This topic does not exist yet.");
     expect(html).toContain(
-      '<a class="wikilink1" href="/wiki/missing/page?do=edit">Create this page</a>'
+      '<a class="wikilink2" href="/wiki/missing/page?do=edit" title="This topic does not exist yet">Create this page</a>'
     );
     expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');
   });
@@ -1585,7 +1602,9 @@ describe("handleRequest", () => {
       title: "Preview"
     });
     expect(preview).toMatchObject({
-      html: expect.stringContaining('<a href="/wiki/wiki/guide/child" class="wikilink1">Child</a>')
+      html: expect.stringContaining(
+        '<a href="/wiki/wiki/guide/child" class="wikilink2" title="This topic does not exist yet">Child</a>'
+      )
     });
   });
 
@@ -2215,6 +2234,14 @@ function createD1Stub(state: D1StubState): D1Database {
                 currentPageSourceRows(state).filter((page) => page.namespace === idOrLimit),
                 200
               )
+            };
+          }
+
+          if (sql.includes("from pages") && sql.includes("id in")) {
+            return {
+              results: currentPageSourceRows(state)
+                .filter((page) => values.includes(page.id))
+                .map((page) => ({ id: page.id }))
             };
           }
 

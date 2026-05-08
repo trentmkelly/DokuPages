@@ -1,4 +1,4 @@
-import { pageIdToRoutePath } from "./page-id";
+import { cleanPageId, pageIdToRoutePath } from "./page-id";
 import { extractInternalPageLinks } from "./page-links";
 import { buildSearchTermFrequencies, makeSearchSnippet, parseSearchQuery } from "./search";
 
@@ -327,6 +327,26 @@ export async function listAllPages(db: D1Database, limit = 500): Promise<PageLin
     title: row.title,
     updatedAt: row.updated_at
   }));
+}
+
+export async function listExistingPageIds(
+  db: D1Database,
+  pageIds: readonly string[]
+): Promise<Set<string>> {
+  const ids = [...new Set(pageIds.map(cleanPageId).filter(Boolean))];
+  if (ids.length === 0) return new Set();
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `select id
+       from pages
+       where is_deleted = 0 and id in (${placeholders})`
+    )
+    .bind(...ids)
+    .all<{ id: string }>();
+
+  return new Set(result.results.map((row) => row.id));
 }
 
 export async function listBacklinks(

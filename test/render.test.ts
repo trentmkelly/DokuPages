@@ -185,6 +185,19 @@ describe("renderWikiText", () => {
     ]);
   });
 
+  it("uses DokuWiki missing-link styling when page existence is known", () => {
+    const rendered = renderWikiText(
+      "[[wiki:welcome|Welcome]] [[missing:page|Missing]] [[#local section|Local]]",
+      { pageId: "wiki:welcome", existingPageIds: new Set(["wiki:welcome"]) }
+    );
+
+    expect(rendered.html).toContain('<a href="/wiki/wiki/welcome" class="wikilink1">Welcome</a>');
+    expect(rendered.html).toContain(
+      '<a href="/wiki/missing/page" class="wikilink2" title="This topic does not exist yet">Missing</a>'
+    );
+    expect(rendered.html).toContain('<a href="#local-section" class="wikilink1">Local</a>');
+  });
+
   it("renders interwiki links from the default DokuWiki map", () => {
     const rendered = renderWikiText(
       "[[doku>newsletter]] [[doku>faq:sidebar|FAQ]] [[wp>Wiki|Wiki]] [[this>doku.php?do=admin&page=config|config]]"

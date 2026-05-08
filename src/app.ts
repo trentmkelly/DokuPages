@@ -96,6 +96,7 @@ import {
   getPageRevision,
   listAllPages,
   listBacklinks,
+  listExistingPageIds,
   listNamespacePages,
   listOrphanPages,
   listPageRevisions,
@@ -111,6 +112,7 @@ import {
   type PageDraft,
   type PageRevision
 } from "./wiki/page-service";
+import { extractInternalPageLinks } from "./wiki/page-links";
 import {
   getWikiRenderDirectives,
   renderWikiText,
@@ -127,7 +129,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 17;
+const RENDER_CACHE_VERSION = 18;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -519,7 +521,8 @@ export async function handleRequest(
     const form = await request.formData();
     const content = String(form.get("content") ?? "");
     const pageId = cleanPageId(String(form.get("id") ?? ""));
-    return jsonResponse(renderWikiText(content, { pageId: pageId || undefined }));
+    const existingPageIds = await existingPageIdsForContent(env, content, pageId || undefined);
+    return jsonResponse(renderWikiText(content, { pageId: pageId || undefined, existingPageIds }));
   }
 
   if (url.pathname.startsWith("/wiki/")) {
@@ -666,7 +669,7 @@ export async function handleRequest(
         );
       }
 
-      return renderPageExport(env, url, id, exportPage, exportMode);
+      return await renderPageExport(env, url, id, exportPage, exportMode);
     }
 
     if (revisionId) {
@@ -2310,7 +2313,8 @@ async function renderPageHtml(
     });
   }
 
-  const rendered = renderWikiText(content, { pageId: id, directives });
+  const existingPageIds = await existingPageIdsForContent(env, content, id);
+  const rendered = renderWikiText(content, { pageId: id, directives, existingPageIds });
   const title = rendered.title ?? page?.title ?? id;
 
   if (!rendered.noCache && !privateCache) {
@@ -2338,16 +2342,17 @@ async function renderPageHtml(
   );
 }
 
-function renderPageExport(
+async function renderPageExport(
   env: Env,
   url: URL,
   id: string,
   page: CurrentPage | PageRevision,
   mode: ExportMode
-): Response {
+): Promise<Response> {
   const content = page.content;
   const revisionId = "revisionId" in page ? page.revisionId : page.id;
-  const rendered = renderWikiText(content, { pageId: id });
+  const existingPageIds = await existingPageIdsForContent(env, content, id);
+  const rendered = renderWikiText(content, { pageId: id, existingPageIds });
   const title = rendered.title ?? ("title" in page ? page.title : null) ?? id;
   const headers = securityHeaders({ "x-robots-tag": "noindex" });
   const language = getRuntimeConfig(env).language;
@@ -2392,6 +2397,25 @@ function exportFileName(id: string): string {
   return name.replace(/[^a-z0-9._-]+/gi, "_");
 }
 
+async function existingPageIdsForContent(
+  env: Env,
+  content: string,
+  sourcePageId?: string
+): Promise<Set<string>> {
+  const sourceId = sourcePageId ? cleanPageId(sourcePageId) : "";
+  const linkedPageIds = extractInternalPageLinks(content, sourceId || undefined);
+  const existingPageIds = await listExistingPageIds(
+    env.DB,
+    sourceId ? [...linkedPageIds, sourceId] : linkedPageIds
+  );
+
+  if (sourceId) {
+    existingPageIds.add(sourceId);
+  }
+
+  return existingPageIds;
+}
+
 function versionedAssetPath(assetPath: string, env: Env): string {
   return `${assetPath}?v=${encodeURIComponent(staticAssetVersion(env))}`;
 }
@@ -2411,7 +2435,7 @@ function renderMissingPage(env: Env, id: string, principal?: AuthPrincipal): str
     <h1 id="${escapeAttribute(slugForPageHeading(id))}">${escapeHtml(id)}</h1>
     <p>This topic does not exist yet.</p>
     <p>
-      <a class="wikilink1" href="${pagePath(id)}?do=edit">Create this page</a>
+      <a class="wikilink2" href="${pagePath(id)}?do=edit" title="This topic does not exist yet">Create this page</a>
       <span class="sep"> · </span>
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
     </p>`,
