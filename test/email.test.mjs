@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   digestEmail,
   emailConfig,
+  generatedPasswordEmail,
   pageChangeEmail,
   passwordResetEmail,
   registrationNotificationEmail,
@@ -178,6 +179,23 @@ describe("email templates", () => {
     expect(digest.subject).toBe("Test Wiki: page change digest");
     expect(digest.text).toContain("- wiki:start (edit) by Bob");
     expect(digest.html).toContain("updated");
+  });
+
+  it("renders DokuWiki generated password emails", () => {
+    const message = generatedPasswordEmail({
+      siteName: "Test Wiki",
+      baseUrl: "https://wiki.example.test",
+      username: "alice<script>",
+      displayName: "Alice <Admin>",
+      password: "cefsezdug:42"
+    });
+
+    expect(message.subject).toBe("Your DokuWiki password");
+    expect(message.text).toContain("Login    : alice<script>");
+    expect(message.text).toContain("Password : cefsezdug:42");
+    expect(message.html).toContain("Alice &lt;Admin&gt;");
+    expect(message.html).toContain("cefsezdug:42");
+    expect(message.html).not.toContain("alice<script>");
   });
 });
 

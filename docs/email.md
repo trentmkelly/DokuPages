@@ -23,6 +23,7 @@ Optional sender configuration:
 - `EMAIL_RETURN_PATH`: fixed return-path value passed in provider headers.
 - `EMAIL_BASE_URL`: public wiki base URL for email links.
 - `EMAIL_REGISTRATION_NOTIFY`: comma-separated notification recipients.
+- `AUTOPASSWD`: enables generated-password registration emails when set to `1`.
 - `EMAIL_TASK_TOKEN`: bearer token for scheduled digest execution.
 
 The adapter never uses user-supplied addresses as the sender. User input can
@@ -37,6 +38,7 @@ Implemented flows and templates:
 
 - native registration form and `/api/auth/register`
 - registration notification
+- generated registration password
 - native password reset request and confirmation forms
 - password reset
 - page change notification

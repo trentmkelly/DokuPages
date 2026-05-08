@@ -54,6 +54,12 @@ registration notification through the outbound email adapter. When Turnstile is
 configured, registration submissions are verified through Cloudflare Siteverify
 before the user row is created.
 
+With `AUTOPASSWD=1`, registration follows DokuWiki's generated-password mode:
+the password fields are hidden, a pronounceable DokuWiki-style password is
+generated, and the password is emailed to the new account address before the
+user row is created. Generated-password registration requires outbound email to
+be configured and does not create an immediate login session.
+
 `/resendpwd` and `/password-reset` request password reset email. Reset tokens are
 stored only as SHA-256 hashes in D1, expire after one hour, and are marked used
 when the password is changed. A successful reset invalidates existing sessions
@@ -90,5 +96,6 @@ memberships using DokuWiki `authplain` escaping rules. The login verifier accept
 the DokuWiki `passcrypt` formats needed for imported accounts: `bcrypt`, `smd5`,
 `md5`, `sha1`, `ssha`, DES `crypt`, pre-4.1 MySQL `mysql`, and MySQL 4.1+
 `my411`. A successful legacy-hash login immediately rewrites that user's
-`password_hash` to the native PBKDF2 format; new registrations, profile password
-changes, and password resets never create legacy hashes.
+`password_hash` to the native PBKDF2 format; new registrations, generated
+passwords, profile password changes, and password resets never create legacy
+hashes.

@@ -14,8 +14,8 @@ of full PHP DokuWiki runtime compatibility.
   no-body metadata exports, and explicit unsupported-renderer responses for
   unavailable `export_*` modes.
 - Anonymous and D1-backed native user sessions with imported `authplain` users,
-  groups, native registration, profile updates, password changes, and emailed
-  password resets.
+  groups, native registration, DokuWiki-style generated registration passwords,
+  profile updates, password changes, and emailed password resets.
 - DokuWiki-style ACL matching for pages, namespaces, media reads, uploads, deletes, aggregate views, feeds, search, and admin routes.
 - Native renderer coverage for headings, paragraphs, inline formatting, links,
   imported interwiki and external-link scheme rules, media embeds, lists,

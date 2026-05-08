@@ -3,7 +3,12 @@ import type { Env } from "./env";
 const DEFAULT_RESEND_ENDPOINT = "https://api.resend.com/emails";
 const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
-export type EmailKind = "registration_notification" | "password_reset" | "page_change" | "digest";
+export type EmailKind =
+  | "registration_notification"
+  | "generated_password"
+  | "password_reset"
+  | "page_change"
+  | "digest";
 
 export interface WikiEmail {
   kind: EmailKind;
@@ -40,6 +45,14 @@ export interface RegistrationNotificationTemplateInput {
   username: string;
   displayName: string;
   email: string | null;
+}
+
+export interface GeneratedPasswordTemplateInput {
+  siteName: string;
+  baseUrl: string;
+  username: string;
+  displayName: string;
+  password: string;
 }
 
 export interface PasswordResetTemplateInput {
@@ -191,6 +204,30 @@ export function registrationNotificationEmail(
     html: `${paragraph(`A new user registered on ${input.siteName}.`)}
 ${definitionList(rows)}
 ${paragraph(link(input.baseUrl, input.baseUrl))}`
+  };
+}
+
+export function generatedPasswordEmail(
+  input: GeneratedPasswordTemplateInput
+): Omit<WikiEmail, "kind" | "to"> {
+  const text = [
+    `Hi ${input.displayName}!`,
+    "",
+    `Here is your userdata for ${input.siteName} at ${input.baseUrl}`,
+    "",
+    `Login    : ${input.username}`,
+    `Password : ${input.password}`
+  ].join("\n");
+
+  return {
+    subject: "Your DokuWiki password",
+    text,
+    html: `${paragraph(`Hi ${escapeHtml(input.displayName)}!`)}
+${paragraph(`Here is your userdata for ${escapeHtml(input.siteName)} at ${link(input.baseUrl, input.baseUrl)}`)}
+${definitionList([
+  ["Login", input.username],
+  ["Password", input.password]
+])}`
   };
 }
 

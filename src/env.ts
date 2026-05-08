@@ -9,6 +9,7 @@ export interface Env {
   SESSION_COOKIE_NAME?: string;
   SUPERUSER?: string;
   MANAGER?: string;
+  AUTOPASSWD?: string;
   HIDE_PAGES?: string;
   SNEAKY_INDEX?: string;
   MAINTENANCE_MODE?: string;

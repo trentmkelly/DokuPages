@@ -17,6 +17,7 @@ describe("runtime config", () => {
       sessionCookieName: "DW_PAGES_SESSION",
       superuser: "@admin",
       manager: "@manager",
+      autoPassword: false,
       hidePages: null,
       sneakyIndex: false,
       maintenanceMode: false,
@@ -75,6 +76,7 @@ describe("runtime config", () => {
       WIKI_LANG: "pt_BR",
       SUPERUSER: "root,@ops",
       MANAGER: "@staff,mona",
+      AUTOPASSWD: "1",
       HIDE_PAGES: ":hidden:",
       SNEAKY_INDEX: "1",
       MAINTENANCE_MODE: "true",
@@ -121,6 +123,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).language).toBe("pt-br");
     expect(getRuntimeConfig(env).superuser).toBe("root,@ops");
     expect(getRuntimeConfig(env).manager).toBe("@staff,mona");
+    expect(getRuntimeConfig(env).autoPassword).toBe(true);
     expect(getRuntimeConfig(env).hidePages).toBe(":hidden:");
     expect(getRuntimeConfig(env).sneakyIndex).toBe(true);
     expect(getRuntimeConfig(env).maintenanceMode).toBe(true);
@@ -227,6 +230,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "MANAGER",
           effectiveValue: "@manager"
+        }),
+        expect.objectContaining({
+          key: "AUTOPASSWD",
+          effectiveValue: "false"
         }),
         expect.objectContaining({
           key: "CANONICAL_URLS",

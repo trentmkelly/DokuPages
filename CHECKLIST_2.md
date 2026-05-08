@@ -137,7 +137,7 @@ are not fixed by this checklist.
 - [x] Implement persistent remember-me tokens compatible with upstream `rememberme`, or document the permanent security replacement.
 - [x] Implement `auth_security_timeout` revalidation semantics for long-lived sessions.
 - [x] Map upstream `superuser` and `manager` config expressions instead of requiring fixed `admin` and `manager` groups.
-- [ ] Match upstream `autopasswd` registration behavior and generated-password emails.
+- [x] Match upstream `autopasswd` registration behavior and generated-password emails.
 - [ ] Match upstream `profileconfirm` behavior and all profile-delete flows from `ProfileDelete.php`.
 - [ ] Implement or explicitly reject profile deletion with a DokuWiki-style UI.
 - [ ] Implement auth backend compatibility or sync bridges for `authad`, `authldap`, and `authpdo`.

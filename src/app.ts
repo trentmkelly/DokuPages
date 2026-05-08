@@ -21,6 +21,7 @@ import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import {
   digestEmail,
   emailConfig,
+  generatedPasswordEmail,
   pageChangeEmail,
   passwordResetEmail,
   registrationNotificationEmail,
@@ -7050,7 +7051,8 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  const parsed = parseRegistrationForm(form);
+  const autoPassword = getRuntimeConfig(env).autoPassword;
+  const parsed = parseRegistrationForm(form, autoPassword);
 
   if (!parsed.ok) {
     return htmlResponseWithCsrf(
@@ -7070,8 +7072,38 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  const user = await createRegisteredUser(env.DB, parsed.values);
+  const password = autoPassword ? generateDokuWikiPassword() : parsed.values.password;
+  const values = { ...parsed.values, password };
+
+  if (autoPassword) {
+    const sent = await sendGeneratedRegistrationPassword(request, env, values);
+    if (!sent.ok) {
+      return htmlResponseWithCsrf(
+        request,
+        renderRegisterPage(
+          env,
+          url,
+          csrf.token,
+          "Looks like there was an error on sending the password mail. Please contact the admin!",
+          parsed.values
+        ),
+        csrf,
+        { status: 502 }
+      );
+    }
+  }
+
+  const user = await createRegisteredUser(env.DB, values);
   await sendRegistrationNotifications(request, env, user);
+
+  if (autoPassword) {
+    return acceptsJson(request)
+      ? jsonResponse(
+          { ok: true, user: publicRegisteredUser(user), passwordEmailSent: true },
+          { status: 201 }
+        )
+      : redirectResponse("/login?registered=1");
+  }
 
   const session = await createLoginSession(env.DB, user.id);
   const response = acceptsJson(request)
@@ -7858,7 +7890,8 @@ interface EmailNotificationEventRecord {
 }
 
 function parseRegistrationForm(
-  form: FormData
+  form: FormData,
+  autoPassword = false
 ):
   | { ok: true; values: RegistrationValues }
   | { ok: false; error: string; values: RegistrationValues } {
@@ -7878,8 +7911,16 @@ function parseRegistrationForm(
     return { ok: false, error: "Display name is required.", values };
   }
 
-  if (values.email && !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(values.email)) {
+  if (!values.email) {
+    return { ok: false, error: "Email address is required.", values };
+  }
+
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(values.email)) {
     return { ok: false, error: "Email address is invalid.", values };
+  }
+
+  if (autoPassword) {
+    return { ok: true, values };
   }
 
   if (values.password.length < 8) {
@@ -7986,6 +8027,37 @@ async function sendRegistrationNotifications(
     to: config.registrationNotify,
     ...template,
     idempotencyKey: `registration:${user.id}`
+  });
+}
+
+async function sendGeneratedRegistrationPassword(
+  request: Request,
+  env: Env,
+  values: RegistrationValues
+) {
+  if (!values.email) {
+    return {
+      ok: false,
+      status: "failed" as const,
+      provider: "resend",
+      providerMessageId: null,
+      error: "Email address is required."
+    };
+  }
+
+  const template = generatedPasswordEmail({
+    siteName: getRuntimeConfig(env).siteName,
+    baseUrl: absoluteEmailUrl(env, request, "/"),
+    username: values.username,
+    displayName: values.displayName,
+    password: values.password
+  });
+
+  return sendWikiEmail(env, {
+    kind: "generated_password",
+    to: [values.email],
+    ...template,
+    idempotencyKey: `generated-password:${values.username}`
   });
 }
 
@@ -8475,6 +8547,17 @@ function renderRegisterPage(
 ): string {
   const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
   const returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env);
+  const autoPassword = getRuntimeConfig(env).autoPassword;
+  const passwordFields = autoPassword
+    ? `<p class="info">A generated password will be sent to the email address you provide.</p>`
+    : `<div class="auth-field">
+          <label for="register__pass">Password</label>
+          <input id="register__pass" name="password" class="edit" type="password" autocomplete="new-password" required>
+        </div>
+        <div class="auth-field">
+          <label for="register__passchk">Confirm password</label>
+          <input id="register__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
+        </div>`;
 
   return htmlShell(
     env,
@@ -8496,16 +8579,9 @@ function renderRegisterPage(
         </div>
         <div class="auth-field">
           <label for="register__mail">Email</label>
-          <input id="register__mail" name="email" class="edit" type="email" autocomplete="email" value="${escapeAttribute(values.email ?? "")}">
+          <input id="register__mail" name="email" class="edit" type="email" autocomplete="email" value="${escapeAttribute(values.email ?? "")}" required>
         </div>
-        <div class="auth-field">
-          <label for="register__pass">Password</label>
-          <input id="register__pass" name="password" class="edit" type="password" autocomplete="new-password" required>
-        </div>
-        <div class="auth-field">
-          <label for="register__passchk">Confirm password</label>
-          <input id="register__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
-        </div>
+        ${passwordFields}
         ${renderTurnstileWidget(env, "register")}
         <div class="auth-actions">
           <button type="submit">Register</button>
@@ -8663,7 +8739,11 @@ function renderLoginPage(
   returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env),
   csrfToken = ""
 ): string {
-  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+  const message = error
+    ? `<p class="error">${escapeHtml(error)}</p>`
+    : url.searchParams.get("registered") === "1"
+      ? '<p class="success">The user has been created and the password was sent by email.</p>'
+      : "";
 
   return htmlShell(
     env,
@@ -10456,6 +10536,38 @@ function randomBase64Url(length: number): string {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return bytesToBase64Url(bytes);
+}
+
+function generateDokuWikiPassword(): string {
+  const consonants = "bcdfghjklmnprstvwz";
+  const vowels = "aeiou";
+  const letters = `${consonants}${vowels}`;
+  const specials = "!$%&?+*~#-_:.;,";
+  let password = "";
+
+  for (let index = 0; index < 3; index += 1) {
+    password += randomCharacter(consonants);
+    password += randomCharacter(vowels);
+    password += randomCharacter(letters);
+  }
+
+  return `${password}${randomCharacter(specials)}${randomInteger(10, 99)}`;
+}
+
+function randomCharacter(characters: string): string {
+  return characters.charAt(randomInteger(0, characters.length - 1));
+}
+
+function randomInteger(min: number, max: number): number {
+  const range = max - min + 1;
+  const limit = Math.floor(0x1_0000_0000 / range) * range;
+  const value = new Uint32Array(1);
+
+  do {
+    crypto.getRandomValues(value);
+  } while (value[0] >= limit);
+
+  return min + (value[0] % range);
 }
 
 async function sha256Hex(value: string): Promise<string> {

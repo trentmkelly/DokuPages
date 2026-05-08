@@ -218,6 +218,74 @@ describe("auth routes", () => {
     });
   });
 
+  it("supports DokuWiki autopasswd registration with generated password email", async () => {
+    env = createEnv({
+      AUTOPASSWD: "1",
+      EMAIL_FROM: "Wiki <wiki@example.test>",
+      EMAIL_PROVIDER_ENDPOINT: "https://email.example.test/emails",
+      RESEND_API_KEY: "resend-token"
+    });
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ id: "email_password" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const registerPage = await handleRequest(new Request("https://example.com/register"), env);
+    const registerHtml = await registerPage.text();
+    expect(registerHtml).toContain("A generated password will be sent");
+    expect(registerHtml).not.toContain('id="register__pass"');
+
+    const form = new FormData();
+    form.set("username", "autouser");
+    form.set("displayName", "Auto User");
+    form.set("email", "autouser@example.test");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/auth/register", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/login?registered=1");
+    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const emailRequest = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(emailRequest).toMatchObject({
+      from: "Wiki <wiki@example.test>",
+      to: ["autouser@example.test"],
+      subject: "Your DokuWiki password"
+    });
+    expect(emailRequest.text).toContain("Login    : autouser");
+    const generatedPassword = emailRequest.text.match(/Password : (\S+)/)?.[1];
+    expect(generatedPassword).toMatch(
+      /^[bcdfghjklmnprstvwz][aeiou][bcdfghjklmnprstvwzaeiou]{7}[!$%&?+*~#_:.;,-][1-9][0-9]$/
+    );
+
+    const login = await postLogin(env, "autouser", generatedPassword);
+    expect(login.status).toBe(303);
+    await expect(
+      env.DB.prepare("select kind, recipient, status, provider_message_id from email_deliveries")
+        .bind()
+        .all()
+    ).resolves.toMatchObject({
+      results: [
+        {
+          kind: "generated_password",
+          recipient: "autouser@example.test",
+          status: "sent",
+          provider_message_id: "email_password"
+        }
+      ]
+    });
+  });
+
   it("sends password reset emails and accepts valid reset tokens", async () => {
     env = createEnv({
       EMAIL_FROM: "Wiki <wiki@example.test>",

@@ -73,6 +73,8 @@ Optional Pages environment variables:
 - `EMAIL_REGISTRATION_NOTIFY`: optional comma-separated registration notification recipients.
 - `EMAIL_TASK_TOKEN`: bearer token required by the scheduled email digest
   endpoint.
+- `AUTOPASSWD`: set to `1` to use DokuWiki-style generated-password
+  registration. Requires outbound email configuration.
 - `TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for login and
   registration forms.
 - `DOKUWIKI_COOKIE_SALT`: Pages secret containing the upstream

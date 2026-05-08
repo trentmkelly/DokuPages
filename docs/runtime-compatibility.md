@@ -47,7 +47,7 @@ replacement surface, or explicit unsupported status.
 | `AJAX_CALL_UNKNOWN`            | Native AJAX router; unknown calls return compatibility errors.                  |
 | `AUTH_ACL_CHECK`               | Native ACL resolver in `src/wiki/acl.ts`.                                       |
 | `AUTH_LOGIN_CHECK`             | Native auth validation and `auth_event` logs.                                   |
-| `AUTH_PASSWORD_GENERATE`       | Deferred with upstream generated-password behavior.                             |
+| `AUTH_PASSWORD_GENERATE`       | Native DokuWiki-style generated passwords for `AUTOPASSWD=1`; no plugin hook.   |
 | `AUTH_USER_CHANGE`             | Native user manager writes and audit records.                                   |
 | `COMMON_PAGETPL_LOAD`          | Deferred with page-template parity.                                             |
 | `COMMON_USER_LINK`             | Native user display rendering; no plugin hook.                                  |
