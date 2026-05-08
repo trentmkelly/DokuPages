@@ -2625,9 +2625,13 @@ async function renderMediaManagerPage(
 
   const query = (url.searchParams.get("q") ?? "").trim();
   const pagination = paginationFromUrl(url, { defaultLimit: 200, maxLimit: 500 });
+  const viewMode = mediaManagerViewMode(url);
+  const sortMode = mediaManagerSortMode(url);
+  const sortOrder = mediaManagerSortOrder(url, sortMode);
+  const listOptions = { sort: sortMode, order: sortOrder };
   const media = query
-    ? await searchMedia(env.DB, namespace, query, pagination.limit, pagination.offset)
-    : await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset);
+    ? await searchMedia(env.DB, namespace, query, pagination.limit, pagination.offset, listOptions)
+    : await listNamespaceMedia(env.DB, namespace, pagination.limit, pagination.offset, listOptions);
   const aclRules = await listAclRules(env);
   const namespaces = (await listMediaNamespaces(env.DB)).filter((item) =>
     canListNamespace(env, aclRules, principal, item)
@@ -2647,7 +2651,7 @@ async function renderMediaManagerPage(
   const mediaItems =
     media.length === 0
       ? `<p class="media-manager__empty">No media found.</p>`
-      : `<ul class="idx media__manager media-grid">${media.map(renderMediaManagerItem).join("")}</ul>`;
+      : renderMediaManagerItems(media, viewMode);
   const uploadPanel = canUpload
     ? `<form id="media__upload" class="media-manager__upload" method="post" action="/api/media/upload" enctype="multipart/form-data">
         ${csrfInput(csrfToken)}
@@ -2693,10 +2697,26 @@ async function renderMediaManagerPage(
             <div class="media-manager__toolbar">
               <div class="media-manager__crumb">Files in <strong>${escapeHtml(namespaceTitle)}</strong></div>
               <div class="media-manager__view" aria-label="Media view">
-                <span class="media-manager__view-active">Thumbnails</span>
-                <span>Rows</span>
-                <span>Name</span>
-                <span>Date</span>
+                ${renderMediaManagerToolbarLink(url, "Thumbnails", { view: "thumbs" }, viewMode === "thumbs")}
+                ${renderMediaManagerToolbarLink(url, "Rows", { view: "rows" }, viewMode === "rows")}
+                ${renderMediaManagerToolbarLink(
+                  url,
+                  "Name",
+                  {
+                    sort: "name",
+                    order: sortMode === "name" && sortOrder === "asc" ? "desc" : "asc"
+                  },
+                  sortMode === "name"
+                )}
+                ${renderMediaManagerToolbarLink(
+                  url,
+                  "Date",
+                  {
+                    sort: "date",
+                    order: sortMode === "date" && sortOrder === "desc" ? "asc" : "desc"
+                  },
+                  sortMode === "date"
+                )}
               </div>
             </div>
             ${query ? `<p class="media-manager__query">Search results for <strong>${escapeHtml(query)}</strong></p>` : ""}
@@ -2775,7 +2795,41 @@ function mediaManagerNamespacePath(namespace: string): string {
   return namespace ? `/media-manager?ns=${encodeURIComponent(namespace)}` : "/media-manager";
 }
 
-function renderMediaManagerItem(item: CurrentMedia): string {
+function mediaManagerViewMode(url: URL): "thumbs" | "rows" {
+  return url.searchParams.get("view") === "rows" ? "rows" : "thumbs";
+}
+
+function mediaManagerSortMode(url: URL): "name" | "date" {
+  return url.searchParams.get("sort") === "date" ? "date" : "name";
+}
+
+function mediaManagerSortOrder(url: URL, sortMode: "name" | "date"): "asc" | "desc" {
+  const order = url.searchParams.get("order");
+  if (order === "asc" || order === "desc") return order;
+  return sortMode === "date" ? "desc" : "asc";
+}
+
+function renderMediaManagerToolbarLink(
+  url: URL,
+  label: string,
+  params: Record<string, string>,
+  active: boolean
+): string {
+  const next = new URL(url.href);
+  next.searchParams.delete("offset");
+  for (const [key, value] of Object.entries(params)) {
+    next.searchParams.set(key, value);
+  }
+  return `<a class="${active ? "media-manager__view-active" : ""}" href="${escapeAttribute(`${next.pathname}${next.search}`)}">${escapeHtml(label)}</a>`;
+}
+
+function renderMediaManagerItems(items: CurrentMedia[], viewMode: "thumbs" | "rows"): string {
+  return viewMode === "rows"
+    ? `<ul class="idx media__manager media-rows">${items.map(renderMediaManagerRow).join("")}</ul>`
+    : `<ul class="idx media__manager media-grid">${items.map(renderMediaManagerTile).join("")}</ul>`;
+}
+
+function renderMediaManagerTile(item: CurrentMedia): string {
   const name = mediaName(item.id);
   const detailPath = mediaDetailPath(item.id);
   const preview = isPreviewableImage(item)
@@ -2788,6 +2842,32 @@ function renderMediaManagerItem(item: CurrentMedia): string {
     <span class="media-tile__meta">${escapeHtml(item.mimeType)}</span>
     <span class="media-tile__meta">${escapeHtml(formatMediaDate(item.updatedAt))}</span>
     <span class="media-tile__meta">${escapeHtml(formatMediaByteLength(item.byteLength))}</span>
+  </li>`;
+}
+
+function renderMediaManagerRow(item: CurrentMedia): string {
+  const name = mediaName(item.id);
+  const detailPath = mediaDetailPath(item.id);
+  const mediaUrl = mediaPath(item.id);
+  const info = [
+    item.mimeType,
+    formatMediaDate(item.updatedAt),
+    formatMediaByteLength(item.byteLength)
+  ].join(" ");
+  const preview = isPreviewableImage(item)
+    ? `<div class="detail"><div class="thumb"><a href="${escapeAttribute(detailPath)}"><img src="${escapeAttribute(mediaUrl)}" alt="${escapeAttribute(name)}" loading="lazy" decoding="async"></a></div></div>`
+    : "";
+
+  return `<li class="media-row" title="${escapeAttribute(item.id)}">
+    <div class="media-row__main">
+      <a class="select mediafile mf_${escapeAttribute(mediaFileExtension(name).toLowerCase())}" href="${escapeAttribute(detailPath)}">${escapeHtml(name)}</a>
+      <span class="info">(${escapeHtml(info)})</span>
+      <a class="media-row__button" href="${escapeAttribute(mediaUrl)}" target="_blank" rel="noopener">View</a>
+      <a class="media-row__button" href="${escapeAttribute(detailPath)}">Details</a>
+    </div>
+    <div class="example">Usage <code>{{:${escapeHtml(item.id)}}}</code></div>
+    ${preview}
+    <div class="clearer"></div>
   </li>`;
 }
 

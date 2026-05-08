@@ -109,7 +109,7 @@ are not fixed by this checklist.
 - [ ] Match upstream media overwrite, delete, and revision behavior when `mediarevisions` is disabled.
 - [ ] Match upstream media detail UI from `lib/tpl/dokuwiki/detail.php` and `inc/Ui/MediaRevisions.php`.
 - [ ] Match upstream media manager tabs, namespace tree behavior, file list behavior, upload progress, and selection callbacks from `lib/exe/mediamanager.php` and `lib/scripts/media.js`.
-- [ ] Match upstream row and thumbnail media-manager modes, sorting, and pagination from `inc/Ui/Media/DisplayRow.php` and `DisplayTile.php`.
+- [x] Match upstream row and thumbnail media-manager modes, sorting, and pagination from `inc/Ui/Media/DisplayRow.php` and `DisplayTile.php`.
 - [ ] Parse and display JPEG/EXIF/IPTC metadata like `inc/JpegMeta.php` and `conf/mediameta.php`.
 - [ ] Match upstream MIME force-download behavior from `conf/mime.conf`, including imported `mime.local.conf` metadata.
 - [ ] Allow configurable media extension and MIME policies rather than the current conservative validator-only policy.

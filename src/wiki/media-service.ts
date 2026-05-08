@@ -25,6 +25,11 @@ export interface MediaRevision {
   createdAt: string;
 }
 
+export interface MediaListOptions {
+  sort?: "name" | "date";
+  order?: "asc" | "desc";
+}
+
 export interface SaveMediaUploadInput {
   id: string;
   body: ArrayBuffer;
@@ -241,17 +246,19 @@ export async function listNamespaceMedia(
   db: D1Database,
   namespace: string,
   limit = 200,
-  offset = 0
+  offset = 0,
+  options: MediaListOptions = {}
 ): Promise<CurrentMedia[]> {
   const safeLimit = Math.max(1, Math.min(limit, 500));
   const safeOffset = Math.max(0, offset);
+  const orderBy = mediaOrderBySql(options);
   const result = await db
     .prepare(
       `select id, namespace, object_key, mime_type, byte_length, content_hash,
               current_revision_id, created_at, updated_at
        from media
        where namespace = ? and is_deleted = 0
-       order by id asc
+       order by ${orderBy}
        limit ? offset ?`
     )
     .bind(namespace, safeLimit, safeOffset)
@@ -265,11 +272,13 @@ export async function searchMedia(
   namespace: string,
   query: string,
   limit = 200,
-  offset = 0
+  offset = 0,
+  options: MediaListOptions = {}
 ): Promise<CurrentMedia[]> {
   const safeLimit = Math.max(1, Math.min(limit, 500));
   const safeOffset = Math.max(0, offset);
   const pattern = likePattern(query);
+  const orderBy = mediaOrderBySql(options);
   const result = await db
     .prepare(
       `select id, namespace, object_key, mime_type, byte_length, content_hash,
@@ -277,13 +286,21 @@ export async function searchMedia(
        from media
        where namespace = ? and is_deleted = 0
          and (id like ? escape '\\' or mime_type like ? escape '\\')
-       order by id asc
+       order by ${orderBy}
        limit ? offset ?`
     )
     .bind(namespace, pattern, pattern, safeLimit, safeOffset)
     .all<CurrentMediaRow>();
 
   return result.results.map(mapCurrentMedia);
+}
+
+function mediaOrderBySql(options: MediaListOptions): string {
+  const direction = options.order === "desc" ? "desc" : "asc";
+  if (options.sort === "date") {
+    return `updated_at ${direction}, id asc`;
+  }
+  return `id ${direction}`;
 }
 
 export async function saveMediaUpload(

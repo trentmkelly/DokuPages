@@ -7,7 +7,7 @@ Media storage uses D1 for metadata and R2 for object bodies.
 - `GET /media/:id` streams the current media object from R2.
 - `GET /media/:id?rev=:revisionId` streams an immutable media revision from R2.
 - `GET /media-detail/:id` renders metadata and image previews.
-- `GET /media-manager?ns=:namespace&q=:query` browses or searches media in a namespace, renders a DokuWiki-style namespace/sidebar browser, and includes the upload form.
+- `GET /media-manager?ns=:namespace&q=:query` browses or searches media in a namespace, renders a DokuWiki-style namespace/sidebar browser, supports thumbnail or row display through `view=thumbs|rows`, supports `sort=name|date` with `order=asc|desc`, and includes the upload form.
 - `POST /api/media/upload` uploads a media object.
 - `POST /api/media/delete` marks the current media object deleted.
 - `POST /api/media/revert` restores an old media revision as current.

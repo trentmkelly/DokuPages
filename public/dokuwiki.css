@@ -529,9 +529,11 @@ form.search button {
   background-color: inherit;
 }
 
-.dokuwiki .page a.action.create:not(.wikilink2),
-.dokuwiki .page a.action.create:not(.wikilink2):link,
-.dokuwiki .page a.action.create:not(.wikilink2):visited {
+.dokuwiki .page a.action.create,
+.dokuwiki .page a.action.create:link,
+.dokuwiki .page a.action.create:visited,
+.dokuwiki .page a.action.create:hover,
+.dokuwiki .page a.action.create:active {
   color: var(--dw-link);
 }
 
@@ -1245,7 +1247,7 @@ form.search button {
   font-size: 0.875em;
 }
 
-.media-manager__view span {
+.media-manager__view a {
   padding: 0.2em 0.55em;
   border: 1px solid var(--dw-border);
   border-left-width: 0;
@@ -1253,13 +1255,14 @@ form.search button {
   color: var(--dw-text-neutral);
 }
 
-.media-manager__view span:first-child {
+.media-manager__view a:first-child {
   border-left-width: 1px;
 }
 
 .media-manager__view .media-manager__view-active {
   background: var(--dw-background);
   color: var(--dw-text);
+  font-weight: bold;
 }
 
 .media-manager__query,
@@ -1326,6 +1329,45 @@ form.search button {
   font-size: 0.875em;
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+.dokuwiki ul.media__manager.media-rows {
+  margin: 0.8em 0 1.4em;
+  padding: 0;
+  list-style: none;
+}
+
+.dokuwiki ul.media__manager.media-rows li.media-row {
+  margin: 0 0 0.7em;
+  padding: 0.55em;
+  border-bottom: 1px solid var(--dw-border);
+  list-style: none;
+}
+
+.media-row__main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  align-items: baseline;
+}
+
+.media-row__main .info,
+.media-row .example {
+  color: var(--dw-text-neutral);
+}
+
+.media-row__button {
+  font-size: 0.875em;
+}
+
+.media-row .detail {
+  margin-top: 0.45em;
+}
+
+.media-row .thumb img {
+  max-width: 7.5em;
+  max-height: 7.5em;
+  object-fit: contain;
 }
 
 .media-manager__search-panel,

@@ -1050,6 +1050,18 @@ describe("handleRequest", () => {
       new Request("https://example.com/media-detail/wiki/logo.svg?mediado=diff&rev=media-rev-1"),
       env
     );
+    state.media.push({
+      id: "wiki:alpha.txt",
+      namespace: "wiki",
+      object_key: "media/current/wiki/alpha.txt",
+      mime_type: "text/plain",
+      byte_length: 42,
+      content_hash: "alpha-media-hash",
+      current_revision_id: "alpha-media-rev",
+      is_deleted: 0,
+      created_at: "2026-05-08T00:00:00.000Z",
+      updated_at: "2026-05-08T00:00:00.000Z"
+    });
     const manager = await handleRequest(
       new Request("https://example.com/media-manager?ns=wiki"),
       env
@@ -1088,6 +1100,24 @@ describe("handleRequest", () => {
     expect(managerHtml).toContain("Media Files");
     expect(managerHtml).toContain("logo.svg");
     expect(managerHtml).toContain('class="idx media__manager media-grid"');
+    expect(managerHtml).toContain('href="/media-manager?ns=wiki&amp;view=rows"');
+    const rowManager = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki&view=rows&sort=date&order=desc"),
+      env
+    );
+    const rowManagerHtml = await rowManager.text();
+    expect(rowManagerHtml).toContain('class="idx media__manager media-rows"');
+    expect(rowManagerHtml).toContain('class="media-manager__view-active"');
+    expect(rowManagerHtml).toContain("Usage <code>{{:wiki:alpha.txt}}</code>");
+    expect(rowManagerHtml.indexOf("alpha.txt")).toBeLessThan(rowManagerHtml.indexOf("logo.svg"));
+    const descendingNameManager = await handleRequest(
+      new Request("https://example.com/media-manager?ns=wiki&sort=name&order=desc"),
+      env
+    );
+    const descendingNameHtml = await descendingNameManager.text();
+    expect(descendingNameHtml.indexOf("logo.svg")).toBeLessThan(
+      descendingNameHtml.indexOf("alpha.txt")
+    );
     const pagedManager = await handleRequest(
       new Request("https://example.com/media-manager?ns=wiki&limit=1"),
       env
@@ -3135,15 +3165,25 @@ function createD1Stub(state: D1StubState): D1Database {
                   .replaceAll("\\", "")
                   .toLowerCase()
               : "";
+            const sortMediaRows = (rows: Record<string, unknown>[]) => {
+              const direction = sql.includes(" desc") ? -1 : 1;
+              const key = sql.includes("order by updated_at") ? "updated_at" : "id";
+              return rows.sort(
+                (left, right) =>
+                  direction * String(left[key] ?? "").localeCompare(String(right[key] ?? ""))
+              );
+            };
             return {
               results: applyPagination(
-                state.media.filter(
-                  (media) =>
-                    media.namespace === idOrLimit &&
-                    media.is_deleted === 0 &&
-                    (!query ||
-                      String(media.id).toLowerCase().includes(query) ||
-                      String(media.mime_type).toLowerCase().includes(query))
+                sortMediaRows(
+                  state.media.filter(
+                    (media) =>
+                      media.namespace === idOrLimit &&
+                      media.is_deleted === 0 &&
+                      (!query ||
+                        String(media.id).toLowerCase().includes(query) ||
+                        String(media.mime_type).toLowerCase().includes(query))
+                  )
                 ),
                 200
               )
