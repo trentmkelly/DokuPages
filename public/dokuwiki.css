@@ -222,6 +222,24 @@ kbd {
   white-space: nowrap !important;
 }
 
+.a11y.skip:focus-within {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 0 0.5em !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+.a11y.skip a:focus {
+  display: inline-block;
+  padding: 0.35em 0.55em;
+  border: 1px solid var(--dw-link);
+  background: var(--dw-background);
+  color: var(--dw-link);
+}
+
 #dokuwiki__header {
   width: 100%;
   padding: 2em 0 1.5em;

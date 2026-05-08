@@ -30,6 +30,10 @@ plugins.
 Auth event tests cover the native replacement hook boundary used by login,
 logout, rate-limit, and profile-update flows.
 
+Accessibility tests cover rendered wiki shell landmarks, the keyboard skip link,
+the header search label, the mobile tools label, and accessible names for
+icon-only page tools.
+
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
 sizes, and R2 media operation counts.

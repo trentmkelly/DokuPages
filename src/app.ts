@@ -4566,6 +4566,9 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       <header id="dokuwiki__header">
         <div class="pad group">
         <div class="headings">
+          <ul class="a11y skip">
+            <li><a href="#dokuwiki__content">Skip to content</a></li>
+          </ul>
           <h1 class="logo"><a href="${startPath}"><img src="${logoPath}" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
@@ -4574,7 +4577,8 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <nav id="dokuwiki__sitetools" aria-label="Site tools">
             <h3 class="a11y">Site tools</h3>
             <form class="search" method="get" action="/search">
-              <input name="q" type="search" placeholder="Search">
+              <label class="a11y" for="qsearch__in">Search</label>
+              <input id="qsearch__in" name="q" type="search" placeholder="Search">
               <button type="submit">Search</button>
             </form>
             ${renderMobileTools(pageId, options.principal)}
@@ -4666,12 +4670,12 @@ function renderPageTools(pageId: string): string {
     <h3 class="a11y" id="dokuwiki__pagetools__heading">Page tools</h3>
     <div class="tools">
       <ul>
-        <li class="edit"><a href="${pagePath(pageId)}?do=edit"><span class="label">Edit</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="source"><a href="${pagePath(pageId)}?do=source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="revisions"><a href="${pagePath(pageId)}?do=revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="backlink"><a href="${pagePath(pageId)}?do=backlink"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="purge"><a href="${pagePath(pageId)}?do=purge"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>
-        <li class="top"><a href="#dokuwiki__top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="edit"><a href="${pagePath(pageId)}?do=edit" aria-label="Edit this page"><span class="label">Edit</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="source"><a href="${pagePath(pageId)}?do=source" aria-label="Show page source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="Old revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="Backlinks"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="purge"><a href="${pagePath(pageId)}?do=purge" aria-label="Purge cache"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>
+        <li class="top"><a href="#dokuwiki__top" aria-label="Back to top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
       </ul>
     </div>
   </nav>`;
