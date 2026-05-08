@@ -44,6 +44,8 @@ describe("runtime config", () => {
       ieXssProtect: true,
       fetchSize: 0,
       rssMedia: "both",
+      searchNsLimit: 0,
+      searchFragment: "exact",
       pageIdCleanOptions: {
         deaccent: 1,
         fnencode: "url",
@@ -98,6 +100,8 @@ describe("runtime config", () => {
       IEXSSPROTECT: "0",
       FETCHSIZE: "65536",
       RSS_MEDIA: "media",
+      SEARCH_NSLIMIT: "2",
+      SEARCH_FRAGMENT: "contains",
       DEACCENT: "2",
       FNENCODE: "safe",
       SEPCHAR: "-",
@@ -140,6 +144,8 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).ieXssProtect).toBe(false);
     expect(getRuntimeConfig(env).fetchSize).toBe(65536);
     expect(getRuntimeConfig(env).rssMedia).toBe("media");
+    expect(getRuntimeConfig(env).searchNsLimit).toBe(2);
+    expect(getRuntimeConfig(env).searchFragment).toBe("contains");
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
       deaccent: 2,
       fnencode: "safe",
@@ -392,6 +398,8 @@ describe("runtime config", () => {
       LOCKTIME: "-1",
       TYPOGRAPHY: "3",
       RSS_MEDIA: "files",
+      SEARCH_NSLIMIT: "-1",
+      SEARCH_FRAGMENT: "middle",
       DEACCENT: "3",
       FNENCODE: "base64",
       SEPCHAR: "/",
@@ -417,6 +425,8 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "LOCKTIME", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
         expect.objectContaining({ key: "RSS_MEDIA", severity: "error" }),
+        expect.objectContaining({ key: "SEARCH_NSLIMIT", severity: "error" }),
+        expect.objectContaining({ key: "SEARCH_FRAGMENT", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
         expect.objectContaining({ key: "FNENCODE", severity: "error" }),
         expect.objectContaining({ key: "SEPCHAR", severity: "error" }),

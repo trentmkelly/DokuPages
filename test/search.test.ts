@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adjustSearchQuery,
   buildSearchTermFrequencies,
   makeSearchSnippet,
   parseFulltextSearchQuery,
@@ -32,6 +33,29 @@ describe("wiki search helpers", () => {
     expect(query.excludedNamespaces).toEqual(["private"]);
     expect(query.words).toContain("synt*");
     expect(query.simpleTerms).toEqual([]);
+  });
+
+  it("applies DokuWiki search namespace and fragment defaults", () => {
+    expect(
+      adjustSearchQuery("alpha beta", {
+        currentNamespace: "wiki:guides:deep",
+        searchNsLimit: 2,
+        searchFragment: "starts_with"
+      })
+    ).toBe("alpha* beta* @wiki:guides");
+    expect(
+      adjustSearchQuery("alpha @playground", {
+        currentNamespace: "wiki:guides",
+        searchNsLimit: 1,
+        searchFragment: "contains"
+      })
+    ).toBe("*alpha* @playground");
+    expect(
+      adjustSearchQuery("alpha beta", {
+        formSubmitted: true,
+        searchFragment: "contains"
+      })
+    ).toBe("alpha beta");
   });
 
   it("uses DokuWiki language-specific stopword files", () => {

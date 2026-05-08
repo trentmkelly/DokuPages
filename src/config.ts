@@ -49,6 +49,8 @@ export interface RuntimeConfig {
   ieXssProtect: boolean;
   fetchSize: number;
   rssMedia: "pages" | "media" | "both";
+  searchNsLimit: number;
+  searchFragment: "exact" | "starts_with" | "ends_with" | "contains";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
@@ -139,6 +141,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     ieXssProtect: booleanConfig(env.IEXSSPROTECT, true),
     fetchSize: integerConfig(env.FETCHSIZE, 0, 0, 100 * 1024 * 1024),
     rssMedia: rssMediaConfig(env.RSS_MEDIA),
+    searchNsLimit: integerConfig(env.SEARCH_NSLIMIT, 0, 0, 99),
+    searchFragment: searchFragmentConfig(env.SEARCH_FRAGMENT),
     pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
@@ -173,6 +177,8 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateIntegerRange("FETCHSIZE", env.FETCHSIZE, 0, 100 * 1024 * 1024, issues);
   validateRssMedia(env.RSS_MEDIA, issues);
+  validateIntegerRange("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, 0, 99, issues);
+  validateSearchFragment(env.SEARCH_FRAGMENT, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
   validateFnEncode(env.FNENCODE, issues);
   validateSepchar(env.SEPCHAR, issues);
@@ -238,6 +244,8 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("IEXSSPROTECT", env.IEXSSPROTECT, String(config.ieXssProtect), "true"),
     configEntry("FETCHSIZE", env.FETCHSIZE, String(config.fetchSize), "0"),
     configEntry("RSS_MEDIA", env.RSS_MEDIA, config.rssMedia, "both"),
+    configEntry("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, String(config.searchNsLimit), "0"),
+    configEntry("SEARCH_FRAGMENT", env.SEARCH_FRAGMENT, config.searchFragment, "exact"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
     configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
     configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),
@@ -573,6 +581,19 @@ function validateRssMedia(value: string | undefined, issues: ConfigValidationIss
   }
 }
 
+function validateSearchFragment(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  if (!["exact", "starts_with", "ends_with", "contains"].includes(raw)) {
+    issues.push({
+      key: "SEARCH_FRAGMENT",
+      severity: "error",
+      message: "SEARCH_FRAGMENT must be one of 'exact', 'starts_with', 'ends_with', or 'contains'."
+    });
+  }
+}
+
 function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
@@ -797,6 +818,11 @@ function sepcharConfig(value: string | undefined): string {
 function rssMediaConfig(value: string | undefined): RuntimeConfig["rssMedia"] {
   const raw = nonEmpty(value);
   return raw === "pages" || raw === "media" || raw === "both" ? raw : "both";
+}
+
+function searchFragmentConfig(value: string | undefined): RuntimeConfig["searchFragment"] {
+  const raw = nonEmpty(value);
+  return raw === "starts_with" || raw === "ends_with" || raw === "contains" ? raw : "exact";
 }
 
 function integerConfig(

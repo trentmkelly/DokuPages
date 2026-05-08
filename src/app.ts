@@ -128,6 +128,7 @@ import {
   type RecentChange
 } from "./wiki/page-service";
 import { extractInternalPageLinks } from "./wiki/page-links";
+import { adjustSearchQuery } from "./wiki/search";
 import {
   applyPageTemplate,
   pageTemplateCandidates,
@@ -726,7 +727,7 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "search") {
-      return htmlResponse(await renderSearchPage(env, url, principal));
+      return htmlResponse(await renderSearchPage(env, url, principal, id));
     }
 
     if (url.searchParams.get("do") === "index") {
@@ -5755,9 +5756,15 @@ function renderAclPermissionOptions(selected: number): string {
     .join("");
 }
 
-async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+async function renderSearchPage(
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  currentPageId = ""
+): Promise<string> {
   const startedAt = Date.now();
-  const query = url.searchParams.get("q")?.trim() ?? "";
+  const rawQuery = url.searchParams.get("q")?.trim() ?? "";
+  const query = adjustedSearchQuery(env, url, rawQuery, currentPageId);
   const namespace = cleanPageId(url.searchParams.get("ns") ?? "");
   const results = query
     ? await filterReadablePageItems(
@@ -5789,8 +5796,9 @@ async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): P
     "Search",
     `<h1>Search</h1>
     <form method="get" action="/search">
+      <input type="hidden" name="sf" value="1">
       <label for="q">Search pages</label>
-      <input id="q" name="q" type="search" value="${escapeHtml(query)}">
+      <input id="q" name="q" type="search" value="${escapeHtml(rawQuery || query)}">
       <label for="search__ns">Namespace</label>
       <input id="search__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
       <button type="submit">Search</button>
@@ -5800,6 +5808,22 @@ async function renderSearchPage(env: Env, url: URL, principal: AuthPrincipal): P
     <ol>${resultItems}</ol>`,
     { principal }
   );
+}
+
+function adjustedSearchQuery(env: Env, url: URL, query: string, currentPageId: string): string {
+  const config = getRuntimeConfig(env);
+  return adjustSearchQuery(query, {
+    language: config.language,
+    currentNamespace: currentPageId ? namespaceForIndex(currentPageId) : "",
+    formSubmitted: searchFormSubmitted(url),
+    searchNsLimit: config.searchNsLimit,
+    searchFragment: config.searchFragment
+  });
+}
+
+function searchFormSubmitted(url: URL): boolean {
+  const value = url.searchParams.get("sf");
+  return Boolean(value && value !== "0" && value.toLowerCase() !== "false");
 }
 
 async function renderNamespaceIndexPage(

@@ -31,6 +31,12 @@ Optional Pages environment variables:
 - `FNENCODE`: DokuWiki-compatible filename encoding for page path helpers:
   `url`, `safe`, or `utf-8`. Default: `url`.
 - `WIKI_LANG`: supported language tag. Defaults to English fallback.
+- `SEARCH_NSLIMIT`: when a search is launched from a page action, append an
+  `@namespace` filter from the current page's first N namespace levels unless
+  the query already has namespace filters. Default: `0`.
+- `SEARCH_FRAGMENT`: DokuWiki-compatible default fragment search mode for
+  non-search-form queries: `exact`, `starts_with`, `ends_with`, or `contains`.
+  Default: `exact`.
 - `BREADCRUMBS`: number of recent visited pages to keep in the DokuWiki-style
   trace. Default: `10`; set to `0` to disable the trace.
 - `YOUAREHERE`: truthy value enables the DokuWiki-style hierarchical "You are

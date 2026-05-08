@@ -36,6 +36,8 @@ export interface Env {
   IEXSSPROTECT?: string;
   FETCHSIZE?: string;
   RSS_MEDIA?: string;
+  SEARCH_NSLIMIT?: string;
+  SEARCH_FRAGMENT?: string;
   DEACCENT?: string;
   FNENCODE?: string;
   SEPCHAR?: string;

@@ -12,6 +12,7 @@ const stopWordSetCache = new Map<string, ReadonlySet<string>>();
 
 export type SearchOperator = "AND" | "OR" | "NOT";
 export type SearchWildcard = "none" | "prefix" | "suffix" | "contains";
+export type SearchFragment = "exact" | "starts_with" | "ends_with" | "contains";
 
 export interface SearchWordOperand {
   kind: "word";
@@ -42,6 +43,14 @@ export interface ParsedFulltextSearchQuery {
   namespaces: string[];
   excludedNamespaces: string[];
   simpleTerms: string[];
+}
+
+export interface SearchQueryAdjustmentOptions {
+  language?: string;
+  currentNamespace?: string;
+  formSubmitted?: boolean;
+  searchNsLimit?: number;
+  searchFragment?: SearchFragment;
 }
 
 interface TokenizeSearchOptions {
@@ -125,6 +134,38 @@ export function parseFulltextSearchQuery(
     excludedNamespaces: uniqueStrings(excludedNamespaces),
     simpleTerms: simpleConjunctionTerms(rpn)
   };
+}
+
+export function adjustSearchQuery(
+  query: string,
+  options: SearchQueryAdjustmentOptions = {}
+): string {
+  if (!query || options.formSubmitted) return query;
+
+  const language = options.language ?? DEFAULT_LANGUAGE;
+  const parsedQuery = parseFulltextSearchQuery(query, language);
+  const searchNsLimit = options.searchNsLimit ?? 0;
+  const searchFragment = options.searchFragment ?? "exact";
+  let adjusted = query;
+
+  if (
+    searchNsLimit > 0 &&
+    options.currentNamespace &&
+    parsedQuery.namespaces.length === 0 &&
+    parsedQuery.excludedNamespaces.length === 0
+  ) {
+    const namespace = options.currentNamespace.split(":").slice(0, searchNsLimit).join(":");
+    if (namespace) adjusted += ` @${namespace}`;
+  }
+
+  if (searchFragment !== "exact" && !query.includes("*") && canApplySearchFragment(parsedQuery)) {
+    adjusted = adjusted
+      .split(" ")
+      .map((part) => searchFragmentPart(part, searchFragment))
+      .join(" ");
+  }
+
+  return adjusted;
 }
 
 export function searchIndexWordLength(term: string): number {
@@ -413,6 +454,27 @@ function simpleConjunctionTerms(tokens: SearchRpnToken[]): string[] {
   if (operators.some((operator) => operator !== "AND")) return [];
   if (operators.length !== operands.length - 1) return [];
   return uniqueStrings(operands.map((operand) => operand.lookupTerm)).slice(0, 12);
+}
+
+function canApplySearchFragment(parsedQuery: ParsedFulltextSearchQuery): boolean {
+  if (parsedQuery.words.length === 0) return false;
+  const highlighted = new Set(parsedQuery.highlight);
+  return parsedQuery.words.every((word) => highlighted.has(word));
+}
+
+function searchFragmentPart(part: string, fragment: SearchFragment): string {
+  if (
+    part.startsWith("@") ||
+    part.startsWith("ns:") ||
+    part.startsWith("^") ||
+    part.startsWith("-ns:")
+  ) {
+    return part;
+  }
+
+  if (fragment === "starts_with") return `${part}*`;
+  if (fragment === "ends_with") return `*${part}`;
+  return `*${part}*`;
 }
 
 function wordOperands(term: string, language: string, highlight: boolean): SearchWordOperand[] {
