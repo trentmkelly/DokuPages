@@ -101,6 +101,7 @@ describe("handleRequest", () => {
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
     env.IEXSSPROTECT = undefined;
+    env.FETCHSIZE = undefined;
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
@@ -1238,6 +1239,70 @@ describe("handleRequest", () => {
     expect(legacyFetch.headers.get("location")).toBe("/media/wiki/logo.svg?download=1");
     expect(legacyDetail.status).toBe(301);
     expect(legacyDetail.headers.get("location")).toBe("/media-detail/wiki/logo.svg");
+  });
+
+  it("enforces DokuWiki external media tokens before remote fetch redirects", async () => {
+    const remoteUrl = "https://cdn.example/logo.png";
+    const token = mediaToken(remoteUrl, requestedMediaSize(null, null), TEST_DOKUWIKI_COOKIE_SALT);
+    const encoded = encodeURIComponent(remoteUrl);
+
+    const invalid = await handleRequest(
+      new Request(`https://example.com/lib/exe/fetch.php?tok=bad&media=${encoded}`),
+      env
+    );
+    const redirect = await handleRequest(
+      new Request(`https://example.com/lib/exe/fetch.php?tok=${token}&media=${encoded}`),
+      env
+    );
+
+    expect(invalid.status).toBe(412);
+    await expect(invalid.text()).resolves.toBe("Precondition Failed");
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("location")).toBe(remoteUrl);
+  });
+
+  it("downloads external image media when FETCHSIZE allows it", async () => {
+    const remoteUrl = "https://cdn.example/logo.png";
+    const token = mediaToken(remoteUrl, requestedMediaSize(null, null), TEST_DOKUWIKI_COOKIE_SALT);
+    const encoded = encodeURIComponent(remoteUrl);
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response("pngbody", {
+          headers: { "content-type": "image/png" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("oversized", {
+          headers: { "content-type": "image/png" }
+        })
+      );
+
+    try {
+      env.FETCHSIZE = "32";
+      const fetched = await handleRequest(
+        new Request(`https://example.com/lib/exe/fetch.php?tok=${token}&media=${encoded}`),
+        env
+      );
+
+      env.FETCHSIZE = "4";
+      const oversized = await handleRequest(
+        new Request(`https://example.com/lib/exe/fetch.php?tok=${token}&media=${encoded}`),
+        env
+      );
+
+      expect(fetched.status).toBe(200);
+      expect(fetched.headers.get("content-type")).toBe("image/png");
+      expect(fetched.headers.get("content-disposition")).toBe('inline; filename="logo.png"');
+      expect(fetched.headers.get("x-dokuwiki-remote-media")).toBe("fetched");
+      await expect(fetched.text()).resolves.toBe("pngbody");
+      expect(oversized.status).toBe(302);
+      expect(oversized.headers.get("location")).toBe(remoteUrl);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      fetchMock.mockRestore();
+      env.FETCHSIZE = undefined;
+    }
   });
 
   it("answers conditional media fetches without R2 body reads", async () => {

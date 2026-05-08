@@ -41,6 +41,7 @@ describe("runtime config", () => {
       refcheck: true,
       mediaRevisions: true,
       ieXssProtect: true,
+      fetchSize: 0,
       pageIdCleanOptions: {
         deaccent: 1,
         fnencode: "url",
@@ -92,6 +93,7 @@ describe("runtime config", () => {
       REFCHECK: "0",
       MEDIAREVISIONS: "0",
       IEXSSPROTECT: "0",
+      FETCHSIZE: "65536",
       DEACCENT: "2",
       FNENCODE: "safe",
       SEPCHAR: "-",
@@ -131,6 +133,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).refcheck).toBe(false);
     expect(getRuntimeConfig(env).mediaRevisions).toBe(false);
     expect(getRuntimeConfig(env).ieXssProtect).toBe(false);
+    expect(getRuntimeConfig(env).fetchSize).toBe(65536);
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
       deaccent: 2,
       fnencode: "safe",
@@ -262,6 +265,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "IEXSSPROTECT",
           effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "FETCHSIZE",
+          effectiveValue: "0"
         }),
         expect.objectContaining({
           key: "DEACCENT",

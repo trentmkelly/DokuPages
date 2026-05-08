@@ -154,6 +154,10 @@ interface MetadataRow {
 
 const MAX_MEDIA_USAGE_REFERENCES = 500;
 
+export function isExternalMediaId(value: string): boolean {
+  return /^(?:https?|ftp):\/\//i.test(value.trim());
+}
+
 export function cleanMediaId(rawId: string): string {
   return cleanPageId(rawId);
 }
@@ -167,6 +171,7 @@ export function mediaNamespace(id: string): string {
 }
 
 export function mediaName(id: string): string {
+  if (isExternalMediaId(id)) return externalMediaName(id);
   return id.includes(":") ? id.slice(id.lastIndexOf(":") + 1) : id;
 }
 
@@ -189,6 +194,16 @@ export function mediaDetailPath(id: string): string {
 export function detectMimeType(id: string): string {
   const extension = mediaName(id).split(".").pop()?.toLowerCase() ?? "";
   return getMimeTypeForExtension(extension) ?? "application/octet-stream";
+}
+
+function externalMediaName(id: string): string {
+  try {
+    const parsed = new URL(id);
+    const name = parsed.pathname.split("/").filter(Boolean).pop();
+    return name ? decodeURIComponent(name) : parsed.hostname;
+  } catch {
+    return id;
+  }
 }
 
 export async function getCurrentMedia(db: D1Database, id: string): Promise<CurrentMedia | null> {

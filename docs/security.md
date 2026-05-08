@@ -49,6 +49,12 @@ pattern before any R2 write; matching uploads are rejected with the DokuWiki
 `uploadxss` message. `IEXSSPROTECT=0` disables that scan for trusted
 installations that deliberately allow active SVG or HTML media.
 
+External media proxying follows DokuWiki's token gate. Requests for external
+`lib/exe/fetch.php?media=<url>` media require the HMAC token generated from the
+remote URL, and `FETCHSIZE=0` keeps proxy downloads disabled by default. When a
+positive `FETCHSIZE` is configured, the Worker only serves remote JPEG, GIF, or
+PNG responses that fit within the configured byte limit.
+
 ## ACL
 
 ACL records use DokuWiki permission levels: none `0`, read `1`, edit `2`, create `4`,

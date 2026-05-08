@@ -5,7 +5,13 @@ import {
   resolvePageLinkId,
   type PageIdCleanOptions
 } from "./page-id";
-import { cleanMediaId, mediaDetailPath, mediaName, mediaPath } from "./media-service";
+import {
+  cleanMediaId,
+  isExternalMediaId,
+  mediaDetailPath,
+  mediaName,
+  mediaPath
+} from "./media-service";
 import { mediaSizeQuery, requestedMediaSize } from "./media-token";
 
 export interface TocItem {
@@ -984,7 +990,44 @@ function renderMedia(
     const parsed = parseMedia(rawMedia);
     const title = parsed.title?.trim() || null;
     const linkTitle = escapeAttribute(parsed.id);
-    addCacheDependency(context, "media", parsed.id);
+
+    if (!parsed.external) {
+      addCacheDependency(context, "media", parsed.id);
+    }
+
+    if (parsed.external) {
+      const href = externalMediaFetchPath(parsed, context);
+      const target = targetAttribute(context.linkTargets.media);
+      const rel = context.linkTargets.media ? ' rel="noopener"' : "";
+
+      if (parsed.linking === "linkonly" || !isImageMedia(parsed.id)) {
+        const label = title || mediaName(parsed.id);
+        return protectHtml(
+          `<a href="${escapeAttribute(href)}" class="media" title="${linkTitle}"${target}${rel}>${escapeHtml(label)}</a>`,
+          { linkLabelHtml: escapeHtml(label) }
+        );
+      }
+
+      const attributes = [
+        `src="${escapeAttribute(href)}"`,
+        `class="media${parsed.align ?? ""}"`,
+        'loading="lazy"',
+        title ? `title="${escapeAttribute(title)}"` : "",
+        `alt="${title ? escapeAttribute(title) : ""}"`,
+        parsed.width ? `width="${escapeAttribute(parsed.width)}"` : "",
+        parsed.height ? `height="${escapeAttribute(parsed.height)}"` : ""
+      ].filter(Boolean);
+      const image = `<img ${attributes.join(" ")}>`;
+
+      if (parsed.linking === "nolink") {
+        return protectHtml(image, { linkLabelHtml: image });
+      }
+
+      return protectHtml(
+        `<a href="${escapeAttribute(href)}" class="media" title="${linkTitle}"${target}${rel}>${image}</a>`,
+        { linkLabelHtml: image }
+      );
+    }
 
     if (parsed.linking === "linkonly" || !isImageMedia(parsed.id)) {
       const label = title || mediaName(parsed.id);
@@ -1034,6 +1077,22 @@ function mediaImageSrc(parsed: ParsedMedia, context: RenderContext): string {
   return query ? `${path}?${query}` : path;
 }
 
+function externalMediaFetchPath(parsed: ParsedMedia, context: RenderContext): string {
+  const params = new URLSearchParams();
+  const size = requestedMediaSize(parsed.width, parsed.height);
+
+  if (size.width > 0) params.set("w", String(size.width));
+  if (size.height > 0) params.set("h", String(size.height));
+  if (parsed.cache !== "cache") params.set("cache", parsed.cache);
+
+  const query = mediaSizeQuery(parsed.id, size, context.mediaTokenSecret);
+  const token = new URLSearchParams(query).get("tok");
+  if (token) params.set("tok", token);
+
+  params.set("media", parsed.id);
+  return `/lib/exe/fetch.php?${params.toString()}`;
+}
+
 interface ProtectedHtml {
   html: string;
   linkLabelHtml?: string;
@@ -1045,7 +1104,9 @@ interface ParsedMedia {
   align: "left" | "right" | "center" | null;
   width: string | null;
   height: string | null;
+  cache: "cache" | "recache" | "nocache";
   linking: "details" | "direct" | "linkonly" | "nolink";
+  external: boolean;
 }
 
 function parseMedia(rawMedia: string): ParsedMedia {
@@ -1065,15 +1126,23 @@ function parseMedia(rawMedia: string): ParsedMedia {
   const rawId = queryIndex === -1 ? trimmedTarget : trimmedTarget.slice(0, queryIndex);
   const params = queryIndex === -1 ? "" : trimmedTarget.slice(queryIndex + 1);
   const size = params.match(/(\d+)(?:x(\d+))?/i);
+  const external = isExternalMediaId(rawId);
 
   return {
-    id: cleanMediaId(rawId),
+    id: external ? rawId : cleanMediaId(rawId),
     title: rawTitle ?? null,
     align,
     width: size?.[1] ?? null,
     height: size?.[2] ?? null,
-    linking: mediaLinkingMode(params)
+    cache: mediaCacheMode(params),
+    linking: mediaLinkingMode(params),
+    external
   };
+}
+
+function mediaCacheMode(params: string): ParsedMedia["cache"] {
+  const match = params.match(/\b(nocache|recache)\b/i);
+  return match ? (match[1].toLowerCase() as ParsedMedia["cache"]) : "cache";
 }
 
 function mediaLinkingMode(params: string): ParsedMedia["linking"] {

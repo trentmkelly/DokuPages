@@ -232,6 +232,19 @@ describe("renderWikiText", () => {
     );
   });
 
+  it("renders external media through DokuWiki's tokenized fetch endpoint", () => {
+    const rendered = renderWikiText(
+      "{{https://cdn.example/assets/logo.png|Remote logo}} {{https://cdn.example/files/manual.pdf?linkonly|Manual}}",
+      { mediaTokenSecret: "secret" }
+    );
+
+    expect(rendered.html).toContain('src="/lib/exe/fetch.php?tok=');
+    expect(rendered.html).toContain("media=https%3A%2F%2Fcdn.example%2Fassets%2Flogo.png");
+    expect(rendered.html).toContain('href="/lib/exe/fetch.php?tok=');
+    expect(rendered.html).toContain("media=https%3A%2F%2Fcdn.example%2Ffiles%2Fmanual.pdf");
+    expect(rendered.dependencies).toEqual([]);
+  });
+
   it("renders automatic external links", () => {
     const rendered = renderWikiText(
       "Visit http://www.google.com or www.example.org. Join irc://irc.example/channel."

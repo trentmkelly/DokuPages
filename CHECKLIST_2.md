@@ -114,7 +114,7 @@ are not fixed by this checklist.
 - [x] Match upstream MIME force-download behavior from `conf/mime.conf`, including imported `mime.local.conf` metadata.
 - [x] Allow configurable media extension and MIME policies rather than the current conservative validator-only policy.
 - [x] Match upstream SVG handling policy and messages when `iexssprotect` is enabled or disabled.
-- [ ] Match upstream remote media fetch behavior and `fetchsize` where DokuWiki downloads external media.
+- [x] Match upstream remote media fetch behavior and `fetchsize` where DokuWiki downloads external media.
 - [ ] Match upstream media search semantics, including metadata/title fields and namespace recursion.
 - [ ] Match upstream current media and old media revision cache headers, ETag behavior, range requests, and content-disposition details.
 - [ ] Match upstream media changelog display and media feed inclusion behavior.

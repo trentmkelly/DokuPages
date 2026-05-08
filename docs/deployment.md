@@ -71,6 +71,9 @@ Optional Pages environment variables:
   and old-revision fetches. Default: enabled.
 - `IEXSSPROTECT`: set to `0` to disable DokuWiki's upstream upload XSS scan.
   Default: enabled.
+- `FETCHSIZE`: maximum bytes `lib/exe/fetch.php` may download for external
+  image media. Default: `0`, which disables proxy downloads and redirects to the
+  original URL like upstream DokuWiki.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.

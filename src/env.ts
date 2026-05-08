@@ -33,6 +33,7 @@ export interface Env {
   REFCHECK?: string;
   MEDIAREVISIONS?: string;
   IEXSSPROTECT?: string;
+  FETCHSIZE?: string;
   DEACCENT?: string;
   FNENCODE?: string;
   SEPCHAR?: string;

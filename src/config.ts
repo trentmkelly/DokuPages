@@ -45,6 +45,7 @@ export interface RuntimeConfig {
   refcheck: boolean;
   mediaRevisions: boolean;
   ieXssProtect: boolean;
+  fetchSize: number;
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
   appVersion: string;
@@ -132,6 +133,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     refcheck: booleanConfig(env.REFCHECK, true),
     mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
     ieXssProtect: booleanConfig(env.IEXSSPROTECT, true),
+    fetchSize: integerConfig(env.FETCHSIZE, 0, 0, 100 * 1024 * 1024),
     pageIdCleanOptions,
     linkTargets: {
       wiki: normalizedLinkTarget(env.TARGET_WIKI),
@@ -163,6 +165,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("BREADCRUMBS", env.BREADCRUMBS, 0, 99, issues);
   validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
+  validateIntegerRange("FETCHSIZE", env.FETCHSIZE, 0, 100 * 1024 * 1024, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
   validateFnEncode(env.FNENCODE, issues);
   validateSepchar(env.SEPCHAR, issues);
@@ -225,6 +228,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("REFCHECK", env.REFCHECK, String(config.refcheck), "true"),
     configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
     configEntry("IEXSSPROTECT", env.IEXSSPROTECT, String(config.ieXssProtect), "true"),
+    configEntry("FETCHSIZE", env.FETCHSIZE, String(config.fetchSize), "0"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
     configEntry("FNENCODE", env.FNENCODE, config.pageIdCleanOptions.fnencode, "url"),
     configEntry("SEPCHAR", env.SEPCHAR, config.pageIdCleanOptions.sepchar, "_"),

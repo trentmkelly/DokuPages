@@ -70,6 +70,7 @@ import {
   getCurrentMedia,
   getMediaMetadata,
   getMediaRevision,
+  isExternalMediaId,
   listMediaRevisions,
   listMediaUsageReferences,
   listNamespaceMedia,
@@ -173,6 +174,8 @@ const BREADCRUMB_COOKIE_NAME = "DW_PAGES_BC";
 const BREADCRUMB_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
+const DEFAULT_MEDIA_CACHE_SECONDS = 60 * 60 * 24;
+const REMOTE_MEDIA_FETCH_TIMEOUT_MS = 25_000;
 const PAGE_LOCK_WARNING_SECONDS = 60;
 const PAGE_LOCK_MIN_REFRESH_SECONDS = 30;
 const PAGE_LOCK_TOKEN_BYTES = 24;
@@ -254,6 +257,10 @@ export async function handleRequest(
   }
 
   if (url.pathname === "/lib/exe/fetch.php") {
+    const media = url.searchParams.get("media") ?? url.searchParams.get("id") ?? "";
+    if (isExternalMediaId(media)) {
+      return handleRemoteMediaFetch(request, env, url, media);
+    }
     return redirectLegacyMediaFetch(url);
   }
 
@@ -1050,6 +1057,173 @@ function redirectLegacyMediaFetch(url: URL): Response {
   }
 
   return redirectResponse(`${target.pathname}${target.search}`, 301);
+}
+
+async function handleRemoteMediaFetch(
+  request: Request,
+  env: Env,
+  url: URL,
+  mediaUrl: string
+): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return jsonResponse({ error: "Method not allowed." }, { status: 405 });
+  }
+
+  const size = requestedMediaSizeFromUrl(url);
+  if (!validMediaToken(mediaUrl, size, url.searchParams.get("tok"), mediaTokenSecret(env))) {
+    return new Response("Precondition Failed", {
+      status: 412,
+      headers: securityHeaders({ "content-type": "text/plain; charset=utf-8" })
+    });
+  }
+
+  const config = getRuntimeConfig(env);
+  if (config.fetchSize <= 0 || remoteMediaCacheMode(url) === "nocache") {
+    return redirectResponse(mediaUrl, 302);
+  }
+
+  const remote = await fetchRemoteImage(mediaUrl, config.fetchSize);
+  if (!remote) {
+    return redirectResponse(mediaUrl, 302);
+  }
+
+  let body = remote.body;
+  let contentType = remote.mimeType;
+  let derivativeStatus: MediaDerivativeStatus = size.requested ? "unsupported" : "not-requested";
+
+  if (size.requested) {
+    const derivative = await generateMediaDerivative(
+      {
+        id: mediaUrl,
+        namespace: "",
+        objectKey: mediaUrl,
+        mimeType: remote.mimeType,
+        byteLength: remote.body.byteLength,
+        contentHash: "",
+        currentRevisionId: null,
+        createdAt: "",
+        updatedAt: ""
+      },
+      remote.body,
+      size
+    );
+
+    derivativeStatus = derivative.status;
+    if (derivative.status === "generated" && derivative.body && derivative.mimeType) {
+      body = uint8ArrayToArrayBuffer(derivative.body);
+      contentType = derivative.mimeType;
+    }
+  }
+
+  const headers = securityHeaders({
+    "content-type": contentType,
+    "content-length": String(body.byteLength),
+    "cache-control": `public, proxy-revalidate, no-transform, max-age=${DEFAULT_MEDIA_CACHE_SECONDS}`,
+    "content-disposition": `inline; filename="${escapeHeaderValue(mediaName(mediaUrl))}"`,
+    "x-dokuwiki-remote-media": "fetched",
+    "x-dokuwiki-resize-policy": size.requested ? derivativeStatus : "original"
+  });
+
+  return new Response(request.method === "HEAD" ? null : body, { headers });
+}
+
+interface RemoteImageFetchResult {
+  body: ArrayBuffer;
+  mimeType: string;
+}
+
+async function fetchRemoteImage(
+  mediaUrl: string,
+  maxBytes: number
+): Promise<RemoteImageFetchResult | null> {
+  let parsed: URL;
+  try {
+    parsed = new URL(mediaUrl);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REMOTE_MEDIA_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(mediaUrl, {
+      redirect: "follow",
+      signal: controller.signal
+    });
+
+    if (!response.ok) return null;
+
+    const mimeType = remoteImageMimeType(response.headers.get("content-type"));
+    if (!mimeType) return null;
+
+    const body = await readLimitedResponseBody(response, maxBytes);
+    return body ? { body, mimeType } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function remoteMediaCacheMode(url: URL): "cache" | "recache" | "nocache" {
+  const cache = url.searchParams.get("cache")?.toLowerCase();
+  return cache === "recache" || cache === "nocache" ? cache : "cache";
+}
+
+function remoteImageMimeType(contentType: string | null): string | null {
+  const mimeType = (contentType ?? "").split(";")[0].trim().toLowerCase();
+  if (mimeType === "image/jpg") return "image/jpeg";
+  if (mimeType === "image/jpeg" || mimeType === "image/gif" || mimeType === "image/png") {
+    return mimeType;
+  }
+  return null;
+}
+
+async function readLimitedResponseBody(
+  response: Response,
+  maxBytes: number
+): Promise<ArrayBuffer | null> {
+  const contentLength = Number(response.headers.get("content-length") ?? "");
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) return null;
+
+  if (!response.body) {
+    const body = await response.arrayBuffer();
+    return body.byteLength <= maxBytes ? body : null;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return uint8ArrayToArrayBuffer(body);
 }
 
 function redirectLegacyMediaDetail(url: URL): Response {

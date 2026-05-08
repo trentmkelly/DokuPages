@@ -23,6 +23,16 @@ download, matching DokuWiki's `lib/exe/fetch.php` behavior when `mimetype()`
 cannot resolve an extension. Explicit `download=1` or legacy `dl=1` query
 parameters still force attachment for otherwise inline media.
 
+External image media rendered from wiki syntax, for example
+`{{https://example.test/logo.png}}`, is emitted through DokuWiki's tokenized
+`lib/exe/fetch.php?media=<url>` shape. The token is required even when no resize
+is requested, matching upstream `media_get_token()`. With the default
+`FETCHSIZE=0`, valid external fetch requests redirect to the original URL.
+Setting `FETCHSIZE` to a positive byte limit allows the Worker to download and
+serve remote `image/jpeg`, `image/gif`, and `image/png` responses up to that
+limit; unsupported, oversized, `nocache`, or failed remote fetches fall back to
+the original URL redirect.
+
 ## Upload Semantics
 
 The media manager keeps the upstream popup/full-screen hook structure used by

@@ -1,4 +1,4 @@
-import { cleanMediaId } from "./media-service";
+import { cleanMediaId, isExternalMediaId } from "./media-service";
 
 export interface RequestedMediaSize {
   width: number;
@@ -41,9 +41,9 @@ export function mediaToken(
   size: RequestedMediaSize,
   secret: string | null | undefined
 ): string {
-  if (!size.requested || !secret) return "";
+  if (!requiresMediaToken(id, size) || !secret) return "";
 
-  let tokenInput = cleanMediaId(id);
+  let tokenInput = isExternalMediaId(id) ? id : cleanMediaId(id);
   if (size.width > 0) tokenInput += `.${size.width}`;
   if (size.height > 0) tokenInput += `.${size.height}`;
 
@@ -56,7 +56,7 @@ export function validMediaToken(
   candidate: string | null | undefined,
   secret: string | null | undefined
 ): boolean {
-  if (!size.requested) return true;
+  if (!requiresMediaToken(id, size)) return true;
   if (!candidate || !secret) return false;
   return constantTimeEqual(candidate, mediaToken(id, size, secret));
 }
@@ -66,13 +66,17 @@ export function mediaSizeQuery(
   size: RequestedMediaSize,
   secret: string | null | undefined
 ): string {
-  if (!size.requested || !secret) return "";
+  if (!requiresMediaToken(id, size) || !secret) return "";
 
   const params = new URLSearchParams();
   if (size.width > 0) params.set("w", String(size.width));
   if (size.height > 0) params.set("h", String(size.height));
   params.set("tok", mediaToken(id, size, secret));
   return params.toString();
+}
+
+function requiresMediaToken(id: string, size: RequestedMediaSize): boolean {
+  return size.requested || isExternalMediaId(id);
 }
 
 function mediaDimension(value: string | number | null | undefined): number {
