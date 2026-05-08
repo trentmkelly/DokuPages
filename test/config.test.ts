@@ -27,6 +27,7 @@ describe("runtime config", () => {
       tocMinHeads: 3,
       maxTocLevel: 3,
       maxSectionEditLevel: 3,
+      breadcrumbs: 10,
       useHeading: false,
       camelCaseLinks: false,
       typographyMode: 1,
@@ -69,6 +70,7 @@ describe("runtime config", () => {
       TOC_MIN_HEADS: "4",
       MAX_TOC_LEVEL: "4",
       MAX_SECTION_EDIT_LEVEL: "2",
+      BREADCRUMBS: "3",
       USE_HEADING: "1",
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
@@ -99,6 +101,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).tocMinHeads).toBe(4);
     expect(getRuntimeConfig(env).maxTocLevel).toBe(4);
     expect(getRuntimeConfig(env).maxSectionEditLevel).toBe(2);
+    expect(getRuntimeConfig(env).breadcrumbs).toBe(3);
     expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
@@ -182,6 +185,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "USE_HEADING",
           effectiveValue: "false"
+        }),
+        expect.objectContaining({
+          key: "BREADCRUMBS",
+          effectiveValue: "10"
         }),
         expect.objectContaining({
           key: "CAMELCASE",
@@ -296,6 +303,7 @@ describe("runtime config", () => {
       TOC_MIN_HEADS: "many",
       MAX_TOC_LEVEL: "9",
       MAX_SECTION_EDIT_LEVEL: "-1",
+      BREADCRUMBS: "-1",
       TYPOGRAPHY: "3",
       DEACCENT: "3",
       FNENCODE: "base64",
@@ -317,6 +325,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "TOC_MIN_HEADS", severity: "error" }),
         expect.objectContaining({ key: "MAX_TOC_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "MAX_SECTION_EDIT_LEVEL", severity: "error" }),
+        expect.objectContaining({ key: "BREADCRUMBS", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
         expect.objectContaining({ key: "FNENCODE", severity: "error" }),

@@ -19,6 +19,7 @@ export interface Env {
   TOC_MIN_HEADS?: string;
   MAX_TOC_LEVEL?: string;
   MAX_SECTION_EDIT_LEVEL?: string;
+  BREADCRUMBS?: string;
   USE_HEADING?: string;
   CAMELCASE?: string;
   TYPOGRAPHY?: string;

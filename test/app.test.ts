@@ -90,6 +90,7 @@ describe("handleRequest", () => {
     env.TYPOGRAPHY = undefined;
     env.AUTOPLURAL = undefined;
     env.REL_NOFOLLOW = undefined;
+    env.BREADCRUMBS = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
     env.TARGET_EXTERN = undefined;
@@ -195,6 +196,29 @@ describe("handleRequest", () => {
       '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
     );
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("renders and updates DokuWiki-style recent page breadcrumbs", async () => {
+    const priorTrail = encodeURIComponent(JSON.stringify([{ id: "wiki:syntax", name: "Syntax" }]));
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome", {
+        headers: {
+          cookie: `DW_PAGES_BC=${priorTrail}`
+        }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<div class="trace"><span class="bchead">Trace:</span>');
+    expect(html).toContain(
+      '<a href="/wiki/wiki/syntax" class="breadcrumbs" title="wiki:syntax">Syntax</a>'
+    );
+    expect(html).toContain(
+      '<span class="curid"><bdi><a href="/wiki/wiki/welcome" class="breadcrumbs" title="wiki:welcome">Welcome</a></bdi></span>'
+    );
+    expect(response.headers.get("set-cookie")).toContain("DW_PAGES_BC=");
   });
 
   it("marks missing internal page links with DokuWiki red-link styling", async () => {

@@ -31,6 +31,8 @@ Optional Pages environment variables:
 - `FNENCODE`: DokuWiki-compatible filename encoding for page path helpers:
   `url`, `safe`, or `utf-8`. Default: `url`.
 - `WIKI_LANG`: supported language tag. Defaults to English fallback.
+- `BREADCRUMBS`: number of recent visited pages to keep in the DokuWiki-style
+  trace. Default: `10`; set to `0` to disable the trace.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.

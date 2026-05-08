@@ -129,10 +129,18 @@ import type { AclRuleRecord, AuditLogRecord, UserRecord } from "./storage/interf
 type AssetFallback = () => Promise<Response>;
 type ExportMode = "raw" | "xhtml" | "xhtmlbody" | "code";
 type RenderCacheMode = "shared" | "private";
+
+interface BreadcrumbEntry {
+  id: string;
+  name: string;
+}
+
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
 const RENDER_CACHE_VERSION = 29;
+const BREADCRUMB_COOKIE_NAME = "DW_PAGES_BC";
+const BREADCRUMB_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -831,12 +839,18 @@ export async function handleRequest(
     if (denied) return denied;
 
     const cacheMode = await renderCacheModeForPage(env, id);
-    return htmlResponse(
+    const breadcrumbState = breadcrumbStateForPage(request, env, page);
+    const response = htmlResponse(
       await renderPageHtml(env, id, page.content, page.revisionId, undefined, page, {
+        breadcrumbs: breadcrumbState?.entries,
         cacheMode,
         principal
       })
     );
+    if (breadcrumbState) {
+      response.headers.append("set-cookie", breadcrumbState.cookie);
+    }
+    return response;
   }
 
   if (assetFallback && isStaticAssetPath(url.pathname)) {
@@ -2574,7 +2588,11 @@ async function renderPageHtml(
   revisionId: string,
   revisionDate?: string,
   page?: CurrentPage,
-  options: { cacheMode?: RenderCacheMode; principal?: AuthPrincipal } = {}
+  options: {
+    breadcrumbs?: BreadcrumbEntry[];
+    cacheMode?: RenderCacheMode;
+    principal?: AuthPrincipal;
+  } = {}
 ): Promise<string> {
   const startedAt = Date.now();
   const cacheKey = revisionDate ? `page:${id}:${revisionId}` : `page:${id}`;
@@ -2622,7 +2640,12 @@ async function renderPageHtml(
       env,
       cached.title,
       `${renderBreadcrumbs(id)}${renderToc(cached.toc, config.tocMinHeads)}${revisionNotice}${cached.html}`,
-      { pageId: id, principal: options.principal, updatedAt: revisionDate ?? page?.updatedAt }
+      {
+        breadcrumbs: options.breadcrumbs,
+        pageId: id,
+        principal: options.principal,
+        updatedAt: revisionDate ?? page?.updatedAt
+      }
     );
   }
 
@@ -2694,7 +2717,12 @@ async function renderPageHtml(
     env,
     title,
     `${renderBreadcrumbs(id)}${renderToc(rendered.toc, config.tocMinHeads)}${revisionNotice}${rendered.html}`,
-    { pageId: id, principal: options.principal, updatedAt: revisionDate ?? page?.updatedAt }
+    {
+      breadcrumbs: options.breadcrumbs,
+      pageId: id,
+      principal: options.principal,
+      updatedAt: revisionDate ?? page?.updatedAt
+    }
   );
 }
 
@@ -3089,6 +3117,62 @@ function autoPluralPageId(pageId: string): string {
   return pageId.endsWith("s") ? pageId.slice(0, -1) : `${pageId}s`;
 }
 
+function breadcrumbStateForPage(
+  request: Request,
+  env: Env,
+  page: CurrentPage
+): { entries: BreadcrumbEntry[]; cookie: string } | null {
+  const config = getRuntimeConfig(env);
+  if (config.breadcrumbs <= 0) return null;
+
+  const current: BreadcrumbEntry = {
+    id: page.id,
+    name: pageLabel(page)
+  };
+  const existing = readBreadcrumbCookie(request, config.pageIdCleanOptions);
+  const entries = [...existing.filter((entry) => entry.id !== current.id), current].slice(
+    -config.breadcrumbs
+  );
+
+  return {
+    entries,
+    cookie: breadcrumbCookieHeader(request, entries)
+  };
+}
+
+function readBreadcrumbCookie(
+  request: Request,
+  pageIdCleanOptions: PageIdCleanOptions
+): BreadcrumbEntry[] {
+  const raw = readCookie(request, BREADCRUMB_COOKIE_NAME);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw)) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") return null;
+        const candidate = entry as { id?: unknown; name?: unknown };
+        if (typeof candidate.id !== "string" || typeof candidate.name !== "string") return null;
+
+        const id = cleanPageId(candidate.id, pageIdCleanOptions);
+        const name = candidate.name.trim().slice(0, 120);
+        return id && name ? { id, name } : null;
+      })
+      .filter((entry): entry is BreadcrumbEntry => Boolean(entry));
+  } catch {
+    return [];
+  }
+}
+
+function breadcrumbCookieHeader(request: Request, entries: readonly BreadcrumbEntry[]): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  const value = encodeURIComponent(JSON.stringify(entries));
+  return `${BREADCRUMB_COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${BREADCRUMB_COOKIE_MAX_AGE_SECONDS}${secure}`;
+}
+
 function versionedAssetPath(assetPath: string, env: Env): string {
   return `${assetPath}?v=${encodeURIComponent(staticAssetVersion(env))}`;
 }
@@ -3221,9 +3305,15 @@ function renderBreadcrumbs(id: string): string {
   return `<nav aria-label="Breadcrumb">${crumbs}</nav>`;
 }
 
-function renderHeaderBreadcrumbs(pageId: string | undefined, startId: string): string {
+function renderHeaderBreadcrumbs(
+  pageId: string | undefined,
+  startId: string,
+  breadcrumbTrace: readonly BreadcrumbEntry[] | undefined
+): string {
+  const trace = renderBreadcrumbTrace(breadcrumbTrace);
+
   if (!pageId) {
-    return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span><a href="${pagePath(startId)}">start</a></div></div>`;
+    return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span><a href="${pagePath(startId)}">start</a></div>${trace}</div>`;
   }
 
   const segments = pageId.split(":").filter(Boolean);
@@ -3240,7 +3330,21 @@ function renderHeaderBreadcrumbs(pageId: string | undefined, startId: string): s
     })
     .join(' <span class="bcsep">&raquo;</span> ');
 
-  return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span>${crumbs}</div></div>`;
+  return `<div class="breadcrumbs"><div class="youarehere"><span>You are here: </span>${crumbs}</div>${trace}</div>`;
+}
+
+function renderBreadcrumbTrace(entries: readonly BreadcrumbEntry[] | undefined): string {
+  if (!entries || entries.length === 0) return "";
+
+  const lastIndex = entries.length - 1;
+  const links = entries
+    .map((entry, index) => {
+      const link = `<bdi><a href="${pagePath(entry.id)}" class="breadcrumbs" title="${escapeAttribute(entry.id)}">${escapeHtml(entry.name)}</a></bdi>`;
+      return index === lastIndex ? `<span class="curid">${link}</span>` : link;
+    })
+    .join(' <span class="bcsep">•</span> ');
+
+  return `<div class="trace"><span class="bchead">Trace:</span> ${links}</div>`;
 }
 
 function renderToc(toc: TocItem[], minimumHeadings = 2): string {
@@ -6595,6 +6699,7 @@ function getComparablePageId(page: CurrentPage | PageRevision): string {
 }
 
 interface HtmlShellOptions {
+  breadcrumbs?: BreadcrumbEntry[];
   pageId?: string;
   principal?: AuthPrincipal;
   updatedAt?: string;
@@ -6679,7 +6784,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             </ul>
           </nav>
         </div>
-        ${renderHeaderBreadcrumbs(pageId, startId)}
+        ${renderHeaderBreadcrumbs(pageId, startId, options.breadcrumbs)}
         <hr class="a11y">
         </div>
       </header>
