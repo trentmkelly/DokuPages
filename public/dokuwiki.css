@@ -733,6 +733,47 @@ form.search button {
   background: transparent;
 }
 
+.dokuwiki .page form.auth-form {
+  max-width: 42em;
+  padding: 1em;
+}
+
+.dokuwiki .page form.auth-form fieldset {
+  margin: 0;
+  padding: 0.75em 1em 1em;
+  border: 1px solid var(--dw-border);
+}
+
+.dokuwiki .page form.auth-form legend {
+  padding: 0 0.35em;
+}
+
+.dokuwiki form.auth-form .auth-field {
+  margin-bottom: 0.75em;
+}
+
+.dokuwiki form.auth-form label {
+  display: block;
+  margin-bottom: 0.2em;
+}
+
+.dokuwiki form.auth-form input[type="text"],
+.dokuwiki form.auth-form input[type="email"],
+.dokuwiki form.auth-form input[type="password"] {
+  width: 100%;
+  max-width: 28em;
+  box-sizing: border-box;
+}
+
+.dokuwiki form.auth-form .turnstile-field {
+  min-height: 65px;
+  margin: 0.9em 0 1em;
+}
+
+.dokuwiki form.auth-form .auth-actions {
+  margin-top: 0.25em;
+}
+
 .dokuwiki div.toolbar {
   display: block;
   margin-bottom: 0.5em;
@@ -756,6 +797,8 @@ form.search button {
 }
 
 .dokuwiki .page input[type="text"],
+.dokuwiki .page input[type="email"],
+.dokuwiki .page input[type="password"],
 .dokuwiki .page input[type="search"],
 .dokuwiki .page textarea {
   width: 100%;

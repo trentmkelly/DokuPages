@@ -86,6 +86,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateEmailAddress("EMAIL_REPLY_TO", env.EMAIL_REPLY_TO, issues);
   validateEmailAddress("EMAIL_RETURN_PATH", env.EMAIL_RETURN_PATH, issues);
   validateEmailList("EMAIL_REGISTRATION_NOTIFY", env.EMAIL_REGISTRATION_NOTIFY, issues);
+  validateTurnstileConfig(env, issues);
 
   return {
     ok: issues.every((issue) => issue.severity !== "error"),
@@ -138,6 +139,12 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       nonEmpty(env.EMAIL_REGISTRATION_NOTIFY) ?? null,
       null
     ),
+    configEntry(
+      "TURNSTILE_SITE_KEY",
+      env.TURNSTILE_SITE_KEY,
+      nonEmpty(env.TURNSTILE_SITE_KEY) ?? null,
+      null
+    ),
     cloudflareEntry("CF_PAGES_BRANCH", env.CF_PAGES_BRANCH),
     cloudflareEntry("CF_PAGES_COMMIT_SHA", env.CF_PAGES_COMMIT_SHA),
     cloudflareEntry("CF_PAGES_URL", env.CF_PAGES_URL)
@@ -149,6 +156,7 @@ export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
   const resendApiKey = nonEmpty(env.RESEND_API_KEY) ?? null;
   const emailApiToken = nonEmpty(env.EMAIL_API_TOKEN) ?? null;
   const emailTaskToken = nonEmpty(env.EMAIL_TASK_TOKEN) ?? null;
+  const turnstileSecretKey = nonEmpty(env.TURNSTILE_SECRET_KEY) ?? null;
 
   return [
     {
@@ -174,6 +182,12 @@ export function getSecretConfigStatus(env: Env): SecretConfigStatus[] {
       configured: Boolean(emailTaskToken),
       redactedValue: emailTaskToken ? "[redacted]" : null,
       purpose: "Bearer token for scheduled email digest task execution."
+    },
+    {
+      key: "TURNSTILE_SECRET_KEY",
+      configured: Boolean(turnstileSecretKey),
+      redactedValue: turnstileSecretKey ? "[redacted]" : null,
+      purpose: "Cloudflare Turnstile Siteverify secret for login and registration forms."
     }
   ];
 }
@@ -361,6 +375,43 @@ function validateEmailList(
       key,
       severity: "error",
       message: `${key} contains invalid email address entries.`
+    });
+  }
+}
+
+function validateTurnstileConfig(env: Env, issues: ConfigValidationIssue[]): void {
+  const siteKey = nonEmpty(env.TURNSTILE_SITE_KEY);
+  const secretKey = nonEmpty(env.TURNSTILE_SECRET_KEY);
+
+  if (env.TURNSTILE_SITE_KEY !== undefined && !siteKey) {
+    issues.push({
+      key: "TURNSTILE_SITE_KEY",
+      severity: "warning",
+      message: "TURNSTILE_SITE_KEY is blank; Turnstile will be disabled."
+    });
+  }
+
+  if (env.TURNSTILE_SECRET_KEY !== undefined && !secretKey) {
+    issues.push({
+      key: "TURNSTILE_SECRET_KEY",
+      severity: "warning",
+      message: "TURNSTILE_SECRET_KEY is blank; Turnstile will be disabled."
+    });
+  }
+
+  if (siteKey && !secretKey) {
+    issues.push({
+      key: "TURNSTILE_SECRET_KEY",
+      severity: "error",
+      message: "TURNSTILE_SECRET_KEY is required when TURNSTILE_SITE_KEY is configured."
+    });
+  }
+
+  if (secretKey && !siteKey) {
+    issues.push({
+      key: "TURNSTILE_SITE_KEY",
+      severity: "error",
+      message: "TURNSTILE_SITE_KEY is required when TURNSTILE_SECRET_KEY is configured."
     });
   }
 }

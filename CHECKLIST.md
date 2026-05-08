@@ -316,6 +316,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [x] Implement auth event hooks or replacement extension points.
 - [x] Add auth rate limiting.
 - [x] Add brute force protection.
+- [x] Gate login and registration forms with Cloudflare Turnstile when configured.
 
 ## ACL
 
@@ -793,7 +794,7 @@ This checklist tracks the full migration from the current PHP and flat-file Doku
 - [ ] Verify backups are running.
 - [ ] Verify restore procedure with a test restore.
 - [ ] Review Cloudflare billing and quotas.
-- [ ] Review unsupported feature requests.
-- [ ] Prioritize remaining feature parity gaps.
+- [x] Review unsupported feature requests.
+- [x] Prioritize remaining feature parity gaps.
 - [ ] Archive old DokuWiki deployment after retention period.
-- [ ] Document final production runbook.
+- [x] Document final production runbook.

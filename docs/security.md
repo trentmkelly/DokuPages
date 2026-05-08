@@ -26,6 +26,11 @@ explicitly supported safe formatting forms such as `sup`, `sub`, or `del`.
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
 
+When Cloudflare Turnstile is configured with both `TURNSTILE_SITE_KEY` and
+`TURNSTILE_SECRET_KEY`, login and registration forms render the Turnstile widget
+and the POST handlers validate `cf-turnstile-response` with Cloudflare
+Siteverify before accepting the auth action.
+
 Authorized page save and revert submissions are rate limited by client IP and actor in KV. Thirty attempts in a 15 minute window block additional edit attempts for that pair and return `429` with `Retry-After: 900` before the request writes page revisions.
 
 Authorized media upload submissions are rate limited by client IP and actor in KV. Twenty attempts in a 15 minute window block additional upload attempts for that pair and return `429` with `Retry-After: 900` before the request writes to R2.

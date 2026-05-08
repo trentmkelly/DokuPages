@@ -15,6 +15,7 @@ import {
   sessionCookieHeader
 } from "./auth/session";
 import { hashPassword } from "./auth/password";
+import { getTurnstileConfig, verifyTurnstileForm } from "./auth/turnstile";
 import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import {
   digestEmail,
@@ -3939,6 +3940,16 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
   const url = new URL(request.url);
   const csrf = csrfContext(request);
+  const turnstile = await verifyTurnstileForm(request, env, form);
+
+  if (!turnstile.ok) {
+    return htmlResponseWithCsrf(
+      request,
+      renderLoginPage(env, url, turnstile.message, returnTo, csrf.token),
+      csrf,
+      { status: 400 }
+    );
+  }
 
   if (!username || !password) {
     return htmlResponseWithCsrf(
@@ -3989,6 +4000,18 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
 
   const url = new URL(request.url);
   const csrf = csrfContext(request);
+  const submittedValues = registrationValuesFromForm(form);
+  const turnstile = await verifyTurnstileForm(request, env, form);
+
+  if (!turnstile.ok) {
+    return htmlResponseWithCsrf(
+      request,
+      renderRegisterPage(env, url, csrf.token, turnstile.message, submittedValues),
+      csrf,
+      { status: 400 }
+    );
+  }
+
   const parsed = parseRegistrationForm(form);
 
   if (!parsed.ok) {
@@ -4799,14 +4822,7 @@ function parseRegistrationForm(
 ):
   | { ok: true; values: RegistrationValues }
   | { ok: false; error: string; values: RegistrationValues } {
-  const values: RegistrationValues = {
-    username: String(form.get("username") ?? form.get("login") ?? "")
-      .trim()
-      .toLowerCase(),
-    displayName: String(form.get("displayName") ?? form.get("fullname") ?? "").trim(),
-    email: String(form.get("email") ?? "").trim() || null,
-    password: String(form.get("password") ?? form.get("pass") ?? "")
-  };
+  const values = registrationValuesFromForm(form);
   const passwordConfirm = String(form.get("passwordConfirm") ?? form.get("passchk") ?? "");
 
   if (!/^[a-z0-9._-]{2,64}$/.test(values.username)) {
@@ -4835,6 +4851,17 @@ function parseRegistrationForm(
   }
 
   return { ok: true, values };
+}
+
+function registrationValuesFromForm(form: FormData): RegistrationValues {
+  return {
+    username: String(form.get("username") ?? form.get("login") ?? "")
+      .trim()
+      .toLowerCase(),
+    displayName: String(form.get("displayName") ?? form.get("fullname") ?? "").trim(),
+    email: String(form.get("email") ?? "").trim() || null,
+    password: String(form.get("password") ?? form.get("pass") ?? "")
+  };
 }
 
 async function usernameExists(db: D1Database, username: string): Promise<boolean> {
@@ -5414,22 +5441,35 @@ function renderRegisterPage(
     "Register",
     `<h1>Register</h1>
     ${message}
-    <form id="dw__register" method="post" action="/api/auth/register">
+    <form id="dw__register" class="auth-form" method="post" action="/api/auth/register">
       ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <fieldset>
         <legend>Register</legend>
-        <label for="register__user">Username</label>
-        <input id="register__user" name="username" class="edit" type="text" autocomplete="username" value="${escapeAttribute(values.username ?? "")}" required autofocus>
-        <label for="register__name">Full name</label>
-        <input id="register__name" name="displayName" class="edit" type="text" autocomplete="name" value="${escapeAttribute(values.displayName ?? "")}" required>
-        <label for="register__mail">Email</label>
-        <input id="register__mail" name="email" class="edit" type="email" autocomplete="email" value="${escapeAttribute(values.email ?? "")}">
-        <label for="register__pass">Password</label>
-        <input id="register__pass" name="password" class="edit" type="password" autocomplete="new-password" required>
-        <label for="register__passchk">Confirm password</label>
-        <input id="register__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
-        <button type="submit">Register</button>
+        <div class="auth-field">
+          <label for="register__user">Username</label>
+          <input id="register__user" name="username" class="edit" type="text" autocomplete="username" value="${escapeAttribute(values.username ?? "")}" required autofocus>
+        </div>
+        <div class="auth-field">
+          <label for="register__name">Full name</label>
+          <input id="register__name" name="displayName" class="edit" type="text" autocomplete="name" value="${escapeAttribute(values.displayName ?? "")}" required>
+        </div>
+        <div class="auth-field">
+          <label for="register__mail">Email</label>
+          <input id="register__mail" name="email" class="edit" type="email" autocomplete="email" value="${escapeAttribute(values.email ?? "")}">
+        </div>
+        <div class="auth-field">
+          <label for="register__pass">Password</label>
+          <input id="register__pass" name="password" class="edit" type="password" autocomplete="new-password" required>
+        </div>
+        <div class="auth-field">
+          <label for="register__passchk">Confirm password</label>
+          <input id="register__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
+        </div>
+        ${renderTurnstileWidget(env, "register")}
+        <div class="auth-actions">
+          <button type="submit">Register</button>
+        </div>
       </fieldset>
     </form>`
   );
@@ -5590,16 +5630,23 @@ function renderLoginPage(
     "Login",
     `<h1>Login</h1>
     ${message}
-    <form id="dw__login" method="post" action="/api/auth/login">
+    <form id="dw__login" class="auth-form" method="post" action="/api/auth/login">
       ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <fieldset>
         <legend>Login</legend>
-        <label for="login__user">Username</label>
-        <input id="login__user" name="username" class="edit" type="text" autocomplete="username" required autofocus>
-        <label for="login__pass">Password</label>
-        <input id="login__pass" name="password" class="edit" type="password" autocomplete="current-password" required>
-        <button type="submit">Login</button>
+        <div class="auth-field">
+          <label for="login__user">Username</label>
+          <input id="login__user" name="username" class="edit" type="text" autocomplete="username" required autofocus>
+        </div>
+        <div class="auth-field">
+          <label for="login__pass">Password</label>
+          <input id="login__pass" name="password" class="edit" type="password" autocomplete="current-password" required>
+        </div>
+        ${renderTurnstileWidget(env, "login")}
+        <div class="auth-actions">
+          <button type="submit">Login</button>
+        </div>
       </fieldset>
     </form>`
   );
@@ -5687,6 +5734,9 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
     ? `<div class="docInfo">Last modified: ${escapeHtml(options.updatedAt)}</div>`
     : "";
   const pageTools = pageId ? renderPageTools(pageId) : "";
+  const siteToolNamespace = pageId ? namespaceForIndex(pageId) : namespaceForIndex(startId);
+  const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
+  const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
   const stylesheetPath = versionedAssetPath("/dokuwiki.css", env);
   const scriptPath = versionedAssetPath("/dokuwiki.js", env);
   const faviconPath = versionedAssetPath("/images/favicon.ico", env);
@@ -5729,7 +5779,8 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             ${renderMobileTools(pageId, options.principal)}
             <ul>
               <li><a href="/recent">Recent changes</a></li>
-              <li><a href="/index?ns=wiki">Index</a></li>
+              <li><a href="${mediaManagerPath}">Media Manager</a></li>
+              <li><a href="${siteIndexPath}">Sitemap</a></li>
               <li><a href="/diagnostics">Diagnostics</a></li>
             </ul>
           </nav>
@@ -5784,6 +5835,9 @@ function renderUserTools(principal?: AuthPrincipal, pageId?: string): string {
 
 function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
   const actionLinks = accountActionLinks(pageId);
+  const siteToolNamespace = pageId ? namespaceForIndex(pageId) : "wiki";
+  const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
+  const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
   const pageOptions = pageId
     ? `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>
       <option value="${pagePath(pageId)}?do=source">Show source</option>
@@ -5805,7 +5859,8 @@ function renderMobileTools(pageId?: string, principal?: AuthPrincipal): string {
         <option value="">Tools</option>
         ${pageOptions}
         <option value="/recent">Recent changes</option>
-        <option value="/index?ns=wiki">Index</option>
+        <option value="${mediaManagerPath}">Media Manager</option>
+        <option value="${siteIndexPath}">Sitemap</option>
         <option value="/search">Search</option>
         <option value="/diagnostics">Diagnostics</option>
         ${accountOptions}
@@ -5900,6 +5955,16 @@ function htmlResponseWithCsrf(
 
 function csrfInput(token: string): string {
   return `<input type="hidden" name="sectok" value="${escapeAttribute(token)}">`;
+}
+
+function renderTurnstileWidget(env: Env, action: "login" | "register"): string {
+  const config = getTurnstileConfig(env);
+  if (!config.enabled || !config.siteKey) return "";
+
+  return `<div class="turnstile-field">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <div class="cf-turnstile" data-sitekey="${escapeAttribute(config.siteKey)}" data-action="${action}"></div>
+  </div>`;
 }
 
 function validateCsrf(request: Request, form: FormData): Response | null {

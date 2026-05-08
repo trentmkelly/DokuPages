@@ -22,9 +22,26 @@ describe("password hashing", () => {
     await expect(verifyPassword("same password", second)).resolves.toBe(true);
   });
 
+  it("uses a Workers-compatible default iteration count", async () => {
+    const hash = await hashPassword("same password", {
+      salt: new Uint8Array(16).fill(3)
+    });
+
+    expect(hash).toMatch(/^pbkdf2-sha256\$100000\$/);
+    await expect(hashPassword("same password", { iterations: 100_001 })).rejects.toThrow(
+      /Cloudflare Workers/
+    );
+  });
+
   it("rejects malformed hashes without throwing", async () => {
     await expect(verifyPassword("password", "")).resolves.toBe(false);
     await expect(verifyPassword("password", "bcrypt$hash")).resolves.toBe(false);
     await expect(verifyPassword("password", "pbkdf2-sha256$0$salt$hash")).resolves.toBe(false);
+    await expect(
+      verifyPassword(
+        "password",
+        "pbkdf2-sha256$100001$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      )
+    ).resolves.toBe(false);
   });
 });

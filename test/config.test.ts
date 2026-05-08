@@ -63,7 +63,9 @@ describe("runtime config", () => {
       EMAIL_PROVIDER: "resend",
       EMAIL_FROM: "Wiki <wiki@example.test>",
       EMAIL_REGISTRATION_NOTIFY: "admin@example.test",
-      RESEND_API_KEY: "resend-secret-token"
+      RESEND_API_KEY: "resend-secret-token",
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
     } as Env;
     const exported = createConfigExport(env, new Date("2026-05-07T00:00:00.000Z"));
 
@@ -93,6 +95,11 @@ describe("runtime config", () => {
           key: "EMAIL_FROM",
           value: "Wiki <wiki@example.test>",
           effectiveValue: "Wiki <wiki@example.test>"
+        }),
+        expect.objectContaining({
+          key: "TURNSTILE_SITE_KEY",
+          value: "1x00000000000000000000AA",
+          effectiveValue: "1x00000000000000000000AA"
         })
       ])
     );
@@ -105,6 +112,11 @@ describe("runtime config", () => {
         }),
         expect.objectContaining({
           key: "RESEND_API_KEY",
+          configured: true,
+          redactedValue: "[redacted]"
+        }),
+        expect.objectContaining({
+          key: "TURNSTILE_SECRET_KEY",
           configured: true,
           redactedValue: "[redacted]"
         })
@@ -126,6 +138,7 @@ describe("runtime config", () => {
     ]);
     expect(JSON.stringify(exported)).not.toContain("super-secret-token");
     expect(JSON.stringify(exported)).not.toContain("resend-secret-token");
+    expect(JSON.stringify(exported)).not.toContain("1x0000000000000000000000000000000AA");
     expect(exported).toMatchObject({
       exportedAt: "2026-05-07T00:00:00.000Z",
       runtime: {
@@ -181,5 +194,25 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "EMAIL_RETURN_PATH", severity: "error" })
       ])
     );
+  });
+
+  it("requires matching Turnstile site and secret keys", () => {
+    expect(
+      validateRuntimeConfig({
+        TURNSTILE_SITE_KEY: "1x00000000000000000000AA"
+      } as Env)
+    ).toMatchObject({
+      ok: false,
+      issues: [expect.objectContaining({ key: "TURNSTILE_SECRET_KEY", severity: "error" })]
+    });
+
+    expect(
+      validateRuntimeConfig({
+        TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
+      } as Env)
+    ).toMatchObject({
+      ok: false,
+      issues: [expect.objectContaining({ key: "TURNSTILE_SITE_KEY", severity: "error" })]
+    });
   });
 });

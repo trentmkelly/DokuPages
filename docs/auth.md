@@ -20,6 +20,10 @@ Native login uses D1-backed users with the native password hash format. Successf
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
 
+When `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are both configured, login
+submissions must include a valid Cloudflare Turnstile response before password
+verification or rate-limit updates run.
+
 Login success, login failure, login rate-limit, logout, and profile update events emit typed `auth_event` records through the native auth event handler boundary in `src/auth/events.ts`. The default handler writes structured logs with non-sensitive actor and request metadata. Passwords, session tokens, and cookie values are never logged.
 
 ## Profile Updates
@@ -33,7 +37,9 @@ and removes other active sessions for that user.
 
 `/register` creates native D1 users and adds them to the `user` group. When
 `EMAIL_REGISTRATION_NOTIFY` is configured, the registration handler sends a
-registration notification through the outbound email adapter.
+registration notification through the outbound email adapter. When Turnstile is
+configured, registration submissions are verified through Cloudflare Siteverify
+before the user row is created.
 
 `/resendpwd` and `/password-reset` request password reset email. Reset tokens are
 stored only as SHA-256 hashes in D1, expire after one hour, and are marked used
@@ -55,5 +61,9 @@ New native accounts use PBKDF2-HMAC-SHA-256 through Web Crypto. Encoded hashes u
 ```text
 pbkdf2-sha256$iterations$saltBase64$hashBase64
 ```
+
+Cloudflare Workers currently caps PBKDF2 at 100000 iterations, so new native
+hashes use that value. Higher-iteration native hashes are treated as unsupported
+credentials instead of throwing a runtime error.
 
 The importer migrates `users.auth.php` rows into D1 users, groups, and user-group memberships using DokuWiki `authplain` escaping rules. Migrated legacy hashes are preserved for auditability, but the native verifier rejects unsupported hash formats without throwing until a reset or rehash path converts those accounts.

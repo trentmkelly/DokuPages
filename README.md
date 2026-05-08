@@ -13,6 +13,8 @@ The current deployment is a Cloudflare Pages scaffold with:
 - data import workflow in `docs/data-import.md`
 - deployment and environment setup in `docs/deployment.md`
 - email scope in `docs/email.md`
+- final launch and production operations in `docs/production-runbook.md`
+- parity gap review in `docs/parity-gaps.md`
 - supported features and limitations in `docs/features.md`
 - observability notes in `docs/observability.md`
 - backup, restore, rollback, and launch operations in `docs/operations.md`

@@ -1,5 +1,6 @@
 const PASSWORD_HASH_ALGORITHM = "pbkdf2-sha256";
-const DEFAULT_ITERATIONS = 310_000;
+const MAX_WORKERS_PBKDF2_ITERATIONS = 100_000;
+const DEFAULT_ITERATIONS = MAX_WORKERS_PBKDF2_ITERATIONS;
 const SALT_BYTES = 16;
 const HASH_BITS = 256;
 
@@ -13,6 +14,14 @@ export async function hashPassword(
   options: PasswordHashOptions = {}
 ): Promise<string> {
   const iterations = options.iterations ?? DEFAULT_ITERATIONS;
+  if (!Number.isSafeInteger(iterations) || iterations < 1) {
+    throw new RangeError("Password hash iterations must be a positive integer.");
+  }
+  if (iterations > MAX_WORKERS_PBKDF2_ITERATIONS) {
+    throw new RangeError(
+      `Password hash iterations must be ${MAX_WORKERS_PBKDF2_ITERATIONS} or fewer for Cloudflare Workers.`
+    );
+  }
   const salt = options.salt ?? randomBytes(SALT_BYTES);
   const hash = await derivePasswordHash(password, salt, iterations);
 
@@ -27,6 +36,8 @@ export async function hashPassword(
 export async function verifyPassword(password: string, encodedHash: string): Promise<boolean> {
   const parsed = parsePasswordHash(encodedHash);
   if (!parsed) return false;
+
+  if (parsed.iterations > MAX_WORKERS_PBKDF2_ITERATIONS) return false;
 
   const actual = await derivePasswordHash(password, parsed.salt, parsed.iterations);
   return constantTimeEqual(actual, parsed.hash);

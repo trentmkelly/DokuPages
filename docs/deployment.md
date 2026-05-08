@@ -37,6 +37,8 @@ Optional Pages environment variables:
 - `EMAIL_REGISTRATION_NOTIFY`: optional comma-separated registration notification recipients.
 - `EMAIL_TASK_TOKEN`: bearer token required by the scheduled email digest
   endpoint.
+- `TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for login and
+  registration forms.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.
@@ -44,9 +46,11 @@ and `CF_PAGES_URL` are read when available.
 Set `API_BEARER_TOKEN` as a Pages secret when remote API automation should be
 enabled. Set `RESEND_API_KEY` or `EMAIL_API_TOKEN` as a Pages secret when
 outbound email should be enabled. Set `EMAIL_TASK_TOKEN` when scheduled digest
-execution is enabled. Wrangler authentication, API bearer tokens, and provider
-tokens stay outside the repository and should never be checked in. `npm run
-scan:secrets` guards tracked files for high-signal tokens.
+execution is enabled. Set `TURNSTILE_SECRET_KEY` as a Pages secret when
+Turnstile gating should be enforced. Wrangler authentication, API bearer tokens,
+provider tokens, and Turnstile secrets stay outside the repository and should
+never be checked in. `npm run scan:secrets` guards tracked files for
+high-signal tokens.
 
 Admins can inspect the effective runtime configuration at `/admin/config` and
 download a JSON configuration backup from `/api/admin/config/export`. Secret

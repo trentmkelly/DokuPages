@@ -82,6 +82,85 @@ describe("auth routes", () => {
     expect(legacyReset.headers.get("location")).toBe("/resendpwd");
   });
 
+  it("gates login and registration with Turnstile when configured", async () => {
+    env = createEnv({
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
+    });
+    await seedUser(env.DB);
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ success: true, "error-codes": [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const loginPage = await handleRequest(new Request("https://example.com/login"), env);
+    const loginHtml = await loginPage.text();
+
+    expect(loginHtml).toContain('class="auth-form"');
+    expect(loginHtml).toContain('class="cf-turnstile"');
+    expect(loginHtml).toContain("https://challenges.cloudflare.com/turnstile/v0/api.js");
+    expect(loginPage.headers.get("content-security-policy")).toContain(
+      "https://challenges.cloudflare.com"
+    );
+
+    const missingLoginToken = new FormData();
+    missingLoginToken.set("username", "alice");
+    missingLoginToken.set("password", "correct horse battery staple");
+
+    const rejectedLogin = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: missingLoginToken,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(rejectedLogin.status).toBe(400);
+    await expect(rejectedLogin.text()).resolves.toContain("Human verification failed");
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const login = new FormData();
+    login.set("username", "alice");
+    login.set("password", "correct horse battery staple");
+    login.set("cf-turnstile-response", "XXXX.DUMMY.TOKEN.XXXX");
+
+    const acceptedLogin = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: login,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(acceptedLogin.status).toBe(303);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const register = new FormData();
+    register.set("username", "turnstileuser");
+    register.set("displayName", "Turnstile User");
+    register.set("email", "turnstile@example.test");
+    register.set("password", "new correct battery staple");
+    register.set("passwordConfirm", "new correct battery staple");
+    register.set("cf-turnstile-response", "XXXX.DUMMY.TOKEN.XXXX");
+
+    const acceptedRegister = await handleRequest(
+      new Request("https://example.com/api/auth/register", {
+        method: "POST",
+        body: register,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(acceptedRegister.status).toBe(303);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("registers native users and sends registration notifications when configured", async () => {
     env = createEnv({
       EMAIL_FROM: "Wiki <wiki@example.test>",

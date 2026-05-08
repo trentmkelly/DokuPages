@@ -23,6 +23,8 @@ export interface Env {
   RESEND_API_KEY?: string;
   EMAIL_API_TOKEN?: string;
   EMAIL_TASK_TOKEN?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
   CF_PAGES_BRANCH?: string;
   CF_PAGES_COMMIT_SHA?: string;
   CF_PAGES_URL?: string;

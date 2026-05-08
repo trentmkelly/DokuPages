@@ -29,7 +29,10 @@ describe("accessibility surface", () => {
     expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Site tools">');
     expect(html).toContain('<label class="a11y" for="qsearch__in">Search</label>');
     expect(html).toContain('<input id="qsearch__in" name="q" type="search"');
+    expect(html).toContain('<a href="/media-manager?ns=wiki">Media Manager</a>');
+    expect(html).toContain('<a href="/index?ns=wiki">Sitemap</a>');
     expect(html).toContain('<label class="a11y" for="mobile__tools">Tools</label>');
+    expect(html).toContain('<option value="/media-manager?ns=wiki">Media Manager</option>');
     expect(html).toContain(
       '<nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">'
     );
