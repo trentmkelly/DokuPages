@@ -41,6 +41,8 @@ Optional Pages environment variables:
   `@DATE@` replacement. Default: `%Y/%m/%d %H:%M`.
 - `LOCKTIME`: maximum page edit lock age in seconds, matching DokuWiki
   `locktime`. Default: `900`; set to `0` to disable edit locks.
+- `USEDRAFT`: enables DokuWiki-style edit draft autosave and recovery screens.
+  Default: enabled.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.

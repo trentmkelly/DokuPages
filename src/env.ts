@@ -24,6 +24,7 @@ export interface Env {
   FULLPATH?: string;
   DFORMAT?: string;
   LOCKTIME?: string;
+  USEDRAFT?: string;
   USE_HEADING?: string;
   CAMELCASE?: string;
   TYPOGRAPHY?: string;

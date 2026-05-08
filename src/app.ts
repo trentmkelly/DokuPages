@@ -641,7 +641,16 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "recover") {
-      return redirectResponse(`${pagePath(id)}?do=edit`);
+      if (!getRuntimeConfig(env).useDraft) {
+        return redirectResponse(`${pagePath(id)}?do=edit`);
+      }
+
+      const page = await getCurrentPage(env.DB, id);
+      const draft = await getPageDraft(env.DB, id);
+      if (!draft) {
+        return redirectResponse(`${pagePath(id)}?do=edit`);
+      }
+      return handleEditPage(request, env, principal, id, page, draft);
     }
 
     if (url.searchParams.get("do") === "draftdel") {
@@ -822,6 +831,10 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "draft") {
+      if (!getRuntimeConfig(env).useDraft) {
+        return redirectResponse(`${pagePath(id)}?do=edit`);
+      }
+
       const denied = await requireAclPermission(
         request,
         env,
@@ -834,7 +847,8 @@ export async function handleRequest(
       if (!draft) {
         return notFoundResponse(`Draft for '${id}' was not found.`);
       }
-      return htmlResponse(renderDraftPage(id, draft, env));
+      const csrf = csrfContext(request);
+      return htmlResponseWithCsrf(request, renderDraftPage(id, page, draft, env, csrf.token), csrf);
     }
 
     if (url.searchParams.get("do") === "source") {
@@ -1069,6 +1083,10 @@ async function handleWikiPostAction(
       return handleSaveDraft(request, env, principal, id);
     case "draftdel":
       return handleDeleteDraft(request, env, principal, id, `${pagePath(id)}?do=edit`);
+    case "recover":
+      return handleRecoverDraft(request, env, principal, id);
+    case "show":
+      return handleShowPageAction(request, id);
     case "cancel":
       return handleDeleteDraft(request, env, principal, id, pagePath(id));
     case "redirect":
@@ -7036,7 +7054,8 @@ async function handleEditPage(
   env: Env,
   principal: AuthPrincipal,
   id: string,
-  page: CurrentPage | null
+  page: CurrentPage | null,
+  recoverDraft: PageDraft | null = null
 ): Promise<Response> {
   const config = getRuntimeConfig(env);
 
@@ -7053,7 +7072,12 @@ async function handleEditPage(
   );
   if (denied) return denied;
 
-  const draft = await getPageDraft(env.DB, id);
+  const existingDraft = !recoverDraft && config.useDraft ? await getPageDraft(env.DB, id) : null;
+  if (!recoverDraft && existingDraft) {
+    return redirectResponse(`${pagePath(id)}?do=draft`);
+  }
+
+  const draft = recoverDraft;
   const templateContent =
     !page && !draft ? await resolvePageTemplate(env.DB, id, config, principal) : null;
   const cookieName = pageLockCookieName(id);
@@ -7697,6 +7721,14 @@ async function handleSaveDraft(
   );
   if (denied) return denied;
 
+  if (!getRuntimeConfig(env).useDraft) {
+    if (acceptsJson(request)) {
+      return jsonResponse({ ok: false, id, draft: "" });
+    }
+
+    return redirectResponse(`${pagePath(id)}?do=edit`);
+  }
+
   if (lockToken) {
     const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
 
@@ -7705,7 +7737,7 @@ async function handleSaveDraft(
     }
   }
 
-  await savePageDraft(
+  const draft = await savePageDraft(
     env.DB,
     id,
     String(form.get("content") ?? ""),
@@ -7714,7 +7746,7 @@ async function handleSaveDraft(
   );
 
   if (acceptsJson(request)) {
-    const response = jsonResponse({ ok: true, id });
+    const response = jsonResponse({ ok: true, id, draft: draftMessage(draft, env) });
 
     if (lockToken) {
       response.headers.append(
@@ -7746,6 +7778,46 @@ async function handleSaveDraft(
   }
 
   return response;
+}
+
+async function handleRecoverDraft(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  id: string
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!getRuntimeConfig(env).useDraft) {
+    return redirectResponse(`${pagePath(id)}?do=edit`);
+  }
+
+  const page = await getCurrentPage(env.DB, id);
+  const denied = await requireAclPermission(
+    request,
+    env,
+    principal,
+    id,
+    page ? ACL_EDIT : ACL_CREATE
+  );
+  if (denied) return denied;
+
+  const draft = await getPageDraft(env.DB, id);
+  if (!draft) {
+    return redirectResponse(`${pagePath(id)}?do=edit`);
+  }
+
+  return handleEditPage(request, env, principal, id, page, draft);
+}
+
+async function handleShowPageAction(request: Request, id: string): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  return redirectResponse(pagePath(id));
 }
 
 function acceptsJson(request: Request): boolean {
@@ -8060,7 +8132,12 @@ async function handleDeleteDraft(
   await deletePageDraft(env.DB, id);
   await releaseHeldPageLock(env, principal, id, lockToken);
 
-  const response = redirectResponse(redirectTarget ?? `${pagePath(id)}?do=edit`);
+  const requestedRedirect = String(form.get("redirectTo") ?? "");
+  const response = redirectResponse(
+    requestedRedirect
+      ? safeReturnPath(requestedRedirect, env)
+      : (redirectTarget ?? `${pagePath(id)}?do=edit`)
+  );
   response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
   return response;
 }
@@ -8183,9 +8260,19 @@ function renderEditPage(
   const content = draft?.content ?? page?.content ?? templateContent ?? "";
   const baseRevisionId = draft?.baseRevisionId ?? page?.revisionId ?? "";
   const draftNotice = draft
-    ? `<p><strong>Draft recovered:</strong> ${escapeHtml(draft.updatedAt)}</p>`
+    ? `<p><strong>${escapeHtml(draftMessage(draft, env))}</strong></p>`
     : "";
   const config = getRuntimeConfig(env);
+  const draftAttributes = config.useDraft
+    ? ` data-draft-url="/api/pages/draft" data-draft-refresh-interval="30000"`
+    : "";
+  const draftStatus = config.useDraft
+    ? `<div id="draft__status" aria-live="polite">${escapeHtml(draft ? draftMessage(draft, env) : "Draft autosave ready.")}</div>`
+    : "";
+  const draftButtons = config.useDraft
+    ? `<button type="submit" formaction="/api/pages/draft">Save draft</button>
+          <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>`
+    : "";
   const lockAttributes =
     lockToken && config.lockTime > 0
       ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}"`
@@ -8213,15 +8300,14 @@ function renderEditPage(
           <button class="toolbutton" type="button" data-prefix="  - " data-placeholder="List item" title="Ordered list">OL</button>
           <button class="toolbutton" type="button" data-wrap-before="<code>" data-wrap-after="</code>" data-placeholder="code" title="Code">Code</button>
         </div>
-        <div id="draft__status" aria-live="polite">Draft autosave ready.</div>
+        ${draftStatus}
       </div>
-      <textarea id="content" class="edit" name="content" rows="24" cols="100" data-preview-url="/api/pages/preview" data-draft-url="/api/pages/draft" data-autosave-delay="15000">${escapeHtml(content)}</textarea>
+      <textarea id="content" class="edit" name="content" rows="24" cols="100" data-preview-url="/api/pages/preview"${draftAttributes}>${escapeHtml(content)}</textarea>
       <div class="editBar">
         <div class="editButtons">
           <button type="submit">Save</button>
           <button id="edbtn__preview" type="button">Preview</button>
-          <button type="submit" formaction="/api/pages/draft">Save draft</button>
-          <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>
+          ${draftButtons}
         </div>
         <div class="summary">
           <label for="summary"><span>Summary</span></label>
@@ -8290,15 +8376,53 @@ function renderConflictPage(env: Env, id: string, options: ConflictPageOptions):
   );
 }
 
-function renderDraftPage(id: string, draft: PageDraft, env: Env): string {
+function renderDraftPage(
+  id: string,
+  page: CurrentPage | null,
+  draft: PageDraft,
+  env: Env,
+  csrfToken: string
+): string {
+  const diffRows = renderLineDiff(page?.content ?? "", draft.content);
+
   return htmlShell(
     env,
     `Draft for ${id}`,
-    `<h1>Draft for ${escapeHtml(id)}</h1>
-    <p>${escapeHtml(draft.updatedAt)}</p>
-    <pre><code>${escapeHtml(draft.content)}</code></pre>
-    <p><a href="${pagePath(id)}?do=edit">Recover draft</a></p>`
+    `<h1>Draft file found</h1>
+    <p>Your last edit session on this page was not completed correctly. DokuWiki automatically saved a draft during your work which you may now use to continue your editing. Below you can see the data that was saved from your last session.</p>
+    <p>Please decide if you want to <em>recover</em> your lost edit session, <em>delete</em> the autosaved draft or <em>cancel</em> the editing process.</p>
+    <table class="diff diff_sidebyside">
+      <thead>
+        <tr>
+          <th colspan="2">Current revision</th>
+          <th colspan="2">Autosaved draft</th>
+        </tr>
+      </thead>
+      <tbody>${diffRows}</tbody>
+    </table>
+    <form id="dw__editform" class="draft" method="post" action="${pagePath(id)}?do=recover">
+      <div class="no">
+        ${csrfInput(csrfToken)}
+        <input type="hidden" name="id" value="${escapeAttribute(id)}">
+        <input type="hidden" name="date" value="${escapeAttribute(draft.updatedAt)}">
+        <input type="hidden" name="content" value="${escapeAttribute(draft.content)}">
+        <input type="hidden" name="baseRevisionId" value="${escapeAttribute(draft.baseRevisionId ?? "")}">
+        <input type="hidden" name="redirectTo" value="${escapeAttribute(pagePath(id))}">
+        <div id="draft__status">${escapeHtml(draftMessage(draft, env))}</div>
+        <button type="submit" name="do[recover]" value="1" tabindex="1">Recover draft</button>
+        <button type="submit" name="do[draftdel]" value="1" tabindex="2" formaction="/api/pages/draft/delete">Delete draft</button>
+        <button type="submit" name="do[show]" value="1" tabindex="3" formaction="${pagePath(id)}?do=show">Cancel</button>
+      </div>
+    </form>`,
+    { pageId: id, updatedAt: page?.updatedAt }
   );
+}
+
+function draftMessage(draft: PageDraft, env: Env): string {
+  return `Draft autosaved on ${renderDokuWikiDateFormat(
+    getRuntimeConfig(env).dateFormat,
+    new Date(draft.updatedAt)
+  )}`;
 }
 
 async function purgePageCache(

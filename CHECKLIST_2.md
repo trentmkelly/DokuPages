@@ -89,7 +89,7 @@ are not fixed by this checklist.
 - [x] Match upstream page template selection and namespace template inheritance exactly, including all replacement variables.
 - [x] Match upstream edit conflict pages from `inc/Ui/PageConflict.php` rather than only native optimistic-concurrency messages.
 - [x] Match upstream locked-page UI and lock refresh timing from `locktime`.
-- [ ] Match upstream draft autosave timing and recovery UI from `inc/Draft.php` and `inc/Ui/PageDraft.php`.
+- [x] Match upstream draft autosave timing and recovery UI from `inc/Draft.php` and `inc/Ui/PageDraft.php`.
 - [ ] Match upstream section edit targeting and save behavior for section-only edits.
 - [ ] Match upstream old revision notices, deleted-page notices, and once-existed pages from language files such as `newpage.txt`, `norev.txt`, and `onceexisted.txt`.
 - [ ] Match upstream page deletion behavior and delete summaries, including attic/changelog representation.

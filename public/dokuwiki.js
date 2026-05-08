@@ -206,8 +206,9 @@
       throw new Error("Draft save failed.");
     }
 
+    var saved = await response.json();
     lastSaved.value = textarea.value;
-    setStatus(status, "Draft saved.");
+    setStatus(status, saved.draft || "Draft saved.");
   }
 
   function bindDraftAutosave(form, textarea, status) {
@@ -217,7 +218,25 @@
 
     var lastSaved = { value: textarea.value };
     var timer = 0;
-    var delay = Number(textarea.dataset.autosaveDelay || 15000);
+    var lastAttempt = Date.now();
+    var interval = Number(textarea.dataset.draftRefreshInterval || 30000);
+
+    function scheduleSave() {
+      var elapsed = Date.now() - lastAttempt;
+      var wait = Math.max(0, interval - elapsed);
+
+      window.clearTimeout(timer);
+      timer = window.setTimeout(function () {
+        if (textarea.value === lastSaved.value) {
+          return;
+        }
+
+        lastAttempt = Date.now();
+        saveDraft(form, textarea, status, lastSaved).catch(function () {
+          setStatus(status, "Draft autosave failed.");
+        });
+      }, wait);
+    }
 
     textarea.addEventListener("input", function () {
       if (textarea.value === lastSaved.value) {
@@ -225,12 +244,7 @@
       }
 
       setStatus(status, "Unsaved changes.");
-      window.clearTimeout(timer);
-      timer = window.setTimeout(function () {
-        saveDraft(form, textarea, status, lastSaved).catch(function () {
-          setStatus(status, "Draft autosave failed.");
-        });
-      }, delay);
+      scheduleSave();
     });
   }
 

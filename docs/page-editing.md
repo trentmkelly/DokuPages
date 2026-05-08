@@ -5,7 +5,8 @@ The first page editing implementation is intentionally small but exercises the r
 ## Routes
 
 - `GET /wiki/:id?do=edit` renders an HTML edit form.
-- `GET /wiki/:id?do=draft` shows an anonymous draft when one exists.
+- `GET /wiki/:id?do=draft` shows the recovery screen for an anonymous draft
+  when one exists.
 - `GET /wiki/:id?do=source` returns raw wiki text.
 - `GET /wiki/:id?do=revert&rev=:revisionId` renders a revert confirmation form.
 - `POST /api/pages` saves page content.
@@ -37,7 +38,8 @@ The save path:
 - edits a page when content is non-empty
 - deletes a page when content is empty
 - reverts a page by copying an old revision into a new `revert` revision
-- recovers existing anonymous drafts into the edit form
+- shows existing anonymous drafts through the DokuWiki-style recovery page before
+  loading the draft into the edit form
 - deletes anonymous drafts after successful saves
 - releases the edit lock after successful saves
 - records immutable page revisions
@@ -50,7 +52,7 @@ Authorized page save and revert submissions are rate limited in KV by client IP 
 
 ## Edit Locks
 
-`GET /wiki/:id?do=edit` acquires a Durable Object-backed page lock for the configured `LOCKTIME` duration and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives the DokuWiki-style locked page with HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`; the client refresh interval is derived from `LOCKTIME - 60` seconds like upstream DokuWiki's lock timer. Successful saves or draft deletion release the lock. The edit form also carries the CSRF `sectok` used for saves, drafts, and lock refresh/release calls.
+`GET /wiki/:id?do=edit` acquires a Durable Object-backed page lock for the configured `LOCKTIME` duration and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives the DokuWiki-style locked page with HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`; the client refresh interval is derived from `LOCKTIME - 60` seconds like upstream DokuWiki's lock timer. Draft autosave follows upstream's 30-second edit refresh cadence when `USEDRAFT` is enabled, and `GET /wiki/:id?do=draft` renders the DokuWiki-style draft recovery decision page with a diff plus recover/delete/cancel actions. Successful saves or draft deletion release the lock. The edit form also carries the CSRF `sectok` used for saves, drafts, and lock refresh/release calls.
 
 ## Section Edit Anchors
 

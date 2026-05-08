@@ -95,6 +95,7 @@ describe("handleRequest", () => {
     env.FULLPATH = undefined;
     env.DFORMAT = undefined;
     env.LOCKTIME = undefined;
+    env.USEDRAFT = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
     env.TARGET_EXTERN = undefined;
@@ -1702,6 +1703,7 @@ describe("handleRequest", () => {
     expect(html).toContain('id="tool__bar"');
     expect(html).toContain('id="edbtn__preview"');
     expect(html).toContain('data-draft-url="/api/pages/draft"');
+    expect(html).toContain('data-draft-refresh-interval="30000"');
     expect(html).toContain('data-lock-url="/api/pages/lock"');
     expect(html).toContain('data-lock-refresh-delay="840000"');
     expect(html).toContain('name="minor" type="checkbox"');
@@ -2494,7 +2496,11 @@ describe("handleRequest", () => {
     );
 
     expect(autosaveDraft.status).toBe(200);
-    await expect(autosaveDraft.json()).resolves.toMatchObject({ ok: true, id: "wiki:welcome" });
+    await expect(autosaveDraft.json()).resolves.toMatchObject({
+      ok: true,
+      id: "wiki:welcome",
+      draft: expect.stringContaining("Draft autosaved on")
+    });
 
     const edit = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=edit"),
@@ -2505,11 +2511,47 @@ describe("handleRequest", () => {
       env
     );
 
-    expect(edit.status).toBe(200);
+    expect(edit.status).toBe(303);
+    expect(edit.headers.get("location")).toBe("/wiki/wiki/welcome?do=draft");
     expect(draftView.status).toBe(200);
-    await expect(edit.text()).resolves.toContain("Draft recovered:");
-    await expect(draftView.text()).resolves.toContain("Autosaved text.");
+    const draftHtml = await draftView.text();
+    expect(draftHtml).toContain("Draft file found");
+    expect(draftHtml).toContain("DokuWiki automatically saved a draft");
+    expect(draftHtml).toContain("Autosaved draft");
+    expect(draftHtml).toContain("Draft autosaved on");
+    expect(draftHtml).toContain("Autosaved text.");
+    expect(draftHtml).toContain('name="do[recover]"');
+    expect(draftHtml).toContain('name="do[draftdel]"');
+    expect(draftHtml).toContain('name="do[show]"');
 
+    const cancelDraft = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=show", {
+        method: "POST",
+        body: draft,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(cancelDraft.status).toBe(303);
+    expect(cancelDraft.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(state.drafts).toHaveLength(1);
+
+    const recoverDraft = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=recover", {
+        method: "POST",
+        body: draft,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(recoverDraft.status).toBe(200);
+    const recoveredHtml = await recoverDraft.text();
+    expect(recoveredHtml).toContain("Autosaved text.");
+    expect(recoveredHtml).toContain("Draft autosaved on");
+
+    draft.set("redirectTo", "/wiki/wiki/welcome");
     const deleteDraft = await handleRequest(
       new Request("https://example.com/api/pages/draft/delete", {
         method: "POST",
@@ -2520,6 +2562,42 @@ describe("handleRequest", () => {
     );
 
     expect(deleteDraft.status).toBe(303);
+    expect(deleteDraft.headers.get("location")).toBe("/wiki/wiki/welcome");
+    expect(state.drafts).toHaveLength(0);
+  });
+
+  it("honors USEDRAFT when rendering edit forms and draft saves", async () => {
+    env.USEDRAFT = "0";
+
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+
+    expect(edit.status).toBe(200);
+    const html = await edit.text();
+    expect(html).not.toContain('data-draft-url="/api/pages/draft"');
+    expect(html).not.toContain('id="draft__status"');
+
+    const draft = new FormData();
+    draft.set("id", "wiki:welcome");
+    draft.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    draft.set("content", "====== Draft disabled ======");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages/draft", {
+        method: "POST",
+        body: draft,
+        headers: csrfHeaders({
+          accept: "application/json",
+          "x-requested-with": "XMLHttpRequest"
+        })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: false, id: "wiki:welcome" });
     expect(state.drafts).toHaveLength(0);
   });
 

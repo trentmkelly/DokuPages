@@ -32,6 +32,7 @@ describe("runtime config", () => {
       fullPath: false,
       dateFormat: "%Y/%m/%d %H:%M",
       lockTime: 900,
+      useDraft: true,
       useHeading: false,
       camelCaseLinks: false,
       typographyMode: 1,
@@ -79,6 +80,7 @@ describe("runtime config", () => {
       FULLPATH: "1",
       DFORMAT: "%F %R",
       LOCKTIME: "120",
+      USEDRAFT: "0",
       USE_HEADING: "1",
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
@@ -114,6 +116,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).fullPath).toBe(true);
     expect(getRuntimeConfig(env).dateFormat).toBe("%F %R");
     expect(getRuntimeConfig(env).lockTime).toBe(120);
+    expect(getRuntimeConfig(env).useDraft).toBe(false);
     expect(getRuntimeConfig(env).useHeading).toBe(true);
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
@@ -217,6 +220,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "LOCKTIME",
           effectiveValue: "900"
+        }),
+        expect.objectContaining({
+          key: "USEDRAFT",
+          effectiveValue: "true"
         }),
         expect.objectContaining({
           key: "CAMELCASE",

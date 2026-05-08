@@ -36,6 +36,7 @@ export interface RuntimeConfig {
   fullPath: boolean;
   dateFormat: string;
   lockTime: number;
+  useDraft: boolean;
   useHeading: boolean;
   camelCaseLinks: boolean;
   typographyMode: number;
@@ -119,6 +120,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     fullPath: truthy(env.FULLPATH),
     dateFormat: nonEmpty(env.DFORMAT) ?? "%Y/%m/%d %H:%M",
     lockTime: integerConfig(env.LOCKTIME, 15 * 60, 0, 604800),
+    useDraft: booleanConfig(env.USEDRAFT, true),
     useHeading: truthy(env.USE_HEADING),
     camelCaseLinks: truthy(env.CAMELCASE),
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
@@ -208,6 +210,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("FULLPATH", env.FULLPATH, String(config.fullPath), "false"),
     configEntry("DFORMAT", env.DFORMAT, config.dateFormat, "%Y/%m/%d %H:%M"),
     configEntry("LOCKTIME", env.LOCKTIME, String(config.lockTime), String(15 * 60)),
+    configEntry("USEDRAFT", env.USEDRAFT, String(config.useDraft), "true"),
     configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),
