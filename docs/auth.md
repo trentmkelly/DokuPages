@@ -20,6 +20,14 @@ Native login uses D1-backed users with the native password hash format. Successf
 
 Failed login attempts are rate limited by client IP and username in KV. Five failed attempts in a 15 minute window block further attempts for that pair and return `429` with `Retry-After: 900`; a successful login clears the counter.
 
+Upstream `auth_security_timeout` controls how long cached session auth data may
+be trusted before DokuWiki rechecks the auth backend. The Pages port keeps no
+cached auth principal between requests. Every request validates the opaque
+session token hash, session expiry, current user row, disabled flag, and group
+memberships from D1. That is equivalent to upstream's strict
+`auth_security_timeout=0` behavior and keeps long-lived native sessions
+server-revocable without encrypted password cookies.
+
 When `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are both configured, login
 submissions must include a valid Cloudflare Turnstile response before password
 verification or rate-limit updates run.

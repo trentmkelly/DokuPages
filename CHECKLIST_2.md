@@ -135,7 +135,7 @@ are not fixed by this checklist.
 - [x] Support upstream `authplain` hash verification formats listed by `passcrypt`, not just native PBKDF2 and reset-based conversion.
 - [x] Support imported legacy password hashes for login where safe, including bcrypt, smd5, md5, sha1, ssha, crypt, mysql, and my411 if still required.
 - [x] Implement persistent remember-me tokens compatible with upstream `rememberme`, or document the permanent security replacement.
-- [ ] Implement `auth_security_timeout` revalidation semantics for long-lived sessions.
+- [x] Implement `auth_security_timeout` revalidation semantics for long-lived sessions.
 - [ ] Map upstream `superuser` and `manager` config expressions instead of requiring fixed `admin` and `manager` groups.
 - [ ] Match upstream `autopasswd` registration behavior and generated-password emails.
 - [ ] Match upstream `profileconfirm` behavior and all profile-delete flows from `ProfileDelete.php`.

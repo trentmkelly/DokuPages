@@ -741,6 +741,43 @@ describe("auth routes", () => {
     expect(cookie).not.toContain("correct horse battery staple");
   });
 
+  it("revalidates session user state on every request instead of caching until auth_security_timeout", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+    const now = "2026-05-07T00:01:00.000Z";
+    await env.DB.batch([
+      env.DB.prepare("delete from user_groups where user_id = ? and group_id = ?").bind(
+        "user-1",
+        "group:admin"
+      ),
+      env.DB.prepare("insert into groups (id, name, created_at) values (?, ?, ?)").bind(
+        "group:editor",
+        "editor",
+        now
+      ),
+      env.DB.prepare(
+        "insert into user_groups (user_id, group_id, created_at) values (?, ?, ?)"
+      ).bind("user-1", "group:editor", now)
+    ]);
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/auth/session", {
+        headers: { cookie }
+      }),
+      env
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      principal: {
+        type: "user",
+        username: "alice",
+        groups: ["editor", "user"],
+        aclSubjects: ["@ALL", "@editor", "@user", "alice"]
+      }
+    });
+  });
+
   it("logs in imported DokuWiki authplain hashes and rehashes them natively", async () => {
     env = createEnv();
     await seedUser(env.DB);

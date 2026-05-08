@@ -29,6 +29,11 @@ such as Cloudflare Access or by a future session policy change that preserves
 server-side revocation; encrypted password-derived persistent cookies are not
 part of the port.
 
+Session resolution revalidates current account state on every request instead
+of using DokuWiki's cached-auth window from `auth_security_timeout`. User
+disablement and group changes in D1 therefore affect existing sessions
+immediately.
+
 ## Rendered Content
 
 The native wiki renderer escapes raw HTML in headings, paragraphs, link labels,
