@@ -366,7 +366,9 @@ async function searchPagesSimple(
        where sp.term in (${placeholders}) and p.is_deleted = 0${namespaceClause}
        group by p.id
        having count(distinct sp.term) = ${requiredTermCount}
-       order by score desc, p.updated_at desc
+       order by score desc,
+                (length(p.id) - length(replace(p.id, ':', ''))) asc,
+                p.id asc
        limit ?`
     )
     .bind(...terms, ...(namespace ? [namespace] : []), safeLimit)
@@ -400,7 +402,7 @@ async function searchPagesWithQueryPlan(
       if (!entry.page) return false;
       return !namespace || entry.page.namespace === namespace;
     })
-    .sort((a, b) => b.score - a.score || b.page.updated_at.localeCompare(a.page.updated_at))
+    .sort((a, b) => b.score - a.score || compareSearchPageIds(a.page.id, b.page.id))
     .slice(0, safeLimit);
 
   return rows.map(({ page, score }) => ({
@@ -542,6 +544,13 @@ function complementSearchHits(
     if (!excluded.has(id)) result.set(id, 0);
   }
   return result;
+}
+
+function compareSearchPageIds(left: string, right: string): number {
+  const leftDepth = left.split(":").length;
+  const rightDepth = right.split(":").length;
+  if (leftDepth !== rightDepth) return leftDepth - rightDepth;
+  return left.localeCompare(right);
 }
 
 function uniqueWordOperands(rpn: SearchRpnToken[]): SearchWordOperand[] {
@@ -1053,7 +1062,7 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
   const indexedTerms = await listIndexedTerms(db, input.id);
   const searchTerms = isDelete
     ? new Map<string, number>()
-    : buildSearchTermFrequencies(input.content, title, input.language);
+    : buildSearchTermFrequencies(input.content, title, input.language, input.id);
   const renderedMetadata = isDelete
     ? null
     : renderWikiText(input.content, { pageId: input.id, sectionEdit: false });
@@ -1176,7 +1185,7 @@ export async function rebuildSearchIndex(
 
   for (const page of pages) {
     const title = page.title ?? pageTitleFromId(page.id);
-    const terms = buildSearchTermFrequencies(page.content, title, language);
+    const terms = buildSearchTermFrequencies(page.content, title, language, page.id);
 
     for (const [term, frequency] of terms) {
       postings.push({ term, pageId: page.id, frequency });

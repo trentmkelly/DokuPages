@@ -185,7 +185,7 @@ on conflict(id) do update set
 );`
     );
 
-    const searchTerms = buildSearchTermFrequencies(content, title, searchStopWords);
+    const searchTerms = buildSearchTermFrequencies(content, title, searchStopWords, page.id);
     statements.push(`delete from search_postings where page_id = ${sql(page.id)};`);
 
     for (const [term, frequency] of searchTerms) {
@@ -1612,12 +1612,16 @@ const ASIAN_WORD_PATTERN =
 const utf8Encoder = new TextEncoder();
 const stopWordSetCache = new Map();
 
-function buildSearchTermFrequencies(content, title, stopWords) {
+function buildSearchTermFrequencies(content, title, stopWords, pageId) {
   const terms = new Map();
   addTerms(terms, tokenizeSearchText(stripWikiSyntaxForSearch(content), stopWords), 1);
 
   if (title) {
     addTerms(terms, tokenizeSearchText(title, stopWords), 3);
+  }
+
+  if (pageId) {
+    addTerms(terms, tokenizeSearchText(pageId.replace(/[:/_-]+/g, " "), stopWords), 2);
   }
 
   return terms;

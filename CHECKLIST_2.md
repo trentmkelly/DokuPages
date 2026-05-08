@@ -125,7 +125,7 @@ are not fixed by this checklist.
 - [x] Match DokuWiki's language-specific stopword files instead of the current fixed English stopword set.
 - [x] Match DokuWiki's search query operators, namespace filters, phrase behavior, exclusions, and wildcard or fragment behavior.
 - [x] Implement `search_nslimit` and `search_fragment` configuration.
-- [ ] Match DokuWiki's ranking, title boosting, page ID matching, and snippet extraction.
+- [x] Match DokuWiki's ranking, title boosting, page ID matching, and snippet extraction.
 - [ ] Match DokuWiki's AJAX quick search and link wizard output exactly, including ACL, namespace, and title behavior.
 - [ ] Match upstream indexer task behavior from `lib/exe/indexer.php`, `inc/indexer.php`, and `bin/indexer.php` instead of returning `501` for the legacy endpoint.
 - [ ] Decide whether media text or metadata should be indexed to match upstream search-related media behavior.

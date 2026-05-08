@@ -100,6 +100,19 @@ describe("wiki search helpers", () => {
     expect(terms.get("body")).toBe(1);
   });
 
+  it("adds page id terms for DokuWiki-style page lookup matching", () => {
+    const terms = buildSearchTermFrequencies(
+      "====== Welcome ======",
+      "Welcome",
+      "en",
+      "wiki:start"
+    );
+
+    expect(terms.get("welcome")).toBe(4);
+    expect(terms.get("wiki")).toBe(2);
+    expect(terms.get("start")).toBe(2);
+  });
+
   it("builds snippets around matching terms", () => {
     const snippet = makeSearchSnippet(
       "Intro text ".repeat(12) + "DokuWiki serverless search result " + "tail text ".repeat(12),

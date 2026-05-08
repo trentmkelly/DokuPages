@@ -66,7 +66,8 @@ export function parseSearchQuery(query: string, language = DEFAULT_LANGUAGE): st
 export function buildSearchTermFrequencies(
   content: string,
   title?: string | null,
-  language = DEFAULT_LANGUAGE
+  language = DEFAULT_LANGUAGE,
+  pageId?: string | null
 ): Map<string, number> {
   const terms = new Map<string, number>();
 
@@ -74,6 +75,10 @@ export function buildSearchTermFrequencies(
 
   if (title) {
     addTerms(terms, tokenizeSearchText(title, language), 3);
+  }
+
+  if (pageId) {
+    addTerms(terms, tokenizeSearchText(pageId.replace(/[:/_-]+/g, " "), language), 2);
   }
 
   return terms;
