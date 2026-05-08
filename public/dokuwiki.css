@@ -1242,10 +1242,17 @@ form.search button {
 .media-manager__search-panel,
 .dokuwiki .page form.media-manager__upload,
 .media-manager__upload--disabled {
+  display: none;
   margin-top: 1.2em;
   padding: 0.9em;
   border: 1px solid var(--dw-border);
   background: var(--dw-background-site);
+}
+
+.media-manager__search-panel:target,
+.dokuwiki .page form.media-manager__upload:target,
+.media-manager__upload--disabled:target {
+  display: block;
 }
 
 .dokuwiki .page .media-manager__search-panel form {
