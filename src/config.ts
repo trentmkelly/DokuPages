@@ -35,6 +35,7 @@ export interface RuntimeConfig {
   youAreHere: boolean;
   fullPath: boolean;
   dateFormat: string;
+  lockTime: number;
   useHeading: boolean;
   camelCaseLinks: boolean;
   typographyMode: number;
@@ -117,6 +118,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     youAreHere: truthy(env.YOUAREHERE),
     fullPath: truthy(env.FULLPATH),
     dateFormat: nonEmpty(env.DFORMAT) ?? "%Y/%m/%d %H:%M",
+    lockTime: integerConfig(env.LOCKTIME, 15 * 60, 0, 604800),
     useHeading: truthy(env.USE_HEADING),
     camelCaseLinks: truthy(env.CAMELCASE),
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
@@ -151,6 +153,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("MAX_SECTION_EDIT_LEVEL", env.MAX_SECTION_EDIT_LEVEL, 0, 5, issues);
   validateIntegerRange("BREADCRUMBS", env.BREADCRUMBS, 0, 99, issues);
+  validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
   validateFnEncode(env.FNENCODE, issues);
@@ -204,6 +207,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("YOUAREHERE", env.YOUAREHERE, String(config.youAreHere), "false"),
     configEntry("FULLPATH", env.FULLPATH, String(config.fullPath), "false"),
     configEntry("DFORMAT", env.DFORMAT, config.dateFormat, "%Y/%m/%d %H:%M"),
+    configEntry("LOCKTIME", env.LOCKTIME, String(config.lockTime), String(15 * 60)),
     configEntry("USE_HEADING", env.USE_HEADING, String(config.useHeading), "false"),
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),

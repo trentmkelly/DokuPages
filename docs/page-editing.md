@@ -50,7 +50,7 @@ Authorized page save and revert submissions are rate limited in KV by client IP 
 
 ## Edit Locks
 
-`GET /wiki/:id?do=edit` acquires a 15-minute Durable Object-backed page lock and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`, and successful saves or draft deletion release it. The edit form also carries the CSRF `sectok` used for saves, drafts, and lock refresh/release calls.
+`GET /wiki/:id?do=edit` acquires a Durable Object-backed page lock for the configured `LOCKTIME` duration and stores the token in a hidden form field plus an HTTP-only page lock cookie. A second editor receives the DokuWiki-style locked page with HTTP 423 until the lock is released or expires. Autosave refreshes the lock with `POST /api/pages/lock`; the client refresh interval is derived from `LOCKTIME - 60` seconds like upstream DokuWiki's lock timer. Successful saves or draft deletion release the lock. The edit form also carries the CSRF `sectok` used for saves, drafts, and lock refresh/release calls.
 
 ## Section Edit Anchors
 

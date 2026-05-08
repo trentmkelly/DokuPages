@@ -94,6 +94,7 @@ describe("handleRequest", () => {
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
     env.DFORMAT = undefined;
+    env.LOCKTIME = undefined;
     env.TARGET_WIKI = undefined;
     env.TARGET_INTERWIKI = undefined;
     env.TARGET_EXTERN = undefined;
@@ -1691,6 +1692,7 @@ describe("handleRequest", () => {
     expect(lockCookie).toContain("DW_LOCK_");
     expect(lockCookie).toContain("HttpOnly");
     expect(lockCookie).toContain("SameSite=Lax");
+    expect(lockCookie).toContain("Max-Age=900");
     expect(lockCookie).toContain("Secure");
     const html = await response.text();
     expect(html).toContain('name="baseRevisionId" value="wiki:welcome@2026-05-07T00:00:00.000Z"');
@@ -1701,7 +1703,37 @@ describe("handleRequest", () => {
     expect(html).toContain('id="edbtn__preview"');
     expect(html).toContain('data-draft-url="/api/pages/draft"');
     expect(html).toContain('data-lock-url="/api/pages/lock"');
+    expect(html).toContain('data-lock-refresh-delay="840000"');
     expect(html).toContain('name="minor" type="checkbox"');
+  });
+
+  it("honors LOCKTIME for edit locks and client refresh timing", async () => {
+    env.LOCKTIME = "120";
+
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=120");
+    const html = await response.text();
+    expect(html).toContain('data-lock-refresh-delay="60000"');
+  });
+
+  it("disables edit locks when LOCKTIME is zero", async () => {
+    env.LOCKTIME = "0";
+
+    const response = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).not.toContain("DW_LOCK_");
+    const html = await response.text();
+    expect(html).not.toContain('data-lock-url="/api/pages/lock"');
+    expect(html).toContain('name="lockToken" value=""');
   });
 
   it("prevents page read ACL bypasses before rendering or caching content", async () => {
@@ -1757,7 +1789,12 @@ describe("handleRequest", () => {
 
     expect(first.status).toBe(200);
     expect(locked.status).toBe(423);
-    await expect(locked.text()).resolves.toContain("Page locked");
+    const lockedHtml = await locked.text();
+    expect(lockedHtml).toContain("<h1>Page locked</h1>");
+    expect(lockedHtml).toContain("This page is currently locked for editing by another user.");
+    expect(lockedHtml).toContain("<strong>Currently locked by:</strong> Anonymous");
+    expect(lockedHtml).toContain("<strong>Lock expires at:</strong>");
+    expect(lockedHtml).toContain("(15 min)");
 
     const html = await first.text();
     const token = html.match(/name="lockToken" value="([^"]+)"/)?.[1] ?? "";

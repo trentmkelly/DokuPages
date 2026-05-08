@@ -121,7 +121,11 @@ import {
   type PageRevision
 } from "./wiki/page-service";
 import { extractInternalPageLinks } from "./wiki/page-links";
-import { applyPageTemplate, pageTemplateCandidates } from "./wiki/page-template";
+import {
+  applyPageTemplate,
+  pageTemplateCandidates,
+  renderDokuWikiDateFormat
+} from "./wiki/page-template";
 import {
   extractCodeBlock,
   getWikiRenderDirectives,
@@ -150,7 +154,8 @@ const BREADCRUMB_COOKIE_NAME = "DW_PAGES_BC";
 const BREADCRUMB_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
-const PAGE_LOCK_TTL_SECONDS = 15 * 60;
+const PAGE_LOCK_WARNING_SECONDS = 60;
+const PAGE_LOCK_MIN_REFRESH_SECONDS = 30;
 const PAGE_LOCK_TOKEN_BYTES = 24;
 const CSRF_COOKIE_NAME = "DW_CSRF_TOKEN";
 const CSRF_TOKEN_BYTES = 32;
@@ -7052,18 +7057,25 @@ async function handleEditPage(
   const templateContent =
     !page && !draft ? await resolvePageTemplate(env.DB, id, config, principal) : null;
   const cookieName = pageLockCookieName(id);
-  const lockToken = readCookie(request, cookieName) || randomPageLockToken();
-  const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+  const lockToken =
+    config.lockTime > 0 ? readCookie(request, cookieName) || randomPageLockToken() : "";
+  const lock =
+    config.lockTime > 0 ? await ensurePageEditLock(request, env, principal, id, lockToken) : null;
   const csrf = csrfContext(request);
 
-  if (!lock.ok) {
+  if (lock && !lock.ok) {
     return lockedResponse(request, env, id, lock.lock);
   }
 
   const response = htmlResponse(
     renderEditPage(id, page, draft, env, templateContent, lockToken, csrf.token)
   );
-  response.headers.append("set-cookie", pageLockCookieHeader(cookieName, lockToken, request));
+  if (config.lockTime > 0) {
+    response.headers.append(
+      "set-cookie",
+      pageLockCookieHeader(cookieName, lockToken, request, config.lockTime)
+    );
+  }
   response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
 
   return response;
@@ -7512,7 +7524,7 @@ async function handleRefreshPageLock(
   const response = jsonResponse({ ok: true, lock: lock.lock });
   response.headers.append(
     "set-cookie",
-    pageLockCookieHeader(pageLockCookieName(id), lockToken, request)
+    pageLockCookieHeader(pageLockCookieName(id), lockToken, request, getRuntimeConfig(env).lockTime)
   );
   return response;
 }
@@ -7556,7 +7568,9 @@ async function ensurePageEditLock(
   id: string,
   token: string
 ): Promise<{ ok: true; lock: PageLockInfo | null } | { ok: false; lock: PageLockInfo | null }> {
-  if (!env.PAGE_LOCKS) {
+  const lockTime = getRuntimeConfig(env).lockTime;
+
+  if (!env.PAGE_LOCKS || lockTime <= 0) {
     return { ok: true, lock: null };
   }
 
@@ -7567,7 +7581,7 @@ async function ensurePageEditLock(
     ownerId: owner.ownerId,
     ownerName: owner.ownerName,
     token,
-    ttlSeconds: PAGE_LOCK_TTL_SECONDS
+    ttlSeconds: lockTime
   };
 
   return refreshPageLock(env.PAGE_LOCKS, lockRequest);
@@ -7579,7 +7593,8 @@ async function releaseHeldPageLock(
   id: string,
   token: string
 ): Promise<void> {
-  if (!env.PAGE_LOCKS || !token) return;
+  const lockTime = getRuntimeConfig(env).lockTime;
+  if (!env.PAGE_LOCKS || !token || lockTime <= 0) return;
 
   const owner = pageLockOwner(principal);
   await releasePageLock(env.PAGE_LOCKS, {
@@ -7588,7 +7603,7 @@ async function releaseHeldPageLock(
     ownerId: owner.ownerId,
     ownerName: owner.ownerName,
     token,
-    ttlSeconds: PAGE_LOCK_TTL_SECONDS
+    ttlSeconds: lockTime
   });
 }
 
@@ -7704,7 +7719,12 @@ async function handleSaveDraft(
     if (lockToken) {
       response.headers.append(
         "set-cookie",
-        pageLockCookieHeader(pageLockCookieName(id), lockToken, request)
+        pageLockCookieHeader(
+          pageLockCookieName(id),
+          lockToken,
+          request,
+          getRuntimeConfig(env).lockTime
+        )
       );
     }
 
@@ -7716,7 +7736,12 @@ async function handleSaveDraft(
   if (lockToken) {
     response.headers.append(
       "set-cookie",
-      pageLockCookieHeader(pageLockCookieName(id), lockToken, request)
+      pageLockCookieHeader(
+        pageLockCookieName(id),
+        lockToken,
+        request,
+        getRuntimeConfig(env).lockTime
+      )
     );
   }
 
@@ -8041,19 +8066,32 @@ async function handleDeleteDraft(
 }
 
 function renderLockedPage(env: Env, id: string, lock: PageLockInfo | null): string {
+  const config = getRuntimeConfig(env);
   const lockDetails = lock
-    ? `<p>${escapeHtml(id)} is currently being edited by ${escapeHtml(lock.ownerName || "another editor")}.</p>
-      <p>The current lock expires at ${escapeHtml(lock.expiresAt)}.</p>`
+    ? `<ul>
+        <li><div class="li"><strong>Currently locked by:</strong> ${escapeHtml(lock.ownerName || "another editor")}</div></li>
+        <li><div class="li"><strong>Lock expires at:</strong> ${escapeHtml(formatLockExpiration(lock.expiresAt, config))} (${lockMinutesRemaining(lock.expiresAt)} min)</div></li>
+      </ul>`
     : `<p>${escapeHtml(id)} does not currently have an active edit lock.</p>`;
 
   return htmlShell(
     env,
     `Page locked for ${id}`,
     `<h1>Page locked</h1>
+    <p>This page is currently locked for editing by another user. You have to wait until this user finishes editing or the lock expires.</p>
     ${lockDetails}
     <p><a href="${pagePath(id)}">View current page</a></p>`,
     { pageId: id }
   );
+}
+
+function formatLockExpiration(expiresAt: string, config: RuntimeConfig): string {
+  return renderDokuWikiDateFormat(config.dateFormat, new Date(expiresAt));
+}
+
+function lockMinutesRemaining(expiresAt: string): number {
+  const remainingMs = new Date(expiresAt).getTime() - Date.now();
+  return Math.max(0, Math.round(remainingMs / 60000));
 }
 
 function pageLockOwner(
@@ -8079,9 +8117,14 @@ function pageLockCookieName(id: string): string {
   return `DW_LOCK_${fnv1a(id)}`;
 }
 
-function pageLockCookieHeader(name: string, token: string, request: Request): string {
+function pageLockCookieHeader(
+  name: string,
+  token: string,
+  request: Request,
+  maxAgeSeconds: number
+): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${PAGE_LOCK_TTL_SECONDS}${secure}`;
+  return `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
 }
 
 function clearPageLockCookieHeader(name: string, request: Request): string {
@@ -8142,6 +8185,11 @@ function renderEditPage(
   const draftNotice = draft
     ? `<p><strong>Draft recovered:</strong> ${escapeHtml(draft.updatedAt)}</p>`
     : "";
+  const config = getRuntimeConfig(env);
+  const lockAttributes =
+    lockToken && config.lockTime > 0
+      ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}"`
+      : "";
 
   return htmlShell(
     env,
@@ -8149,7 +8197,7 @@ function renderEditPage(
     `<h1>Edit ${escapeHtml(title)}</h1>
     ${draftNotice}
     <div class="editBox">
-    <form id="dw__editform" class="edit" method="post" action="/api/pages" data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release">
+    <form id="dw__editform" class="edit" method="post" action="/api/pages"${lockAttributes}>
       ${csrfInput(csrfToken)}
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <input type="hidden" name="baseRevisionId" value="${escapeHtml(baseRevisionId)}">
@@ -8186,6 +8234,13 @@ function renderEditPage(
     </div>
   `,
     { pageId: id, updatedAt: page?.updatedAt }
+  );
+}
+
+function pageLockRefreshDelayMs(lockTimeSeconds: number): number {
+  if (lockTimeSeconds <= 0) return 0;
+  return (
+    Math.max(PAGE_LOCK_MIN_REFRESH_SECONDS, lockTimeSeconds - PAGE_LOCK_WARNING_SECONDS) * 1000
   );
 }
 

@@ -283,14 +283,15 @@
       submitting = true;
     });
 
-    window.setInterval(
-      function () {
+    var refreshDelay = Number(form.dataset.lockRefreshDelay || 0);
+
+    if (refreshDelay > 0) {
+      window.setInterval(function () {
         refreshPageLock(form, status).catch(function () {
           setStatus(status, "Page lock refresh failed.");
         });
-      },
-      5 * 60 * 1000
-    );
+      }, refreshDelay);
+    }
 
     window.addEventListener("pagehide", function () {
       if (submitting || !form.dataset.lockReleaseUrl || !navigator.sendBeacon) {

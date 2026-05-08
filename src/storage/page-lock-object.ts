@@ -100,7 +100,7 @@ function isValidLockRequest(
 function lockTtlSeconds(body: LockRequestBody): number {
   const ttl = Number(body.ttlSeconds);
   if (!Number.isFinite(ttl)) return DEFAULT_LOCK_TTL_SECONDS;
-  return Math.max(60, Math.min(Math.floor(ttl), DEFAULT_LOCK_TTL_SECONDS));
+  return Math.max(1, Math.floor(ttl));
 }
 
 function publicLock(lock: StoredLock | null): Omit<StoredLock, "token"> | null {
