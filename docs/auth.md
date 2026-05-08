@@ -12,7 +12,12 @@ Requests without a valid session resolve to an anonymous principal. Anonymous pr
 
 `/api/auth/session` exposes the current public principal shape for runtime checks.
 
-Native admin-only routes require membership in the `admin` group. Manager-level routes such as the admin dashboard accept either the `manager` or `admin` group; ACL editing remains admin-only.
+Native admin-only routes use DokuWiki-style `superuser` member-list matching
+from the `SUPERUSER` runtime variable. Manager-level routes such as the admin
+dashboard accept either `SUPERUSER` matches or `MANAGER` matches. The defaults
+preserve the native launch groups: `SUPERUSER=@admin` and `MANAGER=@manager`.
+Both variables accept comma-separated usernames and `@groups`, including
+`@ALL`, matching upstream member-list behavior.
 
 ## Login Sessions
 

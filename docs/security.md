@@ -90,9 +90,9 @@ Atom responses filter out pages that are hidden by `HIDE_PAGES` or unreadable by
 the active principal. `SNEAKY_INDEX=1` prevents namespace indexes from listing a
 namespace that lacks namespace-level read permission.
 
-`/admin/acl` provides a native ACL manager for users in the `admin` group. It can
-add, update, and delete D1-backed ACL rules and uses the same CSRF protection as
-other state-changing routes.
+`/admin/acl` provides a native ACL manager for principals that match the
+DokuWiki-style `SUPERUSER` member list. It can add, update, and delete D1-backed
+ACL rules and uses the same CSRF protection as other state-changing routes.
 
 Admin ACL changes and search index rebuilds are recorded in D1 `audit_log` rows.
 The admin-only `/admin/audit` page exposes the recent entries for operational

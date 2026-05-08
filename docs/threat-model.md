@@ -43,10 +43,10 @@ Runtime bindings:
 
 Admin route permissions:
 
-- `/admin`: `manager` or `admin`.
-- `/admin/acl`: `admin`.
-- `/admin/audit`: `admin`.
-- `/api/admin/rebuild-search`: `admin` plus CSRF.
+- `/admin`: configured `MANAGER` or `SUPERUSER` member-list match.
+- `/admin/acl`: configured `SUPERUSER` member-list match.
+- `/admin/audit`: configured `SUPERUSER` member-list match.
+- `/api/admin/rebuild-search`: configured `SUPERUSER` member-list match plus CSRF.
 
 Operational permissions:
 

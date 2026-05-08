@@ -15,6 +15,8 @@ describe("runtime config", () => {
       startPage: "wiki:welcome",
       language: "en",
       sessionCookieName: "DW_PAGES_SESSION",
+      superuser: "@admin",
+      manager: "@manager",
       hidePages: null,
       sneakyIndex: false,
       maintenanceMode: false,
@@ -71,6 +73,8 @@ describe("runtime config", () => {
     const env = {
       START_PAGE: "Wiki/Welcome",
       WIKI_LANG: "pt_BR",
+      SUPERUSER: "root,@ops",
+      MANAGER: "@staff,mona",
       HIDE_PAGES: ":hidden:",
       SNEAKY_INDEX: "1",
       MAINTENANCE_MODE: "true",
@@ -115,6 +119,8 @@ describe("runtime config", () => {
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
     expect(getRuntimeConfig(env).language).toBe("pt-br");
+    expect(getRuntimeConfig(env).superuser).toBe("root,@ops");
+    expect(getRuntimeConfig(env).manager).toBe("@staff,mona");
     expect(getRuntimeConfig(env).hidePages).toBe(":hidden:");
     expect(getRuntimeConfig(env).sneakyIndex).toBe(true);
     expect(getRuntimeConfig(env).maintenanceMode).toBe(true);
@@ -213,6 +219,14 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "SEND404",
           effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "SUPERUSER",
+          effectiveValue: "@admin"
+        }),
+        expect.objectContaining({
+          key: "MANAGER",
+          effectiveValue: "@manager"
         }),
         expect.objectContaining({
           key: "CANONICAL_URLS",
@@ -385,6 +399,8 @@ describe("runtime config", () => {
       START_PAGE: "::",
       WIKI_LANG: "zz",
       SESSION_COOKIE_NAME: "bad cookie",
+      SUPERUSER: "@,bad user",
+      MANAGER: "@",
       HIDE_PAGES: "[",
       DISABLE_ACTIONS: "edit,bad action,$",
       BASE_URL: "ftp://example.test",
@@ -412,6 +428,8 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "START_PAGE", severity: "error" }),
         expect.objectContaining({ key: "WIKI_LANG", severity: "error" }),
         expect.objectContaining({ key: "SESSION_COOKIE_NAME", severity: "error" }),
+        expect.objectContaining({ key: "SUPERUSER", severity: "error" }),
+        expect.objectContaining({ key: "MANAGER", severity: "error" }),
         expect.objectContaining({ key: "HIDE_PAGES", severity: "error" }),
         expect.objectContaining({ key: "DISABLE_ACTIONS", severity: "error" }),
         expect.objectContaining({ key: "BASE_URL", severity: "error" }),

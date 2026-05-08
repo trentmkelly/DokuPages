@@ -1109,6 +1109,103 @@ describe("auth routes", () => {
     expect(mediaCleanupPost.status).toBe(403);
   });
 
+  it("honors configured DokuWiki superuser and manager member lists", async () => {
+    env = createEnv({
+      SUPERUSER: "root,@ops",
+      MANAGER: "@staff,mona"
+    });
+    await seedUser(env.DB, {
+      userId: "user-root",
+      username: "root",
+      password: "root password",
+      displayName: "Root User",
+      email: "root@example.test",
+      groups: ["user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-ops",
+      username: "oliver",
+      password: "ops password",
+      displayName: "Oliver Ops",
+      email: "oliver@example.test",
+      groups: ["ops", "user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-staff",
+      username: "stella",
+      password: "staff password",
+      displayName: "Stella Staff",
+      email: "stella@example.test",
+      groups: ["staff", "user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-mona",
+      username: "mona",
+      password: "mona password",
+      displayName: "Mona Named",
+      email: "mona@example.test",
+      groups: ["user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-legacy-manager",
+      username: "mickey",
+      password: "manager password",
+      displayName: "Mickey Manager",
+      email: "mickey@example.test",
+      groups: ["manager", "user"]
+    });
+
+    const rootCookie = await loginAs(env, "root", "root password");
+    const opsCookie = await loginAs(env, "oliver", "ops password");
+    const staffCookie = await loginAs(env, "stella", "staff password");
+    const monaCookie = await loginAs(env, "mona", "mona password");
+    const legacyManagerCookie = await loginAs(env, "mickey", "manager password");
+
+    const rootAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: rootCookie }
+      }),
+      env
+    );
+    const opsAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: opsCookie }
+      }),
+      env
+    );
+    const staffDashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie: staffCookie }
+      }),
+      env
+    );
+    const staffAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: staffCookie }
+      }),
+      env
+    );
+    const monaDashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie: monaCookie }
+      }),
+      env
+    );
+    const legacyManagerDashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie: legacyManagerCookie }
+      }),
+      env
+    );
+
+    expect(rootAcl.status).toBe(200);
+    expect(opsAcl.status).toBe(200);
+    expect(staffDashboard.status).toBe(200);
+    expect(staffAcl.status).toBe(403);
+    expect(monaDashboard.status).toBe(200);
+    expect(legacyManagerDashboard.status).toBe(403);
+  });
+
   it("allows manager users to search and batch-revert spam pages", async () => {
     env = createEnv();
     await seedUser(env.DB, {

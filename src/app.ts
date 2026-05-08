@@ -6,6 +6,7 @@ import {
   type PrincipalAuthor
 } from "./auth/principal";
 import { resolveRequestPrincipal } from "./auth/request";
+import { isDokuWikiManager, isDokuWikiSuperuser } from "./auth/roles";
 import {
   authenticateUser,
   clearSessionCookieHeader,
@@ -5348,23 +5349,23 @@ function renderAdminDashboardPage(
   principal: AuthPrincipal,
   csrfToken: string
 ): string | Response {
-  if (!isManagerPrincipal(principal)) {
+  if (!isManagerPrincipal(principal, env)) {
     return managerDeniedResponse(request, env);
   }
 
-  const aclTool = isAdminPrincipal(principal)
+  const aclTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/acl">Access control list manager</a></li>`
     : "";
-  const userTool = isAdminPrincipal(principal)
+  const userTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/users">User manager</a></li>`
     : "";
-  const configTool = isAdminPrincipal(principal)
+  const configTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/config">Configuration manager</a></li>`
     : "";
-  const mediaCleanupTool = isAdminPrincipal(principal)
+  const mediaCleanupTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/media-cleanup">Media cleanup</a></li>`
     : "";
-  const adminActions = isAdminPrincipal(principal)
+  const adminActions = isAdminPrincipal(principal, env)
     ? `<form method="post" action="/api/admin/search/rebuild">
         ${csrfInput(csrfToken)}
         <button type="submit">Rebuild search index</button>
@@ -5381,7 +5382,7 @@ function renderAdminDashboardPage(
     `<h1>Administration</h1>
       <ul class="admin__tools">
         <li><a href="/admin/diagnostics">Diagnostics</a></li>
-        ${isAdminPrincipal(principal) ? '<li><a href="/admin/audit">Audit log</a></li>' : ""}
+        ${isAdminPrincipal(principal, env) ? '<li><a href="/admin/audit">Audit log</a></li>' : ""}
         ${aclTool}
         ${userTool}
         ${configTool}
@@ -5413,7 +5414,7 @@ async function renderRevertManagerPage(
   csrfToken: string,
   results: readonly RevertManagerResult[] = []
 ): Promise<string | Response> {
-  if (!isManagerPrincipal(principal)) {
+  if (!isManagerPrincipal(principal, env)) {
     return managerDeniedResponse(request, env);
   }
 
@@ -5545,7 +5546,7 @@ function renderConfigAdminPage(
   env: Env,
   principal: AuthPrincipal
 ): string | Response {
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -5570,7 +5571,7 @@ function renderConfigAdminPage(
 }
 
 function handleConfigExport(request: Request, env: Env, principal: AuthPrincipal): Response {
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -5626,7 +5627,7 @@ async function renderAuditLogPage(
   principal: AuthPrincipal,
   url: URL
 ): Promise<string | Response> {
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -5673,7 +5674,7 @@ async function renderAclAdminPage(
   principal: AuthPrincipal,
   csrfToken: string
 ): Promise<string | Response> {
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -5764,7 +5765,7 @@ async function renderUserAdminPage(
   url: URL,
   csrfToken: string
 ): Promise<string | Response> {
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -5818,7 +5819,7 @@ async function renderMediaCleanupPage(
   url: URL,
   csrfToken: string
 ): Promise<string | Response> {
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -6282,7 +6283,7 @@ async function handleAclRuleUpsert(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -6322,7 +6323,7 @@ async function handleAclRuleDelete(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -6350,7 +6351,7 @@ async function handleUserAdminUpdate(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -6394,7 +6395,7 @@ async function handleMediaCleanup(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -6437,7 +6438,7 @@ async function handleGlobalCachePurge(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -6573,7 +6574,7 @@ async function handleRevertManager(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isManagerPrincipal(principal)) {
+  if (!isManagerPrincipal(principal, env)) {
     return managerDeniedResponse(request, env);
   }
 
@@ -6710,7 +6711,7 @@ async function handleSearchIndexRebuild(
   const csrfFailure = validateCsrf(request, form);
   if (csrfFailure) return csrfFailure;
 
-  if (!isAdminPrincipal(principal)) {
+  if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
 
@@ -8877,7 +8878,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <p class="claim">Cloudflare Pages DokuWiki port</p>
         </div>
         <div class="tools">
-          ${renderUserTools(options.principal, pageId, disabledActions)}
+          ${renderUserTools(env, options.principal, pageId, disabledActions)}
           <nav id="dokuwiki__sitetools" aria-label="Site tools">
             <h3 class="a11y">Site tools</h3>
             <form class="search" method="get" action="/search">
@@ -8885,7 +8886,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
               <input id="qsearch__in" name="q" type="search" placeholder="Search">
               <button type="submit">Search</button>
             </form>
-            ${renderMobileTools(pageId, options.principal, disabledActions)}
+            ${renderMobileTools(env, pageId, options.principal, disabledActions)}
             <ul>
               ${disabledActions.has("recent") ? "" : '<li><a href="/recent">Recent changes</a></li>'}
               ${disabledActions.has("media") ? "" : `<li><a href="${mediaManagerPath}">Media Manager</a></li>`}
@@ -8927,6 +8928,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
 }
 
 function renderUserTools(
+  env: Env,
   principal?: AuthPrincipal,
   pageId?: string,
   disabledActions = new Set<string>()
@@ -8934,7 +8936,7 @@ function renderUserTools(
   const actionLinks = accountActionLinks(pageId);
   const accountItems =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal) && !disabledActions.has("admin") ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
+      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
         ${disabledActions.has("profile") ? "" : `<li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">Update Profile</a></li>`}
         ${disabledActions.has("logout") ? "" : `<li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">Log Out</a></li>`}`
       : `${disabledActions.has("login") ? "" : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">Log In</a></li>`}
@@ -8947,6 +8949,7 @@ function renderUserTools(
 }
 
 function renderMobileTools(
+  env: Env,
   pageId?: string,
   principal?: AuthPrincipal,
   disabledActions = new Set<string>()
@@ -8964,7 +8967,7 @@ function renderMobileTools(
     : "";
   const accountOptions =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal) && !disabledActions.has("admin") ? '<option value="/admin">Admin</option>' : ""}
+      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? '<option value="/admin">Admin</option>' : ""}
         ${disabledActions.has("profile") ? "" : `<option value="${escapeAttribute(actionLinks.profile)}">Update Profile</option>`}
         ${disabledActions.has("logout") ? "" : `<option value="${escapeAttribute(actionLinks.logout)}">Log Out</option>`}`
       : `${disabledActions.has("login") ? "" : `<option value="${escapeAttribute(actionLinks.login)}">Log In</option>`}
@@ -10212,15 +10215,13 @@ function userAdminErrorResponse(
   });
 }
 
-function isAdminPrincipal(principal: AuthPrincipal): boolean {
-  return principal.type === "user" && principal.groups.includes("admin");
+function isAdminPrincipal(principal: AuthPrincipal, env: Env): boolean {
+  return isDokuWikiSuperuser(principal, getRuntimeConfig(env).superuser);
 }
 
-function isManagerPrincipal(principal: AuthPrincipal): boolean {
-  return (
-    principal.type === "user" &&
-    (principal.groups.includes("admin") || principal.groups.includes("manager"))
-  );
+function isManagerPrincipal(principal: AuthPrincipal, env: Env): boolean {
+  const config = getRuntimeConfig(env);
+  return isDokuWikiManager(principal, config.superuser, config.manager);
 }
 
 function normalizeAclAdminScope(value: string): string {

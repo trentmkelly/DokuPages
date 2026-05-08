@@ -11,15 +11,20 @@ import { cleanPageId, type DokuWikiFnEncode, type PageIdCleanOptions } from "./w
 const DEFAULT_SITE_NAME = "DokuWiki Pages";
 const DEFAULT_START_PAGE = "wiki:welcome";
 const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
+const DEFAULT_SUPERUSER = "@admin";
+const DEFAULT_MANAGER = "@manager";
 const DEFAULT_CACHE_TIME = 60 * 60 * 24;
 const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+const MEMBER_LIST_ENTRY = /^@?[^\s,]+$/;
 
 export interface RuntimeConfig {
   siteName: string;
   startPage: string;
   language: SupportedLanguage;
   sessionCookieName: string;
+  superuser: string;
+  manager: string;
   hidePages: string | null;
   sneakyIndex: boolean;
   maintenanceMode: boolean;
@@ -112,6 +117,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     startPage: normalizedStartPage(env.START_PAGE, pageIdCleanOptions),
     language: resolveLanguage(env.WIKI_LANG),
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
+    superuser: normalizedMemberList(env.SUPERUSER, DEFAULT_SUPERUSER),
+    manager: normalizedMemberList(env.MANAGER, DEFAULT_MANAGER),
     hidePages: nonEmpty(env.HIDE_PAGES) ?? null,
     sneakyIndex: truthy(env.SNEAKY_INDEX),
     maintenanceMode: truthy(env.MAINTENANCE_MODE),
@@ -163,6 +170,8 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateStartPage(env.START_PAGE, pageIdCleanOptions, issues);
   validateLanguage(env.WIKI_LANG, issues);
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
+  validateMemberList("SUPERUSER", env.SUPERUSER, issues);
+  validateMemberList("MANAGER", env.MANAGER, issues);
   validateHidePages(env.HIDE_PAGES, issues);
   validateActionList(env.DISABLE_ACTIONS, issues);
   validateBaseUrl(env.BASE_URL, issues);
@@ -210,6 +219,8 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       config.sessionCookieName,
       DEFAULT_SESSION_COOKIE_NAME
     ),
+    configEntry("SUPERUSER", env.SUPERUSER, config.superuser, DEFAULT_SUPERUSER),
+    configEntry("MANAGER", env.MANAGER, config.manager, DEFAULT_MANAGER),
     configEntry("HIDE_PAGES", env.HIDE_PAGES, config.hidePages, null),
     configEntry("SNEAKY_INDEX", env.SNEAKY_INDEX, String(config.sneakyIndex), "false"),
     configEntry("MAINTENANCE_MODE", env.MAINTENANCE_MODE, String(config.maintenanceMode), "false"),
@@ -443,6 +454,29 @@ function validateSessionCookieName(
       key: "SESSION_COOKIE_NAME",
       severity: "error",
       message: "SESSION_COOKIE_NAME must be a valid HTTP cookie token."
+    });
+  }
+}
+
+function validateMemberList(
+  key: "SUPERUSER" | "MANAGER",
+  value: string | undefined,
+  issues: ConfigValidationIssue[]
+): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  const invalid = raw
+    .split(",")
+    .map((member) => member.trim())
+    .filter((member) => member.length > 0 && member !== "!!not set!!")
+    .filter((member) => member === "@" || !MEMBER_LIST_ENTRY.test(member));
+
+  if (invalid.length > 0) {
+    issues.push({
+      key,
+      severity: "error",
+      message: `${key} must be a comma-separated DokuWiki member list such as 'alice,@admin'.`
     });
   }
 }
@@ -735,6 +769,10 @@ function normalizedStartPage(
 
 function normalizedSessionCookieName(value: string | undefined): string {
   return value && validCookieName(value) ? value : DEFAULT_SESSION_COOKIE_NAME;
+}
+
+function normalizedMemberList(value: string | undefined, fallback: string): string {
+  return nonEmpty(value) ?? fallback;
 }
 
 function parseActionList(value: string | undefined): string[] {

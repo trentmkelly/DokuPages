@@ -53,6 +53,10 @@ Optional Pages environment variables:
 - `USEDRAFT`: enables DokuWiki-style edit draft autosave and recovery screens.
   Default: enabled.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
+- `SUPERUSER`: DokuWiki-style comma-separated user/group member list for full
+  admin access. Default: `@admin`.
+- `MANAGER`: DokuWiki-style comma-separated user/group member list for
+  manager-level admin dashboard and revert access. Default: `@manager`.
 - `HIDE_PAGES`: regular expression for page IDs hidden from aggregate outputs.
 - `SNEAKY_INDEX`: truthy value enables DokuWiki-style namespace hiding.
 - `APP_VERSION`: display/build version override. Defaults to the package version.
