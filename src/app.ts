@@ -623,7 +623,7 @@ export async function handleRequest(
     }
 
     if (url.searchParams.get("do") === "redirect") {
-      return redirectResponse(pagePath(id));
+      return redirectResponse(redirectTargetForAction(id, url.searchParams.get("hid")));
     }
 
     if (url.searchParams.get("do") === "revisions") {
@@ -1019,9 +1019,36 @@ async function handleWikiPostAction(
       return handleDeleteDraft(request, env, principal, id, `${pagePath(id)}?do=edit`);
     case "cancel":
       return handleDeleteDraft(request, env, principal, id, pagePath(id));
+    case "redirect":
+      return handleRedirectAction(request, id);
     default:
       return null;
   }
+}
+
+async function handleRedirectAction(request: Request, id: string): Promise<Response> {
+  const form = await request.formData();
+  const explicitFragment = String(form.get("hid") ?? "");
+  const content = String(form.get("content") ?? form.get("wikitext") ?? form.get("TEXT") ?? "");
+  const fragment = explicitFragment || firstHeadingFragment(content);
+  return redirectResponse(redirectTargetForAction(id, fragment));
+}
+
+function redirectTargetForAction(id: string, fragment: string | null = null): string {
+  const cleaned = cleanFragment(fragment);
+  return cleaned ? `${pagePath(id)}#${encodeURIComponent(cleaned)}` : pagePath(id);
+}
+
+function firstHeadingFragment(content: string): string | null {
+  const match = content.match(/^\s*={2,6}\s*([^=\n]+?)\s*=*\s*$/m);
+  if (!match) return null;
+  return cleanPageId(match[1]).replaceAll(":", "-").replaceAll("_", "-") || null;
+}
+
+function cleanFragment(value: string | null): string | null {
+  const fragment = value?.replace(/^#/, "").trim();
+  if (!fragment) return null;
+  return fragment.replace(/\s+/g, "-");
 }
 
 async function handlePagePreview(

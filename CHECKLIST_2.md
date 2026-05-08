@@ -48,7 +48,7 @@ are not fixed by this checklist.
 - [x] Make missing-page HTTP status configurable like upstream `send404`; the port currently returns an HTML 404 for missing pages.
 - [x] Match DokuWiki's `userewrite` and `useslash` modes, or document the Pages-only URL policy as intentionally fixed.
 - [ ] Match upstream canonical URL behavior controlled by `canonical`, `baseurl`, and `basedir`.
-- [ ] Support upstream `do=redirect` semantics and redirect metadata, not just route canonicalization.
+- [x] Support upstream `do=redirect` semantics and redirect metadata, not just route canonicalization.
 - [ ] Audit every legacy URL in `docs/url-compatibility.md` against upstream `doku.php`, `feed.php`, `index.php`, and `lib/exe/*` behavior with live fixture requests.
 - [x] Replace placeholder `501` and `410` JSON responses with DokuWiki-template HTML where upstream would render an HTML page.
 - [ ] Confirm `index.php`, `doku.php`, `/wiki`, `/index`, and root redirects match upstream status codes, query preservation, and cache headers.

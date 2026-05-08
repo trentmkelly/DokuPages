@@ -324,6 +324,10 @@ describe("handleRequest", () => {
       new Request("https://example.com/wiki/wiki/welcome?do=media"),
       env
     );
+    const redirect = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=redirect&hid=welcome"),
+      env
+    );
 
     expect(check.status).toBe(200);
     await expect(check.text()).resolves.toContain("<h1>Diagnostics</h1>");
@@ -341,6 +345,7 @@ describe("handleRequest", () => {
     expect(plugin.status).toBe(501);
     await expect(plugin.text()).resolves.toContain("DokuWiki action plugin dispatch");
     expect(media.headers.get("location")).toBe("/media-manager?ns=wiki");
+    expect(redirect.headers.get("location")).toBe("/wiki/wiki/welcome#welcome");
   });
 
   it("hides and rejects actions listed in DISABLE_ACTIONS", async () => {
@@ -447,6 +452,21 @@ describe("handleRequest", () => {
     expect(cancel.status).toBe(303);
     expect(cancel.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(state.drafts).toHaveLength(0);
+
+    const redirectForm = new FormData();
+    redirectForm.set("content", "===== Redirect Heading =====\n\nText");
+
+    const redirected = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=redirect", {
+        method: "POST",
+        body: redirectForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(redirected.status).toBe(303);
+    expect(redirected.headers.get("location")).toBe("/wiki/wiki/welcome#redirect-heading");
   });
 
   it("serves DokuWiki-compatible AJAX search and index endpoints", async () => {
