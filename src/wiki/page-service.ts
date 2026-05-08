@@ -66,6 +66,13 @@ export interface PageLinkReference {
   updatedAt: string;
 }
 
+export interface PageLookupOptions {
+  inNamespace?: boolean;
+  inTitle?: boolean;
+  startPage?: string;
+  limit?: number;
+}
+
 export interface WantedPage {
   id: string;
   referrers: PageLinkReference[];
@@ -553,6 +560,19 @@ function compareSearchPageIds(left: string, right: string): number {
   return left.localeCompare(right);
 }
 
+function pageIdWithoutNamespaceOrStart(id: string, startPage: string): string {
+  const name = pageNameFromId(id);
+  const startName = pageNameFromId(startPage);
+  if (name && name !== startName) return name;
+
+  const namespace = id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
+  return namespace ? pageNameFromId(namespace) || startName : startName;
+}
+
+function pageNameFromId(id: string): string {
+  return id.includes(":") ? id.slice(id.lastIndexOf(":") + 1) : id;
+}
+
 function uniqueWordOperands(rpn: SearchRpnToken[]): SearchWordOperand[] {
   const operands = new Map<string, SearchWordOperand>();
   for (const token of rpn) {
@@ -668,6 +688,30 @@ export async function listAllPages(db: D1Database, limit = 500): Promise<PageLin
     title: row.title,
     updatedAt: row.updated_at
   }));
+}
+
+export async function lookupPages(
+  db: D1Database,
+  query: string,
+  options: PageLookupOptions = {}
+): Promise<PageLinkReference[]> {
+  const cleanQuery = cleanPageId(query);
+  if (!cleanQuery) return [];
+
+  const lowerQuery = cleanQuery.toLowerCase();
+  const lowerRawQuery = query.trim().toLowerCase();
+  const pages = await listAllPages(db, Math.max(options.limit ?? 500, 500));
+  const matches = pages.filter((page) => {
+    const idTarget = options.inNamespace
+      ? page.id
+      : pageIdWithoutNamespaceOrStart(page.id, options.startPage ?? "start");
+    if (idTarget.toLowerCase().includes(lowerQuery)) return true;
+    return Boolean(options.inTitle && page.title?.toLowerCase().includes(lowerRawQuery));
+  });
+
+  return matches
+    .sort((left, right) => compareSearchPageIds(left.id, right.id))
+    .slice(0, Math.max(1, Math.min(options.limit ?? 500, 1000)));
 }
 
 export async function listExistingPageIds(

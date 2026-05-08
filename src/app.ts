@@ -116,6 +116,7 @@ import {
   listPageRevisions,
   listRecentChanges,
   listWantedPages,
+  lookupPages,
   pagePath,
   rebuildSearchIndex,
   savePage,
@@ -2265,20 +2266,26 @@ async function handleAjax(
   const startedAt = Date.now();
 
   if (call === "qsearch") {
-    const query = params.get("q")?.trim() ?? "";
+    const query = decodeURIComponent(params.get("q")?.trim() ?? "");
     if (!query) return ajaxHtmlResponse("");
 
-    const results = await filterReadablePageItems(
-      env,
-      principal,
-      await searchPages(env.DB, query, "", 50, getRuntimeConfig(env).language)
-    );
-    const items = results
-      .map(
-        (page) =>
-          `<li><a href="${pagePath(page.id)}" class="wikilink1">${escapeHtml(pageLabel(page))}</a></li>`
+    const results = (
+      await filterReadablePageItems(
+        env,
+        principal,
+        await lookupPages(env.DB, query, {
+          inNamespace: true,
+          inTitle: getRuntimeConfig(env).useHeading,
+          startPage: startPageId(env),
+          limit: 51
+        })
       )
+    ).slice(0, 51);
+    const items = results
+      .slice(0, 50)
+      .map((page) => `<li>${quickSearchPageLink(env, page)}</li>`)
       .join("");
+    const overflow = results.length > 50 ? "<li>...</li>" : "";
 
     logMetric("search_metric", {
       surface: "ajax_qsearch",
@@ -2287,11 +2294,13 @@ async function handleAjax(
       durationMs: elapsedSince(startedAt)
     });
 
-    return ajaxHtmlResponse(items ? `<strong>Quick hits</strong><ul>${items}</ul>` : "");
+    return ajaxHtmlResponse(
+      items ? `<strong>Matching pagenames</strong><ul>${items}${overflow}</ul>` : ""
+    );
   }
 
   if (call === "suggestions") {
-    const query = cleanPageId(params.get("q") ?? "");
+    const query = cleanPageId(params.get("q") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
     if (!query) {
       return new Response(JSON.stringify([query, [], [], []]), {
         headers: securityHeaders({ "content-type": "application/x-suggestions+json" })
@@ -2301,11 +2310,16 @@ async function handleAjax(
     const results = await filterReadablePageItems(
       env,
       principal,
-      await searchPages(env.DB, query, "", 15, getRuntimeConfig(env).language)
+      await lookupPages(env.DB, query, {
+        inNamespace: false,
+        inTitle: false,
+        startPage: "start",
+        limit: 15
+      })
     );
-    const names = [...new Set(results.map((page) => pageName(page.id)))].sort((a, b) =>
-      a.localeCompare(b)
-    );
+    const names = [...new Set(results.map((page) => pageName(page.id)).map((name) => name.trim()))]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
 
     logMetric("search_metric", {
       surface: "ajax_suggestions",
@@ -2320,38 +2334,20 @@ async function handleAjax(
   }
 
   if (call === "linkwiz") {
-    const query = cleanPageId(params.get("q") ?? "");
-    const namespace = query.includes(":") ? query.slice(0, query.lastIndexOf(":")) : "";
-
-    if (query) {
-      const results = await filterReadablePageItems(
-        env,
-        principal,
-        await searchPages(env.DB, query, namespace, 50, getRuntimeConfig(env).language)
-      );
-      logMetric("search_metric", {
-        surface: "ajax_linkwiz",
-        namespace: namespace || null,
-        queryLength: query.length,
-        resultCount: results.length,
-        durationMs: elapsedSince(startedAt)
-      });
-      return ajaxHtmlResponse(renderAjaxPageList(results));
-    }
-
-    const pages = await filterReadablePageItems(
-      env,
-      principal,
-      await listNamespacePages(env.DB, namespace, 50)
-    );
+    const query = ltrimColon(String(params.get("q") ?? "").trim());
+    const entries = await linkWizardEntries(env, principal, query);
+    const namespace = parseLinkWizardQuery(
+      query,
+      getRuntimeConfig(env).pageIdCleanOptions
+    ).namespace;
     logMetric("search_metric", {
       surface: "ajax_linkwiz",
       namespace: namespace || null,
-      queryLength: 0,
-      resultCount: pages.length,
+      queryLength: query.length,
+      resultCount: entries.length,
       durationMs: elapsedSince(startedAt)
     });
-    return ajaxHtmlResponse(renderAjaxPageList(pages));
+    return ajaxHtmlResponse(renderLinkWizardEntries(entries));
   }
 
   if (call === "index") {
@@ -2385,17 +2381,155 @@ async function readAjaxParams(request: Request, url: URL): Promise<URLSearchPara
   return params;
 }
 
-function renderAjaxPageList<T extends { id: string; title?: string | null }>(pages: T[]): string {
-  if (pages.length === 0) return "Nothing found.";
+interface LinkWizardEntry {
+  id: string;
+  title?: string | null;
+  type: "f" | "d" | "u";
+}
 
-  return pages
-    .map(
-      (page, index) =>
-        `<div class="${index % 2 === 0 ? "even" : "odd"} type_f">${ajaxPageLink(page)}${
-          page.title ? `<span>${escapeHtml(page.title)}</span>` : ""
-        }</div>`
-    )
+async function linkWizardEntries(
+  env: Env,
+  principal: AuthPrincipal,
+  query: string
+): Promise<LinkWizardEntry[]> {
+  const config = getRuntimeConfig(env);
+  const { id, namespace } = parseLinkWizardQuery(query, config.pageIdCleanOptions);
+
+  if (query !== "" && namespace === "") {
+    const pages = await filterReadablePageItems(
+      env,
+      principal,
+      await lookupPages(env.DB, id, {
+        inNamespace: true,
+        inTitle: config.useHeading,
+        startPage: startPageId(env),
+        limit: 500
+      })
+    );
+    const entries: LinkWizardEntry[] = [];
+    const namespaces = new Set<string>();
+
+    for (const page of pages) {
+      const pageNamespace = namespaceForIndex(page.id);
+      if (pageNamespace.includes(id)) {
+        namespaces.add(pageNamespace);
+      } else {
+        entries.push({ id: page.id, title: page.title, type: "f" });
+      }
+    }
+
+    return [
+      ...entries,
+      ...[...namespaces]
+        .sort((left, right) => left.localeCompare(right))
+        .map((ns) => ({
+          id: ns,
+          type: "d" as const
+        }))
+    ];
+  }
+
+  const readablePages = await filterReadablePageItems(
+    env,
+    principal,
+    await listAllPages(env.DB, 1000)
+  );
+  const entries: LinkWizardEntry[] = [];
+  const directories = new Set<string>();
+  const prefix = namespace ? `${namespace}:` : "";
+
+  if (namespace) {
+    entries.push({ id: parentNamespace(namespace), type: "u" });
+  }
+
+  for (const page of readablePages) {
+    if (prefix && !page.id.startsWith(prefix)) continue;
+    const relative = prefix ? page.id.slice(prefix.length) : page.id;
+    if (!relative) continue;
+    const [first, ...rest] = relative.split(":");
+    if (!first) continue;
+    if (id && !first.startsWith(id)) continue;
+
+    if (rest.length > 0) {
+      directories.add(prefix ? `${namespace}:${first}` : first);
+    } else {
+      entries.push({ id: page.id, title: page.title, type: "f" });
+    }
+  }
+
+  return [
+    ...entries,
+    ...[...directories]
+      .sort((left, right) => left.localeCompare(right))
+      .map((ns) => ({
+        id: ns,
+        type: "d" as const
+      }))
+  ];
+}
+
+function parseLinkWizardQuery(
+  query: string,
+  pageIdCleanOptions: RuntimeConfig["pageIdCleanOptions"]
+): { id: string; namespace: string } {
+  const trimmed = ltrimColon(query.trim());
+  const separator = trimmed.lastIndexOf(":");
+  if (separator < 0) {
+    return {
+      id: cleanPageId(trimmed, pageIdCleanOptions),
+      namespace: ""
+    };
+  }
+
+  return {
+    id: cleanPageId(trimmed.slice(separator + 1), pageIdCleanOptions),
+    namespace: cleanPageId(trimmed.slice(0, separator), pageIdCleanOptions)
+  };
+}
+
+function parentNamespace(namespace: string): string {
+  return namespace.includes(":") ? namespace.slice(0, namespace.lastIndexOf(":")) : "";
+}
+
+function renderLinkWizardEntries(entries: LinkWizardEntry[]): string {
+  if (entries.length === 0) return "Nothing was found.";
+
+  return entries
+    .map((entry, index) => {
+      const displayId =
+        (entry.type === "d" || entry.type === "u") && entry.id ? `${entry.id}:` : entry.id;
+      const name = entry.type === "u" ? "jump to parent namespace" : displayId;
+      const title = entry.type === "u" && !displayId ? "" : displayId;
+      return `<div class="${index % 2 === 0 ? "odd" : "even"} type_${entry.type}"><a href="${linkWizardHref(
+        displayId
+      )}" title="${escapeAttribute(title)}" class="wikilink1">${escapeHtml(name)}</a>${
+        entry.title ? `<span>${escapeHtml(entry.title)}</span>` : ""
+      }</div>`;
+    })
     .join("");
+}
+
+function quickSearchPageLink(env: Env, page: { id: string; title?: string | null }): string {
+  const config = getRuntimeConfig(env);
+  const name = config.useHeading
+    ? page.title || quickSearchPageName(page.id)
+    : quickSearchPageName(page.id);
+  return `<a href="${pagePath(page.id)}" class="wikilink1">${escapeHtml(name)}</a>`;
+}
+
+function quickSearchPageName(id: string): string {
+  const namespace = namespaceForIndex(id);
+  if (!namespace) return id;
+  return `${pageName(id)} (${namespace})`;
+}
+
+function linkWizardHref(id: string): string {
+  const target = id.endsWith(":") ? id.slice(0, -1) : id;
+  return target ? pagePath(target) : "/";
+}
+
+function ltrimColon(value: string): string {
+  return value.replace(/^:+/, "");
 }
 
 function ajaxPageLink(page: { id: string; title?: string | null }): string {

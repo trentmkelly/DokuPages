@@ -76,6 +76,8 @@ subscription and event.
 
 D1 postings are the launch search backend. DokuWiki's legacy `data/index` files are not read directly because they encode PHP filesystem assumptions; a rebuild importer can be added later if production data requires exact legacy ranking.
 
+AJAX quick search, OpenSearch suggestions, and the link wizard use DokuWiki-style page lookup semantics over current D1 page rows instead of full-text results. Quick search matches page IDs across namespaces and optional titles, suggestions match page names, and link wizard output distinguishes files, child namespaces, and parent namespace navigation while reusing the native ACL filter.
+
 Media search does not use a separate full-text index. The media manager searches current D1 media metadata by namespace, media ID, and MIME type, backed by the namespace/deleted/id index used for media browsing. This keeps media search tied to canonical media rows instead of migrating DokuWiki's filesystem index files.
 
 ## Rendered Cache
