@@ -33,6 +33,7 @@ export interface ExtractedCodeBlock {
 export interface RenderWikiTextOptions {
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
+  entityReplacements?: ReadonlyArray<readonly [string, string]>;
   sectionEdit?: boolean;
   topTocLevel?: number;
   maxTocLevel?: number;
@@ -46,6 +47,22 @@ export interface RenderWikiTextOptions {
 }
 
 const SMILEY_IMAGE_BASE = "/images/smileys";
+const DEFAULT_ENTITY_REPLACEMENTS: Array<readonly [string, string]> = [
+  ["<->", "↔"],
+  ["->", "→"],
+  ["<-", "←"],
+  ["<=>", "⇔"],
+  ["=>", "⇒"],
+  ["<=", "⇐"],
+  [">>", "»"],
+  ["<<", "«"],
+  ["---", "—"],
+  ["--", "–"],
+  ["(c)", "©"],
+  ["(tm)", "™"],
+  ["(r)", "®"],
+  ["...", "…"]
+];
 // Default mapping from DokuWiki's conf/smileys.conf.
 const DEFAULT_SMILEYS: Record<string, string> = {
   "8-)": "cool.svg",
@@ -166,6 +183,7 @@ export function renderWikiText(
     dependencies: new Map(),
     pageId: options.pageId ? cleanPageId(options.pageId) : undefined,
     existingPageIds: options.existingPageIds,
+    entityReplacements: options.entityReplacements ?? DEFAULT_ENTITY_REPLACEMENTS,
     sectionEdit: options.sectionEdit ?? true,
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
@@ -397,6 +415,7 @@ interface RenderContext {
   dependencies: Map<string, CacheDependency>;
   pageId?: string;
   existingPageIds?: ReadonlySet<string>;
+  entityReplacements: ReadonlyArray<readonly [string, string]>;
   sectionEdit: boolean;
   topTocLevel: number;
   maxTocLevel: number;
@@ -717,6 +736,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             footnotes: [],
             dependencies: context.dependencies,
             pageId: context.pageId,
+            entityReplacements: context.entityReplacements,
             sectionEdit: context.sectionEdit,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
@@ -764,7 +784,7 @@ function renderInline(source: string, context: RenderContext): string {
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
   rendered = renderExternalAutolinks(rendered, protectHtml);
   rendered = renderEmailAutolinks(rendered, protectHtml);
-  rendered = renderTypography(rendered, context.typographyMode);
+  rendered = renderTypography(rendered, context.entityReplacements, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
   rendered = renderSmileys(rendered, protectHtml);
   rendered = renderAcronyms(rendered, protectHtml);
@@ -798,22 +818,16 @@ function renderInline(source: string, context: RenderContext): string {
   return rendered;
 }
 
-function renderTypography(source: string, typographyMode: number): string {
-  let rendered = source
-    .replace(/&lt;-&gt;/g, "&harr;")
-    .replace(/&lt;=&gt;/g, "&hArr;")
-    .replace(/-&gt;/g, "&rarr;")
-    .replace(/&lt;-/g, "&larr;")
-    .replace(/=&gt;/g, "&rArr;")
-    .replace(/&lt;=/g, "&lArr;")
-    .replace(/&gt;&gt;/g, "&raquo;")
-    .replace(/&lt;&lt;/g, "&laquo;")
-    .replace(/\(c\)/gi, "&copy;")
-    .replace(/\(r\)/gi, "&reg;")
-    .replace(/\(tm\)/gi, "&trade;")
-    .replace(/\.\.\./g, "&hellip;")
-    .replace(/---/g, "&mdash;")
-    .replace(/--/g, "&ndash;");
+function renderTypography(
+  source: string,
+  entityReplacements: ReadonlyArray<readonly [string, string]>,
+  typographyMode: number
+): string {
+  let rendered = source;
+
+  for (const [token, replacement] of entityReplacements) {
+    rendered = rendered.replaceAll(escapeHtml(token), replacement);
+  }
 
   if (typographyMode > 0) {
     rendered = rendered

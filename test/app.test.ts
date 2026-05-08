@@ -229,16 +229,23 @@ describe("handleRequest", () => {
 
   it("honors the TYPOGRAPHY parser setting for page views", async () => {
     env.TYPOGRAPHY = "2";
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "entities",
+      key: "??",
+      value_json: JSON.stringify({ token: "??", replacement: "‽", order: 0 }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
     state.row = {
       ...currentPageRow(),
-      content: "====== Welcome ======\n\n'quoted' don't and 640x480."
+      content: "====== Welcome ======\n\n'quoted' don't and 640x480??"
     };
 
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain("‘quoted’ don’t and 640&times;480.");
+    expect(html).toContain("‘quoted’ don’t and 640&times;480‽");
     expect(cachePuts).not.toContain("page:wiki:welcome");
   });
 
@@ -1272,7 +1279,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome",
       JSON.stringify({
-        rendererVersion: 20,
+        rendererVersion: 21,
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
         title: "Cached Welcome",
         html: "<p>Cached body.</p>",
@@ -1294,7 +1301,7 @@ describe("handleRequest", () => {
     renderCache.set(
       "page:wiki:welcome:wiki:welcome@2026-05-06T00:00:00.000Z",
       JSON.stringify({
-        rendererVersion: 20,
+        rendererVersion: 21,
         revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
         title: "Cached Older Welcome",
         html: "<p>Cached older body.</p>",
@@ -2569,6 +2576,17 @@ function createD1Stub(state: D1StubState): D1Database {
               results: sql.includes("where scope = ?")
                 ? state.aclRules.filter((rule) => rule.scope === idOrLimit)
                 : [...state.aclRules]
+            };
+          }
+
+          if (sql.includes("from metadata")) {
+            const [subjectType, subjectId] = values;
+            return {
+              results: state.metadata
+                .filter(
+                  (record) => record.subject_type === subjectType && record.subject_id === subjectId
+                )
+                .map((record) => ({ key: record.key, value_json: record.value_json }))
             };
           }
 

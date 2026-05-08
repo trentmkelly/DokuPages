@@ -87,23 +87,34 @@ describe("renderWikiText", () => {
     const singleQuotes = renderWikiText("'quoted' don't", { typographyMode: 2 });
 
     expect(rendered.html).toContain("first <br>second");
-    expect(rendered.html).toContain("&copy;");
-    expect(rendered.html).toContain("&trade;");
-    expect(rendered.html).toContain("&rarr;");
-    expect(rendered.html).toContain("&larr;");
-    expect(rendered.html).toContain("&harr;");
-    expect(rendered.html).toContain("&rArr;");
-    expect(rendered.html).toContain("&lArr;");
-    expect(rendered.html).toContain("&hArr;");
-    expect(rendered.html).toContain("&raquo;");
-    expect(rendered.html).toContain("&laquo;");
-    expect(rendered.html).toContain("&hellip;");
-    expect(rendered.html).toContain("&mdash;");
-    expect(rendered.html).toContain("&ndash;");
+    expect(rendered.html).toContain("©");
+    expect(rendered.html).toContain("™");
+    expect(rendered.html).toContain("→");
+    expect(rendered.html).toContain("←");
+    expect(rendered.html).toContain("↔");
+    expect(rendered.html).toContain("⇒");
+    expect(rendered.html).toContain("⇐");
+    expect(rendered.html).toContain("⇔");
+    expect(rendered.html).toContain("»");
+    expect(rendered.html).toContain("«");
+    expect(rendered.html).toContain("…");
+    expect(rendered.html).toContain("—");
+    expect(rendered.html).toContain("–");
     expect(rendered.html).toContain("640&times;480");
     expect(rendered.html).toContain("“quoted”");
     expect(disabled.html).toContain("&quot;quoted&quot; 640x480");
     expect(singleQuotes.html).toContain("‘quoted’ don’t");
+  });
+
+  it("uses configured entity replacements when supplied", () => {
+    const rendered = renderWikiText("custom ?? and default (c)", {
+      entityReplacements: [
+        ["??", "‽"],
+        ["(c)", "COPY"]
+      ]
+    });
+
+    expect(rendered.html).toContain("custom ‽ and default COPY");
   });
 
   it("renders horizontal rules for the DokuWiki template", () => {

@@ -98,6 +98,8 @@ describe("DokuWiki import planner", () => {
     );
     await writeFile(path.join(root, "conf/mime.conf"), "jpg image/jpeg\nzip !application/zip\n");
     await writeFile(path.join(root, "conf/mime.local.conf"), "zip application/x-custom-zip\n");
+    await writeFile(path.join(root, "conf/entities.conf"), "-> →\n(c) ©\n");
+    await writeFile(path.join(root, "conf/entities.local.conf"), "(c) COPY\n?? ‽\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
     await writeFile(
       path.join(root, "conf/lang/en/lang.php"),
@@ -128,6 +130,7 @@ describe("DokuWiki import planner", () => {
       pluginSettings: 3,
       interwikiTemplates: 2,
       mimeTypes: 2,
+      entityReplacements: 3,
       wordblockPatterns: 2,
       customLanguageFiles: 2,
       customTemplateFiles: 2
@@ -311,6 +314,11 @@ describe("DokuWiki import planner", () => {
       mimeType: "application/x-custom-zip",
       forceDownload: false
     });
+    expect(plan.entityReplacements).toEqual([
+      { token: "->", replacement: "→", order: 0, source: "entities.conf" },
+      { token: "(c)", replacement: "COPY", order: 1, source: "entities.local.conf" },
+      { token: "??", replacement: "‽", order: 2, source: "entities.local.conf" }
+    ]);
     expect(plan.wordblockPatterns).toEqual([
       { id: "wordblock:1", pattern: "zoosex" },
       { id: "wordblock:2", pattern: "wow gold" }
@@ -463,6 +471,7 @@ describe("DokuWiki import planner", () => {
       "docs https://docs.example/{URL}\n"
     );
     await writeFile(path.join(root, "conf/mime.local.conf"), "foo text/x-foo\n");
+    await writeFile(path.join(root, "conf/entities.local.conf"), "?? ‽\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "spam phrase\n");
     await writeFile(path.join(root, "conf/lang/en/lang.php"), "<?php\n$lang['btn_save']='Save';\n");
     await writeFile(path.join(root, "lib/tpl/custom/main.php"), "<?php echo tpl_content();\n");
@@ -494,6 +503,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'docs'");
     expect(sql).toContain("'mime'");
     expect(sql).toContain("'foo'");
+    expect(sql).toContain("'entities'");
+    expect(sql).toContain("'??'");
     expect(sql).toContain("'wordblock'");
     expect(sql).toContain("'wordblock:1'");
     expect(sql).toContain("insert or replace into changelog");

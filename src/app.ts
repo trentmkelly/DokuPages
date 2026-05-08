@@ -131,7 +131,7 @@ type RenderCacheMode = "shared" | "private";
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 20;
+const RENDER_CACHE_VERSION = 21;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const PAGE_LOCK_TTL_SECONDS = 15 * 60;
@@ -1066,6 +1066,7 @@ async function handlePagePreview(
   const content = String(form.get("content") ?? "");
   const pageId = cleanPageId(String(form.get("id") || overrideId || ""));
   const config = getRuntimeConfig(env);
+  const entityReplacements = await entityReplacementsForRender(env);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
@@ -1075,6 +1076,7 @@ async function handlePagePreview(
   const rendered = renderWikiText(content, {
     pageId: pageId || undefined,
     existingPageIds,
+    entityReplacements,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode
   });
@@ -2602,10 +2604,12 @@ async function renderPageHtml(
   }
 
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
+  const entityReplacements = await entityReplacementsForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
     existingPageIds,
+    entityReplacements,
     sectionEdit,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
@@ -2663,9 +2667,11 @@ async function renderPageExport(
   }
 
   const existingPageIds = await existingPageIdsForContent(env, content, id, config.camelCaseLinks);
+  const entityReplacements = await entityReplacementsForRender(env);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
+    entityReplacements,
     topTocLevel: config.topTocLevel,
     maxTocLevel: config.maxTocLevel,
     maxSectionEditLevel: config.maxSectionEditLevel,
@@ -2729,6 +2735,51 @@ function sanitizedCodeBlockFilename(filename: string | null, language: string | 
   const fallback = `snippet.${language || "txt"}`;
   const baseName = (filename || fallback).split(/[\\/]/).filter(Boolean).at(-1) || fallback;
   return baseName.replace(/[^A-Za-z0-9._-]+/g, "_") || fallback;
+}
+
+async function entityReplacementsForRender(
+  env: Env
+): Promise<Array<readonly [string, string]> | undefined> {
+  const result = await env.DB.prepare(
+    `select value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?`
+  )
+    .bind("config", "entities")
+    .all<{ value_json: string }>();
+  const entries = result.results
+    .map((row) => parseEntityMetadata(row.value_json))
+    .filter((entry): entry is { token: string; replacement: string; order: number } =>
+      Boolean(entry)
+    )
+    .sort((a, b) => a.order - b.order || b.token.length - a.token.length);
+
+  return entries.length > 0
+    ? entries.map((entry) => [entry.token, entry.replacement] as const)
+    : undefined;
+}
+
+function parseEntityMetadata(
+  value: string
+): { token: string; replacement: string; order: number } | null {
+  try {
+    const parsed = JSON.parse(value) as {
+      token?: unknown;
+      replacement?: unknown;
+      order?: unknown;
+    };
+
+    if (typeof parsed.token !== "string" || typeof parsed.replacement !== "string") return null;
+
+    return {
+      token: parsed.token,
+      replacement: parsed.replacement,
+      order: typeof parsed.order === "number" ? parsed.order : Number.MAX_SAFE_INTEGER
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function existingPageIdsForContent(
