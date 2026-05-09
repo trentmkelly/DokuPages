@@ -7,9 +7,10 @@ State-changing POST routes require a DokuWiki-style `sectok` value or `x-csrf-to
 Preview rendering is exempt because it does not write storage.
 
 The native `/api/v1` JSON API keeps automation writes separate from browser form
-CSRF protections. API reads accept either an authenticated same-origin session or
-the configured `API_BEARER_TOKEN`. API writes require `Authorization: Bearer ...`
-and do not accept cookie-only auth.
+CSRF protections. API reads accept an authenticated same-origin session, a
+DokuWiki-compatible auth token, or the configured `API_BEARER_TOKEN`. API writes
+require `Authorization: Bearer ...` or `X-DokuWiki-Token` and do not accept
+cookie-only auth.
 
 ## Media Tokens
 
@@ -33,6 +34,15 @@ Session resolution revalidates current account state on every request instead
 of using DokuWiki's cached-auth window from `auth_security_timeout`. User
 disablement and group changes in D1 therefore affect existing sessions
 immediately.
+
+## Auth Tokens
+
+The profile page exposes a DokuWiki-compatible authentication token form.
+Tokens are JWT-shaped HS256 values with `iss=dokuwiki` and `sub=<username>`,
+signed with `DOKUWIKI_COOKIE_SALT`, and stored in D1 metadata so regenerating a
+token invalidates the previous one. Requests may authenticate with either
+`Authorization: Bearer <token>` or `X-DokuWiki-Token: <token>`, matching
+upstream `Authtoken.php` and `auth_tokenlogin()` behavior.
 
 ## Rendered Content
 

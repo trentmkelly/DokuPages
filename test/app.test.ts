@@ -591,8 +591,8 @@ describe("handleRequest", () => {
     expect(cancel.headers.get("location")).toBe("/wiki/wiki/welcome");
     expect(recover.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
     expect(draftDelete.headers.get("location")).toBe("/wiki/wiki/welcome?do=edit");
-    expect(authToken.status).toBe(501);
-    await expect(authToken.text()).resolves.toContain("Authentication token");
+    expect(authToken.status).toBe(303);
+    expect(authToken.headers.get("location")).toBe("/login?returnTo=%2Fprofile");
     expect(plugin.status).toBe(501);
     await expect(plugin.text()).resolves.toContain("DokuWiki action plugin dispatch");
     expect(media.headers.get("location")).toBe("/media-manager?ns=wiki");
@@ -2410,8 +2410,9 @@ describe("handleRequest", () => {
     expect(html).toContain("This topic does not exist yet");
     expect(html).toContain("You've followed a link to a topic that doesn't exist yet.");
     expect(html).toContain(
-      '<a class="action create" href="/wiki/missing/page?do=edit" rel="nofollow" title="Create this page">Create this page</a>'
+      '<a class="action" href="/wiki/missing/page?do=edit" rel="nofollow" title="Create this page">Create this page</a>'
     );
+    expect(html).not.toContain('class="action create" href="/wiki/missing/page?do=edit"');
     expect(html).not.toContain('class="wikilink2" href="/wiki/missing/page?do=edit"');
     expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');
   });

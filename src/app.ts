@@ -16,6 +16,7 @@ import {
   sessionCookieHeader
 } from "./auth/session";
 import { hashPassword } from "./auth/password";
+import { getOrCreateUserAuthToken, regenerateUserAuthToken } from "./auth/authtoken";
 import { getTurnstileConfig, verifyTurnstileForm } from "./auth/turnstile";
 import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import {
@@ -385,9 +386,13 @@ async function dispatchRequest(
     return htmlResponseWithCsrf(request, page, csrf);
   }
 
+  if (url.pathname === "/profile" && url.searchParams.get("do") === "authtoken") {
+    return handleAuthTokenAction(request, env, principal);
+  }
+
   if (url.pathname === "/profile" && request.method === "GET") {
     const csrf = csrfContext(request);
-    const page = renderProfilePage(request, env, url, principal, csrf.token);
+    const page = await renderProfilePage(request, env, url, principal, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
@@ -716,7 +721,7 @@ async function dispatchRequest(
     }
 
     if (url.searchParams.get("do") === "authtoken") {
-      return authFeatureNotSupportedResponse(request, env, "auth_token");
+      return handleAuthTokenAction(request, env, principal);
     }
 
     if (url.searchParams.get("do") === "plugin") {
@@ -2210,11 +2215,19 @@ function resolveNativeApiPrincipal(
     const token = bearerToken(authorization);
     const expected = env.API_BEARER_TOKEN?.trim();
 
-    if (!token || !expected || !constantTimeEqual(token, expected)) {
-      return nativeApiUnauthorized("Invalid bearer token.");
+    if (token && expected && constantTimeEqual(token, expected)) {
+      return apiTokenPrincipal();
     }
 
-    return apiTokenPrincipal();
+    if (principal.type === "user" && principal.authToken) {
+      return principal;
+    }
+
+    return nativeApiUnauthorized("Invalid bearer token.");
+  }
+
+  if (principal.type === "user" && principal.authToken) {
+    return principal;
   }
 
   if (requireBearer) {
@@ -4714,12 +4727,12 @@ function renderMissingPage(
     <p>
       <a href="${pagePath(id)}?do=revisions">Old revisions</a>
       <span class="sep"> · </span>
-      <a class="action create" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
+      <a class="action" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
     </p>`
     : `<h1 id="this-topic-does-not-exist-yet">This topic does not exist yet</h1>
     <p>You've followed a link to a topic that doesn't exist yet. If permissions allow, you may create it by clicking on <strong>Create this page</strong>.</p>
     <p>
-      <a class="action create" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
+      <a class="action" href="${pagePath(id)}?do=edit" rel="nofollow" title="Create this page">Create this page</a>
       <span class="sep"> · </span>
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
     </p>`;
@@ -7747,12 +7760,12 @@ async function handleProfileUpdate(
   const config = getRuntimeConfig(env);
 
   if (!parsed.ok) {
-    return profileUpdateErrorResponse(request, env, principal, values, parsed.error, csrf);
+    return await profileUpdateErrorResponse(request, env, principal, values, parsed.error, csrf);
   }
 
   const changes = profileChangeSet(principal, parsed);
   if (!changes.hasChanges) {
-    return profileUpdateErrorResponse(
+    return await profileUpdateErrorResponse(
       request,
       env,
       principal,
@@ -7766,7 +7779,7 @@ async function handleProfileUpdate(
     const authenticated = await authenticateUser(env.DB, principal.username, parsed.oldPassword);
 
     if (!authenticated || authenticated.id !== principal.id) {
-      return profileUpdateErrorResponse(
+      return await profileUpdateErrorResponse(
         request,
         env,
         principal,
@@ -7824,7 +7837,46 @@ async function handleProfileUpdate(
   return redirectResponse("/profile?updated=1");
 }
 
-function renderProfilePage(
+async function handleAuthTokenAction(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  if (principal.type !== "user") {
+    return accountLoginRequiredResponse(request, env, "/profile");
+  }
+
+  if (request.method !== "POST") {
+    return redirectResponse("/profile");
+  }
+
+  const form = await readFormDataOrEmpty(request);
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  const token = await regenerateUserAuthToken(env, principal);
+  if (!token) {
+    const csrf = csrfContext(request);
+    const page = await renderProfilePage(
+      request,
+      env,
+      new URL(request.url),
+      principal,
+      csrf.token,
+      {
+        type: "error",
+        text: "Authentication tokens require DOKUWIKI_COOKIE_SALT to be configured."
+      }
+    );
+    return page instanceof Response
+      ? page
+      : htmlResponseWithCsrf(request, page, csrf, { status: 503 });
+  }
+
+  return redirectResponse("/profile?token=updated");
+}
+
+async function renderProfilePage(
   request: Request,
   env: Env,
   url: URL,
@@ -7832,7 +7884,7 @@ function renderProfilePage(
   csrfToken: string,
   message: { type: "success" | "error"; text: string } | null = null,
   values: ProfileFormValues | null = null
-): string | Response {
+): Promise<string | Response> {
   if (principal.type !== "user") {
     return accountLoginRequiredResponse(request, env, "/profile");
   }
@@ -7848,6 +7900,7 @@ function renderProfilePage(
   const deleteProfileForm = isActionDisabled(env, "profile_delete")
     ? ""
     : renderProfileDeleteForm(csrfToken, config.profileConfirm);
+  const authTokenForm = await renderAuthTokenForm(env, principal, csrfToken);
 
   return htmlShell(
     env,
@@ -7875,9 +7928,33 @@ function renderProfilePage(
       </fieldset>
       <button type="submit">Update Profile</button>
     </form>
+    ${authTokenForm}
     ${deleteProfileForm}`,
     { principal }
   );
+}
+
+async function renderAuthTokenForm(
+  env: Env,
+  principal: AuthPrincipal,
+  csrfToken: string
+): Promise<string> {
+  if (principal.type !== "user") return "";
+
+  const token = await getOrCreateUserAuthToken(env, principal);
+  const tokenHtml = token
+    ? `<p><code style="display: block; word-break: break-word">${escapeHtml(token)}</code></p>`
+    : '<p class="error">Authentication tokens require DOKUWIKI_COOKIE_SALT to be configured.</p>';
+
+  return `<form id="dw__profiletoken" method="post" action="/profile?do=authtoken">
+      ${csrfInput(csrfToken)}
+      <fieldset>
+        <legend>Authentication token</legend>
+        <p>Use this token as a Bearer token or X-DokuWiki-Token header for DokuWiki-compatible API authentication.</p>
+        ${tokenHtml}
+        <button type="submit" name="regen" value="1">Generate new token</button>
+      </fieldset>
+    </form>`;
 }
 
 function parseProfileForm(
@@ -7946,26 +8023,30 @@ function profileChangeSet(
 }
 
 function profileNoticeFromUrl(url: URL): { type: "success" | "error"; text: string } | null {
-  return url.searchParams.get("updated") === "1"
-    ? { type: "success", text: "Profile updated." }
-    : null;
+  if (url.searchParams.get("updated") === "1") {
+    return { type: "success", text: "Profile updated." };
+  }
+  if (url.searchParams.get("token") === "updated") {
+    return { type: "success", text: "Authentication token regenerated." };
+  }
+  return null;
 }
 
-function profileUpdateErrorResponse(
+async function profileUpdateErrorResponse(
   request: Request,
   env: Env,
   principal: AuthPrincipal,
   values: ProfileFormValues,
   error: string,
   csrf: CsrfContext
-): Response {
+): Promise<Response> {
   if (acceptsJson(request)) {
     return jsonResponse({ error }, { status: 400 });
   }
 
   return htmlResponseWithCsrf(
     request,
-    renderProfilePage(
+    (await renderProfilePage(
       request,
       env,
       new URL(request.url),
@@ -7973,7 +8054,7 @@ function profileUpdateErrorResponse(
       csrf.token,
       { type: "error", text: error },
       values
-    ) as string,
+    )) as string,
     csrf,
     { status: 400 }
   );
@@ -7996,7 +8077,7 @@ async function handleProfileDelete(
   const oldPassword = String(form.get("oldpass") ?? form.get("currentPassword") ?? "");
 
   if (isActionDisabled(env, "profile_delete")) {
-    return profileDeleteErrorResponse(
+    return await profileDeleteErrorResponse(
       request,
       env,
       principal,
@@ -8007,7 +8088,7 @@ async function handleProfileDelete(
   }
 
   if (!formFlag(form, "delete")) {
-    return profileDeleteErrorResponse(
+    return await profileDeleteErrorResponse(
       request,
       env,
       principal,
@@ -8017,7 +8098,7 @@ async function handleProfileDelete(
   }
 
   if (!formFlag(form, "confirm_delete") && !formFlag(form, "confirmDelete")) {
-    return profileDeleteErrorResponse(
+    return await profileDeleteErrorResponse(
       request,
       env,
       principal,
@@ -8029,7 +8110,7 @@ async function handleProfileDelete(
   if (getRuntimeConfig(env).profileConfirm) {
     const authenticated = await authenticateUser(env.DB, principal.username, oldPassword);
     if (!authenticated || authenticated.id !== principal.id) {
-      return profileDeleteErrorResponse(
+      return await profileDeleteErrorResponse(
         request,
         env,
         principal,
@@ -8088,24 +8169,24 @@ function renderProfileDeleteForm(csrfToken: string, profileConfirm: boolean): st
   </form>`;
 }
 
-function profileDeleteErrorResponse(
+async function profileDeleteErrorResponse(
   request: Request,
   env: Env,
   principal: AuthPrincipal & { type: "user" },
   error: string,
   csrf: CsrfContext,
   status = 400
-): Response {
+): Promise<Response> {
   if (acceptsJson(request)) {
     return jsonResponse({ error }, { status });
   }
 
   return htmlResponseWithCsrf(
     request,
-    renderProfilePage(request, env, new URL(request.url), principal, csrf.token, {
+    (await renderProfilePage(request, env, new URL(request.url), principal, csrf.token, {
       type: "error",
       text: error
-    }) as string,
+    })) as string,
     csrf,
     { status }
   );

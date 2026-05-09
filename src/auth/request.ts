@@ -3,6 +3,7 @@ import { getRuntimeConfig } from "../config";
 import { anonymousPrincipal, principalFromUser, type AuthPrincipal } from "./principal";
 import { principalFromSessionCookie, readCookie } from "./session";
 import type { UserRecord } from "../storage/interfaces";
+import { principalFromAuthToken } from "./authtoken";
 
 interface ExternalAuthUserRow {
   id: string;
@@ -23,6 +24,9 @@ export async function resolveRequestPrincipal(request: Request, env: Env): Promi
   const config = getRuntimeConfig(env);
   const externalPrincipal = await principalFromExternalAuthHeaders(request, env, config);
   if (externalPrincipal) return externalPrincipal;
+
+  const tokenPrincipal = await principalFromAuthToken(request, env);
+  if (tokenPrincipal) return tokenPrincipal;
 
   const cookieName = config.sessionCookieName;
   const cookie = readCookie(request, cookieName);

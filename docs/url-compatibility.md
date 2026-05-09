@@ -20,7 +20,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?id=<page>&do=cancel`                     | Redirects to the native cancel action.                                                                  |
 | `/doku.php?id=<page>&do=recover`                    | Redirects to the native draft recovery action.                                                          |
 | `/doku.php?id=<page>&do=draftdel`                   | Redirects to the native draft deletion action.                                                          |
-| `/doku.php?id=<page>&do=authtoken`                  | Redirects to the native unsupported auth-token action.                                                  |
+| `/doku.php?id=<page>&do=authtoken`                  | Regenerates the logged-in user's DokuWiki-compatible auth token after CSRF validation.                  |
 | `/doku.php?id=<page>&do=plugin`                     | Redirects to the native unsupported plugin action.                                                      |
 | `/doku.php?id=<page>&do=media`                      | Redirects to the native media-manager action.                                                           |
 | `POST /doku.php?id=<page>&do=save`                  | Saves through the native page save handler.                                                             |

@@ -48,6 +48,121 @@ describe("auth routes", () => {
     expect(html).toMatch(/name="sectok" value="[^"]+"/);
   });
 
+  it("creates, rotates, and accepts DokuWiki-compatible authentication tokens", async () => {
+    env = createEnv({
+      DOKUWIKI_COOKIE_SALT: "test-dokuwiki-cookie-salt",
+      API_BEARER_TOKEN: "deployment-api-token"
+    });
+    await seedUser(env.DB);
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nBody."
+    });
+    const cookie = await loginAsAlice(env);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_770_000_000_000);
+
+    try {
+      const profile = await handleRequest(
+        new Request("https://example.com/profile", {
+          headers: { cookie }
+        }),
+        env
+      );
+      const profileHtml = await profile.text();
+      const token = extractProfileToken(profileHtml);
+
+      expect(profile.status).toBe(200);
+      expect(profileHtml).toContain('id="dw__profiletoken"');
+      expect(token).toContain(".");
+
+      const session = await handleRequest(
+        new Request("https://example.com/api/auth/session", {
+          headers: { authorization: `Bearer ${token}` }
+        }),
+        env
+      );
+      await expect(session.json()).resolves.toMatchObject({
+        principal: {
+          type: "user",
+          username: "alice",
+          displayName: "Alice Example"
+        }
+      });
+
+      const apiRead = await handleRequest(
+        new Request("https://example.com/api/v1/users/me", {
+          headers: { "x-dokuwiki-token": token }
+        }),
+        env
+      );
+      await expect(apiRead.json()).resolves.toMatchObject({
+        ok: true,
+        principal: { username: "alice" }
+      });
+
+      const apiWrite = await handleRequest(
+        new Request("https://example.com/api/v1/pages", {
+          method: "POST",
+          body: JSON.stringify({
+            id: "wiki:welcome",
+            content: "====== Welcome ======\n\nToken edit.",
+            baseRevisionId: "wiki:welcome@2026-05-07T00:00:00.000Z"
+          }),
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json"
+          }
+        }),
+        env
+      );
+      expect(apiWrite.status).toBe(200);
+
+      clock.mockReturnValue(1_770_000_001_000);
+      const rotated = await handleRequest(
+        new Request("https://example.com/profile?do=authtoken", {
+          method: "POST",
+          headers: csrfHeaders({ cookie })
+        }),
+        env
+      );
+
+      expect(rotated.status).toBe(303);
+      expect(rotated.headers.get("location")).toBe("/profile?token=updated");
+
+      const updatedProfile = await handleRequest(
+        new Request("https://example.com/profile", {
+          headers: { cookie }
+        }),
+        env
+      );
+      const newToken = extractProfileToken(await updatedProfile.text());
+      expect(newToken).not.toBe(token);
+
+      const oldTokenSession = await handleRequest(
+        new Request("https://example.com/api/auth/session", {
+          headers: { authorization: `Bearer ${token}` }
+        }),
+        env
+      );
+      await expect(oldTokenSession.json()).resolves.toMatchObject({
+        principal: { type: "anonymous", isAuthenticated: false }
+      });
+
+      const newTokenSession = await handleRequest(
+        new Request("https://example.com/api/auth/session", {
+          headers: { authorization: `Bearer ${newToken}` }
+        }),
+        env
+      );
+      await expect(newTokenSession.json()).resolves.toMatchObject({
+        principal: { type: "user", username: "alice" }
+      });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("renders registration and password reset forms", async () => {
     env = createEnv();
 
@@ -2280,6 +2395,12 @@ function csrfHeaders(headers = {}) {
       : `DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`,
     "x-csrf-token": TEST_CSRF_TOKEN
   };
+}
+
+function extractProfileToken(html) {
+  const match = html.match(/<code[^>]*>([^<]+)<\/code>/);
+  if (!match) throw new Error("Profile token was not rendered.");
+  return match[1];
 }
 
 async function seedUser(d1, options) {

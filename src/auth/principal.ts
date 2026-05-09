@@ -21,6 +21,7 @@ export interface UserPrincipal {
   displayName: string;
   email: string | null;
   groups: string[];
+  authToken?: boolean;
 }
 
 export type AuthPrincipal = AnonymousPrincipal | UserPrincipal;

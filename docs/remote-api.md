@@ -13,12 +13,23 @@ The supported remote API surface is the native JSON API under `/api/v1`.
 
 ## Authentication
 
-Read API requests require either an authenticated DokuWiki session cookie or a
-bearer token. Write API requests require a bearer token and deliberately do not
-accept cookie-only auth; this keeps cross-site request forgery protections on
-the browser UI separate from automation access.
+Read API requests require either an authenticated DokuWiki session cookie, a
+DokuWiki-compatible auth token, or the deployment bearer token. Write API
+requests require an `Authorization: Bearer ...` token or `X-DokuWiki-Token`;
+they deliberately do not accept cookie-only auth, which keeps cross-site request
+forgery protections on the browser UI separate from automation access.
 
-Configure the bearer token as a Cloudflare secret:
+Users can create or rotate a DokuWiki-compatible auth token from `/profile`.
+Those tokens are signed with `DOKUWIKI_COOKIE_SALT`, stored for revocation in D1
+metadata, and accepted in either header shape used by upstream DokuWiki:
+
+```http
+Authorization: Bearer <user-token>
+X-DokuWiki-Token: <user-token>
+```
+
+For deployment-wide automation, configure the bearer token as a Cloudflare
+secret:
 
 ```sh
 wrangler pages secret put API_BEARER_TOKEN --project-name dokutest
