@@ -56,7 +56,7 @@ are not fixed by this checklist.
 ## Parser And Wiki Syntax
 
 - [x] Port DokuWiki's full parser mode pipeline from `inc/Parsing/Parser.php` rather than the current regex-based renderer, or define a tested compatibility subset.
-- [ ] Add parity coverage for every upstream parser mode: Acronym, Camelcaselink, Code, Emaillink, Entity, Eol, Externallink, File, Filelink, Footnote, Formatting, Header, Hr, Internallink, Linebreak, Listblock, Media, Multiplyentity, Nocache, Notoc, Plugin, Preformatted, Quote, Quotes, Rss, Smiley, Table, Unformatted, Windowssharelink, and Wordblock.
+- [x] Add parity coverage for every upstream parser mode: Acronym, Camelcaselink, Code, Emaillink, Entity, Eol, Externallink, File, Filelink, Footnote, Formatting, Header, Hr, Internallink, Linebreak, Listblock, Media, Multiplyentity, Nocache, Notoc, Plugin, Preformatted, Quote, Quotes, Rss, Smiley, Table, Unformatted, Windowssharelink, and Wordblock.
 - [x] Implement CamelCase link support controlled by the upstream `camelcase` setting.
 - [ ] Implement RSS feed aggregation syntax from upstream `ParserMode/Rss.php`.
 - [ ] Implement plugin syntax macros, including the bundled info plugin macro seen in `docs/syntax-inventory.md`.
