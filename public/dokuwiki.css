@@ -529,6 +529,12 @@ form.search button {
   background-color: inherit;
 }
 
+.dokuwiki .page a.action,
+.dokuwiki .page a.action:link,
+.dokuwiki .page a.action:visited,
+.dokuwiki .page a.action:hover,
+.dokuwiki .page a.action:active,
+.dokuwiki .page a.action:focus,
 .dokuwiki a.action.create,
 .dokuwiki a.action.create:link,
 .dokuwiki a.action.create:visited,
@@ -549,6 +555,45 @@ form.search button {
 
 .dokuwiki .page tr:hover td {
   background-color: var(--dw-background-alt);
+}
+
+.dokuwiki div.error,
+.dokuwiki div.info,
+.dokuwiki div.success,
+.dokuwiki div.notify {
+  color: #000;
+  background-repeat: no-repeat;
+  background-position: 8px 50%;
+  border: 1px solid;
+  font-size: 90%;
+  margin: 0 0 0.5em;
+  padding: 0.4em 0.4em 0.4em 32px;
+  overflow: hidden;
+  border-radius: 5px;
+}
+
+.dokuwiki div.error {
+  background-color: #fcc;
+  background-image: url("/images/error.png");
+  border-color: #ebb;
+}
+
+.dokuwiki div.info {
+  background-color: #ccf;
+  background-image: url("/images/info.png");
+  border-color: #bbe;
+}
+
+.dokuwiki div.success {
+  background-color: #cfc;
+  background-image: url("/images/success.png");
+  border-color: #beb;
+}
+
+.dokuwiki div.notify {
+  background-color: #ffc;
+  background-image: url("/images/notify.png");
+  border-color: #eeb;
 }
 
 .dokuwiki .page p.success {

@@ -32,6 +32,30 @@ describe("auth routes", () => {
     expect(html).toContain('name="sectok"');
   });
 
+  it("renders, deduplicates, and clears stacked DokuWiki flash messages", async () => {
+    env = createEnv();
+
+    const response = await handleRequest(
+      new Request("https://example.com/login", {
+        headers: {
+          cookie: flashCookie([
+            { type: "error", text: "Repeated message" },
+            { type: "error", text: "Repeated message" },
+            { type: "notify", text: "Review your email." }
+          ])
+        }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie") ?? "").toContain("DW_FLASH_MESSAGES=;");
+    const html = await response.text();
+    expect(html).toContain('<div class="error">Repeated message</div>');
+    expect(html).toContain('<div class="notify">Review your email.</div>');
+    expect(html.match(/Repeated message/g)).toHaveLength(1);
+  });
+
   it("renders DokuWiki-style page action login links with CSRF", async () => {
     env = createEnv();
 
@@ -128,15 +152,22 @@ describe("auth routes", () => {
       );
 
       expect(rotated.status).toBe(303);
-      expect(rotated.headers.get("location")).toBe("/profile?token=updated");
+      expect(rotated.headers.get("location")).toBe("/profile");
+      const flashSetCookie = rotated.headers.get("set-cookie") ?? "";
+      expect(flashSetCookie).toContain("DW_FLASH_MESSAGES=");
 
       const updatedProfile = await handleRequest(
         new Request("https://example.com/profile", {
-          headers: { cookie }
+          headers: { cookie: cookieHeader(cookie, flashSetCookie) }
         }),
         env
       );
-      const newToken = extractProfileToken(await updatedProfile.text());
+      const updatedProfileHtml = await updatedProfile.text();
+      expect(updatedProfile.headers.get("set-cookie") ?? "").toContain("DW_FLASH_MESSAGES=;");
+      expect(updatedProfileHtml).toContain(
+        '<div class="success">Authentication token regenerated.</div>'
+      );
+      const newToken = extractProfileToken(updatedProfileHtml);
       expect(newToken).not.toBe(token);
 
       const oldTokenSession = await handleRequest(
@@ -401,8 +432,10 @@ describe("auth routes", () => {
     );
 
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("/login?registered=1");
-    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+    expect(response.headers.get("location")).toBe("/login");
+    const flashSetCookie = response.headers.get("set-cookie") ?? "";
+    expect(flashSetCookie).toContain("DW_FLASH_MESSAGES=");
+    expect(flashSetCookie).not.toContain("DW_PAGES_SESSION=");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const emailRequest = JSON.parse(String(fetchMock.mock.calls[0][1].body));
     expect(emailRequest).toMatchObject({
@@ -414,6 +447,18 @@ describe("auth routes", () => {
     const generatedPassword = emailRequest.text.match(/Password : (\S+)/)?.[1];
     expect(generatedPassword).toMatch(
       /^[bcdfghjklmnprstvwz][aeiou][bcdfghjklmnprstvwzaeiou]{7}[!$%&?+*~#_:.;,-][1-9][0-9]$/
+    );
+
+    const loginPage = await handleRequest(
+      new Request("https://example.com/login", {
+        headers: { cookie: cookieHeader(flashSetCookie) }
+      }),
+      env
+    );
+    const loginHtml = await loginPage.text();
+    expect(loginPage.headers.get("set-cookie") ?? "").toContain("DW_FLASH_MESSAGES=;");
+    expect(loginHtml).toContain(
+      '<div class="success">The user has been created and the password was sent by email.</div>'
     );
 
     const login = await postLogin(env, "autouser", generatedPassword);
@@ -810,7 +855,9 @@ describe("auth routes", () => {
     );
 
     expect(saved.status).toBe(303);
-    expect(saved.headers.get("location")).toBe("/profile?updated=1");
+    expect(saved.headers.get("location")).toBe("/profile");
+    const profileFlashSetCookie = saved.headers.get("set-cookie") ?? "";
+    expect(profileFlashSetCookie).toContain("DW_FLASH_MESSAGES=");
     await expect(
       env.DB.prepare(
         `select display_name, email
@@ -823,6 +870,15 @@ describe("auth routes", () => {
       display_name: "Alice Updated",
       email: "alice.updated@example.test"
     });
+    const profileAfterSave = await handleRequest(
+      new Request("https://example.com/profile", {
+        headers: { cookie: cookieHeader(cookie, profileFlashSetCookie) }
+      }),
+      env
+    );
+    await expect(profileAfterSave.text()).resolves.toContain(
+      '<div class="success">User profile successfully updated.</div>'
+    );
 
     const oldLogin = await postLogin(env, "alice", "correct horse battery staple");
     expect(oldLogin.status).toBe(401);
@@ -974,7 +1030,7 @@ describe("auth routes", () => {
     expect(deleted.status).toBe(200);
     expect(deleted.headers.get("set-cookie") ?? "").toContain("Max-Age=0");
     await expect(deleted.text()).resolves.toContain(
-      "Your user account has been deleted from this wiki."
+      '<div class="success">Your user account has been deleted from this wiki</div>'
     );
 
     for (const table of [
@@ -2430,6 +2486,17 @@ function csrfHeaders(headers = {}) {
       : `DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`,
     "x-csrf-token": TEST_CSRF_TOKEN
   };
+}
+
+function cookieHeader(...setCookies) {
+  return setCookies
+    .filter(Boolean)
+    .map((setCookie) => String(setCookie).split(";")[0])
+    .join("; ");
+}
+
+function flashCookie(messages) {
+  return `DW_FLASH_MESSAGES=${Buffer.from(JSON.stringify(messages), "utf8").toString("base64url")}`;
 }
 
 function extractProfileToken(html) {

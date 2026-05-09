@@ -205,6 +205,8 @@ const PAGE_LOCK_TOKEN_BYTES = 24;
 const CSRF_COOKIE_NAME = "DW_CSRF_TOKEN";
 const CSRF_TOKEN_BYTES = 32;
 const CSRF_TTL_SECONDS = 60 * 60 * 24;
+const FLASH_COOKIE_NAME = "DW_FLASH_MESSAGES";
+const FLASH_TTL_SECONDS = 5 * 60;
 const LOGIN_RATE_LIMIT_ATTEMPTS = 5;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const PASSWORD_RESET_TOKEN_BYTES = 32;
@@ -365,7 +367,7 @@ async function dispatchRequest(
     const csrf = csrfContext(request);
     return htmlResponseWithCsrf(
       request,
-      renderLoginPage(env, url, undefined, undefined, csrf.token),
+      renderLoginPage(env, url, undefined, undefined, csrf.token, readFlashMessages(request)),
       csrf
     );
   }
@@ -773,7 +775,7 @@ async function dispatchRequest(
       const csrf = csrfContext(request);
       return htmlResponseWithCsrf(
         request,
-        renderLoginPage(env, url, null, pagePath(id), csrf.token),
+        renderLoginPage(env, url, null, pagePath(id), csrf.token, readFlashMessages(request)),
         csrf
       );
     }
@@ -7325,7 +7327,9 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
           { ok: true, user: publicRegisteredUser(user), passwordEmailSent: true },
           { status: 201 }
         )
-      : redirectResponse("/login?registered=1");
+      : flashRedirectResponse(request, "/login", [
+          flashMessage("success", localizedAuthText(env, "regsuccess"))
+        ]);
   }
 
   const session = await createLoginSession(env.DB, user.id);
@@ -7840,7 +7844,9 @@ async function handleProfileUpdate(
     });
   }
 
-  return redirectResponse("/profile?updated=1");
+  return flashRedirectResponse(request, "/profile", [
+    flashMessage("success", localizedAuthText(env, "profchanged") || "Profile updated.")
+  ]);
 }
 
 async function handleAuthTokenAction(
@@ -7879,7 +7885,9 @@ async function handleAuthTokenAction(
       : htmlResponseWithCsrf(request, page, csrf, { status: 503 });
   }
 
-  return redirectResponse("/profile?token=updated");
+  return flashRedirectResponse(request, "/profile", [
+    flashMessage("success", "Authentication token regenerated.")
+  ]);
 }
 
 async function renderProfilePage(
@@ -7888,7 +7896,7 @@ async function renderProfilePage(
   url: URL,
   principal: AuthPrincipal,
   csrfToken: string,
-  message: { type: "success" | "error"; text: string } | null = null,
+  message: FlashMessage | null = null,
   values: ProfileFormValues | null = null
 ): Promise<string | Response> {
   if (principal.type !== "user") {
@@ -7897,7 +7905,10 @@ async function renderProfilePage(
 
   const formValues = values ?? profileValuesFromPrincipal(principal);
   const notice = message ?? profileNoticeFromUrl(url);
-  const noticeHtml = notice ? `<p class="${notice.type}">${escapeHtml(notice.text)}</p>` : "";
+  const noticeHtml = renderMessageArea([
+    ...readFlashMessages(request),
+    ...(notice ? [notice] : [])
+  ]);
   const config = getRuntimeConfig(env);
   const confirmPasswordHtml = config.profileConfirm
     ? `<label for="profile__oldpass">Confirm current password</label>
@@ -8028,7 +8039,7 @@ function profileChangeSet(
   };
 }
 
-function profileNoticeFromUrl(url: URL): { type: "success" | "error"; text: string } | null {
+function profileNoticeFromUrl(url: URL): FlashMessage | null {
   if (url.searchParams.get("updated") === "1") {
     return { type: "success", text: "Profile updated." };
   }
@@ -8147,7 +8158,7 @@ async function handleProfileDelete(
       env,
       "Account deleted",
       `<h1>Account deleted</h1>
-      <p class="success">Your user account has been deleted from this wiki.</p>
+      ${renderMessageArea([flashMessage("success", localizedAuthText(env, "profdeleted"))])}
       <p><a href="${pagePath(startPageId(env))}">Continue</a></p>`
     ),
     { headers }
@@ -9045,7 +9056,7 @@ function renderRegisterPage(
   error: string | null = null,
   values: Partial<RegistrationValues> = {}
 ): string {
-  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+  const message = renderMessageArea(error ? [flashMessage("error", error)] : []);
   const returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env);
   const autoPassword = getRuntimeConfig(env).autoPassword;
   const title = localizedAuthPageTitle(env, "register");
@@ -9101,8 +9112,10 @@ function renderPasswordResetRequestPage(
   identifier = "",
   notice: string | null = null
 ): string {
-  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
-  const success = notice ? `<p class="success">${escapeHtml(notice)}</p>` : "";
+  const message = renderMessageArea([
+    ...(error ? [flashMessage("error", error)] : []),
+    ...(notice ? [flashMessage("success", notice)] : [])
+  ]);
   const title = localizedAuthPageTitle(env, "resendpwd");
 
   return htmlShell(
@@ -9110,7 +9123,6 @@ function renderPasswordResetRequestPage(
     title,
     `${renderLocalizedAuthPageIntro(env, "resendpwd")}
     ${message}
-    ${success}
     <form id="dw__resendpwd" method="post" action="/api/auth/password-reset/request">
       ${csrfInput(csrfToken)}
       <fieldset>
@@ -9130,7 +9142,7 @@ function renderPasswordResetConfirmPage(
   error: string | null = null
 ): string {
   const token = url.searchParams.get("token") ?? "";
-  const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+  const message = renderMessageArea(error ? [flashMessage("error", error)] : []);
   const title = localizedAuthPageTitle(env, "resetpwd");
 
   return htmlShell(
@@ -9159,7 +9171,7 @@ function renderPasswordResetCompletePage(env: Env, csrfToken: string): string {
     env,
     title,
     `<h1>${escapeHtml(title)}</h1>
-    <p class="success">${escapeHtml(localizedAuthText(env, "resendpwdsuccess"))}</p>
+    ${renderMessageArea([flashMessage("success", localizedAuthText(env, "resendpwdsuccess"))])}
     <p><a href="/login">${escapeHtml(localizedAuthText(env, "btn_login"))}</a></p>
     <form class="a11y" method="get" action="/login">${csrfInput(csrfToken)}</form>`
   );
@@ -9242,14 +9254,17 @@ function renderLoginPage(
   url: URL,
   error: string | null = null,
   returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env),
-  csrfToken = ""
+  csrfToken = "",
+  flashMessages: readonly FlashMessage[] = []
 ): string {
   const title = localizedAuthPageTitle(env, "login");
-  const message = error
-    ? `<p class="error">${escapeHtml(error)}</p>`
-    : url.searchParams.get("registered") === "1"
-      ? `<p class="success">${escapeHtml(localizedAuthText(env, "regsuccess"))}</p>`
-      : "";
+  const message = renderMessageArea([
+    ...flashMessages,
+    ...(error ? [flashMessage("error", error)] : []),
+    ...(url.searchParams.get("registered") === "1"
+      ? [flashMessage("success", localizedAuthText(env, "regsuccess"))]
+      : [])
+  ]);
 
   return htmlShell(
     env,
@@ -9652,6 +9667,13 @@ interface CsrfContext {
   token: string;
 }
 
+type FlashMessageType = "error" | "info" | "success" | "notify";
+
+interface FlashMessage {
+  type: FlashMessageType;
+  text: string;
+}
+
 function csrfContext(request: Request): CsrfContext {
   return {
     token: readCookie(request, CSRF_COOKIE_NAME) || randomCsrfToken()
@@ -9666,7 +9688,40 @@ function htmlResponseWithCsrf(
 ): Response {
   const response = htmlResponse(body, init);
   response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
+  if (readFlashMessages(request).length > 0) {
+    response.headers.append("set-cookie", clearFlashCookieHeader(request));
+  }
   return response;
+}
+
+function flashRedirectResponse(
+  request: Request,
+  location: string,
+  messages: FlashMessage[],
+  status = 303
+): Response {
+  const response = redirectResponse(location, status);
+  const stackedMessages = [...readFlashMessages(request), ...messages];
+  response.headers.append("set-cookie", flashCookieHeader(stackedMessages, request));
+  return response;
+}
+
+function renderMessageArea(messages: readonly FlashMessage[]): string {
+  const shown = new Set<string>();
+  const rendered: string[] = [];
+
+  for (const message of messages) {
+    const text = message.text.trim();
+    if (!text || shown.has(text)) continue;
+    shown.add(text);
+    rendered.push(`<div class="${message.type}">${escapeHtml(text)}</div>`);
+  }
+
+  return rendered.join("\n");
+}
+
+function flashMessage(type: FlashMessageType, text: string): FlashMessage {
+  return { type, text };
 }
 
 function csrfInput(token: string): string {
@@ -9705,6 +9760,48 @@ function validateCsrf(request: Request, form: FormData): Response | null {
 function csrfCookieHeader(token: string, request: Request): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   return `${CSRF_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${CSRF_TTL_SECONDS}${secure}`;
+}
+
+function flashCookieHeader(messages: readonly FlashMessage[], request: Request): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  const value = encodeURIComponent(
+    base64UrlEncode(JSON.stringify(normalizeFlashMessages(messages)))
+  );
+  return `${FLASH_COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${FLASH_TTL_SECONDS}${secure}`;
+}
+
+function clearFlashCookieHeader(request: Request): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${FLASH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+function readFlashMessages(request: Request): FlashMessage[] {
+  const raw = readCookie(request, FLASH_COOKIE_NAME);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(base64UrlDecode(decodeURIComponent(raw))) as unknown;
+    return Array.isArray(parsed) ? normalizeFlashMessages(parsed) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeFlashMessages(messages: readonly unknown[]): FlashMessage[] {
+  return messages
+    .map((message) => {
+      if (!message || typeof message !== "object") return null;
+      const candidate = message as { type?: unknown; text?: unknown };
+      if (!isFlashMessageType(candidate.type) || typeof candidate.text !== "string") return null;
+      const text = candidate.text.trim().slice(0, 1000);
+      return text ? { type: candidate.type, text } : null;
+    })
+    .filter((message): message is FlashMessage => Boolean(message))
+    .slice(-10);
+}
+
+function isFlashMessageType(value: unknown): value is FlashMessageType {
+  return value === "error" || value === "info" || value === "success" || value === "notify";
 }
 
 function randomCsrfToken(): string {
@@ -11100,6 +11197,23 @@ function bytesToBase64Url(bytes: Uint8Array): string {
   }
 
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function base64UrlEncode(value: string): string {
+  return bytesToBase64Url(new TextEncoder().encode(value));
+}
+
+function base64UrlDecode(value: string): string {
+  const padded = value
+    .replaceAll("-", "+")
+    .replaceAll("_", "/")
+    .padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 function fnv1a(value: string): string {

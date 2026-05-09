@@ -36,6 +36,8 @@ const LANGUAGE_KEYS = [
   "regbadpass",
   "regpwmail",
   "reghere",
+  "profchanged",
+  "profdeleted",
   "pwdforget",
   "resendna",
   "resendpwd",
