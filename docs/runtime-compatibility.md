@@ -169,22 +169,22 @@ behavior explicitly.
 
 ## Vendor Dependency Replacement Map
 
-| Upstream package                     | Upstream use                          | Pages replacement                                   |
-| ------------------------------------ | ------------------------------------- | --------------------------------------------------- |
-| `aziraphale/email-address-validator` | Email syntax validation.              | Native validation in auth/user flows.               |
-| `geshi/geshi`                        | Code highlighting.                    | Deferred native highlighter compatibility.          |
-| `kissifrot/php-ixr`                  | XML-RPC client/server support.        | Deferred native XML-RPC compatibility.              |
-| `openpsa/universalfeedcreator`       | RSS/Atom generation.                  | Native feed routes.                                 |
-| `paragonie/constant_time_encoding`   | Constant-time encoding helpers.       | Web Crypto and native JS helpers.                   |
-| `paragonie/random_compat`            | PHP random byte polyfill.             | Web Crypto random values.                           |
-| `php81_bc/strftime`                  | Locale date formatting compatibility. | Native `Intl.DateTimeFormat`; locale parity later.  |
-| `phpseclib/phpseclib`                | Crypto/SSH/SFTP utilities.            | Not used at request runtime.                        |
-| `simplepie/simplepie`                | RSS feed parsing.                     | Deferred RSS syntax/feed parsing replacement.       |
-| `splitbrain/lesserphp`               | LESS compilation.                     | Build-time CSS assets.                              |
-| `splitbrain/php-archive`             | Archive read/write.                   | Operator tooling or JS archive libraries if needed. |
-| `splitbrain/php-cli`                 | CLI framework.                        | npm scripts and Node operator scripts.              |
-| `splitbrain/php-jsstrip`             | JavaScript minimization.              | Build tooling and checked-in assets.                |
-| `splitbrain/slika`                   | Image resizing.                       | Deferred Worker-compatible derivative pipeline.     |
+| Upstream package                     | Upstream use                          | Pages replacement                                    |
+| ------------------------------------ | ------------------------------------- | ---------------------------------------------------- |
+| `aziraphale/email-address-validator` | Email syntax validation.              | Native validation in auth/user flows.                |
+| `geshi/geshi`                        | Code highlighting.                    | Native JS highlighter with GeSHi-compatible classes. |
+| `kissifrot/php-ixr`                  | XML-RPC client/server support.        | Deferred native XML-RPC compatibility.               |
+| `openpsa/universalfeedcreator`       | RSS/Atom generation.                  | Native feed routes.                                  |
+| `paragonie/constant_time_encoding`   | Constant-time encoding helpers.       | Web Crypto and native JS helpers.                    |
+| `paragonie/random_compat`            | PHP random byte polyfill.             | Web Crypto random values.                            |
+| `php81_bc/strftime`                  | Locale date formatting compatibility. | Native `Intl.DateTimeFormat`; locale parity later.   |
+| `phpseclib/phpseclib`                | Crypto/SSH/SFTP utilities.            | Not used at request runtime.                         |
+| `simplepie/simplepie`                | RSS feed parsing.                     | Deferred RSS syntax/feed parsing replacement.        |
+| `splitbrain/lesserphp`               | LESS compilation.                     | Build-time CSS assets.                               |
+| `splitbrain/php-archive`             | Archive read/write.                   | Operator tooling or JS archive libraries if needed.  |
+| `splitbrain/php-cli`                 | CLI framework.                        | npm scripts and Node operator scripts.               |
+| `splitbrain/php-jsstrip`             | JavaScript minimization.              | Build tooling and checked-in assets.                 |
+| `splitbrain/slika`                   | Image resizing.                       | Deferred Worker-compatible derivative pipeline.      |
 
 ## CLI Compatibility Map
 

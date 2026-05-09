@@ -33,6 +33,11 @@ describe("DokuWiki syntax inventory", () => {
       occurrences: 1,
       pages: ["wiki:syntax"]
     });
+    expect(features.get("syntax_highlighted_blocks")).toMatchObject({
+      status: "supported",
+      occurrences: 5,
+      pages: ["wiki:syntax"]
+    });
     expect(features.has("control_macros")).toBe(false);
   });
 
@@ -45,5 +50,6 @@ describe("DokuWiki syntax inventory", () => {
     expect(markdown).toContain(
       "| Syntax plugin macros | supported | 1 | `wiki:syntax` | Current content uses the bundled INFO syntax plugin macro, which has a native replacement. |"
     );
+    expect(markdown).toContain("| Code/file language metadata | supported | 5 |");
   });
 });

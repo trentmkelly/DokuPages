@@ -193,10 +193,10 @@ export const FEATURE_DEFINITIONS = [
   {
     id: "syntax_highlighted_blocks",
     label: "Code/file language metadata",
-    status: "partial",
+    status: "supported",
     pattern: /<(?:code|file)\s+(?!-)([a-z0-9_+-]+)(?:\s+[^>]*)?>/gi,
     scope: "raw",
-    note: "Renderer preserves code/file content but does not run GeSHi highlighting."
+    note: "Renderer emits GeSHi-compatible highlighted spans for supported language metadata."
   },
   {
     id: "downloadable_file_blocks",

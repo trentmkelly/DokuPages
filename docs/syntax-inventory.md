@@ -47,7 +47,7 @@ Scanned 4 page files and 572 source lines.
 | Code blocks                      | supported       |           8 | `wiki:syntax`                                                           |                                                                                            |
 | File blocks                      | supported       |           4 | `wiki:syntax`                                                           |                                                                                            |
 | Indented code blocks             | supported       |          41 | `wiki:dokuwiki`, `wiki:syntax`                                          |                                                                                            |
-| Code/file language metadata      | partial         |           5 | `wiki:syntax`                                                           | Renderer preserves code/file content but does not run GeSHi highlighting.                  |
+| Code/file language metadata      | supported       |           5 | `wiki:syntax`                                                           | Renderer emits GeSHi-compatible highlighted spans for supported language metadata.         |
 | Downloadable file block metadata | partial         |           2 | `wiki:syntax`                                                           | Renderer displays file labels but does not provide generated downloads.                    |
 | No-formatting spans and blocks   | supported       |          39 | `wiki:syntax`                                                           |                                                                                            |
 | Smileys                          | supported       |          27 | `wiki:dokuwiki`, `wiki:syntax`                                          |                                                                                            |
@@ -57,7 +57,6 @@ Scanned 4 page files and 572 source lines.
 
 ## Follow-Up Notes
 
-- partial: Code/file language metadata (5 occurrences) - Renderer preserves code/file content but does not run GeSHi highlighting.
 - partial: Downloadable file block metadata (2 occurrences) - Renderer displays file labels but does not provide generated downloads.
 - supported: Syntax plugin macros (1 occurrence) - Current content uses the bundled INFO syntax plugin macro, which has a native replacement.
 

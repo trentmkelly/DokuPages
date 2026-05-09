@@ -21,6 +21,7 @@ import {
   type RssFeedResult
 } from "./rss";
 import { BUNDLED_DOKUWIKI_PLUGINS, type DokuWikiPluginType } from "./plugin-info";
+import { highlightSyntax } from "./syntax-highlight";
 
 export interface TocItem {
   id: string;
@@ -743,7 +744,7 @@ function flushSpecialBlock(blocks: string[], state: ParserState, context: Render
   if (!state.specialBlock) return;
 
   const block = state.specialBlock;
-  const code = `<pre><code>${escapeHtml(block.lines.join("\n"))}</code></pre>`;
+  const code = renderSpecialBlockCode(block);
 
   if (block.filename) {
     const href = context.pageId
@@ -756,12 +757,25 @@ function flushSpecialBlock(blocks: string[], state: ParserState, context: Render
 
     blocks.push(`<dl class="${block.type}"><dt>${label}</dt><dd>${code}</dd></dl>`);
   } else {
-    blocks.push(
-      `<pre class="${block.type}"><code>${escapeHtml(block.lines.join("\n"))}</code></pre>`
-    );
+    blocks.push(code);
   }
 
   state.specialBlock = null;
+}
+
+function renderSpecialBlockCode(block: SpecialBlock): string {
+  const text = block.lines.join("\n");
+  if (!block.language) {
+    return `<pre class="${block.type}">${escapeHtml(text)}</pre>`;
+  }
+
+  const highlighted = highlightSyntax(text, block.language) ?? escapeHtml(text);
+  const className =
+    block.type === "file"
+      ? `code file ${escapeAttribute(block.language)}`
+      : `code ${escapeAttribute(block.language)}`;
+
+  return `<pre class="${className}">${highlighted}</pre>`;
 }
 
 function parseSpecialBlockMetadata(

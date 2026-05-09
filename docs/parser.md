@@ -42,6 +42,7 @@ fresh render.
 - quote blocks
 - footnotes
 - indented code blocks
+- GeSHi-compatible highlighting for code and file block language metadata
 - file blocks with filename download links through `export_code`
 - bundled INFO syntax plugin macro lists
 - nowiki spans
@@ -72,12 +73,12 @@ treated as covered.
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `Acronym`            | native  | Imported/default acronym replacement, tested in `test/render.test.ts`.                                                                    |
 | `Camelcaselink`      | native  | Optional `CAMELCASE` internal links, tested in `test/render.test.ts`.                                                                     |
-| `Code`               | partial | Code blocks and metadata are preserved; GeSHi highlighting is intentionally separate.                                                     |
+| `Code`               | native  | Code blocks, language metadata, and GeSHi-compatible highlighting are tested in `test/render.test.ts`.                                    |
 | `Emaillink`          | native  | Mail links and mailguard output, tested in `test/render.test.ts`.                                                                         |
 | `Entity`             | native  | Imported/default entity replacement, tested in `test/render.test.ts`.                                                                     |
 | `Eol`                | native  | Paragraph and line-break handling, tested in `test/render.test.ts`.                                                                       |
 | `Externallink`       | native  | Explicit and automatic external links with scheme config, tested in `test/render.test.ts`.                                                |
-| `File`               | partial | File blocks render and expose `export_code`; syntax highlighting remains separate.                                                        |
+| `File`               | native  | File blocks render, expose `export_code`, and use GeSHi-compatible highlighting for language metadata.                                    |
 | `Filelink`           | native  | Media/file links, `linkonly`, sizing, tokenized fetch, and detail links in `test/render.test.ts`.                                         |
 | `Footnote`           | native  | Nested footnote rendering, tested in `test/render.test.ts`.                                                                               |
 | `Formatting`         | native  | Strong, emphasis, underline, monospace, sub, sup, and deleted text in `test/render.test.ts`.                                              |

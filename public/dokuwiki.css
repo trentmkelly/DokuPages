@@ -607,6 +607,33 @@ form.search button {
   border: 1px solid var(--dw-border);
 }
 
+.dokuwiki .page pre.code .kw1,
+.dokuwiki .page pre.code .kw2,
+.dokuwiki .page pre.code .kw3 {
+  color: #008;
+  font-weight: bold;
+}
+
+.dokuwiki .page pre.code .st0 {
+  color: #800;
+}
+
+.dokuwiki .page pre.code .co1,
+.dokuwiki .page pre.code .co2 {
+  color: #808080;
+  font-style: italic;
+}
+
+.dokuwiki .page pre.code .nu0 {
+  color: #080;
+}
+
+.dokuwiki .page pre.code .sy0,
+.dokuwiki .page pre.code .re0,
+.dokuwiki .page pre.code .me1 {
+  color: #606;
+}
+
 .dokuwiki dl.code dt,
 .dokuwiki dl.file dt {
   float: left;

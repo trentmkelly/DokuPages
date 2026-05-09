@@ -15,7 +15,7 @@ describe("upstream parser mode coverage", () => {
       rendered("MissingCamelCase", { camelCaseLinks: true, existingPageIds: new Set() })
     ).toContain('class="wikilink2" title="This topic does not exist yet">MissingCamelCase</a>');
     expect(rendered("<code>\nconst x = 1;\n</code>")).toContain(
-      '<pre class="code"><code>const x = 1;</code></pre>'
+      '<pre class="code">const x = 1;</pre>'
     );
     expect(rendered("<andi@splitbrain.org>")).toContain('class="mail"');
     expect(rendered("(c)")).toContain("©");

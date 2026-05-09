@@ -490,7 +490,7 @@ describe("renderWikiText", () => {
     );
 
     expect(rendered.html).toContain(
-      '<dl class="file"><dt><a href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0" title="Download" class="mediafile mf_txt">example.txt</a></dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
+      '<dl class="file"><dt><a href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0" title="Download" class="mediafile mf_txt">example.txt</a></dt><dd><pre class="code file txt">&lt;unsafe&gt;</pre></dd></dl>'
     );
     expect(extractCodeBlock("<file txt example.txt>\n<unsafe>\n</file>", 0)).toEqual({
       type: "file",
@@ -504,6 +504,20 @@ describe("renderWikiText", () => {
     expect(rendered.html).toContain('<div class="footnotes">');
     expect(rendered.html).toContain('<div class="fn" id="fn__1">');
     expect(rendered.html).toContain("foot <strong>note</strong>");
+  });
+
+  it("renders GeSHi-compatible syntax highlighting for language metadata", () => {
+    const code = renderWikiText('<code php>\n<?php echo "hello";\n</code>');
+    const file = renderWikiText("<file java HelloWorld.java>\nclass HelloWorld {}\n</file>", {
+      pageId: "wiki:welcome"
+    });
+
+    expect(code.html).toContain('<pre class="code php">');
+    expect(code.html).toContain('<span class="kw1">echo</span>');
+    expect(code.html).toContain('<span class="st0">&quot;hello&quot;</span>');
+    expect(file.html).toContain('class="mediafile mf_java"');
+    expect(file.html).toContain('<pre class="code file java">');
+    expect(file.html).toContain('<span class="kw1">class</span>');
   });
 
   it("renders nested DokuWiki quotes", () => {
@@ -594,9 +608,9 @@ describe("renderWikiText", () => {
     const code = renderWikiText("<code>\n<unsafe>\n**literal**");
     const file = renderWikiText("<file txt example.txt>\n<unsafe>", { pageId: "wiki:welcome" });
 
-    expect(code.html).toContain('<pre class="code"><code>&lt;unsafe&gt;\n**literal**</code></pre>');
+    expect(code.html).toContain('<pre class="code">&lt;unsafe&gt;\n**literal**</pre>');
     expect(file.html).toContain(
-      '<dl class="file"><dt><a href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0" title="Download" class="mediafile mf_txt">example.txt</a></dt><dd><pre><code>&lt;unsafe&gt;</code></pre></dd></dl>'
+      '<dl class="file"><dt><a href="/wiki/wiki/welcome?do=export_code&amp;codeblock=0" title="Download" class="mediafile mf_txt">example.txt</a></dt><dd><pre class="code file txt">&lt;unsafe&gt;</pre></dd></dl>'
     );
     expect(extractCodeBlock("<file txt example.txt>\n<unsafe>", 0)?.text).toBe("<unsafe>");
   });
