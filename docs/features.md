@@ -29,6 +29,8 @@ of full PHP DokuWiki runtime compatibility.
 - Recent page changes use DokuWiki-style latest-change grouping, namespace and
   minor-edit filters, configured date formatting, hidden-page filtering, and
   `first[...]` pagination controls.
+- Editor/user display honors DokuWiki `showuseras` modes for login names, full
+  names, user interwiki links, obfuscated email text, and mailto links.
 - KV-backed rendered page cache with D1 dependency tracking, rate-limit counters, and discovery cache.
 - Durable Object-backed page edit locks.
 - Native admin dashboard, ACL manager, configuration manager, user manager,

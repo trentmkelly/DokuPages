@@ -151,6 +151,7 @@ import {
   type RssFeedResult,
   type RssFeedRequest
 } from "./wiki/rss";
+import { renderUserDisplay, type UserDisplaySource } from "./wiki/user-display";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import {
   expectedMediaDerivativeStatus,
@@ -879,7 +880,7 @@ async function dispatchRequest(
           revision.id,
           revision.createdAt,
           undefined,
-          { cacheMode, principal }
+          { cacheMode, principal, updatedBy: revision.author }
         )
       );
     }
@@ -4082,6 +4083,7 @@ async function renderPageHtml(
     breadcrumbs?: BreadcrumbEntry[];
     cacheMode?: RenderCacheMode;
     principal?: AuthPrincipal;
+    updatedBy?: UserDisplaySource | null;
   } = {}
 ): Promise<string> {
   const startedAt = Date.now();
@@ -4134,7 +4136,8 @@ async function renderPageHtml(
         breadcrumbs: options.breadcrumbs,
         pageId: id,
         principal: options.principal,
-        updatedAt: revisionDate ?? page?.updatedAt
+        updatedAt: revisionDate ?? page?.updatedAt,
+        updatedBy: options.updatedBy ?? page?.author
       }
     );
   }
@@ -4215,7 +4218,8 @@ async function renderPageHtml(
       breadcrumbs: options.breadcrumbs,
       pageId: id,
       principal: options.principal,
-      updatedAt: revisionDate ?? page?.updatedAt
+      updatedAt: revisionDate ?? page?.updatedAt,
+      updatedBy: options.updatedBy ?? page?.author
     }
   );
 }
@@ -4884,17 +4888,23 @@ function renderToc(toc: TocItem[], minimumHeadings = 2): string {
 async function renderRevisionsPage(env: Env, id: string, url: URL): Promise<string> {
   const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
   const revisions = await listPageRevisions(env.DB, id, pagination.limit, pagination.offset);
+  const config = getRuntimeConfig(env);
   const items = revisions
-    .map(
-      (revision) => `<li class="${revision.changeType === "minor" ? "minor" : ""}">
+    .map((revision) => {
+      const editor = revision.author
+        ? `<span class="user"><bdi>${renderUserDisplay(revision.author, config.showUserAs)}</bdi></span>`
+        : "";
+
+      return `<li class="${revision.changeType === "minor" ? "minor" : ""}">
         <span class="date"><a href="${pagePath(id)}?rev=${encodeURIComponent(revision.id)}">${escapeHtml(revision.createdAt)}</a></span>
         <a class="diff_link" href="${pagePath(id)}?do=diff&rev=${encodeURIComponent(revision.id)}">diff</a>
         <a class="revisions_link" href="${pagePath(id)}?rev=${encodeURIComponent(revision.id)}">view</a>
         <a href="${pagePath(id)}?do=revert&rev=${encodeURIComponent(revision.id)}">revert</a>
         <span class="changeType">${escapeHtml(revision.changeType)}</span>
         ${revision.summary ? `<span class="sum">${escapeHtml(revision.summary)}</span>` : ""}
-      </li>`
-    )
+        ${editor}
+      </li>`;
+    })
     .join("");
 
   return htmlShell(
@@ -5314,8 +5324,7 @@ function renderRecentChangeItem(env: Env, change: RecentChange): string {
     ? '<span class="diff_link" aria-hidden="true"></span>'
     : `<a class="diff_link" href="${recentChangeDiffUrl(change)}">diff</a>`;
   const summary = change.summary ? `<span class="sum"> - ${escapeHtml(change.summary)}</span>` : "";
-  const editor = change.userName || change.ip;
-  const editorHtml = editor ? `<span class="user"><bdi>${escapeHtml(editor)}</bdi></span>` : "";
+  const editorHtml = renderRecentChangeEditor(env, change);
   const revisionsUrl =
     change.subjectType === "media" ? `${pageUrl}?tab_details=history` : `${pageUrl}?do=revisions`;
   const linkClass = isDelete ? "wikilink2" : "wikilink1";
@@ -5331,6 +5340,17 @@ function renderRecentChangeItem(env: Env, change: RecentChange): string {
     ${editorHtml}
     ${renderRecentSizeChange(change.sizeChange)}
   </div></li>`;
+}
+
+function renderRecentChangeEditor(env: Env, change: RecentChange): string {
+  const config = getRuntimeConfig(env);
+  const editor = change.user
+    ? renderUserDisplay(change.user, config.showUserAs)
+    : change.ip
+      ? escapeHtml(change.ip)
+      : "";
+
+  return editor ? `<span class="user"><bdi>${editor}</bdi></span>` : "";
 }
 
 function recentChangeUrl(change: RecentChange): string {
@@ -9260,6 +9280,7 @@ interface HtmlShellOptions {
   pageId?: string;
   principal?: AuthPrincipal;
   updatedAt?: string;
+  updatedBy?: UserDisplaySource | null;
 }
 
 function canonicalPageHref(env: Env, pageId: string): string {
@@ -9276,10 +9297,12 @@ function canonicalPageHref(env: Env, pageId: string): string {
 function renderPageInfo(
   config: ReturnType<typeof getRuntimeConfig>,
   pageId: string,
-  updatedAt: string
+  updatedAt: string,
+  updatedBy?: UserDisplaySource | null
 ): string {
   const path = pageInfoPath(config, pageId);
-  return `<bdi>${escapeHtml(path)}</bdi> · Last modified: <time datetime="${escapeAttribute(updatedAt)}">${escapeHtml(updatedAt)}</time>`;
+  const by = updatedBy ? ` by <bdi>${renderUserDisplay(updatedBy, config.showUserAs)}</bdi>` : "";
+  return `<bdi>${escapeHtml(path)}</bdi> · Last modified: <time datetime="${escapeAttribute(updatedAt)}">${escapeHtml(updatedAt)}</time>${by}`;
 }
 
 function pageInfoPath(config: ReturnType<typeof getRuntimeConfig>, pageId: string): string {
@@ -9300,7 +9323,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
     : "";
   const docInfo =
     options.updatedAt && pageId
-      ? `<div class="docInfo">${renderPageInfo(config, pageId, options.updatedAt)}</div>`
+      ? `<div class="docInfo">${renderPageInfo(config, pageId, options.updatedAt, options.updatedBy)}</div>`
       : "";
   const disabledActions = new Set(config.disabledActions);
   const pageTools = pageId ? renderPageTools(pageId, disabledActions) : "";
@@ -11059,7 +11082,7 @@ function renderEditPage(
     </form>
     </div>
   `,
-    { pageId: id, updatedAt: page?.updatedAt }
+    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author }
   );
 }
 
@@ -11112,7 +11135,7 @@ function renderConflictPage(env: Env, id: string, options: ConflictPageOptions):
       </thead>
       <tbody>${diffRows}</tbody>
     </table>`,
-    { pageId: id, updatedAt: currentUpdatedAt }
+    { pageId: id, updatedAt: currentUpdatedAt, updatedBy: options.current?.author }
   );
 }
 
@@ -11154,7 +11177,7 @@ function renderDraftPage(
         <button type="submit" name="do[show]" value="1" tabindex="3" formaction="${pagePath(id)}?do=show">Cancel</button>
       </div>
     </form>`,
-    { pageId: id, updatedAt: page?.updatedAt }
+    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author }
   );
 }
 

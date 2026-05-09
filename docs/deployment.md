@@ -45,6 +45,8 @@ Optional Pages environment variables:
   instead of the relative page file path. Default: disabled.
 - `DFORMAT`: DokuWiki-style strftime date format used by page template
   `@DATE@` replacement. Default: `%Y/%m/%d %H:%M`.
+- `SHOWUSERAS`: DokuWiki-compatible editor display mode: `loginname`,
+  `username`, `username_link`, `email`, or `email_link`. Default: `loginname`.
 - `CACHETIME`: DokuWiki-compatible cache lifetime in seconds. Media fetches use
   `max(CACHETIME, 3600)` for normal `cache` requests and `CACHETIME` for
   `cache=recache`. Default: `86400`.

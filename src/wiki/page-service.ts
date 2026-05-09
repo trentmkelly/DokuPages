@@ -2,6 +2,7 @@ import { cleanPageId, pageIdToRoutePath } from "./page-id";
 import { extractInternalPageLinks } from "./page-links";
 import { cleanMediaId, mediaName } from "./media-service";
 import { renderWikiText, type TocItem } from "./render";
+import type { UserDisplaySource } from "./user-display";
 import {
   buildSearchTermFrequencies,
   makeSearchSnippet,
@@ -20,6 +21,7 @@ export interface CurrentPage {
   revisionId: string;
   content: string;
   updatedAt: string;
+  author: UserDisplaySource | null;
 }
 
 export interface PageRevision {
@@ -30,6 +32,7 @@ export interface PageRevision {
   changeType: "create" | "edit" | "minor" | "delete" | "revert";
   sizeChange: number;
   createdAt: string;
+  author: UserDisplaySource | null;
 }
 
 export interface RecentChange {
@@ -38,6 +41,7 @@ export interface RecentChange {
   subjectId: string;
   revisionId: string | null;
   userName: string | null;
+  user: UserDisplaySource | null;
   ip: string | null;
   changeType: string;
   summary: string;
@@ -138,6 +142,11 @@ interface CurrentPageRow {
   revision_id: string;
   content: string;
   updated_at: string;
+  author_id: string | null;
+  author_name: string | null;
+  author_username: string | null;
+  author_display_name: string | null;
+  author_email: string | null;
 }
 
 interface PageRevisionRow {
@@ -148,6 +157,11 @@ interface PageRevisionRow {
   change_type: PageRevision["changeType"];
   size_change: number;
   created_at: string;
+  author_id: string | null;
+  author_name: string | null;
+  author_username: string | null;
+  author_display_name: string | null;
+  author_email: string | null;
 }
 
 interface RecentChangeRow {
@@ -155,7 +169,11 @@ interface RecentChangeRow {
   subject_type: "page" | "media";
   subject_id: string;
   revision_id: string | null;
+  user_id: string | null;
   user_name: string | null;
+  user_username: string | null;
+  user_display_name: string | null;
+  user_email: string | null;
   ip: string | null;
   change_type: string;
   summary: string;
@@ -216,9 +234,14 @@ const MAX_METADATA_REFERENCE_ROWS = 1000;
 export async function getCurrentPage(db: D1Database, id: string): Promise<CurrentPage | null> {
   const row = await db
     .prepare(
-      `select p.id, p.title, p.current_revision_id as revision_id, r.content, p.updated_at
+      `select p.id, p.title, p.current_revision_id as revision_id, r.content, p.updated_at,
+              r.author_id, r.author_name,
+              u.username as author_username,
+              u.display_name as author_display_name,
+              u.email as author_email
        from pages p
        join page_revisions r on r.id = p.current_revision_id
+       left join users u on u.id = r.author_id
        where p.id = ? and p.is_deleted = 0`
     )
     .bind(id)
@@ -231,7 +254,14 @@ export async function getCurrentPage(db: D1Database, id: string): Promise<Curren
     title: row.title,
     revisionId: row.revision_id,
     content: row.content,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    author: userDisplaySource({
+      userId: row.author_id,
+      userName: row.author_name,
+      username: row.author_username,
+      displayName: row.author_display_name,
+      email: row.author_email
+    })
   };
 }
 
@@ -241,9 +271,14 @@ export async function getPageRevision(
 ): Promise<PageRevision | null> {
   const row = await db
     .prepare(
-      `select id, page_id, content, summary, change_type, size_change, created_at
-       from page_revisions
-       where id = ?`
+      `select r.id, r.page_id, r.content, r.summary, r.change_type, r.size_change, r.created_at,
+              r.author_id, r.author_name,
+              u.username as author_username,
+              u.display_name as author_display_name,
+              u.email as author_email
+       from page_revisions r
+       left join users u on u.id = r.author_id
+       where r.id = ?`
     )
     .bind(revisionId)
     .first<PageRevisionRow>();
@@ -261,10 +296,15 @@ export async function listPageRevisions(
   const safeOffset = Math.max(0, offset);
   const result = await db
     .prepare(
-      `select id, page_id, content, summary, change_type, size_change, created_at
-       from page_revisions
-       where page_id = ?
-       order by created_at desc
+      `select r.id, r.page_id, r.content, r.summary, r.change_type, r.size_change, r.created_at,
+              r.author_id, r.author_name,
+              u.username as author_username,
+              u.display_name as author_display_name,
+              u.email as author_email
+       from page_revisions r
+       left join users u on u.id = r.author_id
+       where r.page_id = ?
+       order by r.created_at desc
        limit ? offset ?`
     )
     .bind(pageId, safeLimit, safeOffset)
@@ -287,41 +327,55 @@ export async function listRecentChanges(
   const subjectType = options.subjectType ?? "pages";
 
   if (subjectType === "both") {
-    where.push("subject_type in ('page', 'media')");
+    where.push("c.subject_type in ('page', 'media')");
   } else {
-    where.push("subject_type = ?");
+    where.push("c.subject_type = ?");
     values.push(subjectType === "media" ? "media" : "page");
   }
 
   if (namespace) {
-    where.push("subject_id like ?");
+    where.push("c.subject_id like ?");
     values.push(`${namespace}:%`);
   }
 
   if (options.includeMinor === false) {
-    where.push("change_type <> 'minor'");
+    where.push("c.change_type <> 'minor'");
   }
 
   if (options.onlyCreates) {
-    where.push("change_type = 'create'");
+    where.push("c.change_type = 'create'");
   }
 
   const whereSql = where.join(" and ");
   const sql = options.groupBySubject
-    ? `select id, subject_type, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
+    ? `select id, subject_type, subject_id, revision_id, user_id, user_name,
+              user_username, user_display_name, user_email,
+              ip, change_type, summary, size_change, created_at
        from (
-         select id, subject_type, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at,
-                row_number() over (partition by subject_type, subject_id order by created_at desc, id desc) as recent_rank
-         from changelog
+         select c.id, c.subject_type, c.subject_id, c.revision_id, c.user_id, c.user_name,
+                u.username as user_username,
+                u.display_name as user_display_name,
+                u.email as user_email,
+                c.ip, c.change_type, c.summary, c.size_change, c.created_at,
+                row_number() over (partition by c.subject_type, c.subject_id order by c.created_at desc, c.id desc) as recent_rank
+         from changelog c
+         left join users u on u.id = c.user_id
+           or (c.user_id is null and lower(u.username) = lower(c.user_name))
          where ${whereSql}
        )
        where recent_rank = 1
        order by created_at desc, id desc
        limit ? offset ?`
-    : `select id, subject_type, subject_id, revision_id, user_name, ip, change_type, summary, size_change, created_at
-       from changelog
+    : `select c.id, c.subject_type, c.subject_id, c.revision_id, c.user_id, c.user_name,
+              u.username as user_username,
+              u.display_name as user_display_name,
+              u.email as user_email,
+              c.ip, c.change_type, c.summary, c.size_change, c.created_at
+       from changelog c
+       left join users u on u.id = c.user_id
+         or (c.user_id is null and lower(u.username) = lower(c.user_name))
        where ${whereSql}
-       order by created_at desc, id desc
+       order by c.created_at desc, c.id desc
        limit ? offset ?`;
   const result = await db
     .prepare(sql)
@@ -334,6 +388,13 @@ export async function listRecentChanges(
     subjectId: row.subject_id,
     revisionId: row.revision_id,
     userName: row.user_name,
+    user: userDisplaySource({
+      userId: row.user_id,
+      userName: row.user_name,
+      username: row.user_username,
+      displayName: row.user_display_name,
+      email: row.user_email
+    }),
     ip: row.ip,
     changeType: row.change_type,
     summary: row.summary,
@@ -1218,7 +1279,11 @@ export async function savePage(db: D1Database, input: SavePageInput): Promise<Sa
       title,
       revisionId,
       content: input.content,
-      updatedAt: now
+      updatedAt: now,
+      author: userDisplaySource({
+        userId: input.authorId ?? null,
+        userName: input.authorName ?? null
+      })
     }
   };
 }
@@ -1729,7 +1794,39 @@ function mapRevision(row: PageRevisionRow): PageRevision {
     summary: row.summary,
     changeType: row.change_type,
     sizeChange: row.size_change,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    author: userDisplaySource({
+      userId: row.author_id,
+      userName: row.author_name,
+      username: row.author_username,
+      displayName: row.author_display_name,
+      email: row.author_email
+    })
+  };
+}
+
+function userDisplaySource(input: {
+  userId?: string | null;
+  userName?: string | null;
+  username?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+}): UserDisplaySource | null {
+  const userId = input.userId ?? null;
+  const username = input.username ?? null;
+  const fallbackName = input.userName ?? null;
+  const displayName = input.displayName ?? null;
+  const email = input.email ?? null;
+
+  if (!userId && !username && !fallbackName && !displayName && !email) return null;
+
+  return {
+    userId,
+    username: username ?? (userId ? null : fallbackName),
+    displayName,
+    email,
+    fallbackName,
+    knownUser: Boolean(username)
   };
 }
 

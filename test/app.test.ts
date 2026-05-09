@@ -3845,7 +3845,7 @@ function createD1Stub(state: D1StubState): D1Database {
             return state.media.find((media) => media.id === id && media.is_deleted === 0) ?? null;
           }
 
-          if (sql.includes("from page_revisions") && !sql.includes("join")) {
+          if (sql.includes("from page_revisions")) {
             return state.revisions.find((revision) => revision.id === id) ?? null;
           }
 

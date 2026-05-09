@@ -976,6 +976,65 @@ describe("auth routes", () => {
     });
   });
 
+  it("renders page editor identity with DokuWiki showuseras modes", async () => {
+    env = createEnv({ SHOWUSERAS: "username_link" });
+    await seedUser(env.DB);
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nBody.",
+      authorId: "user-1",
+      authorName: "Alice Example"
+    });
+    await seedChangelog(env.DB, {
+      id: "page:wiki:welcome@2026-05-07T00:00:00.000Z",
+      subjectId: "wiki:welcome",
+      revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
+      userId: "user-1",
+      userName: "Alice Example"
+    });
+
+    const page = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+    const pageHtml = await page.text();
+
+    expect(pageHtml).toContain(
+      'Last modified: <time datetime="2026-05-07T00:00:00.000Z">2026-05-07T00:00:00.000Z</time> by <bdi><a href="/wiki/user/alice" class="interwiki iw_user">Alice Example</a></bdi>'
+    );
+
+    const revisions = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=revisions"),
+      env
+    );
+    await expect(revisions.text()).resolves.toContain(
+      '<span class="user"><bdi><a href="/wiki/user/alice" class="interwiki iw_user">Alice Example</a></bdi></span>'
+    );
+
+    const recent = await handleRequest(new Request("https://example.com/recent"), env);
+    await expect(recent.text()).resolves.toContain(
+      '<span class="user"><bdi><a href="/wiki/user/alice" class="interwiki iw_user">Alice Example</a></bdi></span>'
+    );
+
+    env = createEnv({ SHOWUSERAS: "email_link" });
+    await seedUser(env.DB);
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nBody.",
+      authorId: "user-1",
+      authorName: "Alice Example"
+    });
+
+    const emailPage = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome"),
+      env
+    );
+    const emailHtml = await emailPage.text();
+
+    expect(emailHtml).toContain(
+      '<a href="mailto:&#x61;&#x6c;&#x69;&#x63;&#x65;&#x40;&#x65;&#x78;&#x61;&#x6d;&#x70;&#x6c;&#x65;&#x2e;&#x74;&#x65;&#x73;&#x74;" class="mail"'
+    );
+  });
+
   it("keeps the native session ttl when upstream remember-me fields are submitted", async () => {
     env = createEnv();
     await seedUser(env.DB);
@@ -2234,7 +2293,9 @@ async function seedPage(
     title,
     content,
     revisionId = `${id}@2026-05-07T00:00:00.000Z`,
-    createdAt = "2026-05-07T00:00:00.000Z"
+    createdAt = "2026-05-07T00:00:00.000Z",
+    authorId = null,
+    authorName = null
   }
 ) {
   const namespace = id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
@@ -2258,8 +2319,8 @@ async function seedPage(
       id,
       content,
       `hash:${id}`,
-      null,
-      null,
+      authorId,
+      authorName,
       "Seed page",
       "create",
       content.length,
@@ -2328,6 +2389,45 @@ async function seedPageHistory(d1, { id, title, revisions }) {
 
     previousLength = revision.content.length;
   }
+}
+
+async function seedChangelog(
+  d1,
+  {
+    id,
+    subjectType = "page",
+    subjectId,
+    revisionId,
+    userId = null,
+    userName = null,
+    ip = "127.0.0.1",
+    changeType = "edit",
+    summary = "Seed page",
+    sizeChange = 24,
+    createdAt = "2026-05-07T00:00:00.000Z"
+  }
+) {
+  await d1
+    .prepare(
+      `insert into changelog (
+         id, subject_type, subject_id, revision_id, user_id, user_name, ip,
+         change_type, summary, size_change, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      id,
+      subjectType,
+      subjectId,
+      revisionId,
+      userId,
+      userName,
+      ip,
+      changeType,
+      summary,
+      sizeChange,
+      createdAt
+    )
+    .run();
 }
 
 async function currentPageRevision(d1, id) {

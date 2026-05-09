@@ -35,6 +35,7 @@ describe("runtime config", () => {
       youAreHere: false,
       fullPath: false,
       dateFormat: "%Y/%m/%d %H:%M",
+      showUserAs: "loginname",
       cacheTime: 86400,
       lockTime: 900,
       useDraft: true,
@@ -98,6 +99,7 @@ describe("runtime config", () => {
       YOUAREHERE: "1",
       FULLPATH: "1",
       DFORMAT: "%F %R",
+      SHOWUSERAS: "email_link",
       CACHETIME: "7200",
       LOCKTIME: "120",
       USEDRAFT: "0",
@@ -149,6 +151,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).youAreHere).toBe(true);
     expect(getRuntimeConfig(env).fullPath).toBe(true);
     expect(getRuntimeConfig(env).dateFormat).toBe("%F %R");
+    expect(getRuntimeConfig(env).showUserAs).toBe("email_link");
     expect(getRuntimeConfig(env).cacheTime).toBe(7200);
     expect(getRuntimeConfig(env).lockTime).toBe(120);
     expect(getRuntimeConfig(env).useDraft).toBe(false);
@@ -278,6 +281,10 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "DFORMAT",
           effectiveValue: "%Y/%m/%d %H:%M"
+        }),
+        expect.objectContaining({
+          key: "SHOWUSERAS",
+          effectiveValue: "loginname"
         }),
         expect.objectContaining({
           key: "CACHETIME",
@@ -442,6 +449,7 @@ describe("runtime config", () => {
       DEACCENT: "3",
       FNENCODE: "base64",
       SEPCHAR: "/",
+      SHOWUSERAS: "avatar",
       EXTERNAL_AUTH_MODE: "ldap",
       EXTERNAL_AUTH_EMAIL_HEADER: "bad header",
       EXTERNAL_AUTH_USERNAME_HEADER: "bad:header",
@@ -474,6 +482,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
         expect.objectContaining({ key: "FNENCODE", severity: "error" }),
         expect.objectContaining({ key: "SEPCHAR", severity: "error" }),
+        expect.objectContaining({ key: "SHOWUSERAS", severity: "error" }),
         expect.objectContaining({ key: "EXTERNAL_AUTH_MODE", severity: "error" }),
         expect.objectContaining({ key: "EXTERNAL_AUTH_EMAIL_HEADER", severity: "error" }),
         expect.objectContaining({ key: "EXTERNAL_AUTH_USERNAME_HEADER", severity: "error" }),

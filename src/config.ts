@@ -19,6 +19,13 @@ const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const MEMBER_LIST_ENTRY = /^@?[^\s,]+$/;
 const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const SHOW_USER_AS_VALUES = new Set([
+  "loginname",
+  "username",
+  "username_link",
+  "email",
+  "email_link"
+]);
 
 export interface RuntimeConfig {
   siteName: string;
@@ -45,6 +52,7 @@ export interface RuntimeConfig {
   youAreHere: boolean;
   fullPath: boolean;
   dateFormat: string;
+  showUserAs: "loginname" | "username" | "username_link" | "email" | "email_link";
   cacheTime: number;
   lockTime: number;
   useDraft: boolean;
@@ -144,6 +152,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     youAreHere: truthy(env.YOUAREHERE),
     fullPath: truthy(env.FULLPATH),
     dateFormat: nonEmpty(env.DFORMAT) ?? "%Y/%m/%d %H:%M",
+    showUserAs: showUserAsConfig(env.SHOWUSERAS),
     cacheTime: integerConfig(env.CACHETIME, DEFAULT_CACHE_TIME, 0, 365 * 24 * 60 * 60),
     lockTime: integerConfig(env.LOCKTIME, 15 * 60, 0, 604800),
     useDraft: booleanConfig(env.USEDRAFT, true),
@@ -194,6 +203,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("MAX_SECTION_EDIT_LEVEL", env.MAX_SECTION_EDIT_LEVEL, 0, 5, issues);
   validateIntegerRange("BREADCRUMBS", env.BREADCRUMBS, 0, 99, issues);
+  validateShowUserAs(env.SHOWUSERAS, issues);
   validateIntegerRange("CACHETIME", env.CACHETIME, 0, 365 * 24 * 60 * 60, issues);
   validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
@@ -260,6 +270,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("YOUAREHERE", env.YOUAREHERE, String(config.youAreHere), "false"),
     configEntry("FULLPATH", env.FULLPATH, String(config.fullPath), "false"),
     configEntry("DFORMAT", env.DFORMAT, config.dateFormat, "%Y/%m/%d %H:%M"),
+    configEntry("SHOWUSERAS", env.SHOWUSERAS, config.showUserAs, "loginname"),
     configEntry("CACHETIME", env.CACHETIME, String(config.cacheTime), String(DEFAULT_CACHE_TIME)),
     configEntry("LOCKTIME", env.LOCKTIME, String(config.lockTime), String(15 * 60)),
     configEntry("USEDRAFT", env.USEDRAFT, String(config.useDraft), "true"),
@@ -659,6 +670,20 @@ function validateSearchFragment(value: string | undefined, issues: ConfigValidat
   }
 }
 
+function validateShowUserAs(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  if (!SHOW_USER_AS_VALUES.has(raw)) {
+    issues.push({
+      key: "SHOWUSERAS",
+      severity: "error",
+      message:
+        "SHOWUSERAS must be one of 'loginname', 'username', 'username_link', 'email', or 'email_link'."
+    });
+  }
+}
+
 function validateExternalAuthMode(
   value: string | undefined,
   issues: ConfigValidationIssue[]
@@ -925,6 +950,11 @@ function rssMediaConfig(value: string | undefined): RuntimeConfig["rssMedia"] {
 function searchFragmentConfig(value: string | undefined): RuntimeConfig["searchFragment"] {
   const raw = nonEmpty(value);
   return raw === "starts_with" || raw === "ends_with" || raw === "contains" ? raw : "exact";
+}
+
+function showUserAsConfig(value: string | undefined): RuntimeConfig["showUserAs"] {
+  const raw = nonEmpty(value);
+  return SHOW_USER_AS_VALUES.has(raw ?? "") ? (raw as RuntimeConfig["showUserAs"]) : "loginname";
 }
 
 function externalAuthMode(value: string | undefined): RuntimeConfig["externalAuthMode"] {
