@@ -147,6 +147,13 @@ import {
   type TocItem
 } from "./wiki/render";
 import {
+  authLang,
+  authPageText,
+  authPageTitle,
+  type AuthLanguageKey,
+  type AuthPageKey
+} from "./wiki/auth-language";
+import {
   extractRssFeedRequests,
   fetchRssFeed,
   type RssFeedResult,
@@ -7209,7 +7216,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (!username || !password) {
     return htmlResponseWithCsrf(
       request,
-      renderLoginPage(env, url, "Missing username or password.", returnTo, csrf.token),
+      renderLoginPage(env, url, localizedAuthText(env, "badlogin"), returnTo, csrf.token),
       csrf,
       { status: 400 }
     );
@@ -7227,7 +7234,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     logAuthEvent(request, "login_failure", { username });
     return htmlResponseWithCsrf(
       request,
-      renderLoginPage(env, url, "Invalid username or password.", returnTo, csrf.token),
+      renderLoginPage(env, url, localizedAuthText(env, "badlogin"), returnTo, csrf.token),
       csrf,
       { status: 401 }
     );
@@ -7268,7 +7275,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   }
 
   const autoPassword = getRuntimeConfig(env).autoPassword;
-  const parsed = parseRegistrationForm(form, autoPassword);
+  const parsed = parseRegistrationForm(form, autoPassword, getRuntimeConfig(env).language);
 
   if (!parsed.ok) {
     return htmlResponseWithCsrf(
@@ -7282,7 +7289,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   if (await usernameExists(env.DB, parsed.values.username)) {
     return htmlResponseWithCsrf(
       request,
-      renderRegisterPage(env, url, csrf.token, "Username is already registered.", parsed.values),
+      renderRegisterPage(env, url, csrf.token, localizedAuthText(env, "reguexists"), parsed.values),
       csrf,
       { status: 409 }
     );
@@ -7300,7 +7307,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
           env,
           url,
           csrf.token,
-          "Looks like there was an error on sending the password mail. Please contact the admin!",
+          localizedAuthText(env, "regmailfail"),
           parsed.values
         ),
         csrf,
@@ -7340,8 +7347,7 @@ async function handlePasswordResetRequest(request: Request, env: Env): Promise<R
   const url = new URL(request.url);
   const csrf = csrfContext(request);
   const identifier = String(form.get("identifier") ?? form.get("login") ?? "").trim();
-  const message =
-    "If a matching active account has an email address, a password reset email has been sent.";
+  const message = localizedAuthText(env, "resendpwdconfirm");
 
   if (identifier) {
     const user = await findPasswordResetUser(env.DB, identifier);
@@ -7387,7 +7393,12 @@ async function handlePasswordResetConfirm(request: Request, env: Env): Promise<R
   if (!token) {
     return htmlResponseWithCsrf(
       request,
-      renderPasswordResetConfirmPage(env, url, csrf.token, "Missing password reset token."),
+      renderPasswordResetConfirmPage(
+        env,
+        url,
+        csrf.token,
+        localizedAuthText(env, "resendpwdbadauth")
+      ),
       csrf,
       { status: 400 }
     );
@@ -7396,12 +7407,7 @@ async function handlePasswordResetConfirm(request: Request, env: Env): Promise<R
   if (password.length < 8) {
     return htmlResponseWithCsrf(
       request,
-      renderPasswordResetConfirmPage(
-        env,
-        url,
-        csrf.token,
-        "Password must be at least 8 characters."
-      ),
+      renderPasswordResetConfirmPage(env, url, csrf.token, localizedAuthText(env, "regbadpass")),
       csrf,
       { status: 400 }
     );
@@ -7410,7 +7416,7 @@ async function handlePasswordResetConfirm(request: Request, env: Env): Promise<R
   if (password !== passwordConfirm) {
     return htmlResponseWithCsrf(
       request,
-      renderPasswordResetConfirmPage(env, url, csrf.token, "Password confirmation does not match."),
+      renderPasswordResetConfirmPage(env, url, csrf.token, localizedAuthText(env, "regbadpass")),
       csrf,
       { status: 400 }
     );
@@ -7424,7 +7430,7 @@ async function handlePasswordResetConfirm(request: Request, env: Env): Promise<R
         env,
         url,
         csrf.token,
-        "Password reset link is invalid or expired."
+        localizedAuthText(env, "resendpwdbadauth")
       ),
       csrf,
       { status: 400 }
@@ -8373,7 +8379,8 @@ interface EmailNotificationEventRecord {
 
 function parseRegistrationForm(
   form: FormData,
-  autoPassword = false
+  autoPassword = false,
+  language = "en"
 ):
   | { ok: true; values: RegistrationValues }
   | { ok: false; error: string; values: RegistrationValues } {
@@ -8383,22 +8390,21 @@ function parseRegistrationForm(
   if (!/^[a-z0-9._-]{2,64}$/.test(values.username)) {
     return {
       ok: false,
-      error:
-        "Username must be 2 to 64 characters using letters, numbers, dots, dashes, or underscores.",
+      error: authLang(language, "regmissing"),
       values
     };
   }
 
   if (!values.displayName) {
-    return { ok: false, error: "Display name is required.", values };
+    return { ok: false, error: authLang(language, "regmissing"), values };
   }
 
   if (!values.email) {
-    return { ok: false, error: "Email address is required.", values };
+    return { ok: false, error: authLang(language, "regmissing"), values };
   }
 
   if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(values.email)) {
-    return { ok: false, error: "Email address is invalid.", values };
+    return { ok: false, error: authLang(language, "regbadmail"), values };
   }
 
   if (autoPassword) {
@@ -8406,11 +8412,11 @@ function parseRegistrationForm(
   }
 
   if (values.password.length < 8) {
-    return { ok: false, error: "Password must be at least 8 characters.", values };
+    return { ok: false, error: authLang(language, "regmissing"), values };
   }
 
   if (values.password !== passwordConfirm) {
-    return { ok: false, error: "Password confirmation does not match.", values };
+    return { ok: false, error: authLang(language, "regbadpass"), values };
   }
 
   return { ok: true, values };
@@ -9020,6 +9026,18 @@ function mapSubscriptionRecipient(row: {
   };
 }
 
+function localizedAuthText(env: Env, key: AuthLanguageKey): string {
+  return authLang(getRuntimeConfig(env).language, key);
+}
+
+function localizedAuthPageTitle(env: Env, key: AuthPageKey): string {
+  return authPageTitle(getRuntimeConfig(env).language, key);
+}
+
+function renderLocalizedAuthPageIntro(env: Env, key: AuthPageKey): string {
+  return renderWikiText(authPageText(getRuntimeConfig(env).language, key)).html;
+}
+
 function renderRegisterPage(
   env: Env,
   url: URL,
@@ -9030,43 +9048,45 @@ function renderRegisterPage(
   const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
   const returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env);
   const autoPassword = getRuntimeConfig(env).autoPassword;
+  const title = localizedAuthPageTitle(env, "register");
+  const intro = renderLocalizedAuthPageIntro(env, "register");
   const passwordFields = autoPassword
-    ? `<p class="info">A generated password will be sent to the email address you provide.</p>`
+    ? ""
     : `<div class="auth-field">
-          <label for="register__pass">Password</label>
+          <label for="register__pass">${escapeHtml(localizedAuthText(env, "pass"))}</label>
           <input id="register__pass" name="password" class="edit" type="password" autocomplete="new-password" required>
         </div>
         <div class="auth-field">
-          <label for="register__passchk">Confirm password</label>
+          <label for="register__passchk">${escapeHtml(localizedAuthText(env, "passchk"))}</label>
           <input id="register__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
         </div>`;
 
   return htmlShell(
     env,
-    "Register",
-    `<h1>Register</h1>
+    title,
+    `${intro}
     ${message}
     <form id="dw__register" class="auth-form" method="post" action="/api/auth/register">
       ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <fieldset>
-        <legend>Register</legend>
+        <legend>${escapeHtml(localizedAuthText(env, "btn_register"))}</legend>
         <div class="auth-field">
-          <label for="register__user">Username</label>
+          <label for="register__user">${escapeHtml(localizedAuthText(env, "user"))}</label>
           <input id="register__user" name="username" class="edit" type="text" autocomplete="username" value="${escapeAttribute(values.username ?? "")}" required autofocus>
         </div>
         <div class="auth-field">
-          <label for="register__name">Full name</label>
+          <label for="register__name">${escapeHtml(localizedAuthText(env, "fullname"))}</label>
           <input id="register__name" name="displayName" class="edit" type="text" autocomplete="name" value="${escapeAttribute(values.displayName ?? "")}" required>
         </div>
         <div class="auth-field">
-          <label for="register__mail">Email</label>
+          <label for="register__mail">${escapeHtml(localizedAuthText(env, "email"))}</label>
           <input id="register__mail" name="email" class="edit" type="email" autocomplete="email" value="${escapeAttribute(values.email ?? "")}" required>
         </div>
         ${passwordFields}
         ${renderTurnstileWidget(env, "register")}
         <div class="auth-actions">
-          <button type="submit">Register</button>
+          <button type="submit">${escapeHtml(localizedAuthText(env, "btn_register"))}</button>
         </div>
       </fieldset>
     </form>`
@@ -9083,20 +9103,21 @@ function renderPasswordResetRequestPage(
 ): string {
   const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
   const success = notice ? `<p class="success">${escapeHtml(notice)}</p>` : "";
+  const title = localizedAuthPageTitle(env, "resendpwd");
 
   return htmlShell(
     env,
-    "Password reset",
-    `<h1>Password reset</h1>
+    title,
+    `${renderLocalizedAuthPageIntro(env, "resendpwd")}
     ${message}
     ${success}
     <form id="dw__resendpwd" method="post" action="/api/auth/password-reset/request">
       ${csrfInput(csrfToken)}
       <fieldset>
-        <legend>Password reset</legend>
-        <label for="resendpwd__identifier">Username or email</label>
+        <legend>${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</legend>
+        <label for="resendpwd__identifier">${escapeHtml(localizedAuthText(env, "user"))}</label>
         <input id="resendpwd__identifier" name="identifier" class="edit" type="text" autocomplete="username" value="${escapeAttribute(identifier || url.searchParams.get("u") || "")}" required autofocus>
-        <button type="submit">Reset password</button>
+        <button type="submit">${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</button>
       </fieldset>
     </form>`
   );
@@ -9110,34 +9131,36 @@ function renderPasswordResetConfirmPage(
 ): string {
   const token = url.searchParams.get("token") ?? "";
   const message = error ? `<p class="error">${escapeHtml(error)}</p>` : "";
+  const title = localizedAuthPageTitle(env, "resetpwd");
 
   return htmlShell(
     env,
-    "Password reset",
-    `<h1>Password reset</h1>
+    title,
+    `${renderLocalizedAuthPageIntro(env, "resetpwd")}
     ${message}
     <form id="dw__password_reset" method="post" action="/api/auth/password-reset/confirm">
       ${csrfInput(csrfToken)}
       <input type="hidden" name="token" value="${escapeAttribute(token)}">
       <fieldset>
-        <legend>Choose a new password</legend>
-        <label for="password_reset__pass">New password</label>
+        <legend>${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</legend>
+        <label for="password_reset__pass">${escapeHtml(localizedAuthText(env, "pass"))}</label>
         <input id="password_reset__pass" name="password" class="edit" type="password" autocomplete="new-password" required autofocus>
-        <label for="password_reset__passchk">Confirm new password</label>
+        <label for="password_reset__passchk">${escapeHtml(localizedAuthText(env, "passchk"))}</label>
         <input id="password_reset__passchk" name="passwordConfirm" class="edit" type="password" autocomplete="new-password" required>
-        <button type="submit">Save password</button>
+        <button type="submit">${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</button>
       </fieldset>
     </form>`
   );
 }
 
 function renderPasswordResetCompletePage(env: Env, csrfToken: string): string {
+  const title = localizedAuthPageTitle(env, "resetpwd");
   return htmlShell(
     env,
-    "Password reset",
-    `<h1>Password reset</h1>
-    <p class="success">Your password has been updated.</p>
-    <p><a href="/login">Login</a></p>
+    title,
+    `<h1>${escapeHtml(title)}</h1>
+    <p class="success">${escapeHtml(localizedAuthText(env, "resendpwdsuccess"))}</p>
+    <p><a href="/login">${escapeHtml(localizedAuthText(env, "btn_login"))}</a></p>
     <form class="a11y" method="get" action="/login">${csrfInput(csrfToken)}</form>`
   );
 }
@@ -9221,36 +9244,39 @@ function renderLoginPage(
   returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? "", env),
   csrfToken = ""
 ): string {
+  const title = localizedAuthPageTitle(env, "login");
   const message = error
     ? `<p class="error">${escapeHtml(error)}</p>`
     : url.searchParams.get("registered") === "1"
-      ? '<p class="success">The user has been created and the password was sent by email.</p>'
+      ? `<p class="success">${escapeHtml(localizedAuthText(env, "regsuccess"))}</p>`
       : "";
 
   return htmlShell(
     env,
-    "Login",
-    `<h1>Login</h1>
+    title,
+    `${renderLocalizedAuthPageIntro(env, "login")}
     ${message}
     <form id="dw__login" class="auth-form" method="post" action="/api/auth/login">
       ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <fieldset>
-        <legend>Login</legend>
+        <legend>${escapeHtml(localizedAuthText(env, "btn_login"))}</legend>
         <div class="auth-field">
-          <label for="login__user">Username</label>
+          <label for="login__user">${escapeHtml(localizedAuthText(env, "user"))}</label>
           <input id="login__user" name="username" class="edit" type="text" autocomplete="username" required autofocus>
         </div>
         <div class="auth-field">
-          <label for="login__pass">Password</label>
+          <label for="login__pass">${escapeHtml(localizedAuthText(env, "pass"))}</label>
           <input id="login__pass" name="password" class="edit" type="password" autocomplete="current-password" required>
         </div>
         ${renderTurnstileWidget(env, "login")}
         <div class="auth-actions">
-          <button type="submit">Login</button>
+          <button type="submit">${escapeHtml(localizedAuthText(env, "btn_login"))}</button>
         </div>
       </fieldset>
-    </form>`
+    </form>
+    <p>${escapeHtml(localizedAuthText(env, "reghere"))}: <a href="/register">${escapeHtml(localizedAuthText(env, "btn_register"))}</a></p>
+    <p>${escapeHtml(localizedAuthText(env, "pwdforget"))}: <a href="/resendpwd">${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</a></p>`
   );
 }
 
@@ -9262,12 +9288,12 @@ function renderLogoutPage(
 ): string {
   return htmlShell(
     env,
-    "Logout",
-    `<h1>Logout</h1>
+    localizedAuthText(env, "btn_logout"),
+    `<h1>${escapeHtml(localizedAuthText(env, "btn_logout"))}</h1>
     <form method="post" action="/api/auth/logout">
       ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
-      <button type="submit">Logout</button>
+      <button type="submit">${escapeHtml(localizedAuthText(env, "btn_logout"))}</button>
     </form>`
   );
 }
@@ -9498,13 +9524,16 @@ function renderUserTools(
   disabledActions = new Set<string>()
 ): string {
   const actionLinks = accountActionLinks(pageId);
+  const loginLabel = localizedAuthText(env, "btn_login");
+  const logoutLabel = localizedAuthText(env, "btn_logout");
+  const registerLabel = localizedAuthText(env, "btn_register");
   const accountItems =
     principal?.type === "user"
       ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
         ${disabledActions.has("profile") ? "" : `<li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">Update Profile</a></li>`}
-        ${disabledActions.has("logout") ? "" : `<li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">Log Out</a></li>`}`
-      : `${disabledActions.has("login") ? "" : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">Log In</a></li>`}
-        ${disabledActions.has("register") ? "" : `<li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">Register</a></li>`}`;
+        ${disabledActions.has("logout") ? "" : `<li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">${escapeHtml(logoutLabel)}</a></li>`}`
+      : `${disabledActions.has("login") ? "" : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">${escapeHtml(loginLabel)}</a></li>`}
+        ${disabledActions.has("register") ? "" : `<li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">${escapeHtml(registerLabel)}</a></li>`}`;
 
   return `<nav id="dokuwiki__usertools" aria-label="User tools">
             <h3 class="a11y">User tools</h3>
@@ -9519,6 +9548,9 @@ function renderMobileTools(
   disabledActions = new Set<string>()
 ): string {
   const actionLinks = accountActionLinks(pageId);
+  const loginLabel = localizedAuthText(env, "btn_login");
+  const logoutLabel = localizedAuthText(env, "btn_logout");
+  const registerLabel = localizedAuthText(env, "btn_register");
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : "wiki";
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
@@ -9533,9 +9565,9 @@ function renderMobileTools(
     principal?.type === "user"
       ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? '<option value="/admin">Admin</option>' : ""}
         ${disabledActions.has("profile") ? "" : `<option value="${escapeAttribute(actionLinks.profile)}">Update Profile</option>`}
-        ${disabledActions.has("logout") ? "" : `<option value="${escapeAttribute(actionLinks.logout)}">Log Out</option>`}`
-      : `${disabledActions.has("login") ? "" : `<option value="${escapeAttribute(actionLinks.login)}">Log In</option>`}
-        ${disabledActions.has("register") ? "" : `<option value="${escapeAttribute(actionLinks.register)}">Register</option>`}`;
+        ${disabledActions.has("logout") ? "" : `<option value="${escapeAttribute(actionLinks.logout)}">${escapeHtml(logoutLabel)}</option>`}`
+      : `${disabledActions.has("login") ? "" : `<option value="${escapeAttribute(actionLinks.login)}">${escapeHtml(loginLabel)}</option>`}
+        ${disabledActions.has("register") ? "" : `<option value="${escapeAttribute(actionLinks.register)}">${escapeHtml(registerLabel)}</option>`}`;
 
   return `<div class="mobileTools">
       <label class="a11y" for="mobile__tools">Tools</label>
@@ -10692,6 +10724,7 @@ function aclDeniedResponse(
   requiredPermission: number
 ): Response {
   const message = `Permission denied for '${subjectId}'.`;
+  const title = localizedAuthPageTitle(env, "denied");
 
   if (acceptsJson(request)) {
     return jsonResponse(
@@ -10707,8 +10740,8 @@ function aclDeniedResponse(
   return htmlResponse(
     htmlShell(
       env,
-      "Permission denied",
-      `<h1>Permission denied</h1>
+      title,
+      `${renderLocalizedAuthPageIntro(env, "denied")}
       <p>${escapeHtml(message)}</p>
       <p>Required permission: ${requiredPermission}. Current permission: ${permission}.</p>`
     ),
@@ -10947,18 +10980,18 @@ function renderLockedPage(env: Env, id: string, lock: PageLockInfo | null): stri
   const config = getRuntimeConfig(env);
   const lockDetails = lock
     ? `<ul>
-        <li><div class="li"><strong>Currently locked by:</strong> ${escapeHtml(lock.ownerName || "another editor")}</div></li>
-        <li><div class="li"><strong>Lock expires at:</strong> ${escapeHtml(formatLockExpiration(lock.expiresAt, config))} (${lockMinutesRemaining(lock.expiresAt)} min)</div></li>
+        <li><div class="li"><strong>${escapeHtml(localizedAuthText(env, "lockedby"))}</strong> ${escapeHtml(lock.ownerName || "another editor")}</div></li>
+        <li><div class="li"><strong>${escapeHtml(localizedAuthText(env, "lockexpire"))}</strong> ${escapeHtml(formatLockExpiration(lock.expiresAt, config))} (${lockMinutesRemaining(lock.expiresAt)} min)</div></li>
       </ul>`
-    : `<p>${escapeHtml(id)} does not currently have an active edit lock.</p>`;
+    : "";
+  const title = localizedAuthPageTitle(env, "locked");
 
   return htmlShell(
     env,
-    `Page locked for ${id}`,
-    `<h1>Page locked</h1>
-    <p>This page is currently locked for editing by another user. You have to wait until this user finishes editing or the lock expires.</p>
+    `${title} - ${id}`,
+    `${renderLocalizedAuthPageIntro(env, "locked")}
     ${lockDetails}
-    <p><a href="${pagePath(id)}">View current page</a></p>`,
+    <p><a href="${pagePath(id)}">${escapeHtml(localizedAuthText(env, "btn_back"))}</a></p>`,
     { pageId: id }
   );
 }

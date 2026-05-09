@@ -578,9 +578,11 @@ describe("handleRequest", () => {
     expect(check.status).toBe(200);
     await expect(check.text()).resolves.toContain("<h1>Diagnostics</h1>");
     expect(denied.status).toBe(403);
-    await expect(denied.text()).resolves.toContain("<h1>Permission denied</h1>");
+    await expect(denied.text()).resolves.toContain(
+      '<h1 id="permission-denied">Permission Denied</h1>'
+    );
     expect(locked.status).toBe(200);
-    await expect(locked.text()).resolves.toContain("does not currently have an active edit lock");
+    await expect(locked.text()).resolves.toContain('<h1 id="page-locked">Page locked</h1>');
     expect(conflict.status).toBe(409);
     const conflictHtml = await conflict.text();
     expect(conflictHtml).toContain("<h1>A newer version exists</h1>");
@@ -2621,7 +2623,7 @@ describe("handleRequest", () => {
     expect(first.status).toBe(200);
     expect(locked.status).toBe(423);
     const lockedHtml = await locked.text();
-    expect(lockedHtml).toContain("<h1>Page locked</h1>");
+    expect(lockedHtml).toContain('<h1 id="page-locked">Page locked</h1>');
     expect(lockedHtml).toContain("This page is currently locked for editing by another user.");
     expect(lockedHtml).toContain("<strong>Currently locked by:</strong> Anonymous");
     expect(lockedHtml).toContain("<strong>Lock expires at:</strong>");

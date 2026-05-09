@@ -22,10 +22,11 @@ paths.
 
 ## Language Assets
 
-The launch UI is native English copy with `WIKI_LANG` validation for DokuWiki
-language tags. No PHP language packs are loaded at runtime. Additional localized
-UI strings should be added as native TypeScript resources rather than copied as
-PHP language files.
+The launch UI validates `WIKI_LANG` against bundled DokuWiki language tags.
+Authentication pages use generated native TypeScript resources from upstream
+`inc/lang/<lang>` files. Refresh those resources with `npm run lang:auth` after
+updating the upstream DokuWiki checkout. No PHP language files are loaded at
+runtime.
 
 ## Plugin Assets
 

@@ -197,6 +197,39 @@ describe("auth routes", () => {
     expect(legacyReset.headers.get("location")).toBe("/resendpwd");
   });
 
+  it("renders upstream auth language text for configured locales", async () => {
+    env = createEnv({ WIKI_LANG: "de" });
+
+    const login = await handleRequest(new Request("https://example.com/login"), env);
+    const register = await handleRequest(new Request("https://example.com/register"), env);
+    const resend = await handleRequest(new Request("https://example.com/resendpwd"), env);
+    const reset = await handleRequest(
+      new Request("https://example.com/password-reset?token=reset-token"),
+      env
+    );
+    const denied = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=denied"),
+      env
+    );
+    const locked = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=locked"),
+      env
+    );
+
+    await expect(login.text()).resolves.toContain('<h1 id="anmelden">Anmelden</h1>');
+    await expect(register.text()).resolves.toContain(
+      '<h1 id="als-neuer-benutzer-registrieren">Als neuer Benutzer registrieren</h1>'
+    );
+    await expect(resend.text()).resolves.toContain(
+      '<h1 id="neues-passwort-anfordern">Neues Passwort anfordern</h1>'
+    );
+    await expect(reset.text()).resolves.toContain("Bitte geben Sie ein neues Passwort");
+    await expect(denied.text()).resolves.toContain(
+      '<h1 id="zugang-verweigert">Zugang verweigert</h1>'
+    );
+    await expect(locked.text()).resolves.toContain('<h1 id="seite-gesperrt">Seite gesperrt</h1>');
+  });
+
   it("gates login and registration with Turnstile when configured", async () => {
     env = createEnv({
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
@@ -350,7 +383,7 @@ describe("auth routes", () => {
 
     const registerPage = await handleRequest(new Request("https://example.com/register"), env);
     const registerHtml = await registerPage.text();
-    expect(registerHtml).toContain("A generated password will be sent");
+    expect(registerHtml).toContain("if you are not asked to enter a password here");
     expect(registerHtml).not.toContain('id="register__pass"');
 
     const form = new FormData();
@@ -435,7 +468,9 @@ describe("auth routes", () => {
     );
 
     expect(requested.status).toBe(200);
-    await expect(requested.text()).resolves.toContain("password reset email has been sent");
+    await expect(requested.text()).resolves.toContain(
+      "A confirmation link has been sent by email."
+    );
     expect(resetToken).toBeTruthy();
     await expect(
       env.DB.prepare("select status, provider_message_id from email_deliveries").bind().all()
@@ -457,7 +492,7 @@ describe("auth routes", () => {
     );
 
     expect(confirmed.status).toBe(200);
-    await expect(confirmed.text()).resolves.toContain("Your password has been updated.");
+    await expect(confirmed.text()).resolves.toContain("Your new password has been sent by email.");
     const oldLogin = await postLogin(env, "alice", "correct horse battery staple");
     const newLogin = await postLogin(env, "alice", "new correct battery staple");
     expect(oldLogin.status).toBe(401);
@@ -2286,7 +2321,7 @@ describe("auth routes", () => {
 
       expect(response.status).toBe(401);
       expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
-      await expect(response.text()).resolves.toContain("Invalid username or password.");
+      await expect(response.text()).resolves.toContain("Sorry, username or password was wrong.");
       expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({
         event: "auth_event",
         authEvent: "login_failure",
