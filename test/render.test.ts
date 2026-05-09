@@ -286,6 +286,18 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain('class="media');
   });
 
+  it("renders the bundled info syntax plugin macro", () => {
+    const rendered = renderWikiText("Before\n\n~~INFO:syntaxplugins~~\n\nAfter");
+
+    expect(rendered.html).toContain("<p>Before</p>");
+    expect(rendered.html).toContain(
+      '<a href="https://www.dokuwiki.org/plugin:info" class="urlextern" rel="ugc nofollow">Info Plugin</a>'
+    );
+    expect(rendered.html).toContain("Displays information about various DokuWiki internals");
+    expect(rendered.html).toContain("<p>After</p>");
+    expect(rendered.html).not.toContain("~~INFO:syntaxplugins~~");
+  });
+
   it("renders external media through DokuWiki's tokenized fetch endpoint", () => {
     const rendered = renderWikiText(
       "{{https://cdn.example/assets/logo.png|Remote logo}} {{https://cdn.example/files/manual.pdf?linkonly|Manual}}",

@@ -46,7 +46,7 @@ describe("upstream parser mode coverage", () => {
     expect(noCache.noCache).toBe(true);
     expect(noToc.noToc).toBe(true);
 
-    expect(rendered("~~PLUGIN_MACRO~~")).toContain("~~PLUGIN_MACRO~~");
+    expect(rendered("~~INFO:syntaxplugins~~")).toContain("Info Plugin");
     expect(rendered("  preformatted")).toContain("<pre><code>preformatted</code></pre>");
     expect(rendered("> quote\n>> nested")).toContain("<blockquote><p>quote</p><blockquote>");
     expect(rendered('"quote"', { typographyMode: 1 })).toContain("“quote”");

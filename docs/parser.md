@@ -43,6 +43,7 @@ fresh render.
 - footnotes
 - indented code blocks
 - file blocks with filename download links through `export_code`
+- bundled INFO syntax plugin macro lists
 - nowiki spans
 - simple tables
 - imported acronym, entity, and smiley replacement
@@ -67,38 +68,38 @@ column. `test/parser-compatibility-doc.test.mjs` guards this table so every
 upstream parser mode has an explicit status before the parser checklist can be
 treated as covered.
 
-| Upstream parser mode | Status      | Pages-native coverage or policy                                                                                                           |
-| -------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `Acronym`            | native      | Imported/default acronym replacement, tested in `test/render.test.ts`.                                                                    |
-| `Camelcaselink`      | native      | Optional `CAMELCASE` internal links, tested in `test/render.test.ts`.                                                                     |
-| `Code`               | partial     | Code blocks and metadata are preserved; GeSHi highlighting is intentionally separate.                                                     |
-| `Emaillink`          | native      | Mail links and mailguard output, tested in `test/render.test.ts`.                                                                         |
-| `Entity`             | native      | Imported/default entity replacement, tested in `test/render.test.ts`.                                                                     |
-| `Eol`                | native      | Paragraph and line-break handling, tested in `test/render.test.ts`.                                                                       |
-| `Externallink`       | native      | Explicit and automatic external links with scheme config, tested in `test/render.test.ts`.                                                |
-| `File`               | partial     | File blocks render and expose `export_code`; syntax highlighting remains separate.                                                        |
-| `Filelink`           | native      | Media/file links, `linkonly`, sizing, tokenized fetch, and detail links in `test/render.test.ts`.                                         |
-| `Footnote`           | native      | Nested footnote rendering, tested in `test/render.test.ts`.                                                                               |
-| `Formatting`         | native      | Strong, emphasis, underline, monospace, sub, sup, and deleted text in `test/render.test.ts`.                                              |
-| `Header`             | native      | Heading levels, anchors, TOC, and section edit links in `test/render.test.ts`.                                                            |
-| `Hr`                 | native      | Horizontal rules, tested in `test/render.test.ts`.                                                                                        |
-| `Internallink`       | native      | Page links, missing-page classes, autoplural, and dependencies in `test/render.test.ts`.                                                  |
-| `Linebreak`          | native      | Forced line breaks, tested in `test/render.test.ts`.                                                                                      |
-| `Listblock`          | native      | Nested ordered and unordered lists, tested in `test/render.test.ts`.                                                                      |
-| `Media`              | native      | Image/media embeds, alignment, sizing, remote fetch links, and dependencies in `test/render.test.ts`.                                     |
-| `Multiplyentity`     | native      | Dimension multiplication replacement, tested in `test/render.test.ts`.                                                                    |
-| `Nocache`            | native      | `~~NOCACHE~~` render metadata, tested in `test/render.test.ts`.                                                                           |
-| `Notoc`              | native      | `~~NOTOC~~` TOC suppression, tested in `test/render.test.ts`.                                                                             |
-| `Plugin`             | unsupported | PHP syntax plugin hooks are not run in Workers; compatibility is tracked in plugin docs.                                                  |
-| `Preformatted`       | native      | Indented preformatted blocks, tested in `test/render.test.ts`.                                                                            |
-| `Quote`              | native      | Nested block quotes, tested in `test/render.test.ts` and `test/syntax-fixture.test.mjs`.                                                  |
-| `Quotes`             | native      | Configurable typography quote replacement, tested in `test/render.test.ts`.                                                               |
-| `Rss`                | native      | RSS aggregation syntax fetches and caches remote feeds with upstream max, reverse, author, date, details, nosort, and refresh parameters. |
-| `Smiley`             | native      | Imported/default smileys, tested in `test/render.test.ts`.                                                                                |
-| `Table`              | native      | Header cells, alignment, colspans, and rowspans, tested in `test/render.test.ts`.                                                         |
-| `Unformatted`        | native      | Nowiki/no-formatting spans and raw HTML escaping, tested in `test/render.test.ts`.                                                        |
-| `Windowssharelink`   | native      | Windows share links and target handling, tested in `test/render.test.ts`.                                                                 |
-| `Wordblock`          | policy      | Save-time wordblock validation replaces parser-mode blocking, tested in `test/wordblock.test.ts` and `test/app.test.ts`.                  |
+| Upstream parser mode | Status  | Pages-native coverage or policy                                                                                                           |
+| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Acronym`            | native  | Imported/default acronym replacement, tested in `test/render.test.ts`.                                                                    |
+| `Camelcaselink`      | native  | Optional `CAMELCASE` internal links, tested in `test/render.test.ts`.                                                                     |
+| `Code`               | partial | Code blocks and metadata are preserved; GeSHi highlighting is intentionally separate.                                                     |
+| `Emaillink`          | native  | Mail links and mailguard output, tested in `test/render.test.ts`.                                                                         |
+| `Entity`             | native  | Imported/default entity replacement, tested in `test/render.test.ts`.                                                                     |
+| `Eol`                | native  | Paragraph and line-break handling, tested in `test/render.test.ts`.                                                                       |
+| `Externallink`       | native  | Explicit and automatic external links with scheme config, tested in `test/render.test.ts`.                                                |
+| `File`               | partial | File blocks render and expose `export_code`; syntax highlighting remains separate.                                                        |
+| `Filelink`           | native  | Media/file links, `linkonly`, sizing, tokenized fetch, and detail links in `test/render.test.ts`.                                         |
+| `Footnote`           | native  | Nested footnote rendering, tested in `test/render.test.ts`.                                                                               |
+| `Formatting`         | native  | Strong, emphasis, underline, monospace, sub, sup, and deleted text in `test/render.test.ts`.                                              |
+| `Header`             | native  | Heading levels, anchors, TOC, and section edit links in `test/render.test.ts`.                                                            |
+| `Hr`                 | native  | Horizontal rules, tested in `test/render.test.ts`.                                                                                        |
+| `Internallink`       | native  | Page links, missing-page classes, autoplural, and dependencies in `test/render.test.ts`.                                                  |
+| `Linebreak`          | native  | Forced line breaks, tested in `test/render.test.ts`.                                                                                      |
+| `Listblock`          | native  | Nested ordered and unordered lists, tested in `test/render.test.ts`.                                                                      |
+| `Media`              | native  | Image/media embeds, alignment, sizing, remote fetch links, and dependencies in `test/render.test.ts`.                                     |
+| `Multiplyentity`     | native  | Dimension multiplication replacement, tested in `test/render.test.ts`.                                                                    |
+| `Nocache`            | native  | `~~NOCACHE~~` render metadata, tested in `test/render.test.ts`.                                                                           |
+| `Notoc`              | native  | `~~NOTOC~~` TOC suppression, tested in `test/render.test.ts`.                                                                             |
+| `Plugin`             | partial | Bundled INFO syntax plugin macros render natively; arbitrary PHP syntax plugin hooks are not run in Workers.                              |
+| `Preformatted`       | native  | Indented preformatted blocks, tested in `test/render.test.ts`.                                                                            |
+| `Quote`              | native  | Nested block quotes, tested in `test/render.test.ts` and `test/syntax-fixture.test.mjs`.                                                  |
+| `Quotes`             | native  | Configurable typography quote replacement, tested in `test/render.test.ts`.                                                               |
+| `Rss`                | native  | RSS aggregation syntax fetches and caches remote feeds with upstream max, reverse, author, date, details, nosort, and refresh parameters. |
+| `Smiley`             | native  | Imported/default smileys, tested in `test/render.test.ts`.                                                                                |
+| `Table`              | native  | Header cells, alignment, colspans, and rowspans, tested in `test/render.test.ts`.                                                         |
+| `Unformatted`        | native  | Nowiki/no-formatting spans and raw HTML escaping, tested in `test/render.test.ts`.                                                        |
+| `Windowssharelink`   | native  | Windows share links and target handling, tested in `test/render.test.ts`.                                                                 |
+| `Wordblock`          | policy  | Save-time wordblock validation replaces parser-mode blocking, tested in `test/wordblock.test.ts` and `test/app.test.ts`.                  |
 
 ## Render Controls
 

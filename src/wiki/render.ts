@@ -20,6 +20,7 @@ import {
   type RssFeedItem,
   type RssFeedResult
 } from "./rss";
+import { BUNDLED_DOKUWIKI_PLUGINS, type DokuWikiPluginType } from "./plugin-info";
 
 export interface TocItem {
   id: string;
@@ -207,6 +208,7 @@ export function renderWikiText(
 ): RenderedWikiText {
   const directives = options.directives ?? getWikiRenderDirectives(source);
   const rssRequests = extractRssFeedRequests(source);
+  const hasDynamicInfoMacro = /~~INFO:datetime~~/i.test(source);
   const blocks: string[] = [];
   const toc: TocItem[] = [];
   const context: RenderContext = {
@@ -273,6 +275,13 @@ export function renderWikiText(
         lines: []
       };
       state.codeBlockIndex += 1;
+      continue;
+    }
+
+    const infoMacro = parseInfoPluginMacro(line.trim());
+    if (infoMacro) {
+      flushAll(blocks, state, context);
+      blocks.push(renderInfoPluginMacro(infoMacro, context));
       continue;
     }
 
@@ -365,7 +374,7 @@ export function renderWikiText(
     title: title.value,
     toc: directives.noToc ? [] : toc,
     dependencies: sortedDependencies(context.dependencies),
-    noCache: directives.noCache || rssRequests.length > 0,
+    noCache: directives.noCache || rssRequests.length > 0 || hasDynamicInfoMacro,
     noToc: directives.noToc
   };
 }
@@ -866,6 +875,7 @@ function renderInline(source: string, context: RenderContext): string {
   });
 
   rendered = escapeHtml(rendered);
+  rendered = renderInfoPluginMacros(rendered, context, protectHtml);
   rendered = renderRssAggregations(rendered, context, protectHtml);
   rendered = renderMedia(rendered, context, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
@@ -997,6 +1007,110 @@ function acronymPattern(acronyms: Readonly<Record<string, string>>): RegExp | nu
       .join("|")})(?=$|${ACRONYM_BOUNDARY})`,
     "g"
   );
+}
+
+function parseInfoPluginMacro(source: string): string | null {
+  const match = source.match(/^~~INFO:(\w+)~~$/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function renderInfoPluginMacros(
+  source: string,
+  context: RenderContext,
+  protectHtml: (html: string) => string
+): string {
+  return source.replace(/~~INFO:(\w+)~~/gi, (_match, kind: string) =>
+    protectHtml(renderInfoPluginMacro(kind.toLowerCase(), context))
+  );
+}
+
+function renderInfoPluginMacro(kind: string, context: RenderContext): string {
+  const pluginType = infoPluginListType(kind);
+  if (pluginType) return renderPluginInfoList(pluginType, context);
+
+  switch (kind) {
+    case "datetime":
+      return escapeHtml(new Date().toUTCString());
+    case "syntaxmodes":
+      return renderInfoTable([
+        ["acronym", "220"],
+        ["camelcaselink", "250"],
+        ["code", "200"],
+        ["emaillink", "330"],
+        ["externallink", "330"],
+        ["file", "210"],
+        ["footnote", "150"],
+        ["formatting", "70"],
+        ["header", "50"],
+        ["internallink", "320"],
+        ["media", "320"],
+        ["plugin_info", "155"],
+        ["rss", "310"],
+        ["table", "60"]
+      ]);
+    case "syntaxtypes":
+      return renderInfoTable([
+        ["substition", "acronym, entity, smiley, plugin_info"],
+        ["protected", "code, file, unformatted"],
+        ["formatting", "strong, emphasis, underline, monospace, subscript, superscript, deleted"],
+        ["container", "listblock, quote, table"],
+        ["baseonly", "header, hr"]
+      ]);
+    case "helpermethods":
+    case "hooks":
+      return `<p class="plugin_info">Native Pages replacements do not expose DokuWiki PHP ${escapeHtml(
+        kind
+      )}.</p>`;
+    default:
+      return `no info about ${escapeHtml(kind)}`;
+  }
+}
+
+function infoPluginListType(kind: string): DokuWikiPluginType | null {
+  const types: Record<string, DokuWikiPluginType> = {
+    actionplugins: "action",
+    adminplugins: "admin",
+    authplugins: "auth",
+    helperplugins: "helper",
+    remoteplugins: "remote",
+    rendererplugins: "renderer",
+    syntaxplugins: "syntax"
+  };
+
+  return types[kind] ?? null;
+}
+
+function renderPluginInfoList(type: DokuWikiPluginType, context: RenderContext): string {
+  const items = BUNDLED_DOKUWIKI_PLUGINS.filter((plugin) => plugin.types.includes(type))
+    .map((plugin) => renderPluginInfoItem(plugin, context))
+    .join("");
+
+  return `<ul>${items}</ul>`;
+}
+
+function renderPluginInfoItem(
+  plugin: (typeof BUNDLED_DOKUWIKI_PLUGINS)[number],
+  context: RenderContext
+): string {
+  return `<li><div class="li">${renderRssExternalLink(
+    plugin.url,
+    plugin.name,
+    context
+  )} <em>${escapeHtml(plugin.date)}</em> by ${renderEmailLink(
+    plugin.email,
+    plugin.author
+  )}<br>${escapeHtml(plugin.desc)}</div></li>`;
+}
+
+function renderInfoTable(rows: Array<readonly [string, string]>): string {
+  return `<div class="table"><table class="inline"><tbody>${rows
+    .map(
+      ([left, right]) =>
+        `<tr><td class="leftalign">${escapeHtml(left)}</td><td class="leftalign">${escapeHtml(
+          right
+        )}</td></tr>`
+    )
+    .join("")}</tbody></table></div>`;
 }
 
 function renderRssAggregations(

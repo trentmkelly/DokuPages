@@ -28,5 +28,7 @@ describe("DokuWiki syntax fixture", () => {
     expect(rendered.html).toContain(
       "<blockquote><blockquote><blockquote><p>Then lets do it!</p></blockquote></blockquote></blockquote>"
     );
+    expect(rendered.html).toContain("Info Plugin");
+    expect(rendered.html).not.toContain("~~INFO:syntaxplugins~~");
   });
 });

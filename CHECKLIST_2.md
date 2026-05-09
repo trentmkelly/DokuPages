@@ -59,7 +59,7 @@ are not fixed by this checklist.
 - [x] Add parity coverage for every upstream parser mode: Acronym, Camelcaselink, Code, Emaillink, Entity, Eol, Externallink, File, Filelink, Footnote, Formatting, Header, Hr, Internallink, Linebreak, Listblock, Media, Multiplyentity, Nocache, Notoc, Plugin, Preformatted, Quote, Quotes, Rss, Smiley, Table, Unformatted, Windowssharelink, and Wordblock.
 - [x] Implement CamelCase link support controlled by the upstream `camelcase` setting.
 - [x] Implement RSS feed aggregation syntax from upstream `ParserMode/Rss.php`.
-- [ ] Implement plugin syntax macros, including the bundled info plugin macro seen in `docs/syntax-inventory.md`.
+- [x] Implement plugin syntax macros, including the bundled info plugin macro seen in `docs/syntax-inventory.md`.
 - [ ] Implement GeSHi-compatible code highlighting for `<code>` and `<file>` language metadata.
 - [x] Implement downloadable file-block output for DokuWiki file syntax metadata.
 - [x] Match DokuWiki's raw HTML behavior when `htmlok`-style trusted content is enabled, or document the security-driven mismatch explicitly.

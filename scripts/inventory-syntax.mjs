@@ -129,9 +129,9 @@ export const FEATURE_DEFINITIONS = [
   {
     id: "rss_feed_aggregation",
     label: "RSS feed aggregation syntax",
-    status: "unsupported",
+    status: "supported",
     pattern: /{{rss>[^{}]+}}/gi,
-    note: "Requires a Pages-native replacement; the renderer does not fetch or cache remote feeds."
+    note: "Renderer fetches and caches remote feeds with DokuWiki-style aggregation parameters."
   },
   {
     id: "unordered_lists",
@@ -241,9 +241,9 @@ export const FEATURE_DEFINITIONS = [
   {
     id: "syntax_plugin_macros",
     label: "Syntax plugin macros",
-    status: "unsupported",
+    status: "supported",
     pattern: /~~[A-Z]+:[^~]+~~/g,
-    note: "Current content uses DokuWiki's INFO syntax plugin macro."
+    note: "Current content uses the bundled INFO syntax plugin macro, which has a native replacement."
   }
 ];
 

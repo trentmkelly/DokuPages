@@ -40,9 +40,6 @@ post-launch monitoring.
 - Downloadable file block metadata: file labels render, but generated downloads
   are not emitted. Add generated attachment routes only if production content
   uses this DokuWiki behavior.
-- Syntax plugin INFO macro: current starter content has one occurrence. Replace
-  with a native informational block if production content uses syntax plugin
-  macros outside the starter syntax page.
 
 ## P2
 

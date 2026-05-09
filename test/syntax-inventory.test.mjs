@@ -24,12 +24,12 @@ describe("DokuWiki syntax inventory", () => {
       pages: ["wiki:syntax"]
     });
     expect(features.get("rss_feed_aggregation")).toMatchObject({
-      status: "unsupported",
+      status: "supported",
       occurrences: 1,
       pages: ["wiki:syntax"]
     });
     expect(features.get("syntax_plugin_macros")).toMatchObject({
-      status: "unsupported",
+      status: "supported",
       occurrences: 1,
       pages: ["wiki:syntax"]
     });
@@ -41,9 +41,9 @@ describe("DokuWiki syntax inventory", () => {
 
     expect(markdown).toContain("# DokuWiki Syntax Inventory");
     expect(markdown).toContain("| `wiki:syntax` | `wiki/syntax.txt` |");
-    expect(markdown).toContain("| RSS feed aggregation syntax | unsupported | 1 |");
+    expect(markdown).toContain("| RSS feed aggregation syntax | supported | 1 |");
     expect(markdown).toContain(
-      "- unsupported: Syntax plugin macros (1 occurrence) - Current content uses DokuWiki's INFO syntax plugin macro."
+      "| Syntax plugin macros | supported | 1 | `wiki:syntax` | Current content uses the bundled INFO syntax plugin macro, which has a native replacement. |"
     );
   });
 });
