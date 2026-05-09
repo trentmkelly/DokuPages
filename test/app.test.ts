@@ -884,17 +884,29 @@ describe("handleRequest", () => {
       ["/doku.php?id=Wiki:Welcome&do=authtoken", 301, "/wiki/wiki/welcome?do=authtoken"],
       ["/doku.php?id=Wiki:Welcome&do=plugin", 301, "/wiki/wiki/welcome?do=plugin"],
       ["/doku.php?id=Wiki:Welcome&do=media", 301, "/wiki/wiki/welcome?do=media"],
+      [
+        "/doku.php?id=Wiki:Welcome&do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z&rev2=wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z",
+        301,
+        "/wiki/wiki/welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z&rev2=wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z"
+      ],
       ["/doku.php?id=Wiki:Welcome&do=export_raw", 301, "/wiki/wiki/welcome?do=export_raw"],
       [
         "/doku.php?id=Wiki:Welcome&do=export_code&codeblock=0",
         301,
         "/wiki/wiki/welcome?do=export_code&codeblock=0"
       ],
+      ["/doku.php?id=Wiki:Welcome&do=export_xhtml", 301, "/wiki/wiki/welcome?do=export_xhtml"],
       [
         "/doku.php?id=Wiki:Welcome&do=export_htmlbody",
         301,
         "/wiki/wiki/welcome?do=export_xhtmlbody"
       ],
+      [
+        "/doku.php?id=Wiki:Welcome&do=export_metadata",
+        301,
+        "/wiki/wiki/welcome?do=export_metadata"
+      ],
+      ["/doku.php?id=Wiki:Welcome&do=export_odt", 301, "/wiki/wiki/welcome?do=export_odt"],
       ["/doku.php?do=admin", 301, "/admin"],
       ["/doku.php?do=admin&page=acl", 301, "/admin/acl"],
       ["/doku.php?do=admin&page=config", 301, "/admin/config"],
@@ -908,6 +920,11 @@ describe("handleRequest", () => {
       ["/lib/exe/js.php?t=1", 301, "/dokuwiki.js?v=0.1.0"],
       ["/lib/exe/jquery.php", 301, "/dokuwiki.js?v=0.1.0"],
       ["/lib/exe/fetch.php?media=wiki:logo.svg&dl=1", 301, "/media/wiki/logo.svg?download=1"],
+      [
+        "/lib/exe/fetch.php?media=wiki:logo.svg&rev=20260506000000&dl=1",
+        301,
+        "/media/wiki/logo.svg?rev=20260506000000&download=1"
+      ],
       [
         "/lib/exe/fetch.php?media=wiki:logo.svg&w=80&tok=abc123&cache=nocache",
         301,
@@ -938,6 +955,15 @@ describe("handleRequest", () => {
       ["/lib/exe/manifest.php", 200, "application/manifest+json"],
       ["/manifest.webmanifest", 200, "application/manifest+json"],
       ["/install.php", 410, "text/html"],
+      ["/doku.php?do=admin&page=extension", 501, "text/html"],
+      ["/doku.php?do=admin&page=popularity", 501, "text/html"],
+      ["/doku.php?do=admin&page=safefnrecode", 501, "text/html"],
+      ["/doku.php?do=admin&page=styling", 501, "text/html"],
+      ["/media-detail/wiki/logo.svg?mediado=diff&rev=media-rev-1", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=qsearch&q=welcome", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=suggestions&q=welcome", 200, "application/x-suggestions+json"],
+      ["/lib/exe/ajax.php?call=linkwiz&q=welcome", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=index&idx=wiki", 200, "text/html"],
       ["/lib/exe/indexer.php", 200, "image/gif"],
       ["/lib/exe/xmlrpc.php", 501, "application/json"],
       ["/lib/exe/jsonrpc.php", 501, "application/json"],
