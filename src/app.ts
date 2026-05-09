@@ -145,6 +145,12 @@ import {
   type CacheDependency,
   type TocItem
 } from "./wiki/render";
+import {
+  extractRssFeedRequests,
+  fetchRssFeed,
+  type RssFeedResult,
+  type RssFeedRequest
+} from "./wiki/rss";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
 import {
   expectedMediaDerivativeStatus,
@@ -174,13 +180,16 @@ interface BreadcrumbEntry {
 const RENDER_CACHE_TTL_SECONDS = 60 * 60;
 const MAX_RENDER_CACHE_ENTRY_BYTES = 512 * 1024;
 const DISCOVERY_CACHE_TTL_SECONDS = 5 * 60;
-const RENDER_CACHE_VERSION = 30;
+const RENDER_CACHE_VERSION = 31;
 const BREADCRUMB_COOKIE_NAME = "DW_PAGES_BC";
 const BREADCRUMB_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const MEDIA_CLEANUP_PREFIX = "media/";
 const MEDIA_CLEANUP_SAMPLE_LIMIT = 25;
 const HTTP_MULTIPART_BOUNDARY = "D0KuW1K1B0uNDARY";
 const REMOTE_MEDIA_FETCH_TIMEOUT_MS = 25_000;
+const RSS_FEED_CACHE_PREFIX = "rss_feed:";
+const RSS_FEED_FETCH_TIMEOUT_MS = 8_000;
+const MAX_RSS_FEEDS_PER_RENDER = 10;
 const PAGE_LOCK_WARNING_SECONDS = 60;
 const PAGE_LOCK_MIN_REFRESH_SECONDS = 30;
 const PAGE_LOCK_TOKEN_BYTES = 24;
@@ -1525,6 +1534,76 @@ function cleanFragment(value: string | null): string | null {
   return fragment.replace(/\s+/g, "-");
 }
 
+async function rssFeedsForRender(
+  env: Env,
+  content: string
+): Promise<ReadonlyMap<string, RssFeedResult>> {
+  const requests = extractRssFeedRequests(content);
+  if (requests.length === 0) return new Map();
+
+  const limitedRequests = requests.slice(0, MAX_RSS_FEEDS_PER_RENDER);
+  const entries = await Promise.all(
+    limitedRequests.map(
+      async (request) => [request.url, await cachedRssFeed(env, request)] as const
+    )
+  );
+  const feeds = new Map(entries);
+
+  for (const request of requests.slice(MAX_RSS_FEEDS_PER_RENDER)) {
+    feeds.set(request.url, {
+      ok: false,
+      url: request.url,
+      items: [],
+      fetchedAt: new Date().toISOString(),
+      error: "Too many RSS feeds on one page."
+    });
+  }
+
+  return feeds;
+}
+
+async function cachedRssFeed(env: Env, request: RssFeedRequest): Promise<RssFeedResult> {
+  const cacheKey = `${RSS_FEED_CACHE_PREFIX}${await sha256Hex(request.url)}`;
+
+  try {
+    const cached = (await env.RENDER_CACHE.get(cacheKey, "json")) as unknown;
+    if (isRssFeedResult(cached)) return cached;
+  } catch {
+    // RSS aggregation remains available when KV is degraded.
+  }
+
+  const fetched = await fetchRssFeed(request.url, { timeoutMs: RSS_FEED_FETCH_TIMEOUT_MS });
+
+  try {
+    await env.RENDER_CACHE.put(cacheKey, JSON.stringify(fetched), {
+      expirationTtl: rssFeedCacheTtl(request, fetched)
+    });
+  } catch {
+    // RSS aggregation remains available when KV is degraded.
+  }
+
+  return fetched;
+}
+
+function rssFeedCacheTtl(request: RssFeedRequest, result: RssFeedResult): number {
+  return result.ok ? request.params.refresh : Math.min(request.params.refresh, 10 * 60);
+}
+
+function isRssFeedResult(value: unknown): value is RssFeedResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "ok" in value &&
+    typeof value.ok === "boolean" &&
+    "url" in value &&
+    typeof value.url === "string" &&
+    "items" in value &&
+    Array.isArray(value.items) &&
+    "fetchedAt" in value &&
+    typeof value.fetchedAt === "string"
+  );
+}
+
 async function handlePagePreview(
   request: Request,
   env: Env,
@@ -1550,6 +1629,7 @@ async function handlePagePreview(
     autoPluralLinks,
     config.pageIdCleanOptions
   );
+  const rssFeeds = await rssFeedsForRender(env, content);
   const rendered = renderWikiText(content, {
     pageId: pageId || undefined,
     existingPageIds,
@@ -1564,7 +1644,9 @@ async function handlePagePreview(
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode,
     pageIdCleanOptions: config.pageIdCleanOptions,
-    mediaTokenSecret: mediaTokenSecret(env)
+    mediaTokenSecret: mediaTokenSecret(env),
+    rssFeeds,
+    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
   });
 
   if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
@@ -4082,6 +4164,7 @@ async function renderPageHtml(
     autoPluralLinks,
     config.pageIdCleanOptions
   );
+  const rssFeeds = await rssFeedsForRender(env, content);
   const rendered = renderWikiText(content, {
     pageId: id,
     directives,
@@ -4101,7 +4184,9 @@ async function renderPageHtml(
     maxSectionEditLevel: config.maxSectionEditLevel,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode,
-    mediaTokenSecret: mediaTokenSecret(env)
+    mediaTokenSecret: mediaTokenSecret(env),
+    rssFeeds,
+    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
   });
   const title = displayPageTitle(config, rendered.title, page?.title, id);
 
@@ -4189,6 +4274,7 @@ async function renderPageExport(
     autoPluralLinks,
     config.pageIdCleanOptions
   );
+  const rssFeeds = await rssFeedsForRender(env, content);
   const rendered = renderWikiText(content, {
     pageId: id,
     existingPageIds,
@@ -4206,7 +4292,9 @@ async function renderPageExport(
     maxSectionEditLevel: config.maxSectionEditLevel,
     camelCaseLinks: config.camelCaseLinks,
     typographyMode: config.typographyMode,
-    mediaTokenSecret: mediaTokenSecret(env)
+    mediaTokenSecret: mediaTokenSecret(env),
+    rssFeeds,
+    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
   });
   const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
   const language = config.language;

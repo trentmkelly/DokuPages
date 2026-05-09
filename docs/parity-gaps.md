@@ -34,9 +34,6 @@ post-launch monitoring.
 - Production backup automation: the manual backup and restore scripts are
   implemented and verified, but a recurring production scheduler still needs an
   operator-owned runner and credential policy.
-- RSS feed aggregation syntax: current source has one occurrence in
-  `wiki:syntax`; implement a Pages-native safe fetch/cache policy only if
-  production content depends on feed aggregation.
 - Code highlighting metadata: code and file blocks render safely, but language
   metadata is not passed through a highlighter. Add a static highlighter only if
   production content relies on highlighted snippets.

@@ -13,6 +13,13 @@ import {
   mediaPath
 } from "./media-service";
 import { mediaSizeQuery, requestedMediaSize } from "./media-token";
+import {
+  extractRssFeedRequests,
+  parseRssFeedRequest,
+  type RssAggregationParams,
+  type RssFeedItem,
+  type RssFeedResult
+} from "./rss";
 
 export interface TocItem {
   id: string;
@@ -64,6 +71,8 @@ export interface RenderWikiTextOptions {
   typographyMode?: number;
   pageIdCleanOptions?: PageIdCleanOptions;
   mediaTokenSecret?: string | null;
+  rssFeeds?: ReadonlyMap<string, RssFeedResult>;
+  rssDateFormatter?: (date: Date) => string;
   directives?: {
     noCache: boolean;
     noToc: boolean;
@@ -197,6 +206,7 @@ export function renderWikiText(
   options: RenderWikiTextOptions = {}
 ): RenderedWikiText {
   const directives = options.directives ?? getWikiRenderDirectives(source);
+  const rssRequests = extractRssFeedRequests(source);
   const blocks: string[] = [];
   const toc: TocItem[] = [];
   const context: RenderContext = {
@@ -220,6 +230,8 @@ export function renderWikiText(
     typographyMode: clampTypographyMode(options.typographyMode),
     pageIdCleanOptions: options.pageIdCleanOptions,
     mediaTokenSecret: options.mediaTokenSecret,
+    rssFeeds: options.rssFeeds ?? new Map(),
+    rssDateFormatter: options.rssDateFormatter ?? defaultRssDateFormatter,
     sectionIndex: 0,
     anchorIds: new Set()
   };
@@ -353,7 +365,7 @@ export function renderWikiText(
     title: title.value,
     toc: directives.noToc ? [] : toc,
     dependencies: sortedDependencies(context.dependencies),
-    noCache: directives.noCache,
+    noCache: directives.noCache || rssRequests.length > 0,
     noToc: directives.noToc
   };
 }
@@ -461,6 +473,8 @@ interface RenderContext {
   typographyMode: number;
   pageIdCleanOptions?: PageIdCleanOptions;
   mediaTokenSecret?: string | null;
+  rssFeeds: ReadonlyMap<string, RssFeedResult>;
+  rssDateFormatter: (date: Date) => string;
   sectionIndex: number;
   anchorIds: Set<string>;
 }
@@ -812,6 +826,9 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             camelCaseLinks: context.camelCaseLinks,
             typographyMode: context.typographyMode,
             pageIdCleanOptions: context.pageIdCleanOptions,
+            mediaTokenSecret: context.mediaTokenSecret,
+            rssFeeds: context.rssFeeds,
+            rssDateFormatter: context.rssDateFormatter,
             sectionIndex: context.sectionIndex,
             anchorIds: context.anchorIds
           }
@@ -849,6 +866,7 @@ function renderInline(source: string, context: RenderContext): string {
   });
 
   rendered = escapeHtml(rendered);
+  rendered = renderRssAggregations(rendered, context, protectHtml);
   rendered = renderMedia(rendered, context, protectHtml);
   rendered = renderLinks(rendered, context, protectHtml, renderLinkLabel);
   rendered = renderExternalAutolinks(
@@ -979,6 +997,128 @@ function acronymPattern(acronyms: Readonly<Record<string, string>>): RegExp | nu
       .join("|")})(?=$|${ACRONYM_BOUNDARY})`,
     "g"
   );
+}
+
+function renderRssAggregations(
+  source: string,
+  context: RenderContext,
+  protectHtml: (html: string) => string
+): string {
+  return source.replace(/\{\{rss&gt;([^}]+)\}\}/gi, (_match, escapedBody: string) => {
+    const request = parseRssFeedRequest(decodeHtmlEntities(escapedBody));
+    if (!request) {
+      return protectHtml(renderRssFailure("(invalid feed)", context));
+    }
+
+    return protectHtml(
+      renderRssFeed(request.url, request.params, context.rssFeeds.get(request.url), context)
+    );
+  });
+}
+
+function renderRssFeed(
+  url: string,
+  params: RssAggregationParams,
+  result: RssFeedResult | undefined,
+  context: RenderContext
+): string {
+  if (!result?.ok) return renderRssFailure(url, context);
+
+  const items = rssItemsForDisplay(result.items, params)
+    .map((item) => renderRssFeedItem(item, params, context))
+    .join("");
+
+  return `<ul class="rss">${items}</ul>`;
+}
+
+function renderRssFailure(url: string, context: RenderContext): string {
+  return `<ul class="rss"><li><div class="li"><em>An error occurred while fetching this feed: </em>${renderRssExternalLink(
+    url,
+    url,
+    context
+  )}</div></li></ul>`;
+}
+
+function rssItemsForDisplay(
+  items: ReadonlyArray<RssFeedItem>,
+  params: RssAggregationParams
+): RssFeedItem[] {
+  const indexed = items.map((item, index) => ({ item, index }));
+
+  if (!params.nosort) {
+    indexed.sort((left, right) => {
+      const leftTime = rssItemTimestamp(left.item);
+      const rightTime = rssItemTimestamp(right.item);
+
+      if (leftTime !== rightTime) return rightTime - leftTime;
+      return left.index - right.index;
+    });
+  }
+
+  const ordered = params.reverse ? indexed.reverse() : indexed;
+  return ordered.slice(0, Math.max(0, params.max)).map((entry) => entry.item);
+}
+
+function rssItemTimestamp(item: RssFeedItem): number {
+  const timestamp = item.publishedAt ? Date.parse(item.publishedAt) : Number.NaN;
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
+
+function renderRssFeedItem(
+  item: RssFeedItem,
+  params: RssAggregationParams,
+  context: RenderContext
+): string {
+  const title = item.title || item.link || "(no title)";
+  const link = safeRssItemLink(item.link);
+  const titleHtml = link ? renderRssExternalLink(link, title, context) : escapeHtml(title);
+  const author = params.author && item.author ? ` by ${escapeHtml(item.author)}` : "";
+  const date = params.date && item.publishedAt ? renderRssItemDate(item.publishedAt, context) : "";
+  const details =
+    params.details && item.description
+      ? `<div class="detail">${escapeHtml(stripHtml(item.description))}</div>`
+      : "";
+
+  return `<li><div class="li">${titleHtml}${author}${date}${details}</div></li>`;
+}
+
+function renderRssItemDate(publishedAt: string, context: RenderContext): string {
+  const date = new Date(publishedAt);
+  if (Number.isNaN(date.getTime())) return "";
+  return ` (${escapeHtml(context.rssDateFormatter(date))})`;
+}
+
+function renderRssExternalLink(href: string, label: string, context: RenderContext): string {
+  const safeHref = safeRssItemLink(href) ?? "#";
+  const target = context.linkTargets.extern;
+
+  return `<a href="${escapeAttribute(safeHref)}" class="urlextern"${targetAttribute(target)}${linkRelAttribute(
+    "extern",
+    target,
+    context.relNofollow
+  )}>${escapeHtml(label)}</a>`;
+}
+
+function safeRssItemLink(value: string | null): string | null {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function stripHtml(value: string): string {
+  return decodeHtmlEntities(value.replace(/<[^>]*>/g, ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function defaultRssDateFormatter(date: Date): string {
+  return date.toUTCString();
 }
 
 function renderMedia(

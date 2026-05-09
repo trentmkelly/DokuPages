@@ -232,6 +232,60 @@ describe("renderWikiText", () => {
     );
   });
 
+  it("renders RSS feed aggregation syntax with upstream parameters", () => {
+    const rendered = renderWikiText("{{rss>https://example.com/feed.xml 1 author date desc 1h }}", {
+      rssFeeds: new Map([
+        [
+          "https://example.com/feed.xml",
+          {
+            ok: true,
+            url: "https://example.com/feed.xml",
+            fetchedAt: "2026-05-08T12:00:00.000Z",
+            items: [
+              {
+                title: "Older item",
+                link: "https://example.com/older",
+                author: "Kai",
+                publishedAt: "2026-05-07T12:00:00.000Z",
+                description: "<p>Older <strong>description</strong></p>"
+              },
+              {
+                title: "Newer item",
+                link: "https://example.com/newer",
+                author: "Ann",
+                publishedAt: "2026-05-08T12:00:00.000Z",
+                description: "<p>Newer <strong>description</strong></p>"
+              }
+            ]
+          }
+        ]
+      ]),
+      rssDateFormatter: (date) => date.toISOString().slice(0, 10),
+      linkTargets: { extern: "_blank" }
+    });
+
+    expect(rendered.noCache).toBe(true);
+    expect(rendered.html).toContain('<ul class="rss">');
+    expect(rendered.html).toContain(
+      '<a href="https://example.com/newer" class="urlextern" target="_blank" rel="ugc nofollow noopener">Newer item</a> by Ann (2026-05-08)'
+    );
+    expect(rendered.html).toContain('<div class="detail">Newer description</div>');
+    expect(rendered.html).not.toContain("Older item");
+    expect(rendered.html).not.toContain('class="media');
+  });
+
+  it("renders DokuWiki-style RSS failures when a feed is unavailable", () => {
+    const rendered = renderWikiText("{{rss>https://example.com/missing.xml 5 }}");
+
+    expect(rendered.noCache).toBe(true);
+    expect(rendered.html).toContain('<ul class="rss">');
+    expect(rendered.html).toContain("<em>An error occurred while fetching this feed: </em>");
+    expect(rendered.html).toContain(
+      '<a href="https://example.com/missing.xml" class="urlextern" rel="ugc nofollow">https://example.com/missing.xml</a>'
+    );
+    expect(rendered.html).not.toContain('class="media');
+  });
+
   it("renders external media through DokuWiki's tokenized fetch endpoint", () => {
     const rendered = renderWikiText(
       "{{https://cdn.example/assets/logo.png|Remote logo}} {{https://cdn.example/files/manual.pdf?linkonly|Manual}}",

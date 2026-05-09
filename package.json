@@ -46,6 +46,7 @@
   "dependencies": {
     "@cf-wasm/photon": "^0.3.5",
     "bcryptjs": "^3.0.3",
+    "fast-xml-parser": "^5.7.3",
     "unix-crypt-td-js": "^1.1.4"
   }
 }

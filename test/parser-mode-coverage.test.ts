@@ -50,7 +50,7 @@ describe("upstream parser mode coverage", () => {
     expect(rendered("  preformatted")).toContain("<pre><code>preformatted</code></pre>");
     expect(rendered("> quote\n>> nested")).toContain("<blockquote><p>quote</p><blockquote>");
     expect(rendered('"quote"', { typographyMode: 1 })).toContain("“quote”");
-    expect(rendered("{{rss>https://example.com/feed}}")).not.toContain("<ul");
+    expect(rendered("{{rss>https://example.com/feed}}")).toContain('<ul class="rss">');
     expect(rendered(":-)")).toContain("/images/smileys/smile.svg");
     expect(rendered("^ Head ^\n| Cell |")).toContain("<table>");
     expect(rendered("%%**literal**%%")).toBe("<p>**literal**</p>");
