@@ -140,7 +140,7 @@ are not fixed by this checklist.
 - [x] Match upstream `autopasswd` registration behavior and generated-password emails.
 - [x] Match upstream `profileconfirm` behavior and all profile-delete flows from `ProfileDelete.php`.
 - [x] Implement or explicitly reject profile deletion with a DokuWiki-style UI.
-- [ ] Implement auth backend compatibility or sync bridges for `authad`, `authldap`, and `authpdo`.
+- [x] Implement auth backend compatibility or sync bridges for `authad`, `authldap`, and `authpdo`.
 - [ ] Match upstream user display modes from `showuseras`, including username, full name, email, and linked variants.
 - [ ] Match upstream auth token behavior from `Authtoken.php`.
 - [ ] Match upstream login, logout, register, resend password, reset password, denied, and locked page language text for all supported locales.

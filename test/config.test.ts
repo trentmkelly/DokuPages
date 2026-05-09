@@ -63,6 +63,9 @@ describe("runtime config", () => {
         media: null,
         windows: null
       },
+      externalAuthMode: "off",
+      externalAuthEmailHeader: "cf-access-authenticated-user-email",
+      externalAuthUsernameHeader: null,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -118,7 +121,10 @@ describe("runtime config", () => {
       TARGET_INTERWIKI: "_blank",
       TARGET_EXTERN: "_blank",
       TARGET_MEDIA: "_media",
-      TARGET_WINDOWS: "_windows"
+      TARGET_WINDOWS: "_windows",
+      EXTERNAL_AUTH_MODE: "cloudflare_access",
+      EXTERNAL_AUTH_EMAIL_HEADER: "X-Auth-Email",
+      EXTERNAL_AUTH_USERNAME_HEADER: "X-Auth-User"
     } as Env;
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
@@ -171,6 +177,9 @@ describe("runtime config", () => {
       media: "_media",
       windows: "_windows"
     });
+    expect(getRuntimeConfig(env).externalAuthMode).toBe("cloudflare_access");
+    expect(getRuntimeConfig(env).externalAuthEmailHeader).toBe("x-auth-email");
+    expect(getRuntimeConfig(env).externalAuthUsernameHeader).toBe("x-auth-user");
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -433,6 +442,9 @@ describe("runtime config", () => {
       DEACCENT: "3",
       FNENCODE: "base64",
       SEPCHAR: "/",
+      EXTERNAL_AUTH_MODE: "ldap",
+      EXTERNAL_AUTH_EMAIL_HEADER: "bad header",
+      EXTERNAL_AUTH_USERNAME_HEADER: "bad:header",
       API_BEARER_TOKEN: " "
     } as Env);
 
@@ -462,6 +474,9 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
         expect.objectContaining({ key: "FNENCODE", severity: "error" }),
         expect.objectContaining({ key: "SEPCHAR", severity: "error" }),
+        expect.objectContaining({ key: "EXTERNAL_AUTH_MODE", severity: "error" }),
+        expect.objectContaining({ key: "EXTERNAL_AUTH_EMAIL_HEADER", severity: "error" }),
+        expect.objectContaining({ key: "EXTERNAL_AUTH_USERNAME_HEADER", severity: "error" }),
         expect.objectContaining({ key: "API_BEARER_TOKEN", severity: "warning" })
       ])
     );

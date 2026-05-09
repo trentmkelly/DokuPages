@@ -14,9 +14,11 @@ const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
 const DEFAULT_SUPERUSER = "@admin";
 const DEFAULT_MANAGER = "@manager";
 const DEFAULT_CACHE_TIME = 60 * 60 * 24;
+const DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER = "cf-access-authenticated-user-email";
 const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const MEMBER_LIST_ENTRY = /^@?[^\s,]+$/;
+const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
 export interface RuntimeConfig {
   siteName: string;
@@ -60,6 +62,9 @@ export interface RuntimeConfig {
   searchFragment: "exact" | "starts_with" | "ends_with" | "contains";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
   linkTargets: RuntimeLinkTargets;
+  externalAuthMode: "off" | "cloudflare_access";
+  externalAuthEmailHeader: string;
+  externalAuthUsernameHeader: string | null;
   appVersion: string;
 }
 
@@ -162,6 +167,10 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
       media: normalizedLinkTarget(env.TARGET_MEDIA),
       windows: normalizedLinkTarget(env.TARGET_WINDOWS)
     },
+    externalAuthMode: externalAuthMode(env.EXTERNAL_AUTH_MODE),
+    externalAuthEmailHeader:
+      normalizedHeaderName(env.EXTERNAL_AUTH_EMAIL_HEADER) ?? DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER,
+    externalAuthUsernameHeader: normalizedHeaderName(env.EXTERNAL_AUTH_USERNAME_HEADER),
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -195,6 +204,9 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
   validateFnEncode(env.FNENCODE, issues);
   validateSepchar(env.SEPCHAR, issues);
+  validateExternalAuthMode(env.EXTERNAL_AUTH_MODE, issues);
+  validateHeaderName("EXTERNAL_AUTH_EMAIL_HEADER", env.EXTERNAL_AUTH_EMAIL_HEADER, issues);
+  validateHeaderName("EXTERNAL_AUTH_USERNAME_HEADER", env.EXTERNAL_AUTH_USERNAME_HEADER, issues);
   validateAppVersion(env.APP_VERSION, issues);
   validateApiBearerToken(env.API_BEARER_TOKEN, issues);
   validateEmailProvider(env.EMAIL_PROVIDER, issues);
@@ -272,6 +284,19 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("TARGET_EXTERN", env.TARGET_EXTERN, config.linkTargets.extern, null),
     configEntry("TARGET_MEDIA", env.TARGET_MEDIA, config.linkTargets.media, null),
     configEntry("TARGET_WINDOWS", env.TARGET_WINDOWS, config.linkTargets.windows, null),
+    configEntry("EXTERNAL_AUTH_MODE", env.EXTERNAL_AUTH_MODE, config.externalAuthMode, "off"),
+    configEntry(
+      "EXTERNAL_AUTH_EMAIL_HEADER",
+      env.EXTERNAL_AUTH_EMAIL_HEADER,
+      config.externalAuthEmailHeader,
+      DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER
+    ),
+    configEntry(
+      "EXTERNAL_AUTH_USERNAME_HEADER",
+      env.EXTERNAL_AUTH_USERNAME_HEADER,
+      config.externalAuthUsernameHeader,
+      null
+    ),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",
@@ -634,6 +659,39 @@ function validateSearchFragment(value: string | undefined, issues: ConfigValidat
   }
 }
 
+function validateExternalAuthMode(
+  value: string | undefined,
+  issues: ConfigValidationIssue[]
+): void {
+  const raw = nonEmpty(value);
+  if (!raw) return;
+
+  if (!["off", "cloudflare_access"].includes(raw.toLowerCase())) {
+    issues.push({
+      key: "EXTERNAL_AUTH_MODE",
+      severity: "error",
+      message: "EXTERNAL_AUTH_MODE must be 'off' or 'cloudflare_access'."
+    });
+  }
+}
+
+function validateHeaderName(
+  key: string,
+  value: string | undefined,
+  issues: ConfigValidationIssue[]
+): void {
+  const header = nonEmpty(value);
+  if (!header) return;
+
+  if (!HEADER_NAME.test(header)) {
+    issues.push({
+      key,
+      severity: "error",
+      message: `${key} must be a valid HTTP header name.`
+    });
+  }
+}
+
 function validateApiBearerToken(value: string | undefined, issues: ConfigValidationIssue[]): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
@@ -867,6 +925,16 @@ function rssMediaConfig(value: string | undefined): RuntimeConfig["rssMedia"] {
 function searchFragmentConfig(value: string | undefined): RuntimeConfig["searchFragment"] {
   const raw = nonEmpty(value);
   return raw === "starts_with" || raw === "ends_with" || raw === "contains" ? raw : "exact";
+}
+
+function externalAuthMode(value: string | undefined): RuntimeConfig["externalAuthMode"] {
+  const raw = nonEmpty(value)?.toLowerCase();
+  return raw === "cloudflare_access" ? "cloudflare_access" : "off";
+}
+
+function normalizedHeaderName(value: string | undefined): string | null {
+  const header = nonEmpty(value)?.toLowerCase();
+  return header && HEADER_NAME.test(header) ? header : null;
 }
 
 function integerConfig(

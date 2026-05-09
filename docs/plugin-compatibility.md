@@ -19,9 +19,9 @@ path.
 | `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                              |
 | `styling`      | Replaced by build-time theme assets and checked-in CSS; no runtime styling popup is loaded.           |
 | `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.                |
-| `authad`       | Deferred to an external identity or sync bridge.                                                      |
-| `authldap`     | Deferred to an external identity or sync bridge.                                                      |
-| `authpdo`      | Deferred to an external identity or sync bridge.                                                      |
+| `authad`       | Supported through the external auth sync bridge plus Cloudflare Access header auth.                   |
+| `authldap`     | Supported through the external auth sync bridge plus Cloudflare Access header auth.                   |
+| `authpdo`      | Supported through the external auth sync bridge plus Cloudflare Access header auth.                   |
 
 ## Extension API Boundary
 
@@ -34,7 +34,9 @@ Supported hook categories for launch:
 - Action hooks: none at runtime.
 - Syntax hooks: none at runtime; supported syntax is implemented in `src/wiki/render.ts`.
 - Renderer hooks: none at runtime.
-- Auth hooks: native `auth_event` handlers in `src/auth/events.ts`; external auth integrations must still be native modules or external identity bridges.
+- Auth hooks: native `auth_event` handlers in `src/auth/events.ts`; `authad`,
+  `authldap`, and `authpdo` compatibility uses the committed sync bridge and
+  Cloudflare Access header auth rather than PHP plugin hooks.
 - Admin hooks: none at runtime; admin features must be native routes.
 
 Future native extension modules need explicit packaging rules:

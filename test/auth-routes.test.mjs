@@ -940,6 +940,42 @@ describe("auth routes", () => {
     }
   });
 
+  it("resolves synced external users from Cloudflare Access headers", async () => {
+    env = createEnv({
+      EXTERNAL_AUTH_MODE: "cloudflare_access",
+      EXTERNAL_AUTH_EMAIL_HEADER: "CF-Access-Authenticated-User-Email"
+    });
+    await seedUser(env.DB, {
+      userId: "user-kiwi",
+      username: "kiwi",
+      password: "unused native password",
+      displayName: "Kiwi Example",
+      email: "kiwi@example.test",
+      groups: ["user", "ldap"]
+    });
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/auth/session", {
+        headers: {
+          "CF-Access-Authenticated-User-Email": "kiwi@example.test"
+        }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      principal: {
+        type: "user",
+        isAuthenticated: true,
+        username: "kiwi",
+        displayName: "Kiwi Example",
+        groups: ["ldap", "user"],
+        aclSubjects: ["@ALL", "@ldap", "@user", "kiwi"]
+      }
+    });
+  });
+
   it("keeps the native session ttl when upstream remember-me fields are submitted", async () => {
     env = createEnv();
     await seedUser(env.DB);

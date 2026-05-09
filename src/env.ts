@@ -51,6 +51,9 @@ export interface Env {
   TARGET_EXTERN?: string;
   TARGET_MEDIA?: string;
   TARGET_WINDOWS?: string;
+  EXTERNAL_AUTH_MODE?: string;
+  EXTERNAL_AUTH_EMAIL_HEADER?: string;
+  EXTERNAL_AUTH_USERNAME_HEADER?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

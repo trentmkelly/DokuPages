@@ -46,8 +46,6 @@ post-launch monitoring.
 - XML-RPC, JSON-RPC, and OpenAPI method compatibility: endpoints return explicit
   unsupported responses. Implement only if current clients require legacy remote
   method compatibility.
-- LDAP, Active Directory, and PDO auth backends: replace with an external
-  identity sync bridge or SSO path rather than runtime PHP auth plugins.
 - Runtime styling editor: build-time checked-in CSS replaces the DokuWiki
   styling plugin. Revisit only if operators need browser-based theme edits.
 

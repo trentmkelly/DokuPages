@@ -21,6 +21,9 @@ The long-term goal is a Pages-native implementation that preserves DokuWiki cont
 - Existing DokuWiki URLs must remain stable where they identify pages, media, revisions, feeds, or search.
 - Existing DokuWiki page IDs, media IDs, and namespace syntax are compatibility requirements for migration and redirects.
 - Plugin compatibility is not PHP runtime compatibility. Supported bundled plugin behavior will be reimplemented as native modules; arbitrary PHP plugin execution is out of scope for launch.
+- `authad`, `authldap`, and `authpdo` compatibility is provided by exporting
+  source users/groups into D1 and trusting Cloudflare Access identity headers,
+  not by loading the PHP auth plugins.
 - Admin UI compatibility is behavioral, not byte-for-byte HTML compatibility.
 - XML-RPC and JSON-RPC compatibility are post-MVP unless current users depend on them before launch.
 - The first deployment target is `pages.dev`; custom domains remain a deployment configuration task.
@@ -29,7 +32,7 @@ The long-term goal is a Pages-native implementation that preserves DokuWiki cont
 
 - Running PHP plugins directly.
 - Running DokuWiki's installer in production.
-- LDAP, Active Directory, and PDO auth backends.
+- Runtime execution of LDAP, Active Directory, and PDO PHP auth plugins.
 - ImageMagick-style server-side image conversion.
 - Extension manager installs from the production UI.
 

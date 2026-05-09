@@ -124,7 +124,7 @@ native replacements above are the compatibility surface.
 | ----------- | ------------------------------------------ | ------------------------------------------------------------------------- |
 | `action`    | Observe/modify request actions and output. | Native route code only; no runtime action plugins.                        |
 | `admin`     | Add admin pages.                           | Native admin routes; unsupported plugins appear in compatibility reports. |
-| `auth`      | Replace auth backend.                      | Native users/sessions plus future external identity bridges.              |
+| `auth`      | Replace auth backend.                      | Native users/sessions plus `authad`/`authldap`/`authpdo` sync bridge.     |
 | `cli`       | Add command-line commands.                 | npm scripts or operator scripts committed with the port.                  |
 | `helper`    | Provide PHP utility classes.               | Rewritten as TypeScript services when required by supported behavior.     |
 | `remote`    | Extend XML-RPC/JSON-RPC APIs.              | Deferred until legacy remote APIs are implemented natively.               |

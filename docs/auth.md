@@ -4,7 +4,12 @@ The native auth implementation is being built around Workers-compatible primitiv
 
 ## Supported Backends
 
-Launch auth will be a native D1-backed replacement for DokuWiki's `authplain` user model. LDAP, Active Directory, and PDO backends are not direct Pages runtime dependencies; they require a later import/sync bridge or an external identity layer such as Cloudflare Access.
+Launch auth is a native D1-backed replacement for DokuWiki's `authplain` user
+model. DokuWiki's bundled `authad`, `authldap`, and `authpdo` plugins are
+supported through an external sync bridge rather than runtime PHP plugin
+execution: operators export users and groups from the source backend, sync those
+records into D1, and authenticate requests through a trusted identity layer such
+as Cloudflare Access.
 
 ## Anonymous Requests
 
@@ -18,6 +23,41 @@ dashboard accept either `SUPERUSER` matches or `MANAGER` matches. The defaults
 preserve the native launch groups: `SUPERUSER=@admin` and `MANAGER=@manager`.
 Both variables accept comma-separated usernames and `@groups`, including
 `@ALL`, matching upstream member-list behavior.
+
+## External Auth Sync Bridge
+
+`scripts/sync-auth-bridge.mjs` accepts normalized user/group exports from
+`authad`, `authldap`, or `authpdo` and emits idempotent D1 SQL for the native
+`users`, `groups`, and `user_groups` tables.
+
+```json
+{
+  "backend": "authldap",
+  "users": [
+    {
+      "username": "kiwi",
+      "displayName": "Kiwi Example",
+      "email": "kiwi@example.test",
+      "groups": ["user", "staff"]
+    }
+  ]
+}
+```
+
+Generate and apply the SQL with:
+
+```sh
+npm run auth:sync:sql -- --input .wrangler/auth-bridge-users.json --sql-out .wrangler/auth-bridge-sync.sql
+npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/auth-bridge-sync.sql
+```
+
+Set `EXTERNAL_AUTH_MODE=cloudflare_access` to trust a Cloudflare Access identity
+header for request principals. The default email header is
+`CF-Access-Authenticated-User-Email`; override it with
+`EXTERNAL_AUTH_EMAIL_HEADER`. Set `EXTERNAL_AUTH_USERNAME_HEADER` only when the
+Access policy supplies a separate username header. The header identity must
+match a synced D1 user by email or username, and disabled D1 users remain
+blocked.
 
 ## Login Sessions
 

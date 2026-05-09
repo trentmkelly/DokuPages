@@ -21,6 +21,7 @@
     "import:hash-manifest": "node scripts/import-dokuwiki.mjs --source ../dokuwiki --dry-run --hash-manifest-out .wrangler/dokuwiki-hash-manifest.json",
     "import:verify-hashes": "node scripts/verify-import-hashes.mjs --manifest .wrangler/dokuwiki-hash-manifest.json --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
     "import:media-upload": "node scripts/upload-r2-media.mjs --manifest .wrangler/dokuwiki-media-manifest.json --bucket dokuwiki-pages-dev-media --remote",
+    "auth:sync:sql": "node scripts/sync-auth-bridge.mjs --input .wrangler/auth-bridge-users.json --sql-out .wrangler/auth-bridge-sync.sql",
     "limits:measure": "node scripts/measure-performance.mjs",
     "backup:export": "node scripts/export-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
     "backup:restore": "node scripts/restore-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",

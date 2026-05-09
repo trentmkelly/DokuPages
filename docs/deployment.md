@@ -94,6 +94,13 @@ Optional Pages environment variables:
   original URL like upstream DokuWiki.
 - `RSS_MEDIA`: controls whether recent-change feeds include `pages`, `media`,
   or `both`, matching DokuWiki's `rss_media` setting. Default: `both`.
+- `EXTERNAL_AUTH_MODE`: set to `cloudflare_access` to resolve request
+  principals from trusted Cloudflare Access headers after syncing users/groups
+  into D1. Default: `off`.
+- `EXTERNAL_AUTH_EMAIL_HEADER`: header used for external auth email matching.
+  Default: `CF-Access-Authenticated-User-Email`.
+- `EXTERNAL_AUTH_USERNAME_HEADER`: optional header used for external auth
+  username matching when the identity layer sends one separately.
 
 Cloudflare-provided variables such as `CF_PAGES_BRANCH`, `CF_PAGES_COMMIT_SHA`,
 and `CF_PAGES_URL` are read when available.
@@ -125,6 +132,14 @@ After a deployment, warm important rendered/discovery cache entries:
 
 ```sh
 npm run cache:warm -- --base-url https://dokutest.pages.dev
+```
+
+For `authad`, `authldap`, or `authpdo` migrations, generate a normalized
+manifest and apply the sync SQL before enabling `EXTERNAL_AUTH_MODE`:
+
+```sh
+npm run auth:sync:sql -- --input .wrangler/auth-bridge-users.json --sql-out .wrangler/auth-bridge-sync.sql
+npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/auth-bridge-sync.sql
 ```
 
 ## Deployment Decisions

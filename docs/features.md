@@ -17,6 +17,8 @@ of full PHP DokuWiki runtime compatibility.
   groups, native registration, DokuWiki-style generated registration passwords,
   profile updates, profile deletion, password changes, and emailed password
   resets.
+- `authad`, `authldap`, and `authpdo` user/group compatibility through an
+  operator-run D1 sync bridge and Cloudflare Access header authentication.
 - DokuWiki-style ACL matching for pages, namespaces, media reads, uploads, deletes, aggregate views, feeds, search, and admin routes.
 - Native renderer coverage for headings, paragraphs, inline formatting, links,
   imported interwiki and external-link scheme rules, media embeds, lists,
@@ -47,7 +49,8 @@ of full PHP DokuWiki runtime compatibility.
 
 - Running PHP, arbitrary DokuWiki PHP plugins, or the DokuWiki installer in production.
 - Production extension-manager installs and plugin code uploads.
-- LDAP, Active Directory, and PDO auth backends at runtime.
+- Runtime execution of DokuWiki's PHP LDAP, Active Directory, and PDO auth
+  plugins. Use the native sync bridge plus Cloudflare Access instead.
 - XML-RPC, JSON-RPC, and OpenAPI method compatibility.
 - Full ImageMagick/GD feature parity beyond Photon-backed PNG/JPEG/WebP resize and crop derivatives.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
@@ -73,4 +76,5 @@ PHP modules to execute. Current decisions:
 - `styling`: build-time checked-in theme CSS; runtime styling editor is not
   loaded on Pages.
 - `usermanager`: replaced by native `/admin/users` user management.
-- `authad`, `authldap`, `authpdo`: deferred to external identity/sync bridges.
+- `authad`, `authldap`, `authpdo`: supported through the external auth sync
+  bridge and Cloudflare Access header authentication.
