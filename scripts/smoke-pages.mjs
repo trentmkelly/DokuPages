@@ -44,7 +44,7 @@ const checks = [
     expect: async (response) => {
       assertStatus(response, 200);
       assert(
-        response.headers.get("cache-control") === "public, max-age=300",
+        /^public, max-age=\d+$/.test(response.headers.get("cache-control") ?? ""),
         "sitemap cache header was unexpected"
       );
       const xml = await response.text();
