@@ -19,15 +19,20 @@ Current counts:
 
 | Status                      | Count |
 | --------------------------- | ----: |
-| `implemented`               |    69 |
+| `implemented`               |    71 |
 | `imported_metadata_only`    |     6 |
 | `intentionally_unsupported` |    31 |
-| `not_yet_evaluated`         |     9 |
+| `not_yet_evaluated`         |     7 |
 
 Remaining not-yet-evaluated settings are `securecookie`, `samesitecookie`,
-`remote`, `remoteuser`, `remotecors`, `usewordblock`, `mailguard`,
-`trustedproxies`, and `realip`.
+`remote`, `remoteuser`, `remotecors`, `usewordblock`, and `mailguard`.
 
 `updatecheck` is implemented as a fixed Pages policy: upstream DokuWiki update
 notices are not fetched or rendered, because code updates are deployed through
 git and Cloudflare Pages instead of PHP runtime self-update flows.
+
+`trustedproxies` and `realip` are implemented as client-IP fallback policy. The
+Pages runtime always prefers Cloudflare's `CF-Connecting-IP` header when present;
+`REALIP` enables `X-Real-IP` only when that Cloudflare header is absent, and
+`TRUSTEDPROXIES` enables `X-Forwarded-For` only when the listed proxy hops match
+trusted IP/CIDR entries.

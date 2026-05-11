@@ -19,10 +19,10 @@ describe("DokuWiki config coverage map", () => {
     expect(DOKUWIKI_CONFIG_COVERAGE).toHaveLength(115);
     expect(DOKUWIKI_CONFIG_COVERAGE.every((entry) => Boolean(entry.status))).toBe(true);
     expect(configCoverageCounts()).toEqual({
-      implemented: 69,
+      implemented: 71,
       imported_metadata_only: 6,
       intentionally_unsupported: 31,
-      not_yet_evaluated: 9
+      not_yet_evaluated: 7
     });
   });
 
@@ -31,8 +31,10 @@ describe("DokuWiki config coverage map", () => {
     expect(coverageStatusForDokuWikiConfigKey("useacl")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("rss_type")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("updatecheck")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("trustedproxies")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("realip")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("savedir")).toBe("intentionally_unsupported");
-    expect(coverageStatusForDokuWikiConfigKey("trustedproxies")).toBe("not_yet_evaluated");
+    expect(coverageStatusForDokuWikiConfigKey("securecookie")).toBe("not_yet_evaluated");
   });
 });
 

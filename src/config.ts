@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { isValidIpOrCidr } from "./http/client-ip";
 import { APP_VERSION } from "./version";
 import {
   isSupportedLanguage,
@@ -26,6 +27,14 @@ const DEFAULT_SUPERUSER = "@admin";
 const DEFAULT_MANAGER = "@manager";
 const DEFAULT_CACHE_TIME = 60 * 60 * 24;
 const DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER = "cf-access-authenticated-user-email";
+const DEFAULT_TRUSTED_PROXIES = [
+  "::1",
+  "fe80::/10",
+  "127.0.0.0/8",
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16"
+] as const;
 const COOKIE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const EMAIL_ADDRESS = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const MEMBER_LIST_ENTRY = /^@?[^\s,]+$/;
@@ -92,6 +101,8 @@ export interface RuntimeConfig {
   rssShowDeleted: boolean;
   sitemapDays: number;
   updateCheck: boolean;
+  trustedProxies: string[];
+  realIp: boolean;
   searchNsLimit: number;
   searchFragment: "exact" | "starts_with" | "ends_with" | "contains";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
@@ -209,6 +220,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     rssShowDeleted: booleanConfig(env.RSS_SHOW_DELETED, true),
     sitemapDays: integerConfig(env.SITEMAP, 1, 0, 3650),
     updateCheck: false,
+    trustedProxies: trustedProxiesConfig(env.TRUSTEDPROXIES),
+    realIp: booleanConfig(env.REALIP, false),
     searchNsLimit: integerConfig(env.SEARCH_NSLIMIT, 0, 0, 99),
     searchFragment: searchFragmentConfig(env.SEARCH_FRAGMENT),
     pageIdCleanOptions,
@@ -262,6 +275,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("RSS_UPDATE", env.RSS_UPDATE, 0, 24 * 60 * 60, issues);
   validateIntegerRange("SITEMAP", env.SITEMAP, 0, 3650, issues);
   validateUpdateCheckConfig(env, issues);
+  validateTrustedProxies(env.TRUSTEDPROXIES, issues);
   validateIntegerRange("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, 0, 99, issues);
   validateSearchFragment(env.SEARCH_FRAGMENT, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
@@ -364,6 +378,13 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("RSS_SHOW_DELETED", env.RSS_SHOW_DELETED, String(config.rssShowDeleted), "true"),
     configEntry("SITEMAP", env.SITEMAP, String(config.sitemapDays), "1"),
     configEntry("UPDATECHECK", env.UPDATECHECK, String(config.updateCheck), "false"),
+    configEntry(
+      "TRUSTEDPROXIES",
+      env.TRUSTEDPROXIES,
+      config.trustedProxies.join(","),
+      DEFAULT_TRUSTED_PROXIES.join(",")
+    ),
+    configEntry("REALIP", env.REALIP, String(config.realIp), "false"),
     configEntry("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, String(config.searchNsLimit), "0"),
     configEntry("SEARCH_FRAGMENT", env.SEARCH_FRAGMENT, config.searchFragment, "exact"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
@@ -936,7 +957,8 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "HTMLMAIL",
   "RSS_SHOW_SUMMARY",
   "RSS_SHOW_DELETED",
-  "UPDATECHECK"
+  "UPDATECHECK",
+  "REALIP"
 ] as const satisfies readonly (keyof Env)[];
 
 function validateMetadataBackedRuntimeConfig(env: Env, issues: ConfigValidationIssue[]): void {
@@ -966,6 +988,18 @@ function validateUpdateCheckConfig(env: Env, issues: ConfigValidationIssue[]): v
     severity: "warning",
     message:
       "DokuWiki update notices are intentionally disabled in the Pages runtime; deploy updates through git and Cloudflare Pages."
+  });
+}
+
+function validateTrustedProxies(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  if (value === undefined || !nonEmpty(value)) return;
+  const invalid = trustedProxiesConfig(value).filter((entry) => !isValidIpOrCidr(entry));
+  if (invalid.length === 0) return;
+
+  issues.push({
+    key: "TRUSTEDPROXIES",
+    severity: "error",
+    message: `TRUSTEDPROXIES contains invalid IP or CIDR entries: ${invalid.join(", ")}.`
   });
 }
 
@@ -1137,6 +1171,17 @@ function booleanConfig(value: string | undefined, fallback: boolean): boolean {
     return false;
   }
   return fallback;
+}
+
+function trustedProxiesConfig(value: string | undefined): string[] {
+  const configured = nonEmpty(value);
+  if (configured === undefined) return [...DEFAULT_TRUSTED_PROXIES];
+  if (["0", "false", "off", "none"].includes(configured.toLowerCase())) return [];
+
+  return configured
+    .split(/[\s,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function runtimePageIdCleanOptions(env: Env): RuntimePageIdCleanOptions {

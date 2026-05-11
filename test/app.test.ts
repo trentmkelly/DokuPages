@@ -146,6 +146,8 @@ describe("handleRequest", () => {
     env.RSS_SHOW_DELETED = undefined;
     env.SITEMAP = undefined;
     env.UPDATECHECK = undefined;
+    env.TRUSTEDPROXIES = undefined;
+    env.REALIP = undefined;
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
@@ -3637,6 +3639,29 @@ describe("handleRequest", () => {
     expect(purgedKeys).toContain("discovery:sitemap:https://example.com/sitemap.xml");
     expect(purgedKeys).toContain("discovery:rss:https://example.com/feed.php?view=media");
     expect(purgedKeys).toContain("discovery:atom:https://example.com/atom.xml");
+  });
+
+  it("honors REALIP for saved page change IPs when Cloudflare headers are absent", async () => {
+    env.REALIP = "1";
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Real IP ======\n\nChanged.");
+    form.set("summary", "Updated page");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ "x-real-ip": "198.51.100.44" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(state.changelog[0]).toMatchObject({
+      ip: "198.51.100.44"
+    });
   });
 
   it("rate limits repeated page edit attempts before saving", async () => {

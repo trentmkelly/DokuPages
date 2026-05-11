@@ -142,6 +142,14 @@ Optional Pages environment variables:
   value produces a configuration warning instead of fetching or rendering
   `update.dokuwiki.org` messages. Update the port through git and Cloudflare
   Pages deployments.
+- `TRUSTEDPROXIES`: comma- or whitespace-separated IP/CIDR list matching
+  DokuWiki's `trustedproxies`. Default:
+  `::1,fe80::/10,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`.
+  Cloudflare's `CF-Connecting-IP` header remains the preferred Pages source;
+  this list is used only as a fallback for `X-Forwarded-For` chains when the
+  Cloudflare header is absent.
+- `REALIP`: set to `1` to allow `X-Real-IP` as a fallback client IP when
+  `CF-Connecting-IP` is absent. Default: disabled, matching upstream.
 - `EXTERNAL_AUTH_MODE`: set to `cloudflare_access` to resolve request
   principals from trusted Cloudflare Access headers after syncing users/groups
   into D1. Default: `off`.

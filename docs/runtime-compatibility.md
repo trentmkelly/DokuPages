@@ -140,6 +140,16 @@ Pages port deliberately does not fetch or render those PHP runtime notices.
 runtime policy remains disabled and validation warns operators to update through
 git-reviewed Cloudflare Pages deployments.
 
+## Proxy And Client IP Policy
+
+Cloudflare Pages does not expose PHP's `REMOTE_ADDR`. The native client-IP
+policy therefore prefers Cloudflare's trusted `CF-Connecting-IP` header. When
+that header is absent, `REALIP=1` enables the DokuWiki `X-Real-IP` fallback, and
+`TRUSTEDPROXIES` enables `X-Forwarded-For` only when each listed proxy hop is in
+the configured IP/CIDR allowlist. DokuWiki's outbound `proxy.*` settings remain
+intentionally unsupported because Workers `fetch` does not route through an
+operator-specified HTTP proxy.
+
 ## Farm And Multi-Wiki Decision
 
 Upstream `inc/farm.php` supports named and virtual animals by changing config

@@ -69,6 +69,15 @@ describe("runtime config", () => {
       rssShowDeleted: true,
       sitemapDays: 1,
       updateCheck: false,
+      trustedProxies: [
+        "::1",
+        "fe80::/10",
+        "127.0.0.0/8",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16"
+      ],
+      realIp: false,
       searchNsLimit: 0,
       searchFragment: "exact",
       pageIdCleanOptions: {
@@ -148,6 +157,8 @@ describe("runtime config", () => {
       RSS_SHOW_SUMMARY: "0",
       RSS_SHOW_DELETED: "0",
       SITEMAP: "7",
+      TRUSTEDPROXIES: "203.0.113.0/24, 2001:db8::/32",
+      REALIP: "1",
       SEARCH_NSLIMIT: "2",
       SEARCH_FRAGMENT: "contains",
       DEACCENT: "2",
@@ -215,6 +226,8 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).rssShowSummary).toBe(false);
     expect(getRuntimeConfig(env).rssShowDeleted).toBe(false);
     expect(getRuntimeConfig(env).sitemapDays).toBe(7);
+    expect(getRuntimeConfig(env).trustedProxies).toEqual(["203.0.113.0/24", "2001:db8::/32"]);
+    expect(getRuntimeConfig(env).realIp).toBe(true);
     expect(getRuntimeConfig(env).searchNsLimit).toBe(2);
     expect(getRuntimeConfig(env).searchFragment).toBe("contains");
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
@@ -477,6 +490,16 @@ describe("runtime config", () => {
           dokuwikiKey: "updatecheck"
         }),
         expect.objectContaining({
+          key: "TRUSTEDPROXIES",
+          effectiveValue: "::1,fe80::/10,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+          dokuwikiKey: "trustedproxies"
+        }),
+        expect.objectContaining({
+          key: "REALIP",
+          effectiveValue: "false",
+          dokuwikiKey: "realip"
+        }),
+        expect.objectContaining({
           key: "DEACCENT",
           effectiveValue: "1"
         }),
@@ -589,7 +612,16 @@ describe("runtime config", () => {
         recentEntries: 20,
         recentDays: 7,
         signature: " --- //[[@MAIL@|@NAME@]] @DATE@//",
-        updateCheck: false
+        updateCheck: false,
+        trustedProxies: [
+          "::1",
+          "fe80::/10",
+          "127.0.0.0/8",
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16"
+        ],
+        realIp: false
       },
       variables: expect.arrayContaining([
         expect.objectContaining({
@@ -635,6 +667,8 @@ describe("runtime config", () => {
       RSS_SHOW_DELETED: "maybe",
       SITEMAP: "-1",
       UPDATECHECK: "maybe",
+      TRUSTEDPROXIES: "10.0.0.0/33,not-an-ip",
+      REALIP: "maybe",
       SEARCH_NSLIMIT: "-1",
       SEARCH_FRAGMENT: "middle",
       DEACCENT: "3",
@@ -681,6 +715,8 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "RSS_SHOW_DELETED", severity: "error" }),
         expect.objectContaining({ key: "SITEMAP", severity: "error" }),
         expect.objectContaining({ key: "UPDATECHECK", severity: "error" }),
+        expect.objectContaining({ key: "TRUSTEDPROXIES", severity: "error" }),
+        expect.objectContaining({ key: "REALIP", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_NSLIMIT", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_FRAGMENT", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),

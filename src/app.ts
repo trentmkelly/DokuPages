@@ -1971,7 +1971,7 @@ async function handleNativeApiPageWrite(
     changeType: body.value.minor ? "minor" : undefined,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request),
+    ip: requestClientIp(request, env),
     language: getRuntimeConfig(env).language
   });
 
@@ -2023,7 +2023,7 @@ async function handleNativeApiPageRevert(
     changeType: "revert",
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request),
+    ip: requestClientIp(request, env),
     language: getRuntimeConfig(env).language
   });
 
@@ -2157,7 +2157,7 @@ async function handleNativeApiMediaUpload(
     mediaRevisions: config.mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   });
 
   if (!result.ok) {
@@ -2212,7 +2212,7 @@ async function handleNativeApiMediaDelete(
     mediaRevisions: getRuntimeConfig(env).mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   });
 
   if (!result.ok) {
@@ -2256,7 +2256,7 @@ async function handleNativeApiMediaRevert(
     summary: String(body.value.summary ?? ""),
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   });
 
   if (!result.ok) {
@@ -8442,7 +8442,7 @@ async function executeRevertManagerBatch(
       changeType: restoreRevision ? "revert" : "delete",
       authorId: author.authorId,
       authorName: author.authorName,
-      ip: getClientIp(request),
+      ip: requestClientIp(request, env),
       language: getRuntimeConfig(env).language
     });
 
@@ -8549,7 +8549,7 @@ async function appendAdminAuditLog(
     ...entry.details,
     actorUsername: principal.username,
     actorDisplayName: principal.displayName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   };
 
   await new D1AuditLogStore(env.DB).appendEntry({
@@ -8952,14 +8952,14 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
   const rateLimited = await loginRateLimitResponse(request, env, username, returnTo, csrf);
   if (rateLimited) {
-    logAuthEvent(request, "login_rate_limited", { username });
+    logAuthEvent(request, env, "login_rate_limited", { username });
     return rateLimited;
   }
 
   const user = await authenticateUser(env.DB, username, password);
   if (!user) {
     await recordLoginFailure(request, env, username);
-    logAuthEvent(request, "login_failure", { username });
+    logAuthEvent(request, env, "login_failure", { username });
     return htmlResponseWithCsrf(
       request,
       renderLoginPage(env, url, localizedAuthText(env, "badlogin"), returnTo, csrf.token),
@@ -8970,7 +8970,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
   await clearLoginFailures(request, env, username);
   const session = await createLoginSession(env.DB, user.id);
-  logAuthEvent(request, "login_success", {
+  logAuthEvent(request, env, "login_success", {
     userId: user.id,
     username: user.username
   });
@@ -9295,7 +9295,7 @@ async function readLoginFailureCount(
   env: Env,
   username: string
 ): Promise<number> {
-  const raw = await env.RENDER_CACHE.get(loginRateLimitKey(request, username));
+  const raw = await env.RENDER_CACHE.get(loginRateLimitKey(request, env, username));
   if (!raw) return 0;
 
   const parsed = Number.parseInt(raw, 10);
@@ -9303,7 +9303,7 @@ async function readLoginFailureCount(
 }
 
 async function recordLoginFailure(request: Request, env: Env, username: string): Promise<void> {
-  const key = loginRateLimitKey(request, username);
+  const key = loginRateLimitKey(request, env, username);
   const attempts = (await readLoginFailureCount(request, env, username)) + 1;
   await env.RENDER_CACHE.put(key, String(attempts), {
     expirationTtl: LOGIN_RATE_LIMIT_WINDOW_SECONDS
@@ -9311,11 +9311,11 @@ async function recordLoginFailure(request: Request, env: Env, username: string):
 }
 
 async function clearLoginFailures(request: Request, env: Env, username: string): Promise<void> {
-  await env.RENDER_CACHE.delete(loginRateLimitKey(request, username));
+  await env.RENDER_CACHE.delete(loginRateLimitKey(request, env, username));
 }
 
-function loginRateLimitKey(request: Request, username: string): string {
-  const client = getClientIp(request) ?? "unknown";
+function loginRateLimitKey(request: Request, env: Env, username: string): string {
+  const client = requestClientIp(request, env) ?? "unknown";
   return `auth:login:${client}:${encodeURIComponent(username.toLowerCase()).slice(0, 128)}`;
 }
 
@@ -9350,7 +9350,7 @@ async function readEditAttemptCount(
   env: Env,
   principal: AuthPrincipal
 ): Promise<number> {
-  const raw = await env.RENDER_CACHE.get(editRateLimitKey(request, principal));
+  const raw = await env.RENDER_CACHE.get(editRateLimitKey(request, env, principal));
   if (!raw) return 0;
 
   const parsed = Number.parseInt(raw, 10);
@@ -9362,15 +9362,15 @@ async function recordEditAttempt(
   env: Env,
   principal: AuthPrincipal
 ): Promise<void> {
-  const key = editRateLimitKey(request, principal);
+  const key = editRateLimitKey(request, env, principal);
   const attempts = (await readEditAttemptCount(request, env, principal)) + 1;
   await env.RENDER_CACHE.put(key, String(attempts), {
     expirationTtl: EDIT_RATE_LIMIT_WINDOW_SECONDS
   });
 }
 
-function editRateLimitKey(request: Request, principal: AuthPrincipal): string {
-  const client = getClientIp(request) ?? "unknown";
+function editRateLimitKey(request: Request, env: Env, principal: AuthPrincipal): string {
+  const client = requestClientIp(request, env) ?? "unknown";
   const actor = principal.type === "user" ? `user:${principal.id}` : "anonymous";
   return `page:edit:${client}:${encodeURIComponent(actor).slice(0, 160)}`;
 }
@@ -9406,7 +9406,7 @@ async function readUploadAttemptCount(
   env: Env,
   principal: AuthPrincipal
 ): Promise<number> {
-  const raw = await env.RENDER_CACHE.get(uploadRateLimitKey(request, principal));
+  const raw = await env.RENDER_CACHE.get(uploadRateLimitKey(request, env, principal));
   if (!raw) return 0;
 
   const parsed = Number.parseInt(raw, 10);
@@ -9418,15 +9418,15 @@ async function recordUploadAttempt(
   env: Env,
   principal: AuthPrincipal
 ): Promise<void> {
-  const key = uploadRateLimitKey(request, principal);
+  const key = uploadRateLimitKey(request, env, principal);
   const attempts = (await readUploadAttemptCount(request, env, principal)) + 1;
   await env.RENDER_CACHE.put(key, String(attempts), {
     expirationTtl: UPLOAD_RATE_LIMIT_WINDOW_SECONDS
   });
 }
 
-function uploadRateLimitKey(request: Request, principal: AuthPrincipal): string {
-  const client = getClientIp(request) ?? "unknown";
+function uploadRateLimitKey(request: Request, env: Env, principal: AuthPrincipal): string {
+  const client = requestClientIp(request, env) ?? "unknown";
   const actor = principal.type === "user" ? `user:${principal.id}` : "anonymous";
   return `media:upload:${client}:${encodeURIComponent(actor).slice(0, 160)}`;
 }
@@ -9444,7 +9444,7 @@ async function handleLogout(
   const cookieName = getRuntimeConfig(env).sessionCookieName;
 
   await deleteLoginSession(env.DB, readCookie(request, cookieName));
-  logAuthEvent(request, "logout", {
+  logAuthEvent(request, env, "logout", {
     userId: principal.id,
     username: principal.username
   });
@@ -9552,7 +9552,7 @@ async function handleProfileUpdate(
     await deleteOtherLoginSessions(request, env, principal.id);
   }
 
-  logAuthEvent(request, "profile_update", {
+  logAuthEvent(request, env, "profile_update", {
     userId: principal.id,
     username: principal.username,
     displayNameChanged: changes.displayNameChanged,
@@ -9865,7 +9865,7 @@ async function handleProfileDelete(
 
   await deleteProfileUserRows(env, principal.id);
 
-  logAuthEvent(request, "profile_delete", {
+  logAuthEvent(request, env, "profile_delete", {
     userId: principal.id,
     username: principal.username
   });
@@ -9973,8 +9973,17 @@ function sessionIdFromCookie(value: string | null): string | null {
   return value?.split(".")[0] || null;
 }
 
+function requestClientIp(request: Request, env: Env): string | null {
+  const config = getRuntimeConfig(env);
+  return getClientIp(request, {
+    realIp: config.realIp,
+    trustedProxies: config.trustedProxies
+  });
+}
+
 function logAuthEvent(
   request: Request,
+  env: Env,
   authEvent: AuthEventName,
   details: Record<string, unknown>
 ): void {
@@ -9987,7 +9996,7 @@ function logAuthEvent(
     requestId: request.headers.get("cf-ray") ?? request.headers.get("x-request-id") ?? null,
     method: request.method,
     path: url.pathname,
-    ip: getClientIp(request),
+    ip: requestClientIp(request, env),
     ...details
   });
 }
@@ -10248,8 +10257,8 @@ async function sendRegistrationNotifications(
     email: user.email,
     date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date()),
     browser: request.headers.get("user-agent") ?? "",
-    ipAddress: getClientIp(request) ?? "",
-    hostname: getClientIp(request) ?? ""
+    ipAddress: requestClientIp(request, env) ?? "",
+    hostname: requestClientIp(request, env) ?? ""
   });
 
   await sendWikiEmail(env, {
@@ -10497,8 +10506,8 @@ async function recordAndSendPageChangeNotifications(
       summary,
       date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(page.updatedAt)),
       browser: request.headers.get("user-agent") ?? "",
-      ipAddress: getClientIp(request) ?? "",
-      hostname: getClientIp(request) ?? "",
+      ipAddress: requestClientIp(request, env) ?? "",
+      hostname: requestClientIp(request, env) ?? "",
       newRevision: page.revisionId
     });
 
@@ -10520,8 +10529,8 @@ async function recordAndSendPageChangeNotifications(
       summary,
       date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(page.updatedAt)),
       browser: request.headers.get("user-agent") ?? "",
-      ipAddress: getClientIp(request) ?? "",
-      hostname: getClientIp(request) ?? "",
+      ipAddress: requestClientIp(request, env) ?? "",
+      hostname: requestClientIp(request, env) ?? "",
       newRevision: page.revisionId
     });
     const result = await sendWikiEmail(env, {
@@ -10558,8 +10567,8 @@ async function sendMediaChangeNotifications(
     byteLength: revision.byteLength,
     date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(revision.createdAt)),
     browser: request.headers.get("user-agent") ?? "",
-    ipAddress: getClientIp(request) ?? "",
-    hostname: getClientIp(request) ?? ""
+    ipAddress: requestClientIp(request, env) ?? "",
+    hostname: requestClientIp(request, env) ?? ""
   });
 
   await sendWikiEmail(env, {
@@ -11818,7 +11827,7 @@ async function handleSave(
     changeType: form.get("minor") ? "minor" : undefined,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request),
+    ip: requestClientIp(request, env),
     language: getRuntimeConfig(env).language
   });
 
@@ -11933,7 +11942,7 @@ async function handleMediaUpload(
     mediaRevisions: config.mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   });
 
   if (!result.ok) {
@@ -11998,7 +12007,7 @@ async function handleMediaDelete(
     mediaRevisions: getRuntimeConfig(env).mediaRevisions,
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   });
 
   if (!result.ok) {
@@ -12125,7 +12134,7 @@ async function handleMediaRevert(
     summary: String(form.get("summary") ?? ""),
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request)
+    ip: requestClientIp(request, env)
   });
 
   if (!result.ok) {
@@ -12212,7 +12221,7 @@ async function handleRevert(
     changeType: "revert",
     authorId: author.authorId,
     authorName: author.authorName,
-    ip: getClientIp(request),
+    ip: requestClientIp(request, env),
     language: getRuntimeConfig(env).language
   });
 
@@ -12335,7 +12344,7 @@ async function ensurePageEditLock(
     return { ok: true, lock: null };
   }
 
-  const owner = pageLockOwner(principal, request);
+  const owner = pageLockOwner(principal, request, env);
   const lockRequest: PageLockRequest = {
     subjectType: "page",
     subjectId: id,
@@ -13216,7 +13225,8 @@ function lockMinutesRemaining(expiresAt: string): number {
 
 function pageLockOwner(
   principal: AuthPrincipal,
-  request?: Request
+  request?: Request,
+  env?: Env
 ): { ownerId: string; ownerName: string } {
   if (principal.type === "user") {
     return {
@@ -13225,7 +13235,7 @@ function pageLockOwner(
     };
   }
 
-  const ip = request ? getClientIp(request) : null;
+  const ip = request && env ? requestClientIp(request, env) : null;
 
   return {
     ownerId: ip ? `anonymous:${ip}` : "anonymous",

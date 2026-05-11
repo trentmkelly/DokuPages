@@ -195,6 +195,8 @@ const IMPLEMENTED = new Set<string>([
   "fnencode",
   "autoplural",
   "send404",
+  "trustedproxies",
+  "realip",
   "search_nslimit",
   "search_fragment"
 ]);

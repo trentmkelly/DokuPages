@@ -1,4 +1,5 @@
 import type { Env } from "../env";
+import { getRuntimeConfig } from "../config";
 import { getClientIp } from "../http/client-ip";
 
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -53,6 +54,7 @@ export async function verifyTurnstileForm(
     return failedVerification(["missing-input-response"]);
   }
 
+  const runtimeConfig = getRuntimeConfig(env);
   try {
     const response = await fetcher(SITEVERIFY_URL, {
       method: "POST",
@@ -62,7 +64,11 @@ export async function verifyTurnstileForm(
       body: JSON.stringify({
         secret: config.secretKey,
         response: token,
-        remoteip: getClientIp(request) ?? undefined,
+        remoteip:
+          getClientIp(request, {
+            realIp: runtimeConfig.realIp,
+            trustedProxies: runtimeConfig.trustedProxies
+          }) ?? undefined,
         idempotency_key: crypto.randomUUID()
       })
     });

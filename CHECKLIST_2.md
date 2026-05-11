@@ -183,7 +183,7 @@ are not fixed by this checklist.
 - [x] Support `rss_type`, `rss_linkto`, `rss_content`, `rss_media`, `rss_show_summary`, and `rss_show_deleted`.
 - [x] Support `sitemap` frequency instead of always exposing sitemap output.
 - [x] Support `updatecheck` or explicitly remove update notices from the UI.
-- [ ] Support `trustedproxies`, `realip`, and proxy config semantics where they differ from Cloudflare header handling.
+- [x] Support `trustedproxies`, `realip`, and proxy config semantics where they differ from Cloudflare header handling.
 - [ ] Support custom language files imported from `conf/lang` at runtime instead of storing them only as metadata.
 - [ ] Port upstream language pack strings for supported locales beyond the current native English UI.
 - [ ] Match upstream date, time, byte-size, and number formatting rules, including locale effects.
