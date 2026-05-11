@@ -7,3 +7,7 @@ URL:        http://pc.de/icons/#Dusseldorf
 Icons for:  error.png, info.png, notify.png, success.png
 Source:     DokuWiki lib/images
 License:    GNU GPL v2, matching the upstream DokuWiki distribution
+
+Icons for:  acl/ns.png, acl/page.png, acl/user.png, acl/group.png
+Source:     DokuWiki bundled ACL plugin pix
+License:    GNU GPL v2, matching the upstream DokuWiki distribution

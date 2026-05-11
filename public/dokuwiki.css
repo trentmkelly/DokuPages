@@ -979,6 +979,160 @@ form.search button {
   border-bottom-right-radius: 4px;
 }
 
+#acl_manager form {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#acl__tree {
+  float: left;
+  width: 25%;
+  height: 300px;
+  overflow: auto;
+  border: 1px solid var(--dw-border);
+  text-align: left;
+  font-size: 90%;
+}
+
+#acl__tree a.cur {
+  background-color: var(--dw-highlight);
+  font-weight: bold;
+}
+
+#acl__tree ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+#acl__tree li {
+  padding-left: 1em;
+  list-style-image: none;
+}
+
+#acl__tree .acl__toggle {
+  display: inline-block;
+  width: 1em;
+  margin-right: 0.25em;
+  color: var(--dw-text-neutral);
+}
+
+#acl__detail {
+  float: right;
+  width: 73%;
+  height: 300px;
+  overflow: auto;
+}
+
+#acl__detail fieldset {
+  width: 90%;
+  margin: 0.8em 0 0;
+  padding: 0.8em 1em 1em;
+  border: 1px solid var(--dw-border);
+}
+
+#acl__detail div#acl__user {
+  margin-bottom: 0.6em;
+  padding: 0.5em;
+  border: 1px solid var(--dw-border);
+}
+
+#acl_manager select.edit,
+#acl_manager input.edit {
+  width: auto;
+  max-width: 16em;
+  padding: 0.2em 0.3em;
+}
+
+#acl_manager table.inline {
+  width: 100%;
+  margin: 0;
+}
+
+#acl_manager table .check {
+  text-align: center;
+}
+
+#acl_manager table tr {
+  background-color: inherit;
+}
+
+#acl_manager table tr:hover {
+  background-color: var(--dw-background-alt);
+}
+
+#acl_manager .aclgroup,
+#acl_manager .acluser,
+#acl_manager .aclpage,
+#acl_manager .aclns {
+  padding: 1px 0 1px 18px;
+  background-color: transparent;
+  background-position: 0 1px;
+  background-repeat: no-repeat;
+}
+
+#acl_manager .aclgroup {
+  background-image: url("/images/acl/group.png");
+}
+
+#acl_manager .acluser {
+  background-image: url("/images/acl/user.png");
+}
+
+#acl_manager .aclpage {
+  background-image: url("/images/acl/page.png");
+}
+
+#acl_manager .aclns {
+  background-image: url("/images/acl/ns.png");
+}
+
+#acl_manager label {
+  display: inline;
+  margin-right: 0.8em;
+  color: var(--dw-text);
+  font-weight: normal;
+  text-align: left;
+}
+
+#acl_manager label.disabled {
+  cursor: auto;
+  opacity: 0.5;
+}
+
+#acl_manager .acl__rules button {
+  margin: 0;
+}
+
+[dir="rtl"] #acl__tree {
+  float: right;
+  text-align: right;
+}
+
+[dir="rtl"] #acl__tree li {
+  padding-right: 1em;
+  padding-left: 0;
+}
+
+[dir="rtl"] #acl__tree .acl__toggle {
+  margin-right: 0;
+  margin-left: 0.25em;
+}
+
+[dir="rtl"] #acl__detail {
+  float: left;
+}
+
+[dir="rtl"] #acl_manager .aclgroup,
+[dir="rtl"] #acl_manager .acluser,
+[dir="rtl"] #acl_manager .aclpage,
+[dir="rtl"] #acl_manager .aclns {
+  padding: 1px 18px 1px 0;
+  background-position: right 1px;
+}
+
 .dokuwiki div.preview {
   margin-bottom: 1.4em;
   padding: 1.4em 0;

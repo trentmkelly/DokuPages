@@ -5905,50 +5905,63 @@ async function renderAclAdminPage(
     return adminDeniedResponse(request, env);
   }
 
-  const rules = await listAclRules(env);
+  const url = new URL(request.url);
+  const rules = sortAclRules(await listAclRules(env));
+  const selection = aclSelectionFromUrl(env, url);
+  const selectedPrincipal = aclPrincipalSelectionFromUrl(env, url);
+  const exactRule = selectedPrincipal
+    ? (rules.find(
+        (rule) =>
+          rule.scope === selection.scope &&
+          rule.principalType === selectedPrincipal.principalType &&
+          rule.principal === selectedPrincipal.principal
+      ) ?? null)
+    : null;
+  const tree = await renderAclExplorer(env, selection);
+  const detail = await renderAclDetail(
+    env,
+    rules,
+    selection,
+    selectedPrincipal,
+    exactRule,
+    csrfToken
+  );
   const rows = rules.map((rule) => renderAclRuleRow(rule, csrfToken)).join("");
 
   return htmlShell(
     env,
-    "ACL Manager",
-    `<h1>Access control list manager</h1>
-    <table class="inline acl__rules">
-      <thead>
-        <tr><th>Scope</th><th>Principal</th><th>Permission</th><th>Action</th></tr>
-      </thead>
-      <tbody>${rows || '<tr><td colspan="4">No ACL rules configured.</td></tr>'}</tbody>
-    </table>
-    <form class="acl__editor" method="post" action="/api/admin/acl">
-      ${csrfInput(csrfToken)}
-      <fieldset>
-        <legend>Add or update ACL rule</legend>
-        <label for="acl__scope">Scope</label>
-        <input id="acl__scope" name="scope" type="text" value="*" required>
-        <label for="acl__principal_type">Principal type</label>
-        <select id="acl__principal_type" name="principalType">
-          <option value="all">All users</option>
-          <option value="group">Group</option>
-          <option value="user">User</option>
-        </select>
-        <label for="acl__principal">Principal</label>
-        <input id="acl__principal" name="principal" type="text" value="@ALL" required>
-        <label for="acl__permission">Permission</label>
-        <select id="acl__permission" name="permission">
-          ${renderAclPermissionOptions(ACL_READ)}
-        </select>
-        <button type="submit">Save ACL rule</button>
-      </fieldset>
-    </form>`,
+    "Access Control List Management",
+    `<div id="acl_manager">
+      <h1>Access Control List Management</h1>
+      <div class="level1 group">
+        <div id="acl__tree">${tree}</div>
+        <div id="acl__detail">${detail}</div>
+      </div>
+      <div class="clearer"></div>
+      <h2>Current ACL Rules</h2>
+      <div class="level2">
+        <table class="inline acl__rules">
+          <thead>
+            <tr><th>Page/Namespace</th><th>User/Group</th><th>Permissions</th><th>Delete</th></tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="4">No ACL rules configured.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="footnotes"><div class="fn"><sup>1)</sup><div class="content">Higher permissions include lower ones. Create, Upload and Delete permissions only apply to namespaces, not pages.</div></div></div>
+    </div>`,
     { principal }
   );
 }
 
 function renderAclRuleRow(rule: AclRuleRecord, csrfToken: string): string {
+  const scopeClass = isAclNamespaceScope(rule.scope) ? "aclns" : "aclpage";
+  const principalClass = rule.principalType === "user" ? "acluser" : "aclgroup";
+
   return `<tr>
-    <td><code>${escapeHtml(rule.scope)}</code></td>
-    <td>${escapeHtml(rule.principalType)} <code>${escapeHtml(rule.principal)}</code></td>
-    <td>${rule.permission}</td>
-    <td>
+    <td><span class="${scopeClass}">${escapeHtml(rule.scope)}</span></td>
+    <td><span class="${principalClass}">${escapeHtml(rule.principal)}</span></td>
+    <td>${escapeHtml(aclPermissionLabel(rule.permission))}</td>
+    <td class="check">
       <form method="post" action="/api/admin/acl/delete">
         ${csrfInput(csrfToken)}
         <input type="hidden" name="id" value="${escapeAttribute(rule.id)}">
@@ -5956,6 +5969,443 @@ function renderAclRuleRow(rule: AclRuleRecord, csrfToken: string): string {
       </form>
     </td>
   </tr>`;
+}
+
+interface AclScopeSelection {
+  scope: string;
+  kind: "page" | "namespace";
+  id: string;
+}
+
+interface AclPrincipalSelection {
+  principalType: AclRuleRecord["principalType"];
+  principal: string;
+}
+
+interface AclTreeEntry {
+  id: string;
+  type: "d" | "f";
+  depth: number;
+  label: string;
+}
+
+interface AclSubjectOption {
+  value: string;
+  label: string;
+  className: "aclgroup" | "acluser";
+}
+
+function aclSelectionFromUrl(env: Env, url: URL): AclScopeSelection {
+  const rawScope = url.searchParams.get("scope");
+  const scope = rawScope ? normalizeAclAdminScope(rawScope, env) : "";
+  if (scope) return aclScopeSelection(scope);
+
+  if (url.searchParams.has("ns") || url.searchParams.has("current_ns")) {
+    const rawNamespace = String(
+      url.searchParams.get("ns") ?? url.searchParams.get("current_ns") ?? ""
+    );
+    if (rawNamespace === "*") return { scope: "*", kind: "namespace", id: "*" };
+    const namespace = cleanPageId(rawNamespace, getRuntimeConfig(env).pageIdCleanOptions);
+    return { scope: namespace ? `${namespace}:*` : "*", kind: "namespace", id: namespace || "*" };
+  }
+
+  const rawPage = url.searchParams.get("current_id") ?? url.searchParams.get("id");
+  const page = cleanPageId(rawPage ?? startPageId(env), getRuntimeConfig(env).pageIdCleanOptions);
+  return { scope: page || startPageId(env), kind: "page", id: page || startPageId(env) };
+}
+
+function aclScopeSelection(scope: string): AclScopeSelection {
+  if (scope === "*") return { scope, kind: "namespace", id: "*" };
+  if (scope.endsWith(":*")) {
+    const id = scope.slice(0, -2);
+    return { scope, kind: "namespace", id: id || "*" };
+  }
+  return { scope, kind: "page", id: scope };
+}
+
+function aclPrincipalSelectionFromUrl(env: Env, url: URL): AclPrincipalSelection | null {
+  const explicitType = parseAclPrincipalType(String(url.searchParams.get("principalType") ?? ""));
+  if (explicitType) {
+    const principal = normalizeAclAdminPrincipal(
+      env,
+      explicitType,
+      String(url.searchParams.get("principal") ?? "")
+    );
+    return principal ? { principalType: explicitType, principal } : null;
+  }
+
+  const selected = String(url.searchParams.get("acl_t") ?? "");
+  const entered = String(url.searchParams.get("acl_w") ?? "");
+  const inferredType = aclPrincipalTypeFromSelector(selected, entered);
+  if (!inferredType) return null;
+
+  const principal = normalizeAclAdminPrincipal(
+    env,
+    inferredType,
+    selected === "__g__" || selected === "__u__" || !selected ? entered : selected
+  );
+  return principal ? { principalType: inferredType, principal } : null;
+}
+
+function aclPrincipalTypeFromSelector(
+  selected: string,
+  entered: string
+): AclRuleRecord["principalType"] | null {
+  if (selected === "__g__") return "group";
+  if (selected === "__u__") return "user";
+  const principal = selected || entered.trim();
+  if (!principal) return null;
+  if (principal === "@ALL") return "all";
+  if (principal === "%GROUP%" || principal.startsWith("@")) return "group";
+  return "user";
+}
+
+async function renderAclExplorer(env: Env, selection: AclScopeSelection): Promise<string> {
+  const pages = await listAllPages(env.DB, 1000);
+  const mediaNamespaces = await listMediaNamespaces(env.DB);
+  const namespaces = collectAclNamespaces(
+    pages.map((page) => page.id),
+    mediaNamespaces
+  );
+  const entries: AclTreeEntry[] = [
+    { id: "*", type: "d" as const, depth: 0, label: "[root]" },
+    ...namespaces
+      .filter((namespace) => namespace)
+      .map((namespace) => ({
+        id: namespace,
+        type: "d" as const,
+        depth: namespace.split(":").length,
+        label: namespace.slice(namespace.lastIndexOf(":") + 1)
+      })),
+    ...pages.map((page) => ({
+      id: page.id,
+      type: "f" as const,
+      depth: page.id.includes(":") ? page.id.split(":").length - 1 : 0,
+      label: page.id.slice(page.id.lastIndexOf(":") + 1)
+    }))
+  ];
+  entries.sort(compareAclTreeEntries);
+
+  const items = entries
+    .map((entry) => {
+      const active =
+        entry.type === "d"
+          ? selection.kind === "namespace" && selection.id === entry.id
+          : selection.kind === "page" && selection.id === entry.id;
+      const href =
+        entry.type === "d"
+          ? `/admin/acl?ns=${encodeURIComponent(entry.id)}`
+          : `/admin/acl?id=${encodeURIComponent(entry.id)}`;
+      const className = `${entry.type === "d" ? "idx_dir" : "wikilink1"}${active ? " cur" : ""}`;
+      const marker = entry.type === "d" ? (active ? "-" : "+") : "";
+      const style = ` style="padding-left: ${Math.min(entry.depth, 8)}em"`;
+      return `<li class="level${Math.min(entry.depth, 8)} ${active ? "open" : "closed"}"${style}>${marker ? `<span class="acl__toggle">${marker}</span>` : ""}<a href="${href}" class="${className}">${escapeHtml(entry.label)}</a></li>`;
+    })
+    .join("");
+
+  return `<ul class="idx">${items}</ul>`;
+}
+
+function collectAclNamespaces(pageIds: string[], mediaNamespaces: string[]): string[] {
+  const namespaces = new Set<string>([""]);
+
+  for (const pageId of pageIds) {
+    if (!pageId.includes(":")) continue;
+    collectAclNamespaceParents(pageId.slice(0, pageId.lastIndexOf(":")), namespaces);
+  }
+
+  for (const namespace of mediaNamespaces) {
+    collectAclNamespaceParents(namespace, namespaces);
+  }
+
+  return [...namespaces];
+}
+
+function collectAclNamespaceParents(namespace: string, namespaces: Set<string>): void {
+  if (!namespace) return;
+
+  const parts = namespace.split(":");
+  for (let index = 1; index <= parts.length; index += 1) {
+    namespaces.add(parts.slice(0, index).join(":"));
+  }
+}
+
+function compareAclTreeEntries(left: AclTreeEntry, right: AclTreeEntry): number {
+  const leftParts = left.id === "*" ? [""] : left.id.split(":");
+  const rightParts = right.id === "*" ? [""] : right.id.split(":");
+  const max = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < max; index += 1) {
+    const leftPart = leftParts[index];
+    const rightPart = rightParts[index];
+    if (leftPart === undefined) return left.type === "d" ? -1 : 1;
+    if (rightPart === undefined) return right.type === "d" ? 1 : -1;
+    const compared = leftPart.localeCompare(rightPart);
+    if (compared !== 0) return compared;
+  }
+
+  if (left.type === right.type) return 0;
+  return left.type === "d" ? -1 : 1;
+}
+
+async function renderAclDetail(
+  env: Env,
+  rules: AclRuleRecord[],
+  selection: AclScopeSelection,
+  selectedPrincipal: AclPrincipalSelection | null,
+  exactRule: AclRuleRecord | null,
+  csrfToken: string
+): Promise<string> {
+  const options = await aclSubjectOptions(env, rules);
+  const selector = renderAclSubjectSelector(options, selectedPrincipal);
+  const customPrincipal =
+    selectedPrincipal && !options.some((option) => option.value === selectedPrincipal.principal)
+      ? selectedPrincipal.principal.replace(/^@/, "")
+      : "";
+  const info = selectedPrincipal
+    ? await renderAclSelectedPrincipalInfo(
+        env,
+        rules,
+        selection,
+        selectedPrincipal,
+        exactRule,
+        csrfToken
+      )
+    : renderAclSelectionHelp(selection);
+
+  return `<form action="/admin/acl" method="get">
+      <div id="acl__user">
+        Permissions for
+        ${selector}
+        <input type="text" name="acl_w" class="edit" value="${escapeAttribute(customPrincipal)}">
+        <input type="hidden" name="scope" value="${escapeAttribute(selection.scope)}">
+        <button type="submit">Select</button>
+      </div>
+    </form>
+    <div id="acl__info">${info}</div>`;
+}
+
+function renderAclSubjectSelector(
+  options: AclSubjectOption[],
+  selectedPrincipal: AclPrincipalSelection | null
+): string {
+  const selectedValue = selectedPrincipal?.principal ?? "";
+  const entries = options
+    .map((option) => {
+      const selected = option.value === selectedValue ? " selected" : "";
+      return `<option value="${escapeAttribute(option.value)}" class="${option.className}"${selected}>${escapeHtml(option.label)}</option>`;
+    })
+    .join("");
+  const fallback =
+    selectedPrincipal && !options.some((option) => option.value === selectedValue)
+      ? selectedPrincipal.principalType === "group"
+        ? " selected"
+        : ""
+      : "";
+  const userFallback =
+    selectedPrincipal && !options.some((option) => option.value === selectedValue)
+      ? selectedPrincipal.principalType === "user"
+        ? " selected"
+        : ""
+      : "";
+
+  return `<select name="acl_t" class="edit">
+      <option value="__g__" class="aclgroup"${fallback}>Group:</option>
+      <option value="__u__" class="acluser"${userFallback}>User:</option>
+      <optgroup label=" ">${entries}</optgroup>
+    </select>`;
+}
+
+async function aclSubjectOptions(env: Env, rules: AclRuleRecord[]): Promise<AclSubjectOption[]> {
+  const subjects = new Set<string>(["@ALL", "@user"]);
+  for (const member of [
+    ...getRuntimeConfig(env).manager.split(","),
+    ...getRuntimeConfig(env).superuser.split(",")
+  ]) {
+    const normalized = member.trim();
+    if (normalized && normalized !== "!!not set!!") subjects.add(normalized);
+  }
+  for (const rule of rules) subjects.add(rule.principal);
+
+  const users = await listAclAdminUsers(env.DB);
+  const groups = await listAclAdminGroups(env.DB);
+  for (const user of users) subjects.add(user);
+  for (const group of groups) subjects.add(`@${group}`);
+
+  return [...subjects]
+    .filter((subject) => subject && subject !== "!!not set!!")
+    .sort((left, right) => left.localeCompare(right))
+    .map((subject) => ({
+      value: subject,
+      label: subject,
+      className: subject.startsWith("@") ? "aclgroup" : "acluser"
+    }));
+}
+
+async function listAclAdminUsers(db: D1Database): Promise<string[]> {
+  const result = await db
+    .prepare("select username from users where is_disabled = 0 order by username asc limit 500")
+    .all<{ username: string }>();
+  return result.results.map((row) => row.username);
+}
+
+async function listAclAdminGroups(db: D1Database): Promise<string[]> {
+  const result = await db
+    .prepare("select name from groups order by name asc limit 500")
+    .all<{ name: string }>();
+  return result.results.map((row) => row.name);
+}
+
+function renderAclSelectionHelp(selection: AclScopeSelection): string {
+  const label = selection.kind === "namespace" ? "namespace" : "page";
+  return `<p>Please <b>enter a user or group</b> in the form above to view or edit the permissions set for the ${label} <b class="${selection.kind === "namespace" ? "aclns" : "aclpage"}">${escapeHtml(selection.id)}</b>.</p>`;
+}
+
+async function renderAclSelectedPrincipalInfo(
+  env: Env,
+  rules: AclRuleRecord[],
+  selection: AclScopeSelection,
+  selectedPrincipal: AclPrincipalSelection,
+  exactRule: AclRuleRecord | null,
+  csrfToken: string
+): Promise<string> {
+  const syntheticPrincipal = await aclSyntheticPrincipalForSelection(env, selectedPrincipal);
+  const permission = resolveConfiguredAclPermission(
+    env,
+    rules,
+    selection.scope,
+    syntheticPrincipal
+  );
+  const names = aclPermissionNames(permission, selection.kind === "page");
+  const principalClass = selectedPrincipal.principalType === "user" ? "acluser" : "aclgroup";
+  const scopeClass = selection.kind === "namespace" ? "aclns" : "aclpage";
+  const principalLabel = selectedPrincipal.principal.replace(/^@/, "");
+  const subject =
+    selectedPrincipal.principalType === "all"
+      ? `All users <b class="${principalClass}">${escapeHtml(selectedPrincipal.principal)}</b>`
+      : selectedPrincipal.principalType === "group"
+        ? `Members of group <b class="${principalClass}">${escapeHtml(principalLabel)}</b>`
+        : `User <b class="${principalClass}">${escapeHtml(selectedPrincipal.principal)}</b>`;
+  const scopeLabel =
+    selection.kind === "namespace"
+      ? `namespace <b class="${scopeClass}">${escapeHtml(selection.id)}</b>`
+      : `page <b class="${scopeClass}">${escapeHtml(selection.id)}</b>`;
+  const inherited = exactRule
+    ? ""
+    : "<p>Note: Those permissions were not set explicitly but were inherited from other groups or higher namespaces.</p>";
+
+  return `<p>${subject} currently has the following permissions on ${scopeLabel}: <i>${escapeHtml(names.join(", "))}</i>.</p>
+    ${inherited}
+    ${renderAclEditor(selection, selectedPrincipal, exactRule, csrfToken)}`;
+}
+
+async function aclSyntheticPrincipalForSelection(
+  env: Env,
+  selectedPrincipal: AclPrincipalSelection
+): Promise<AuthPrincipal> {
+  if (selectedPrincipal.principalType === "all") return anonymousPrincipal();
+  if (selectedPrincipal.principalType === "group") {
+    return {
+      type: "user",
+      isAuthenticated: true,
+      id: "acl-preview",
+      username: "acl-preview",
+      displayName: "ACL preview",
+      email: null,
+      groups: [selectedPrincipal.principal.replace(/^@/, "")]
+    };
+  }
+
+  return {
+    type: "user",
+    isAuthenticated: true,
+    id: "acl-preview",
+    username: selectedPrincipal.principal,
+    displayName: selectedPrincipal.principal,
+    email: null,
+    groups: await aclGroupsForUsername(env.DB, selectedPrincipal.principal)
+  };
+}
+
+async function aclGroupsForUsername(db: D1Database, username: string): Promise<string[]> {
+  const row = await db
+    .prepare("select id from users where lower(username) = lower(?)")
+    .bind(username)
+    .first<{ id: string }>();
+  if (!row) return [];
+  const groups = await readManagedUserGroups(db, [row.id]);
+  return groups.get(row.id) ?? [];
+}
+
+function renderAclEditor(
+  selection: AclScopeSelection,
+  selectedPrincipal: AclPrincipalSelection,
+  exactRule: AclRuleRecord | null,
+  csrfToken: string
+): string {
+  return `<form class="acl__editor" method="post" action="/api/admin/acl">
+    ${csrfInput(csrfToken)}
+    <input type="hidden" name="scope" value="${escapeAttribute(selection.scope)}">
+    <input type="hidden" name="principalType" value="${selectedPrincipal.principalType}">
+    <input type="hidden" name="principal" value="${escapeAttribute(selectedPrincipal.principal)}">
+    <fieldset>
+      <legend>${exactRule ? "Modify Entry" : "Add new Entry"}</legend>
+      ${renderAclPermissionRadios(exactRule?.permission ?? null, selection.kind === "page", "permission")}
+      <button type="submit">${exactRule ? "Update" : "Save"}</button>
+    </fieldset>
+  </form>`;
+}
+
+function renderAclPermissionRadios(selected: number | null, isPage: boolean, name: string): string {
+  return [ACL_NONE, ACL_READ, ACL_EDIT, ACL_CREATE, ACL_UPLOAD, ACL_DELETE]
+    .map((permission) => {
+      const disabled = isPage && permission > ACL_EDIT;
+      const checked =
+        selected === permission ||
+        (isPage && selected !== null && selected > ACL_EDIT && permission === ACL_EDIT);
+      const id = `acl_${name}_${permission}_${isPage ? "page" : "ns"}`;
+      return `<label for="${id}"${disabled ? ' class="disabled"' : ""}><input id="${id}" type="radio" name="${escapeAttribute(name)}" value="${permission}"${checked ? " checked" : ""}${disabled ? " disabled" : ""}> ${escapeHtml(aclPermissionLabel(permission))}</label>`;
+    })
+    .join("");
+}
+
+function sortAclRules(rules: AclRuleRecord[]): AclRuleRecord[] {
+  return [...rules].sort((left, right) => {
+    const scope = left.scope.localeCompare(right.scope);
+    if (scope !== 0) return scope;
+    return left.principal.localeCompare(right.principal);
+  });
+}
+
+function aclPermissionNames(permission: number, isPage: boolean): string[] {
+  const clamped = isPage && permission > ACL_EDIT ? ACL_EDIT : permission;
+  if (clamped <= ACL_NONE) return [aclPermissionLabel(ACL_NONE)];
+  return [ACL_READ, ACL_EDIT, ACL_CREATE, ACL_UPLOAD, ACL_DELETE]
+    .filter((level) => (!isPage || level <= ACL_EDIT) && clamped >= level)
+    .map(aclPermissionLabel);
+}
+
+function aclPermissionLabel(permission: number): string {
+  switch (permission) {
+    case ACL_NONE:
+      return "None";
+    case ACL_READ:
+      return "Read";
+    case ACL_EDIT:
+      return "Edit";
+    case ACL_CREATE:
+      return "Create";
+    case ACL_UPLOAD:
+      return "Upload";
+    case ACL_DELETE:
+      return "Delete";
+    default:
+      return String(permission);
+  }
+}
+
+function isAclNamespaceScope(scope: string): boolean {
+  return scope === "*" || scope.endsWith(":*");
 }
 
 interface ManagedUser extends UserRecord {
@@ -6158,22 +6608,6 @@ function renderManagedUserRow(
       </form>
     </td>
   </tr>`;
-}
-
-function renderAclPermissionOptions(selected: number): string {
-  return [
-    [ACL_NONE, "None"],
-    [ACL_READ, "Read"],
-    [ACL_EDIT, "Edit"],
-    [ACL_CREATE, "Create"],
-    [ACL_UPLOAD, "Upload"],
-    [ACL_DELETE, "Delete"]
-  ]
-    .map(
-      ([value, label]) =>
-        `<option value="${value}"${value === selected ? " selected" : ""}>${label} (${value})</option>`
-    )
-    .join("");
 }
 
 async function renderSearchPage(
@@ -6514,7 +6948,7 @@ async function handleAclRuleUpsert(
     return adminDeniedResponse(request, env);
   }
 
-  const parsed = parseAclRuleForm(form);
+  const parsed = parseAclRuleForm(form, env);
   if (!parsed.ok) {
     return aclAdminErrorResponse(request, env, parsed.error);
   }
@@ -7160,19 +7594,27 @@ function groupId(group: string): string {
 }
 
 function parseAclRuleForm(
-  form: FormData
+  form: FormData,
+  env: Env
 ): { ok: true; rule: AclRuleRecord } | { ok: false; error: string } {
-  const scope = normalizeAclAdminScope(String(form.get("scope") ?? ""));
+  const scope = normalizeAclAdminScope(String(form.get("scope") ?? ""), env);
   if (!scope) {
     return { ok: false, error: "Missing ACL scope." };
   }
 
-  const principalType = parseAclPrincipalType(String(form.get("principalType") ?? ""));
+  let principalType = parseAclPrincipalType(String(form.get("principalType") ?? ""));
+  let principalInput = String(form.get("principal") ?? "");
+  if (!principalType) {
+    const selected = String(form.get("acl_t") ?? "");
+    const entered = String(form.get("acl_w") ?? "");
+    principalType = aclPrincipalTypeFromSelector(selected, entered);
+    principalInput = selected === "__g__" || selected === "__u__" || !selected ? entered : selected;
+  }
   if (!principalType) {
     return { ok: false, error: "Invalid ACL principal type." };
   }
 
-  const principal = normalizeAclAdminPrincipal(principalType, String(form.get("principal") ?? ""));
+  const principal = normalizeAclAdminPrincipal(env, principalType, principalInput);
   if (!principal) {
     return { ok: false, error: "Missing ACL principal." };
   }
@@ -7189,7 +7631,7 @@ function parseAclRuleForm(
       scope,
       principalType,
       principal,
-      permission,
+      permission: isAclNamespaceScope(scope) ? permission : Math.min(permission, ACL_EDIT),
       createdAt: new Date().toISOString()
     }
   };
@@ -10937,8 +11379,19 @@ function isManagerPrincipal(principal: AuthPrincipal, env: Env): boolean {
   return isDokuWikiManager(principal, config.superuser, config.manager);
 }
 
-function normalizeAclAdminScope(value: string): string {
-  return value.trim().replace(/\s+/g, "");
+function normalizeAclAdminScope(value: string, env: Env): string {
+  const compact = value.trim().replace(/\s+/g, "");
+  if (!compact) return "";
+  if (compact === "*") return "*";
+
+  const isNamespace = compact.endsWith(":*");
+  const rawId = isNamespace ? compact.slice(0, -2) : compact;
+  if (!rawId || rawId.includes("*")) return "";
+
+  const id = cleanAclScopeId(rawId, env);
+  if (!id) return "";
+
+  return isNamespace ? `${id}:*` : id;
 }
 
 function parseAclPrincipalType(value: string): AclRuleRecord["principalType"] | null {
@@ -10946,6 +11399,7 @@ function parseAclPrincipalType(value: string): AclRuleRecord["principalType"] | 
 }
 
 function normalizeAclAdminPrincipal(
+  env: Env,
   principalType: AclRuleRecord["principalType"],
   value: string
 ): string {
@@ -10953,12 +11407,32 @@ function normalizeAclAdminPrincipal(
 
   if (principalType === "all") return "@ALL";
   if (principalType === "group") {
-    if (principal === "%GROUP%") return principal;
-    return principal ? (principal.startsWith("@") ? principal : `@${principal}`) : "";
+    if (principal.toUpperCase() === "%GROUP%") return "%GROUP%";
+    const group = cleanAclIdentity(principal.replace(/^@+/, ""), env);
+    return group ? `@${group}` : "";
   }
 
-  if (principal === "%USER%") return principal;
-  return principal.replace(/^@+/, "");
+  if (principal.toUpperCase() === "%USER%") return "%USER%";
+  return cleanAclIdentity(principal.replace(/^@+/, ""), env);
+}
+
+function cleanAclScopeId(value: string, env: Env): string {
+  const cleanOptions = getRuntimeConfig(env).pageIdCleanOptions;
+  const tokenized = value
+    .replace(/%USER%/gi, "acluserplaceholder")
+    .replace(/%GROUP%/gi, "aclgroupplaceholder");
+  return cleanPageId(tokenized, cleanOptions)
+    .replaceAll("acluserplaceholder", "%USER%")
+    .replaceAll("aclgroupplaceholder", "%GROUP%");
+}
+
+function cleanAclIdentity(value: string, env: Env): string {
+  const cleanOptions = getRuntimeConfig(env).pageIdCleanOptions;
+  const sepchar = cleanOptions.sepchar ?? "_";
+  return cleanPageId(value.replace(/[:;/\\]+/g, sepchar), {
+    ...cleanOptions,
+    useslash: false
+  });
 }
 
 function stableAclRuleId(

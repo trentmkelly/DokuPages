@@ -1324,6 +1324,11 @@ describe("auth routes", () => {
   it("allows admin users to manage ACL rules", async () => {
     env = createEnv();
     await seedUser(env.DB);
+    await seedPage(env.DB, {
+      id: "wiki:welcome",
+      title: "Welcome",
+      content: "====== Welcome ======\n\nBody."
+    });
     const cookie = await loginAsAlice(env);
 
     const denied = await handleRequest(new Request("https://example.com/admin/acl"), env);
@@ -1342,7 +1347,15 @@ describe("auth routes", () => {
     expect(legacy.status).toBe(301);
     expect(legacy.headers.get("location")).toBe("/admin/acl");
     expect(page.status).toBe(200);
-    await expect(page.text()).resolves.toContain("Access control list manager");
+    const html = await page.text();
+    expect(html).toContain("Access Control List Management");
+    expect(html).toContain('id="acl_manager"');
+    expect(html).toContain('id="acl__tree"');
+    expect(html).toContain('id="acl__detail"');
+    expect(html).toContain('name="acl_t"');
+    expect(html).toContain("/admin/acl?ns=wiki");
+    expect(html).toContain("/admin/acl?id=wiki%3Awelcome");
+    expect(html).toContain("Current ACL Rules");
 
     const rebuild = await handleRequest(
       new Request("https://example.com/api/admin/search/rebuild", {
@@ -1437,6 +1450,70 @@ describe("auth routes", () => {
     expect(auditHtml).toContain("Audit log");
     expect(auditHtml).toContain("acl_rule_upsert");
     expect(auditHtml).toContain("search_index_rebuild");
+  });
+
+  it("normalizes ACL admin values and clamps page permissions", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const pageForm = new FormData();
+    pageForm.set("scope", "Wiki:Locked");
+    pageForm.set("principalType", "user");
+    pageForm.set("principal", "@Alice Example");
+    pageForm.set("permission", "16");
+
+    const pageSaved = await handleRequest(
+      new Request("https://example.com/api/admin/acl", {
+        method: "POST",
+        body: pageForm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(pageSaved.status).toBe(303);
+    await expect(
+      env.DB.prepare("select scope, principal_type, principal, permission from acl_rules").all()
+    ).resolves.toMatchObject({
+      results: [
+        {
+          scope: "wiki:locked",
+          principal_type: "user",
+          principal: "alice_example",
+          permission: 2
+        }
+      ]
+    });
+
+    const placeholderForm = new FormData();
+    placeholderForm.set("scope", "teams:%GROUP%:*");
+    placeholderForm.set("principalType", "group");
+    placeholderForm.set("principal", "%GROUP%");
+    placeholderForm.set("permission", "8");
+
+    const placeholderSaved = await handleRequest(
+      new Request("https://example.com/api/admin/acl", {
+        method: "POST",
+        body: placeholderForm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(placeholderSaved.status).toBe(303);
+    await expect(
+      env.DB.prepare(
+        "select scope, principal_type, principal, permission from acl_rules where scope = ?"
+      )
+        .bind("teams:%GROUP%:*")
+        .first()
+    ).resolves.toMatchObject({
+      scope: "teams:%GROUP%:*",
+      principal_type: "group",
+      principal: "%GROUP%",
+      permission: 8
+    });
   });
 
   it("allows admin users to manage native users and groups", async () => {
@@ -2267,7 +2344,7 @@ describe("auth routes", () => {
     await seedUser(env.DB);
     const cookie = await loginAsAlice(env);
     const replacements = [
-      ["acl", "/admin/acl", "Access control list manager"],
+      ["acl", "/admin/acl", "Access Control List Management"],
       ["config", "/admin/config", "Configuration manager"],
       ["info", "/diagnostics", "Diagnostics"],
       ["logviewer", "/admin/audit", "Audit log"],
