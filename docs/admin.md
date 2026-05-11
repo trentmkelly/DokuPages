@@ -52,3 +52,14 @@ search index rebuilds append rows to the D1 `audit_log` table with the actor,
 action, target, request IP, and action-specific JSON details. Legacy
 `data/log` files from a source DokuWiki install are intentionally not imported
 or displayed by this page.
+
+Operators can promote an existing native user to the configured DokuWiki
+`SUPERUSER` role without hand-editing D1 rows:
+
+```sh
+npm run user:promote-superuser -- --username testuser
+```
+
+The script reads `SUPERUSER` from the environment, defaulting to `@admin`, and
+adds the user to the first configured superuser group. Use `--group <group>` when
+the deployment uses a literal-user `SUPERUSER` list that has no group entry.

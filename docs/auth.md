@@ -21,6 +21,16 @@ Native admin-only routes use DokuWiki-style `superuser` member-list matching
 from the `SUPERUSER` runtime variable. Manager-level routes such as the admin
 dashboard accept either `SUPERUSER` matches or `MANAGER` matches. The defaults
 preserve the native launch groups: `SUPERUSER=@admin` and `MANAGER=@manager`.
+
+To promote an existing D1 user without manually editing rows, run:
+
+```sh
+npm run user:promote-superuser -- --username testuser
+```
+
+The operator script adds the user to the first group in `SUPERUSER` such as
+`@admin`, or accepts `--group <group>` for deployments whose `SUPERUSER` setting
+contains only literal usernames.
 Both variables accept comma-separated usernames and `@groups`, including
 `@ALL`, matching upstream member-list behavior.
 
