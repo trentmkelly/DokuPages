@@ -107,6 +107,7 @@ export interface RecentChangeListOptions {
   namespace?: string;
   groupBySubject?: boolean;
   includeMinor?: boolean;
+  includeDeleted?: boolean;
   onlyCreates?: boolean;
   since?: string;
   subjectType?: "pages" | "media" | "both";
@@ -341,6 +342,10 @@ export async function listRecentChanges(
 
   if (options.includeMinor === false) {
     where.push("c.change_type <> 'minor'");
+  }
+
+  if (options.includeDeleted === false) {
+    where.push("c.change_type <> 'delete'");
   }
 
   if (options.onlyCreates) {

@@ -48,7 +48,13 @@ export interface Env {
   MEDIAREVISIONS?: string;
   IEXSSPROTECT?: string;
   FETCHSIZE?: string;
+  RSS_TYPE?: string;
+  RSS_LINKTO?: string;
+  RSS_CONTENT?: string;
   RSS_MEDIA?: string;
+  RSS_UPDATE?: string;
+  RSS_SHOW_SUMMARY?: string;
+  RSS_SHOW_DELETED?: string;
   SEARCH_NSLIMIT?: string;
   SEARCH_FRAGMENT?: string;
   DEACCENT?: string;

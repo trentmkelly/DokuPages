@@ -138,6 +138,12 @@ describe("handleRequest", () => {
     env.AUTOPLURAL = undefined;
     env.RECENT = undefined;
     env.RECENT_DAYS = undefined;
+    env.RSS_TYPE = undefined;
+    env.RSS_LINKTO = undefined;
+    env.RSS_CONTENT = undefined;
+    env.RSS_UPDATE = undefined;
+    env.RSS_SHOW_SUMMARY = undefined;
+    env.RSS_SHOW_DELETED = undefined;
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
@@ -1053,9 +1059,9 @@ describe("handleRequest", () => {
 
     const htmlRoutes: Array<[string, number, string]> = [
       ["/", 302, ""],
-      ["/feed.php", 200, "application/rss+xml"],
-      ["/feed", 200, "application/rss+xml"],
-      ["/feed.xml", 200, "application/rss+xml"],
+      ["/feed.php", 200, "text/xml"],
+      ["/feed", 200, "text/xml"],
+      ["/feed.xml", 200, "text/xml"],
       ["/atom.xml", 200, "application/atom+xml"],
       ["/sitemap.xml", 200, "application/xml"],
       ["/sitemap", 200, "application/xml"],
@@ -3336,13 +3342,13 @@ describe("handleRequest", () => {
     expect(mixedRecentHtml).toContain("wiki:welcome");
     expect(mixedRecentHtml).toContain("/media-detail/wiki/logo.svg");
 
-    expect(mediaFeedXml).toContain("<title>edit: wiki:logo.svg</title>");
+    expect(mediaFeedXml).toContain("<title>logo.svg - Uploaded replacement logo</title>");
     expect(mediaFeedXml).toContain("https://example.com/media-detail/wiki/logo.svg");
     expect(mediaFeedXml).not.toContain("wiki:welcome");
-    expect(pageFeedXml).toContain("wiki:welcome");
+    expect(pageFeedXml).toContain("wiki/welcome");
     expect(pageFeedXml).not.toContain("wiki:logo.svg");
-    expect(mixedFeedXml).toContain("wiki:welcome");
-    expect(mixedFeedXml).toContain("wiki:logo.svg");
+    expect(mixedFeedXml).toContain("wiki/welcome");
+    expect(mixedFeedXml).toContain("logo.svg");
   });
 
   it("renders backlinks for a page", async () => {
@@ -3388,11 +3394,91 @@ describe("handleRequest", () => {
     expect(manifest.status).toBe(200);
     expect(robots.status).toBe(200);
     await expect(sitemap.text()).resolves.toContain("https://example.com/wiki/wiki/welcome");
-    await expect(rss.text()).resolves.toContain('<rss version="2.0">');
+    await expect(rss.text()).resolves.toContain("<rdf:RDF");
     await expect(atom.text()).resolves.toContain("http://www.w3.org/2005/Atom");
     await expect(opensearch.text()).resolves.toContain("OpenSearchDescription");
     await expect(manifest.json()).resolves.toMatchObject({ name: "Test Wiki" });
     await expect(robots.text()).resolves.toContain("Sitemap: https://example.com/sitemap.xml");
+  });
+
+  it("honors DokuWiki feed type, link, content, summary, deleted, and cache settings", async () => {
+    state.revisions.unshift({
+      id: "wiki:welcome@2026-05-08T00:00:00.000Z",
+      page_id: "wiki:welcome",
+      content: "====== Welcome ======\n\nChanged feed content.",
+      summary: "Feed update",
+      change_type: "edit",
+      size_change: 12,
+      created_at: "2026-05-08T00:00:00.000Z"
+    });
+    state.changelog.unshift(
+      {
+        id: "page:wiki:welcome@2026-05-08T00:00:00.000Z",
+        subject_type: "page",
+        subject_id: "wiki:welcome",
+        revision_id: "wiki:welcome@2026-05-08T00:00:00.000Z",
+        user_name: "alice",
+        change_type: "edit",
+        summary: "Feed update",
+        size_change: 12,
+        created_at: "2026-05-08T00:00:00.000Z"
+      },
+      {
+        id: "page:wiki:old@2026-05-09T00:00:00.000Z",
+        subject_type: "page",
+        subject_id: "wiki:old",
+        revision_id: "wiki:old@2026-05-09T00:00:00.000Z",
+        user_name: "alice",
+        change_type: "delete",
+        summary: "Deleted old page",
+        size_change: -10,
+        created_at: "2026-05-09T00:00:00.000Z"
+      }
+    );
+    env.RSS_TYPE = "rss2";
+    env.RSS_LINKTO = "current";
+    env.RSS_CONTENT = "html";
+    env.RSS_SHOW_SUMMARY = "0";
+    env.RSS_SHOW_DELETED = "0";
+    env.RSS_UPDATE = "120";
+
+    const rss2 = await handleRequest(new Request("https://example.com/feed.php?case=rss2"), env);
+    const rss2Text = await rss2.text();
+
+    expect(rss2.headers.get("content-type")).toContain("text/xml");
+    expect(rss2.headers.get("cache-control")).toBe("public, max-age=120");
+    expect(rss2Text).toContain('<rss version="2.0">');
+    expect(rss2Text).toContain("https://example.com/wiki/wiki/welcome</link>");
+    expect(rss2Text).toContain("Changed feed content");
+    expect(rss2Text).not.toContain("Welcome - Feed update");
+    expect(rss2Text).not.toContain("wiki:old");
+
+    env.RSS_LINKTO = "diff";
+    env.RSS_CONTENT = "diff";
+    env.RSS_SHOW_SUMMARY = "1";
+    env.RSS_SHOW_DELETED = "1";
+    const diffFeed = await handleRequest(
+      new Request("https://example.com/feed.php?type=atom&case=diff"),
+      env
+    );
+    const diffText = await diffFeed.text();
+    expect(diffFeed.headers.get("content-type")).toContain("application/xml");
+    expect(diffText).toContain('version="0.3"');
+    expect(diffText).toContain("welcome - Feed update");
+    expect(diffText).toContain("do=diff");
+    expect(diffText).toContain("+Changed feed content.");
+    expect(diffText).toContain("old - Deleted old page");
+
+    env.RSS_TYPE = "rss";
+    const rss091 = await handleRequest(
+      new Request("https://example.com/feed.php?case=rss091"),
+      env
+    );
+    await expect(rss091.text()).resolves.toContain('<rss version="0.91">');
+
+    const atom1 = await handleRequest(new Request("https://example.com/feed.php?type=atom1"), env);
+    expect(atom1.headers.get("content-type")).toContain("application/atom+xml");
+    await expect(atom1.text()).resolves.toContain("http://www.w3.org/2005/Atom");
   });
 
   it("caches sitemap and feed documents in KV", async () => {
@@ -4381,6 +4467,9 @@ function createD1Stub(state: D1StubState): D1Database {
                   return false;
                 }
                 if (sql.includes("change_type <> 'minor'") && change.change_type === "minor") {
+                  return false;
+                }
+                if (sql.includes("change_type <> 'delete'") && change.change_type === "delete") {
                   return false;
                 }
                 if (sql.includes("change_type = 'create'") && change.change_type !== "create") {

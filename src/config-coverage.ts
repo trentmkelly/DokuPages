@@ -180,7 +180,13 @@ const IMPLEMENTED = new Set<string>([
   "mailreturnpath",
   "mailprefix",
   "htmlmail",
+  "rss_type",
+  "rss_linkto",
+  "rss_content",
   "rss_media",
+  "rss_update",
+  "rss_show_summary",
+  "rss_show_deleted",
   "useslash",
   "sepchar",
   "canonical",
@@ -199,12 +205,6 @@ const IMPORTED_METADATA_ONLY = new Set<string>([
   "im_convert",
   "jpg_quality",
   "sitemap",
-  "rss_type",
-  "rss_linkto",
-  "rss_content",
-  "rss_update",
-  "rss_show_summary",
-  "rss_show_deleted",
   "updatecheck"
 ]);
 

@@ -122,6 +122,18 @@ Optional Pages environment variables:
   original URL like upstream DokuWiki.
 - `RSS_MEDIA`: controls whether recent-change feeds include `pages`, `media`,
   or `both`, matching DokuWiki's `rss_media` setting. Default: `both`.
+- `RSS_TYPE`: default `/feed.php` format: `rss`, `rss1`, `rss2`, `atom`, or
+  `atom1`. Default: `rss1`, matching upstream DokuWiki.
+- `RSS_LINKTO`: feed item link target: `diff`, `page`, `rev`, or `current`.
+  Default: `diff`.
+- `RSS_CONTENT`: feed item body mode: `abstract`, `diff`, `htmldiff`, or
+  `html`. Default: `abstract`.
+- `RSS_SHOW_SUMMARY`: set to `0` to omit edit summaries from feed item titles.
+  Default: enabled.
+- `RSS_SHOW_DELETED`: set to `0` to omit deleted items from feeds. Default:
+  enabled.
+- `RSS_UPDATE`: feed cache lifetime in seconds. Default: `300`; set to `0` to
+  bypass KV feed caching.
 - `EXTERNAL_AUTH_MODE`: set to `cloudflare_access` to resolve request
   principals from trusted Cloudflare Access headers after syncing users/groups
   into D1. Default: `off`.

@@ -60,7 +60,13 @@ describe("runtime config", () => {
       mediaRevisions: true,
       ieXssProtect: true,
       fetchSize: 0,
+      rssType: "rss1",
+      rssLinkTo: "diff",
+      rssContent: "abstract",
       rssMedia: "both",
+      rssUpdate: 300,
+      rssShowSummary: true,
+      rssShowDeleted: true,
       searchNsLimit: 0,
       searchFragment: "exact",
       pageIdCleanOptions: {
@@ -132,7 +138,13 @@ describe("runtime config", () => {
       MEDIAREVISIONS: "0",
       IEXSSPROTECT: "0",
       FETCHSIZE: "65536",
+      RSS_TYPE: "atom1",
+      RSS_LINKTO: "current",
+      RSS_CONTENT: "html",
       RSS_MEDIA: "media",
+      RSS_UPDATE: "120",
+      RSS_SHOW_SUMMARY: "0",
+      RSS_SHOW_DELETED: "0",
       SEARCH_NSLIMIT: "2",
       SEARCH_FRAGMENT: "contains",
       DEACCENT: "2",
@@ -192,7 +204,13 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).mediaRevisions).toBe(false);
     expect(getRuntimeConfig(env).ieXssProtect).toBe(false);
     expect(getRuntimeConfig(env).fetchSize).toBe(65536);
+    expect(getRuntimeConfig(env).rssType).toBe("atom1");
+    expect(getRuntimeConfig(env).rssLinkTo).toBe("current");
+    expect(getRuntimeConfig(env).rssContent).toBe("html");
     expect(getRuntimeConfig(env).rssMedia).toBe("media");
+    expect(getRuntimeConfig(env).rssUpdate).toBe(120);
+    expect(getRuntimeConfig(env).rssShowSummary).toBe(false);
+    expect(getRuntimeConfig(env).rssShowDeleted).toBe(false);
     expect(getRuntimeConfig(env).searchNsLimit).toBe(2);
     expect(getRuntimeConfig(env).searchFragment).toBe("contains");
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
@@ -404,6 +422,21 @@ describe("runtime config", () => {
           effectiveValue: "0"
         }),
         expect.objectContaining({
+          key: "RSS_TYPE",
+          effectiveValue: "rss1",
+          dokuwikiKey: "rss_type"
+        }),
+        expect.objectContaining({
+          key: "RSS_LINKTO",
+          effectiveValue: "diff",
+          dokuwikiKey: "rss_linkto"
+        }),
+        expect.objectContaining({
+          key: "RSS_CONTENT",
+          effectiveValue: "abstract",
+          dokuwikiKey: "rss_content"
+        }),
+        expect.objectContaining({
           key: "RSS_MEDIA",
           effectiveValue: "both",
           dokuwikiKey: "rss_media",
@@ -411,6 +444,21 @@ describe("runtime config", () => {
             handler: "multichoice",
             choices: ["both", "pages", "media"]
           })
+        }),
+        expect.objectContaining({
+          key: "RSS_UPDATE",
+          effectiveValue: "300",
+          dokuwikiKey: "rss_update"
+        }),
+        expect.objectContaining({
+          key: "RSS_SHOW_SUMMARY",
+          effectiveValue: "true",
+          dokuwikiKey: "rss_show_summary"
+        }),
+        expect.objectContaining({
+          key: "RSS_SHOW_DELETED",
+          effectiveValue: "true",
+          dokuwikiKey: "rss_show_deleted"
         }),
         expect.objectContaining({
           key: "DEACCENT",
@@ -561,7 +609,13 @@ describe("runtime config", () => {
       CACHETIME: "-1",
       LOCKTIME: "-1",
       TYPOGRAPHY: "3",
+      RSS_TYPE: "json",
+      RSS_LINKTO: "bad",
+      RSS_CONTENT: "bad",
       RSS_MEDIA: "files",
+      RSS_UPDATE: "-1",
+      RSS_SHOW_SUMMARY: "maybe",
+      RSS_SHOW_DELETED: "maybe",
       SEARCH_NSLIMIT: "-1",
       SEARCH_FRAGMENT: "middle",
       DEACCENT: "3",
@@ -599,7 +653,13 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "CACHETIME", severity: "error" }),
         expect.objectContaining({ key: "LOCKTIME", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
+        expect.objectContaining({ key: "RSS_TYPE", severity: "error" }),
+        expect.objectContaining({ key: "RSS_LINKTO", severity: "error" }),
+        expect.objectContaining({ key: "RSS_CONTENT", severity: "error" }),
         expect.objectContaining({ key: "RSS_MEDIA", severity: "error" }),
+        expect.objectContaining({ key: "RSS_UPDATE", severity: "error" }),
+        expect.objectContaining({ key: "RSS_SHOW_SUMMARY", severity: "error" }),
+        expect.objectContaining({ key: "RSS_SHOW_DELETED", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_NSLIMIT", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_FRAGMENT", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),

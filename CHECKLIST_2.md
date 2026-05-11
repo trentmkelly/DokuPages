@@ -180,7 +180,7 @@ are not fixed by this checklist.
 - [x] Support `recent`, `recent_days`, `breadcrumbs`, `fullpath`, `typography`, `dformat`, and `signature` display settings.
 - [x] Support `target` link settings for wiki, interwiki, extern, media, and windows.
 - [x] Support `mailprefix`, `htmlmail`, `notify`, and upstream mail template settings more closely.
-- [ ] Support `rss_type`, `rss_linkto`, `rss_content`, `rss_media`, `rss_show_summary`, and `rss_show_deleted`.
+- [x] Support `rss_type`, `rss_linkto`, `rss_content`, `rss_media`, `rss_show_summary`, and `rss_show_deleted`.
 - [ ] Support `sitemap` frequency instead of always exposing sitemap output.
 - [ ] Support `updatecheck` or explicitly remove update notices from the UI.
 - [ ] Support `trustedproxies`, `realip`, and proxy config semantics where they differ from Cloudflare header handling.
@@ -205,13 +205,13 @@ are not fixed by this checklist.
 
 ## Feeds, Sitemap, Manifest, And Discovery
 
-- [ ] Match DokuWiki RSS 0.91, RSS 1.0, RSS 2.0, Atom 0.3, and Atom 1.0 options instead of only the current RSS/Atom outputs.
-- [ ] Match feed item link targets controlled by `rss_linkto`.
-- [ ] Match feed content modes: abstract, diff, HTML diff, and full HTML.
-- [ ] Include or exclude media changes according to `rss_media`.
-- [ ] Match deleted-item feed behavior from `rss_show_deleted`.
-- [ ] Match feed summaries from `rss_show_summary`.
-- [ ] Match feed cache timing from `rss_update`.
+- [x] Match DokuWiki RSS 0.91, RSS 1.0, RSS 2.0, Atom 0.3, and Atom 1.0 options instead of only the current RSS/Atom outputs.
+- [x] Match feed item link targets controlled by `rss_linkto`.
+- [x] Match feed content modes: abstract, diff, HTML diff, and full HTML.
+- [x] Include or exclude media changes according to `rss_media`.
+- [x] Match deleted-item feed behavior from `rss_show_deleted`.
+- [x] Match feed summaries from `rss_show_summary`.
+- [x] Match feed cache timing from `rss_update`.
 - [ ] Match sitemap frequency behavior from `sitemap`, including disabled sitemap mode.
 - [ ] Match OpenSearch and manifest output from upstream `inc/Manifest.php` and `lib/exe/opensearch.php`.
 - [ ] Match robots behavior to upstream and site configuration instead of always allowing all.

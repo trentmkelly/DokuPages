@@ -242,6 +242,18 @@ const EDIT_DERIVED_ACTIONS = new Set([
   "conflict"
 ]);
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
+type FeedType = RuntimeConfig["rssType"];
+
+interface FeedRenderItem {
+  change: RecentChange;
+  title: string;
+  link: string;
+  id: string;
+  updatedAt: string;
+  authorName: string;
+  authorEmail: string;
+  description: string;
+}
 
 interface RenderCacheEntry {
   rendererVersion: number;
@@ -607,14 +619,28 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/feed.php" || url.pathname === "/feed" || url.pathname === "/feed.xml") {
-    return cachedXmlResponse(env, "rss", url, "application/rss+xml; charset=utf-8", () =>
-      renderRssFeed(env, url, anonymousPrincipal())
+    const config = getRuntimeConfig(env);
+    const feedType = feedTypeForUrl(config, url);
+    return cachedXmlResponse(
+      env,
+      "rss",
+      url,
+      feedContentType(feedType),
+      () => renderFeed(env, url, anonymousPrincipal(), feedType),
+      config.rssUpdate
     );
   }
 
   if (url.pathname === "/atom.xml") {
-    return cachedXmlResponse(env, "atom", url, "application/atom+xml; charset=utf-8", () =>
-      renderAtomFeed(env, url, anonymousPrincipal())
+    const config = getRuntimeConfig(env);
+    const feedType = feedTypeForUrl(config, url, "atom1");
+    return cachedXmlResponse(
+      env,
+      "atom",
+      url,
+      feedContentType(feedType),
+      () => renderFeed(env, url, anonymousPrincipal(), feedType),
+      config.rssUpdate
     );
   }
 
@@ -7388,66 +7414,162 @@ ${urls}
 </urlset>`;
 }
 
-async function renderRssFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+async function renderFeed(
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal,
+  feedType: FeedType
+): Promise<string> {
   const config = getRuntimeConfig(env);
   const changes = await filterReadableChanges(
     env,
     principal,
     await listRecentChanges(env.DB, feedItemLimit(url, config), 0, {
       includeMinor: url.searchParams.get("minor") === "1",
+      includeDeleted: config.rssShowDeleted,
       onlyCreates: url.searchParams.get("onlynewpages") === "1",
       namespace: cleanPageId(url.searchParams.get("ns") ?? ""),
       since: recentSinceIso(config),
       subjectType: feedSubjectType(env, url)
     })
   );
+
+  const items = await Promise.all(
+    changes.map((change) => feedRenderItem(env, url, config, change))
+  );
+
+  switch (feedType) {
+    case "rss":
+      return renderRss091Feed(url, config, items);
+    case "rss2":
+      return renderRss2Feed(url, config, items);
+    case "atom":
+      return renderAtom03Feed(url, config, items);
+    case "atom1":
+      return renderAtom10Feed(url, config, items);
+    case "rss1":
+    default:
+      return renderRss1Feed(url, config, items);
+  }
+}
+
+function renderRss091Feed(url: URL, config: RuntimeConfig, items: FeedRenderItem[]): string {
+  return renderRssChannelFeed("0.91", url, config, items);
+}
+
+function renderRss2Feed(url: URL, config: RuntimeConfig, items: FeedRenderItem[]): string {
+  return renderRssChannelFeed("2.0", url, config, items);
+}
+
+function renderRssChannelFeed(
+  version: "0.91" | "2.0",
+  url: URL,
+  config: RuntimeConfig,
+  items: FeedRenderItem[]
+): string {
   const title = config.siteName;
-  const items = changes
+  const feedItems = items
     .map(
-      (change) => `<item>
-  <title>${escapeXml(`${change.changeType}: ${change.subjectId}`)}</title>
-  <link>${escapeXml(new URL(feedChangeLink(change), url).href)}</link>
-  <guid>${escapeXml(change.id)}</guid>
-  <pubDate>${escapeXml(new Date(change.createdAt).toUTCString())}</pubDate>
-  <description>${escapeXml(change.summary || change.changeType)}</description>
+      (item) => `<item>
+  <title>${escapeXml(item.title)}</title>
+  <link>${escapeXml(item.link)}</link>
+  <guid>${escapeXml(item.id)}</guid>
+  <pubDate>${escapeXml(new Date(item.updatedAt).toUTCString())}</pubDate>
+  <description>${escapeXml(item.description)}</description>
+  <author>${escapeXml(`${item.authorEmail} (${item.authorName})`)}</author>
 </item>`
     )
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="${version}">
 <channel>
   <title>${escapeXml(title)}</title>
   <link>${escapeXml(new URL("/", url).href)}</link>
-  <description>${escapeXml(`${title} recent changes`)}</description>
-${items}
+  <description>${escapeXml(config.tagline || `${title} recent changes`)}</description>
+${feedItems}
 </channel>
 </rss>`;
 }
 
-async function renderAtomFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
-  const config = getRuntimeConfig(env);
-  const changes = await filterReadableChanges(
-    env,
-    principal,
-    await listRecentChanges(env.DB, feedItemLimit(url, config), 0, {
-      includeMinor: url.searchParams.get("minor") === "1",
-      onlyCreates: url.searchParams.get("onlynewpages") === "1",
-      namespace: cleanPageId(url.searchParams.get("ns") ?? ""),
-      since: recentSinceIso(config),
-      subjectType: feedSubjectType(env, url)
-    })
-  );
+function renderRss1Feed(url: URL, config: RuntimeConfig, items: FeedRenderItem[]): string {
   const title = config.siteName;
-  const updated = changes[0]?.createdAt ?? new Date(0).toISOString();
-  const entries = changes
+  const feedUrl = new URL(url.pathname + url.search, url).href;
+  const itemSequence = items
+    .map((item) => `        <rdf:li rdf:resource="${escapeXml(item.link)}"/>`)
+    .join("\n");
+  const feedItems = items
     .map(
-      (change) => `<entry>
-  <title>${escapeXml(`${change.changeType}: ${change.subjectId}`)}</title>
-  <link href="${escapeXml(new URL(feedChangeLink(change), url).href)}"/>
-  <id>${escapeXml(change.id)}</id>
-  <updated>${escapeXml(change.createdAt)}</updated>
-  <summary>${escapeXml(change.summary || change.changeType)}</summary>
+      (item) => `    <item rdf:about="${escapeXml(item.link)}">
+        <title>${escapeXml(item.title)}</title>
+        <link>${escapeXml(item.link)}</link>
+        <description>${escapeXml(item.description)}</description>
+        <dc:date>${escapeXml(item.updatedAt)}</dc:date>
+        <dc:creator>${escapeXml(`${item.authorName} (${item.authorEmail})`)}</dc:creator>
+    </item>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+    xmlns="http://purl.org/rss/1.0/"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel rdf:about="${escapeXml(feedUrl)}">
+        <title>${escapeXml(title)}</title>
+        <description>${escapeXml(config.tagline || `${title} recent changes`)}</description>
+        <link>${escapeXml(new URL("/", url).href)}</link>
+        <items>
+            <rdf:Seq>
+${itemSequence}
+            </rdf:Seq>
+        </items>
+    </channel>
+${feedItems}
+</rdf:RDF>`;
+}
+
+function renderAtom03Feed(url: URL, config: RuntimeConfig, items: FeedRenderItem[]): string {
+  const title = config.siteName;
+  const updated = items[0]?.updatedAt ?? new Date(0).toISOString();
+  const entries = items
+    .map(
+      (item) => `    <entry>
+        <title>${escapeXml(item.title)}</title>
+        <link rel="alternate" type="text/html" href="${escapeXml(item.link)}"/>
+        <id>${escapeXml(item.link)}</id>
+        <created>${escapeXml(item.updatedAt)}</created>
+        <issued>${escapeXml(item.updatedAt)}</issued>
+        <modified>${escapeXml(item.updatedAt)}</modified>
+        <author><name>${escapeXml(item.authorName)}</name></author>
+        <summary>${escapeXml(item.description)}</summary>
+    </entry>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed version="0.3" xmlns="http://purl.org/atom/ns#">
+    <title>${escapeXml(title)}</title>
+    <tagline>${escapeXml(config.tagline || `${title} recent changes`)}</tagline>
+    <link rel="alternate" type="text/html" href="${escapeXml(new URL("/", url).href)}"/>
+    <id>${escapeXml(new URL("/", url).href)}</id>
+    <modified>${escapeXml(updated)}</modified>
+${entries}
+</feed>`;
+}
+
+function renderAtom10Feed(url: URL, config: RuntimeConfig, items: FeedRenderItem[]): string {
+  const title = config.siteName;
+  const updated = items[0]?.updatedAt ?? new Date(0).toISOString();
+  const entries = items
+    .map(
+      (item) => `  <entry>
+  <title>${escapeXml(item.title)}</title>
+  <link href="${escapeXml(item.link)}"/>
+  <id>${escapeXml(item.id)}</id>
+  <updated>${escapeXml(item.updatedAt)}</updated>
+  <author><name>${escapeXml(item.authorName)}</name><email>${escapeXml(item.authorEmail)}</email></author>
+  <summary type="html">${escapeXml(item.description)}</summary>
 </entry>`
     )
     .join("\n");
@@ -7476,10 +7598,244 @@ function feedItemLimit(url: URL, config: RuntimeConfig): number {
   return Number.isFinite(raw) && raw >= 0 ? raw : config.recentEntries;
 }
 
-function feedChangeLink(change: RecentChange): string {
-  return change.subjectType === "media"
-    ? mediaDetailPath(change.subjectId)
-    : pagePath(change.subjectId);
+async function feedRenderItem(
+  env: Env,
+  url: URL,
+  config: RuntimeConfig,
+  change: RecentChange
+): Promise<FeedRenderItem> {
+  const link = new URL(feedChangeLink(change, config.rssLinkTo), url).href;
+  const authorName = feedAuthorName(change);
+
+  return {
+    change,
+    title: feedItemTitle(change, config),
+    link,
+    id: change.id,
+    updatedAt: change.createdAt,
+    authorName,
+    authorEmail: feedAuthorEmail(change),
+    description: await feedItemDescription(env, change, config)
+  };
+}
+
+function feedItemTitle(change: RecentChange, config: RuntimeConfig): string {
+  const baseTitle =
+    change.subjectType === "media"
+      ? mediaName(change.subjectId)
+      : (change.subjectId.split(":").at(-1) ?? change.subjectId);
+  return config.rssShowSummary && change.summary ? `${baseTitle} - ${change.summary}` : baseTitle;
+}
+
+function feedChangeLink(change: RecentChange, linkTo: RuntimeConfig["rssLinkTo"]): string {
+  const revision = change.revisionId ? encodeURIComponent(change.revisionId) : "";
+
+  if (change.subjectType === "media") {
+    switch (linkTo) {
+      case "page":
+        return revision
+          ? `${mediaDetailPath(change.subjectId)}?rev=${revision}`
+          : mediaDetailPath(change.subjectId);
+      case "rev":
+        return revision
+          ? `${mediaDetailPath(change.subjectId)}?rev=${revision}#media__revisions`
+          : `${mediaDetailPath(change.subjectId)}#media__revisions`;
+      case "current":
+        return mediaDetailPath(change.subjectId);
+      case "diff":
+      default:
+        return revision
+          ? `${mediaDetailPath(change.subjectId)}?mediado=diff&rev=${revision}`
+          : mediaDetailPath(change.subjectId);
+    }
+  }
+
+  switch (linkTo) {
+    case "page":
+      return revision
+        ? `${pagePath(change.subjectId)}?rev=${revision}`
+        : pagePath(change.subjectId);
+    case "rev":
+      return revision
+        ? `${pagePath(change.subjectId)}?rev=${revision}&do=revisions`
+        : `${pagePath(change.subjectId)}?do=revisions`;
+    case "current":
+      return pagePath(change.subjectId);
+    case "diff":
+    default:
+      return revision
+        ? `${pagePath(change.subjectId)}?rev=${revision}&do=diff`
+        : `${pagePath(change.subjectId)}?do=diff`;
+  }
+}
+
+async function feedItemDescription(
+  env: Env,
+  change: RecentChange,
+  config: RuntimeConfig
+): Promise<string> {
+  if (change.subjectType === "media") {
+    return mediaFeedDescription(change, config.rssContent);
+  }
+
+  switch (config.rssContent) {
+    case "diff":
+      return pageFeedDiff(env, change, "text");
+    case "htmldiff":
+      return pageFeedDiff(env, change, "html");
+    case "html":
+      return pageFeedHtml(env, change, config);
+    case "abstract":
+    default:
+      return pageFeedAbstract(env, change);
+  }
+}
+
+async function pageFeedAbstract(env: Env, change: RecentChange): Promise<string> {
+  const revision = await feedPageRevision(env, change);
+  const source = revision?.content ?? change.summary;
+  const firstParagraph =
+    source
+      .replace(/^=+\s*(.*?)\s*=+$/gm, "$1")
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .find(Boolean) ?? "";
+  return firstParagraph || change.summary || change.changeType;
+}
+
+async function pageFeedHtml(
+  env: Env,
+  change: RecentChange,
+  config: RuntimeConfig
+): Promise<string> {
+  const revision = await feedPageRevision(env, change);
+  if (!revision) return escapeHtml(change.summary || change.changeType);
+
+  const rendered = renderWikiText(revision.content, {
+    pageId: revision.pageId,
+    typographyMode: config.typographyMode,
+    pageIdCleanOptions: config.pageIdCleanOptions,
+    linkTargets: config.linkTargets,
+    relNofollow: config.relNofollow
+  });
+  return rendered.html;
+}
+
+async function pageFeedDiff(
+  env: Env,
+  change: RecentChange,
+  mode: "text" | "html"
+): Promise<string> {
+  const pair = await feedPageDiffPair(env, change);
+  if (!pair) return change.summary || change.changeType;
+
+  if (mode === "html") {
+    return `<table>${renderLineDiff(pair.left, pair.right)}</table>`;
+  }
+
+  return renderUnifiedFeedDiff(pair.left, pair.right);
+}
+
+async function feedPageDiffPair(
+  env: Env,
+  change: RecentChange
+): Promise<{ left: string; right: string } | null> {
+  const revision = await feedPageRevision(env, change);
+  if (!revision) return null;
+
+  const revisions = await listPageRevisions(env.DB, revision.pageId, 100, 0);
+  const index = revisions.findIndex((candidate) => candidate.id === revision.id);
+  const previous = index >= 0 ? revisions[index + 1] : null;
+  return {
+    left: previous?.content ?? "",
+    right: revision.content
+  };
+}
+
+async function feedPageRevision(env: Env, change: RecentChange): Promise<PageRevision | null> {
+  if (change.revisionId) {
+    const revision = await getPageRevision(env.DB, change.revisionId);
+    if (revision && revision.pageId === change.subjectId) return revision;
+  }
+
+  const current = await getCurrentPage(env.DB, change.subjectId);
+  return current
+    ? {
+        id: current.revisionId,
+        pageId: current.id,
+        content: current.content,
+        summary: "",
+        changeType: "edit",
+        sizeChange: 0,
+        createdAt: current.updatedAt,
+        author: current.author
+      }
+    : null;
+}
+
+function renderUnifiedFeedDiff(left: string, right: string): string {
+  const oldLines = left.split("\n");
+  const newLines = right.split("\n");
+  const max = Math.max(oldLines.length, newLines.length);
+  const lines = ["--- old", "+++ new"];
+
+  for (let index = 0; index < max; index += 1) {
+    const oldLine = oldLines[index] ?? "";
+    const newLine = newLines[index] ?? "";
+    if (oldLine === newLine) {
+      if (oldLine) lines.push(` ${oldLine}`);
+      continue;
+    }
+    if (oldLine) lines.push(`-${oldLine}`);
+    if (newLine) lines.push(`+${newLine}`);
+  }
+
+  return `<pre>${escapeHtml(lines.join("\n"))}</pre>`;
+}
+
+function mediaFeedDescription(change: RecentChange, content: RuntimeConfig["rssContent"]): string {
+  const summary = change.summary || change.changeType;
+  if (content === "diff" || content === "htmldiff") {
+    return `<table><tr><th>Media</th><th>Change</th></tr><tr><td>${escapeHtml(
+      change.subjectId
+    )}</td><td>${escapeHtml(summary)}</td></tr></table>`;
+  }
+  if (content === "html") {
+    return `<p>${escapeHtml(mediaName(change.subjectId))}</p><p>${escapeHtml(summary)}</p>`;
+  }
+  return summary;
+}
+
+function feedAuthorName(change: RecentChange): string {
+  return (
+    change.user?.displayName?.trim() ||
+    change.user?.username?.trim() ||
+    change.userName?.trim() ||
+    "Anonymous"
+  );
+}
+
+function feedAuthorEmail(change: RecentChange): string {
+  return change.user?.email?.trim() || `${change.userName || "anonymous"}@undisclosed.example.com`;
+}
+
+function feedTypeForUrl(config: RuntimeConfig, url: URL, forcedType?: FeedType): FeedType {
+  const raw = url.searchParams.get("type") ?? forcedType ?? config.rssType;
+  return raw === "rss" || raw === "rss2" || raw === "atom" || raw === "atom1" ? raw : "rss1";
+}
+
+function feedContentType(type: FeedType): string {
+  switch (type) {
+    case "atom":
+      return "application/xml; charset=utf-8";
+    case "atom1":
+      return "application/atom+xml; charset=utf-8";
+    case "rss":
+    case "rss1":
+    case "rss2":
+    default:
+      return "text/xml; charset=utf-8";
+  }
 }
 
 function renderOpenSearch(env: Env, url: URL): string {
@@ -13275,12 +13631,16 @@ async function cachedXmlResponse(
   kind: DiscoveryCacheKind,
   url: URL,
   contentType: string,
-  render: () => Promise<string>
+  render: () => Promise<string>,
+  cacheTtlSeconds = DISCOVERY_CACHE_TTL_SECONDS
 ): Promise<Response> {
   const startedAt = Date.now();
   const cacheKey = discoveryCacheKey(kind, url);
-  const cached = await readTextCache(env, cacheKey);
-  const cacheHeaders = { "cache-control": `public, max-age=${DISCOVERY_CACHE_TTL_SECONDS}` };
+  const safeTtl = Math.max(0, cacheTtlSeconds);
+  const cached = safeTtl > 0 ? await readTextCache(env, cacheKey) : null;
+  const cacheHeaders = {
+    "cache-control": safeTtl > 0 ? `public, max-age=${safeTtl}` : "no-cache"
+  };
 
   if (cached) {
     logMetric("cache_metric", {
@@ -13301,14 +13661,16 @@ async function cachedXmlResponse(
     durationMs: elapsedSince(startedAt)
   });
   const body = await render();
-  await writeTextCache(env, cacheKey, body, DISCOVERY_CACHE_TTL_SECONDS);
-  logMetric("cache_metric", {
-    cache: "discovery",
-    kind,
-    action: "write",
-    cacheKey,
-    durationMs: elapsedSince(startedAt)
-  });
+  if (safeTtl > 0) {
+    await writeTextCache(env, cacheKey, body, safeTtl);
+    logMetric("cache_metric", {
+      cache: "discovery",
+      kind,
+      action: "write",
+      cacheKey,
+      durationMs: elapsedSince(startedAt)
+    });
+  }
   return xmlResponse(body, contentType, cacheHeaders);
 }
 

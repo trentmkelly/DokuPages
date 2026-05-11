@@ -19,8 +19,8 @@ describe("DokuWiki config coverage map", () => {
     expect(DOKUWIKI_CONFIG_COVERAGE).toHaveLength(115);
     expect(DOKUWIKI_CONFIG_COVERAGE.every((entry) => Boolean(entry.status))).toBe(true);
     expect(configCoverageCounts()).toEqual({
-      implemented: 61,
-      imported_metadata_only: 14,
+      implemented: 67,
+      imported_metadata_only: 8,
       intentionally_unsupported: 31,
       not_yet_evaluated: 9
     });
@@ -29,7 +29,7 @@ describe("DokuWiki config coverage map", () => {
   it("classifies representative implemented, metadata-only, unsupported, and unevaluated settings", () => {
     expect(DOKUWIKI_CONFIG_KEYS).toContain("trustedproxies");
     expect(coverageStatusForDokuWikiConfigKey("useacl")).toBe("implemented");
-    expect(coverageStatusForDokuWikiConfigKey("rss_type")).toBe("imported_metadata_only");
+    expect(coverageStatusForDokuWikiConfigKey("rss_type")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("savedir")).toBe("intentionally_unsupported");
     expect(coverageStatusForDokuWikiConfigKey("trustedproxies")).toBe("not_yet_evaluated");
   });

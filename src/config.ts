@@ -83,7 +83,13 @@ export interface RuntimeConfig {
   mediaRevisions: boolean;
   ieXssProtect: boolean;
   fetchSize: number;
+  rssType: "rss" | "rss1" | "rss2" | "atom" | "atom1";
+  rssLinkTo: "diff" | "page" | "rev" | "current";
+  rssContent: "abstract" | "diff" | "htmldiff" | "html";
   rssMedia: "pages" | "media" | "both";
+  rssUpdate: number;
+  rssShowSummary: boolean;
+  rssShowDeleted: boolean;
   searchNsLimit: number;
   searchFragment: "exact" | "starts_with" | "ends_with" | "contains";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
@@ -192,7 +198,13 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
     ieXssProtect: booleanConfig(env.IEXSSPROTECT, true),
     fetchSize: integerConfig(env.FETCHSIZE, 0, 0, 100 * 1024 * 1024),
+    rssType: rssTypeConfig(env.RSS_TYPE),
+    rssLinkTo: rssLinkToConfig(env.RSS_LINKTO),
+    rssContent: rssContentConfig(env.RSS_CONTENT),
     rssMedia: rssMediaConfig(env.RSS_MEDIA),
+    rssUpdate: integerConfig(env.RSS_UPDATE, 5 * 60, 0, 24 * 60 * 60),
+    rssShowSummary: booleanConfig(env.RSS_SHOW_SUMMARY, true),
+    rssShowDeleted: booleanConfig(env.RSS_SHOW_DELETED, true),
     searchNsLimit: integerConfig(env.SEARCH_NSLIMIT, 0, 0, 99),
     searchFragment: searchFragmentConfig(env.SEARCH_FRAGMENT),
     pageIdCleanOptions,
@@ -239,7 +251,11 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateIntegerRange("FETCHSIZE", env.FETCHSIZE, 0, 100 * 1024 * 1024, issues);
+  validateRssType(env.RSS_TYPE, issues);
+  validateRssLinkTo(env.RSS_LINKTO, issues);
+  validateRssContent(env.RSS_CONTENT, issues);
   validateRssMedia(env.RSS_MEDIA, issues);
+  validateIntegerRange("RSS_UPDATE", env.RSS_UPDATE, 0, 24 * 60 * 60, issues);
   validateIntegerRange("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, 0, 99, issues);
   validateSearchFragment(env.SEARCH_FRAGMENT, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
@@ -333,7 +349,13 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
     configEntry("IEXSSPROTECT", env.IEXSSPROTECT, String(config.ieXssProtect), "true"),
     configEntry("FETCHSIZE", env.FETCHSIZE, String(config.fetchSize), "0"),
+    configEntry("RSS_TYPE", env.RSS_TYPE, config.rssType, "rss1"),
+    configEntry("RSS_LINKTO", env.RSS_LINKTO, config.rssLinkTo, "diff"),
+    configEntry("RSS_CONTENT", env.RSS_CONTENT, config.rssContent, "abstract"),
     configEntry("RSS_MEDIA", env.RSS_MEDIA, config.rssMedia, "both"),
+    configEntry("RSS_UPDATE", env.RSS_UPDATE, String(config.rssUpdate), String(5 * 60)),
+    configEntry("RSS_SHOW_SUMMARY", env.RSS_SHOW_SUMMARY, String(config.rssShowSummary), "true"),
+    configEntry("RSS_SHOW_DELETED", env.RSS_SHOW_DELETED, String(config.rssShowDeleted), "true"),
     configEntry("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, String(config.searchNsLimit), "0"),
     configEntry("SEARCH_FRAGMENT", env.SEARCH_FRAGMENT, config.searchFragment, "exact"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
@@ -723,14 +745,35 @@ function validateSepchar(value: string | undefined, issues: ConfigValidationIssu
 }
 
 function validateRssMedia(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  validateChoice("RSS_MEDIA", value, ["pages", "media", "both"], issues);
+}
+
+function validateRssType(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  validateChoice("RSS_TYPE", value, ["rss", "rss1", "rss2", "atom", "atom1"], issues);
+}
+
+function validateRssLinkTo(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  validateChoice("RSS_LINKTO", value, ["diff", "page", "rev", "current"], issues);
+}
+
+function validateRssContent(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  validateChoice("RSS_CONTENT", value, ["abstract", "diff", "htmldiff", "html"], issues);
+}
+
+function validateChoice(
+  key: string,
+  value: string | undefined,
+  choices: string[],
+  issues: ConfigValidationIssue[]
+): void {
   const raw = nonEmpty(value);
   if (!raw) return;
 
-  if (!["pages", "media", "both"].includes(raw)) {
+  if (!choices.includes(raw)) {
     issues.push({
-      key: "RSS_MEDIA",
+      key,
       severity: "error",
-      message: "RSS_MEDIA must be one of 'pages', 'media', or 'both'."
+      message: `${key} must be one of ${choices.map((choice) => `'${choice}'`).join(", ")}.`
     });
   }
 }
@@ -882,7 +925,9 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "CANONICAL_URLS",
   "AUTOPLURAL",
   "SEND404",
-  "HTMLMAIL"
+  "HTMLMAIL",
+  "RSS_SHOW_SUMMARY",
+  "RSS_SHOW_DELETED"
 ] as const satisfies readonly (keyof Env)[];
 
 function validateMetadataBackedRuntimeConfig(env: Env, issues: ConfigValidationIssue[]): void {
@@ -1091,6 +1136,21 @@ function fnencodeConfig(value: string | undefined): DokuWikiFnEncode {
 function sepcharConfig(value: string | undefined): string {
   const raw = nonEmpty(value);
   return raw && /^[A-Za-z0-9_.-]$/.test(raw) ? raw : "_";
+}
+
+function rssTypeConfig(value: string | undefined): RuntimeConfig["rssType"] {
+  const raw = nonEmpty(value);
+  return raw === "rss" || raw === "rss2" || raw === "atom" || raw === "atom1" ? raw : "rss1";
+}
+
+function rssLinkToConfig(value: string | undefined): RuntimeConfig["rssLinkTo"] {
+  const raw = nonEmpty(value);
+  return raw === "page" || raw === "rev" || raw === "current" ? raw : "diff";
+}
+
+function rssContentConfig(value: string | undefined): RuntimeConfig["rssContent"] {
+  const raw = nonEmpty(value);
+  return raw === "diff" || raw === "htmldiff" || raw === "html" ? raw : "abstract";
 }
 
 function rssMediaConfig(value: string | undefined): RuntimeConfig["rssMedia"] {
