@@ -106,8 +106,11 @@ the active principal. `SNEAKY_INDEX=1` prevents namespace indexes from listing a
 namespace that lacks namespace-level read permission.
 
 `/admin/acl` provides a native ACL manager for principals that match the
-DokuWiki-style `SUPERUSER` member list. It can add, update, and delete D1-backed
-ACL rules and uses the same CSRF protection as other state-changing routes.
+DokuWiki-style `SUPERUSER` member list. It can browse namespaces directly, add
+or update a selected principal's rule, and bulk update or bulk delete current
+D1-backed ACL rules. Page-scoped permissions are clamped to edit-level access,
+matching DokuWiki's page permission ceiling. ACL writes use the same CSRF
+protection as other state-changing routes.
 
 Admin ACL changes and search index rebuilds are recorded in D1 `audit_log` rows.
 The admin-only `/admin/audit` page exposes the recent entries for operational

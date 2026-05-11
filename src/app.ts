@@ -525,6 +525,10 @@ async function dispatchRequest(
     return handleAclRuleUpsert(request, env, principal);
   }
 
+  if (url.pathname === "/api/admin/acl/bulk" && request.method === "POST") {
+    return handleAclRuleBulkUpdate(request, env, principal);
+  }
+
   if (url.pathname === "/api/admin/acl/delete" && request.method === "POST") {
     return handleAclRuleDelete(request, env, principal);
   }
@@ -6071,13 +6075,14 @@ async function renderAclAdminPage(
     exactRule,
     csrfToken
   );
-  const rows = rules.map((rule) => renderAclRuleRow(rule, csrfToken)).join("");
+  const rows = rules.map(renderAclRuleRow).join("");
 
   return htmlShell(
     env,
     "Access Control List Management",
     `<div id="acl_manager">
       <h1>Access Control List Management</h1>
+      ${renderAclAdminNotice(url)}
       <div class="level1 group">
         <div id="acl__tree">${tree}</div>
         <div id="acl__detail">${detail}</div>
@@ -6085,12 +6090,19 @@ async function renderAclAdminPage(
       <div class="clearer"></div>
       <h2>Current ACL Rules</h2>
       <div class="level2">
-        <table class="inline acl__rules">
-          <thead>
-            <tr><th>Page/Namespace</th><th>User/Group</th><th>Permissions</th><th>Delete</th></tr>
-          </thead>
-          <tbody>${rows || '<tr><td colspan="4">No ACL rules configured.</td></tr>'}</tbody>
-        </table>
+        <form id="acl__bulk" method="post" action="/api/admin/acl/bulk">
+          ${csrfInput(csrfToken)}
+          <table class="inline acl__rules">
+            <thead>
+              <tr><th>Page/Namespace</th><th>User/Group</th><th>Permissions</th><th>Delete</th></tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="4">No ACL rules configured.</td></tr>'}</tbody>
+          </table>
+          <p class="acl__bulk_actions">
+            <button type="submit" name="run" value="update"${rules.length ? "" : " disabled"}>Update Selected Rules</button>
+            <button type="submit" name="run" value="delete"${rules.length ? "" : " disabled"}>Delete Selected Rules</button>
+          </p>
+        </form>
       </div>
       <div class="footnotes"><div class="fn"><sup>1)</sup><div class="content">Higher permissions include lower ones. Create, Upload and Delete permissions only apply to namespaces, not pages.</div></div></div>
     </div>`,
@@ -6098,20 +6110,34 @@ async function renderAclAdminPage(
   );
 }
 
-function renderAclRuleRow(rule: AclRuleRecord, csrfToken: string): string {
+function renderAclAdminNotice(url: URL): string {
+  const bulkUpdated = Number.parseInt(url.searchParams.get("bulkUpdated") ?? "", 10);
+  if (Number.isFinite(bulkUpdated) && bulkUpdated > 0) {
+    return `<div class="success">${bulkUpdated} ACL rule${bulkUpdated === 1 ? "" : "s"} updated.</div>`;
+  }
+
+  const bulkDeleted = Number.parseInt(url.searchParams.get("bulkDeleted") ?? "", 10);
+  if (Number.isFinite(bulkDeleted) && bulkDeleted > 0) {
+    return `<div class="success">${bulkDeleted} ACL rule${bulkDeleted === 1 ? "" : "s"} deleted.</div>`;
+  }
+
+  return "";
+}
+
+function renderAclRuleRow(rule: AclRuleRecord): string {
   const scopeClass = isAclNamespaceScope(rule.scope) ? "aclns" : "aclpage";
   const principalClass = rule.principalType === "user" ? "acluser" : "aclgroup";
+  const isPage = !isAclNamespaceScope(rule.scope);
 
   return `<tr>
     <td><span class="${scopeClass}">${escapeHtml(rule.scope)}</span></td>
     <td><span class="${principalClass}">${escapeHtml(rule.principal)}</span></td>
-    <td>${escapeHtml(aclPermissionLabel(rule.permission))}</td>
+    <td>
+      <input type="hidden" name="rule" value="${escapeAttribute(rule.id)}">
+      ${renderAclPermissionRadios(rule.permission, isPage, `permission:${rule.id}`)}
+    </td>
     <td class="check">
-      <form method="post" action="/api/admin/acl/delete">
-        ${csrfInput(csrfToken)}
-        <input type="hidden" name="id" value="${escapeAttribute(rule.id)}">
-        <button type="submit">Delete</button>
-      </form>
+      <label><input type="checkbox" name="delete" value="${escapeAttribute(rule.id)}"> Delete</label>
     </td>
   </tr>`;
 }
@@ -6248,7 +6274,16 @@ async function renderAclExplorer(env: Env, selection: AclScopeSelection): Promis
     })
     .join("");
 
-  return `<ul class="idx">${items}</ul>`;
+  const namespaceValue =
+    selection.kind === "namespace" && selection.id !== "*" ? escapeAttribute(selection.id) : "";
+
+  return `<form class="acl__namespace" method="get" action="/admin/acl">
+      <label for="acl__namespace_input">Namespace</label>
+      <input id="acl__namespace_input" type="text" name="ns" class="edit" value="${namespaceValue}" placeholder="wiki">
+      <button type="submit">Browse namespace</button>
+      <a href="/admin/acl?ns=*">Root namespace</a>
+    </form>
+    <ul class="idx">${items}</ul>`;
 }
 
 function collectAclNamespaces(pageIds: string[], mediaNamespaces: string[]): string[] {
@@ -6502,13 +6537,14 @@ function renderAclEditor(
 }
 
 function renderAclPermissionRadios(selected: number | null, isPage: boolean, name: string): string {
+  const idName = name.replace(/[^a-zA-Z0-9_-]/g, "_");
   return [ACL_NONE, ACL_READ, ACL_EDIT, ACL_CREATE, ACL_UPLOAD, ACL_DELETE]
     .map((permission) => {
       const disabled = isPage && permission > ACL_EDIT;
       const checked =
         selected === permission ||
         (isPage && selected !== null && selected > ACL_EDIT && permission === ACL_EDIT);
-      const id = `acl_${name}_${permission}_${isPage ? "page" : "ns"}`;
+      const id = `acl_${idName}_${permission}_${isPage ? "page" : "ns"}`;
       return `<label for="${id}"${disabled ? ' class="disabled"' : ""}><input id="${id}" type="radio" name="${escapeAttribute(name)}" value="${permission}"${checked ? " checked" : ""}${disabled ? " disabled" : ""}> ${escapeHtml(aclPermissionLabel(permission))}</label>`;
     })
     .join("");
@@ -7211,6 +7247,101 @@ async function handleAclRuleUpsert(
   return redirectResponse("/admin/acl");
 }
 
+async function handleAclRuleBulkUpdate(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await request.formData();
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal, env)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const run = String(form.get("run") ?? "update");
+  if (run !== "update" && run !== "delete") {
+    return aclAdminErrorResponse(request, env, "Invalid ACL bulk operation.");
+  }
+
+  const store = new D1AclStore(env.DB);
+  const rules = await store.listAllRules();
+  const rulesById = new Map(rules.map((rule) => [rule.id, rule]));
+
+  if (run === "delete") {
+    const deleteIds = uniqueFormStringValues(form, "delete");
+    if (deleteIds.length === 0) {
+      return aclAdminErrorResponse(request, env, "No ACL rules selected.");
+    }
+
+    const existingIds = deleteIds.filter((id) => rulesById.has(id));
+    for (const id of existingIds) {
+      await store.deleteRule(id);
+    }
+
+    await appendAdminAuditLog(request, env, principal, {
+      action: "acl_rules_bulk_delete",
+      targetType: "acl_rule",
+      targetId: null,
+      details: {
+        ruleIds: existingIds,
+        deletedCount: existingIds.length
+      }
+    });
+
+    if (acceptsJson(request)) {
+      return jsonResponse({ ok: true, deletedCount: existingIds.length });
+    }
+    return redirectResponse(`/admin/acl?bulkDeleted=${existingIds.length}`);
+  }
+
+  const ruleIds = uniqueFormStringValues(form, "rule");
+  if (ruleIds.length === 0) {
+    return aclAdminErrorResponse(request, env, "No ACL rules are available to update.");
+  }
+
+  const updatedRules: AclRuleRecord[] = [];
+  for (const id of ruleIds) {
+    const rule = rulesById.get(id);
+    if (!rule) continue;
+
+    const rawPermission = form.get(`permission:${id}`);
+    const permission = Number.parseInt(String(rawPermission ?? ""), 10);
+    if (![ACL_NONE, ACL_READ, ACL_EDIT, ACL_CREATE, ACL_UPLOAD, ACL_DELETE].includes(permission)) {
+      return aclAdminErrorResponse(request, env, `Invalid ACL permission for ${rule.scope}.`);
+    }
+
+    updatedRules.push({
+      ...rule,
+      permission: isAclNamespaceScope(rule.scope) ? permission : Math.min(permission, ACL_EDIT)
+    });
+  }
+
+  if (updatedRules.length === 0) {
+    return aclAdminErrorResponse(request, env, "No matching ACL rules were found.");
+  }
+
+  for (const rule of updatedRules) {
+    await store.putRule(rule);
+  }
+
+  await appendAdminAuditLog(request, env, principal, {
+    action: "acl_rules_bulk_update",
+    targetType: "acl_rule",
+    targetId: null,
+    details: {
+      ruleIds: updatedRules.map((rule) => rule.id),
+      updatedCount: updatedRules.length
+    }
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, updatedCount: updatedRules.length });
+  }
+  return redirectResponse(`/admin/acl?bulkUpdated=${updatedRules.length}`);
+}
+
 async function handleAclRuleDelete(
   request: Request,
   env: Env,
@@ -7237,6 +7368,17 @@ async function handleAclRuleDelete(
     details: {}
   });
   return redirectResponse("/admin/acl");
+}
+
+function uniqueFormStringValues(form: FormData, name: string): string[] {
+  return [
+    ...new Set(
+      form
+        .getAll(name)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+    )
+  ];
 }
 
 async function handleUserAdminUpdate(

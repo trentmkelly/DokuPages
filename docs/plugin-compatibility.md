@@ -8,7 +8,7 @@ path.
 
 | Plugin         | Pages decision                                                                                                                                |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `acl`          | Replaced by native ACL matching and `/admin/acl`.                                                                                             |
+| `acl`          | Replaced by native ACL matching and `/admin/acl` with namespace browsing, selected-rule editing, and current-rule bulk edit/delete support.   |
 | `authplain`    | Replaced by D1-backed users, groups, sessions, and importer support.                                                                          |
 | `config`       | Permanently read-only in Pages runtime; replaced by validated environment variables, `/admin/config`, and redacted config export.             |
 | `extension`    | DokuWiki-styled `/admin/extension` unsupported page; plugin code upload/install is unavailable in production Pages runtime.                   |

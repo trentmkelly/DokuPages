@@ -1329,6 +1329,11 @@ describe("auth routes", () => {
       title: "Welcome",
       content: "====== Welcome ======\n\nBody."
     });
+    await seedPage(env.DB, {
+      id: "docs:guide:start",
+      title: "Guide Start",
+      content: "====== Guide Start ======\n\nBody."
+    });
     const cookie = await loginAsAlice(env);
 
     const denied = await handleRequest(new Request("https://example.com/admin/acl"), env);
@@ -1352,9 +1357,13 @@ describe("auth routes", () => {
     expect(html).toContain('id="acl_manager"');
     expect(html).toContain('id="acl__tree"');
     expect(html).toContain('id="acl__detail"');
+    expect(html).toContain('id="acl__namespace_input"');
+    expect(html).toContain("Browse namespace");
     expect(html).toContain('name="acl_t"');
     expect(html).toContain("/admin/acl?ns=wiki");
     expect(html).toContain("/admin/acl?id=wiki%3Awelcome");
+    expect(html).toContain("/admin/acl?ns=docs");
+    expect(html).toContain("/admin/acl?id=docs%3Aguide%3Astart");
     expect(html).toContain("Current ACL Rules");
 
     const rebuild = await handleRequest(
@@ -1414,6 +1423,103 @@ describe("auth routes", () => {
     await expect(env.DB.prepare("select * from acl_rules").bind().all()).resolves.toEqual({
       results: []
     });
+
+    const namespaceRule = new FormData();
+    namespaceRule.set("scope", "private:*");
+    namespaceRule.set("principalType", "group");
+    namespaceRule.set("principal", "admin");
+    namespaceRule.set("permission", "16");
+    await handleRequest(
+      new Request("https://example.com/api/admin/acl", {
+        method: "POST",
+        body: namespaceRule,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    const pageRule = new FormData();
+    pageRule.set("scope", "docs:guide:start");
+    pageRule.set("principalType", "user");
+    pageRule.set("principal", "alice");
+    pageRule.set("permission", "2");
+    await handleRequest(
+      new Request("https://example.com/api/admin/acl", {
+        method: "POST",
+        body: pageRule,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    const currentRulesPage = await handleRequest(
+      new Request("https://example.com/admin/acl?ns=docs", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const currentRulesHtml = await currentRulesPage.text();
+    const currentRules = await env.DB.prepare("select id, scope from acl_rules order by scope")
+      .bind()
+      .all();
+    const docsRule = currentRules.results.find((rule) => rule.scope === "docs:guide:start");
+    const privateRule = currentRules.results.find((rule) => rule.scope === "private:*");
+
+    expect(docsRule).toBeTruthy();
+    expect(privateRule).toBeTruthy();
+    expect(currentRulesPage.status).toBe(200);
+    expect(currentRulesHtml).toContain('action="/api/admin/acl/bulk"');
+    expect(currentRulesHtml).toContain('id="acl__namespace_input"');
+    expect(currentRulesHtml).toContain('value="docs"');
+    expect(currentRulesHtml).toContain(`name="permission:${docsRule.id}"`);
+    expect(currentRulesHtml).toContain(`name="permission:${privateRule.id}"`);
+
+    const bulkUpdate = new FormData();
+    bulkUpdate.set("run", "update");
+    bulkUpdate.append("rule", privateRule.id);
+    bulkUpdate.append("rule", docsRule.id);
+    bulkUpdate.set(`permission:${privateRule.id}`, "1");
+    bulkUpdate.set(`permission:${docsRule.id}`, "16");
+
+    const bulkUpdated = await handleRequest(
+      new Request("https://example.com/api/admin/acl/bulk", {
+        method: "POST",
+        body: bulkUpdate,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(bulkUpdated.status).toBe(303);
+    expect(bulkUpdated.headers.get("location")).toBe("/admin/acl?bulkUpdated=2");
+    await expect(
+      env.DB.prepare("select scope, permission from acl_rules order by scope").bind().all()
+    ).resolves.toEqual({
+      results: [
+        { scope: "docs:guide:start", permission: 2 },
+        { scope: "private:*", permission: 1 }
+      ]
+    });
+
+    const bulkDelete = new FormData();
+    bulkDelete.set("run", "delete");
+    bulkDelete.append("delete", privateRule.id);
+    bulkDelete.append("delete", docsRule.id);
+
+    const bulkDeleted = await handleRequest(
+      new Request("https://example.com/api/admin/acl/bulk", {
+        method: "POST",
+        body: bulkDelete,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(bulkDeleted.status).toBe(303);
+    expect(bulkDeleted.headers.get("location")).toBe("/admin/acl?bulkDeleted=2");
+    await expect(env.DB.prepare("select * from acl_rules").bind().all()).resolves.toEqual({
+      results: []
+    });
     await expect(
       env.DB.prepare(
         "select action, target_type, target_id, details_json from audit_log order by action"
@@ -1430,6 +1536,14 @@ describe("auth routes", () => {
           action: "acl_rule_upsert",
           target_type: "acl_rule",
           target_id: expect.stringContaining("private")
+        }),
+        expect.objectContaining({
+          action: "acl_rules_bulk_delete",
+          target_type: "acl_rule"
+        }),
+        expect.objectContaining({
+          action: "acl_rules_bulk_update",
+          target_type: "acl_rule"
         }),
         expect.objectContaining({
           action: "search_index_rebuild",

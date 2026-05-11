@@ -5,7 +5,8 @@ Native admin routes use D1-backed session principals and DokuWiki-style
 `SUPERUSER=@admin` and `MANAGER=@manager`.
 
 - `/admin` is the admin dashboard and requires a `MANAGER` or `SUPERUSER` match.
-- `/admin/acl` manages ACL rules and requires a `SUPERUSER` match.
+- `/admin/acl` manages ACL rules, supports namespace browsing, supports
+  current-rule bulk permission edits/deletes, and requires a `SUPERUSER` match.
 - `/admin/config` shows validated read-only runtime configuration, secret
   status, and export links and requires a `SUPERUSER` match. Unlike DokuWiki's
   bundled config plugin, this route is permanently read-only in the Pages
@@ -47,11 +48,11 @@ rendered cache. Manager users can view the dashboard but cannot edit ACL rules,
 manage users, inspect audit logs, inspect/export configuration, run rebuild
 actions, clean up media, or purge caches unless they also match `SUPERUSER`.
 
-Admin ACL upserts, ACL deletes, user updates, cache purges, media cleanups, and
-search index rebuilds append rows to the D1 `audit_log` table with the actor,
-action, target, request IP, and action-specific JSON details. Legacy
-`data/log` files from a source DokuWiki install are intentionally not imported
-or displayed by this page.
+Admin ACL upserts, ACL deletes, ACL bulk edits/deletes, user updates, cache
+purges, media cleanups, and search index rebuilds append rows to the D1
+`audit_log` table with the actor, action, target, request IP, and
+action-specific JSON details. Legacy `data/log` files from a source DokuWiki
+install are intentionally not imported or displayed by this page.
 
 Operators can promote an existing native user to the configured DokuWiki
 `SUPERUSER` role without hand-editing D1 rows:
