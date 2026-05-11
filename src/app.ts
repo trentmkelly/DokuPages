@@ -291,6 +291,10 @@ async function dispatchRequest(
     return redirectResponse(versionedAssetPath("/dokuwiki.js", env), 301);
   }
 
+  if (url.pathname === "/theme.css" && request.method === "GET") {
+    return handleThemeCss(env);
+  }
+
   if (url.pathname === "/lib/exe/fetch.php") {
     const media = url.searchParams.get("media") ?? url.searchParams.get("id") ?? "";
     if (isExternalMediaId(media)) {
@@ -473,6 +477,12 @@ async function dispatchRequest(
     return page instanceof Response ? page : htmlResponse(page, { status: 501 });
   }
 
+  if (url.pathname === "/admin/styling" && request.method === "GET") {
+    const csrf = csrfContext(request);
+    const page = await renderStylingAdminPage(request, env, principal, url, csrf.token);
+    return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
+  }
+
   if (url.pathname === "/admin/config" && request.method === "GET") {
     const page = renderConfigAdminPage(request, env, principal);
     return page instanceof Response ? page : htmlResponse(page);
@@ -520,6 +530,10 @@ async function dispatchRequest(
 
   if (url.pathname === "/api/admin/users" && request.method === "POST") {
     return handleUserAdminUpdate(request, env, principal);
+  }
+
+  if (url.pathname === "/api/admin/styling" && request.method === "POST") {
+    return handleStylingAdminUpdate(request, env, principal);
   }
 
   if (url.pathname === "/api/admin/media/cleanup" && request.method === "POST") {
@@ -1066,12 +1080,7 @@ function redirectLegacyAdminPage(request: Request, env: Env, page: string | null
     case "safefnrecode":
       return legacyEndpointNotAvailableResponse(request, env, "DokuWiki safefnrecode plugin", 501);
     case "styling":
-      return legacyEndpointNotAvailableResponse(
-        request,
-        env,
-        "DokuWiki styling plugin runtime editor",
-        501
-      );
+      return redirectResponse("/admin/styling", 301);
     default:
       return redirectResponse("/admin", 301);
   }
@@ -2479,6 +2488,16 @@ function taskrunnerGifResponse(): Response {
       "cache-control": "no-store",
       "content-length": String(bytes.byteLength),
       "content-type": "image/gif"
+    })
+  });
+}
+
+async function handleThemeCss(env: Env): Promise<Response> {
+  const variables = await readThemeVariables(env.DB);
+  return new Response(renderThemeCss(variables), {
+    headers: securityHeaders({
+      "cache-control": "no-store",
+      "content-type": "text/css; charset=utf-8"
     })
   });
 }
@@ -5609,6 +5628,9 @@ function renderAdminDashboardPage(
   const extensionTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/extension">Extension Manager</a></li>`
     : "";
+  const stylingTool = isAdminPrincipal(principal, env)
+    ? `<li><a href="/admin/styling">Template Style Settings</a></li>`
+    : "";
   const mediaCleanupTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/media-cleanup">Media cleanup</a></li>`
     : "";
@@ -5634,6 +5656,7 @@ function renderAdminDashboardPage(
         ${userTool}
         ${configTool}
         ${extensionTool}
+        ${stylingTool}
         ${mediaCleanupTool}
         <li><a href="/admin/revert">Revert Manager</a></li>
         <li><a href="/media-manager">Media manager</a></li>
@@ -5673,6 +5696,53 @@ function renderExtensionManagerUnsupportedPage(
           <tr><td>Search the DokuWiki extension repository</td><td>Use dokuwiki.org outside production, then port or replace natively</td></tr>
         </tbody>
       </table>
+    </div>`,
+    { principal }
+  );
+}
+
+async function renderStylingAdminPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  url: URL,
+  csrfToken: string
+): Promise<string | Response> {
+  if (!isAdminPrincipal(principal, env)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const savedVariables = await readThemeVariables(env.DB);
+  const rows = THEME_VARIABLES.map((variable) => {
+    const value = savedVariables[variable.key] ?? variable.defaultValue;
+    return `<tr>
+      <td><label for="tpl__${escapeAttribute(variable.key)}">${escapeHtml(variable.label)}</label></td>
+      <td><input type="color" name="${escapeAttribute(variable.key)}" id="tpl__${escapeAttribute(variable.key)}" value="${escapeAttribute(colorInputValue(value))}" dir="ltr" required></td>
+      <td><code>${escapeHtml(variable.cssVariable)}</code></td>
+    </tr>`;
+  }).join("");
+  const message =
+    url.searchParams.get("saved") === "1"
+      ? '<p class="success">Template style settings saved.</p>'
+      : url.searchParams.get("reverted") === "1"
+        ? '<p class="success">Template style settings reverted to defaults.</p>'
+        : "";
+
+  return htmlShell(
+    env,
+    "Template Style Settings",
+    `<div id="plugin__styling" class="nopopup">
+      <h1>Template Style Settings</h1>
+      ${message}
+      <p>This tool allows you to change certain style settings of your currently selected template. Changes are stored in D1 as deployment-safe Pages configuration and applied through <code>/theme.css</code>.</p>
+      <form class="styling" method="post" action="/api/admin/styling">
+        ${csrfInput(csrfToken)}
+        <table><tbody>${rows}</tbody></table>
+        <p>
+          <button type="submit" name="run" value="save" class="primary">Save changes</button>
+          <button type="submit" name="run" value="revert">Revert styles back to template's default</button>
+        </p>
+      </form>
     </div>`,
     { principal }
   );
@@ -7101,6 +7171,51 @@ async function handleUserAdminUpdate(
   }
 
   return redirectResponse("/admin/users");
+}
+
+async function handleStylingAdminUpdate(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const form = await readFormDataOrEmpty(request);
+  const csrfFailure = validateCsrf(request, form);
+  if (csrfFailure) return csrfFailure;
+
+  if (!isAdminPrincipal(principal, env)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const run = String(form.get("run") ?? "save");
+  if (run === "revert") {
+    await deleteThemeVariables(env.DB);
+    await appendAdminAuditLog(request, env, principal, {
+      action: "theme_variables_revert",
+      targetType: "plugin",
+      targetId: "styling",
+      details: {}
+    });
+    return redirectResponse("/admin/styling?reverted=1");
+  }
+
+  const parsed = parseThemeVariablesForm(form);
+  if (!parsed.ok) {
+    return stylingAdminErrorResponse(request, env, parsed.error);
+  }
+
+  await saveThemeVariables(env.DB, parsed.variables);
+  await appendAdminAuditLog(request, env, principal, {
+    action: "theme_variables_update",
+    targetType: "plugin",
+    targetId: "styling",
+    details: { variables: parsed.variables }
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, variables: parsed.variables });
+  }
+
+  return redirectResponse("/admin/styling?saved=1");
 }
 
 async function handleMediaCleanup(
@@ -9952,6 +10067,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
   const stylesheetPath = versionedAssetPath("/dokuwiki.css", env);
+  const themeStylesheetPath = "/theme.css";
   const scriptPath = versionedAssetPath("/dokuwiki.js", env);
   const faviconPath = versionedAssetPath("/images/favicon.ico", env);
   const appleTouchIconPath = versionedAssetPath("/images/apple-touch-icon.png", env);
@@ -9967,6 +10083,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   <link rel="apple-touch-icon" href="${appleTouchIconPath}">
   ${canonicalLink}
   <link rel="stylesheet" href="${stylesheetPath}">
+  <link rel="stylesheet" href="${themeStylesheetPath}">
   <script src="${scriptPath}" defer></script>
 </head>
 <body class="dokuwiki">
@@ -11411,6 +11528,21 @@ function aclAdminErrorResponse(request: Request, env: Env, message: string): Res
   });
 }
 
+function stylingAdminErrorResponse(request: Request, env: Env, message: string): Response {
+  if (acceptsJson(request)) {
+    return jsonResponse({ error: message }, { status: 400 });
+  }
+
+  return htmlResponse(
+    htmlShell(
+      env,
+      "Template Style Settings",
+      `<h1>Template Style Settings</h1><p>${escapeHtml(message)}</p>`
+    ),
+    { status: 400 }
+  );
+}
+
 function userAdminErrorResponse(
   request: Request,
   env: Env,
@@ -11452,6 +11584,202 @@ function normalizeAclAdminScope(value: string, env: Env): string {
 
 function parseAclPrincipalType(value: string): AclRuleRecord["principalType"] | null {
   return value === "all" || value === "group" || value === "user" ? value : null;
+}
+
+const THEME_PLUGIN = "styling";
+const THEME_VARIABLES_KEY = "theme_variables";
+const THEME_VARIABLES = [
+  {
+    key: "__text__",
+    cssVariable: "--dw-text",
+    label: "Main text color",
+    defaultValue: "#333333"
+  },
+  {
+    key: "__background__",
+    cssVariable: "--dw-background",
+    label: "Main background color",
+    defaultValue: "#ffffff"
+  },
+  {
+    key: "__text_alt__",
+    cssVariable: "--dw-text-alt",
+    label: "Alternative text color",
+    defaultValue: "#999999"
+  },
+  {
+    key: "__background_alt__",
+    cssVariable: "--dw-background-alt",
+    label: "Alternative background color",
+    defaultValue: "#eeeeee"
+  },
+  {
+    key: "__text_neu__",
+    cssVariable: "--dw-text-neutral",
+    label: "Neutral text color",
+    defaultValue: "#666666"
+  },
+  {
+    key: "__background_neu__",
+    cssVariable: "--dw-background-neutral",
+    label: "Neutral background color",
+    defaultValue: "#dddddd"
+  },
+  {
+    key: "__border__",
+    cssVariable: "--dw-border",
+    label: "Border color",
+    defaultValue: "#cccccc"
+  },
+  {
+    key: "__highlight__",
+    cssVariable: "--dw-highlight",
+    label: "Highlight color",
+    defaultValue: "#ffff99"
+  },
+  {
+    key: "__link__",
+    cssVariable: "--dw-link",
+    label: "Link color",
+    defaultValue: "#2b73b7"
+  },
+  {
+    key: "__existing__",
+    cssVariable: "--dw-existing",
+    label: "Existing page link color",
+    defaultValue: "#008800"
+  },
+  {
+    key: "__missing__",
+    cssVariable: "--dw-missing",
+    label: "Missing page link color",
+    defaultValue: "#dd3300"
+  },
+  {
+    key: "__background_site__",
+    cssVariable: "--dw-background-site",
+    label: "Site background color",
+    defaultValue: "#fbfaf9"
+  }
+] as const;
+
+type ThemeVariableKey = (typeof THEME_VARIABLES)[number]["key"];
+type ThemeVariables = Partial<Record<ThemeVariableKey, string>>;
+
+interface ThemeVariablesParseResult {
+  ok: true;
+  variables: Record<ThemeVariableKey, string>;
+}
+
+interface ThemeVariablesParseError {
+  ok: false;
+  error: string;
+}
+
+function parseThemeVariablesForm(
+  form: FormData
+): ThemeVariablesParseResult | ThemeVariablesParseError {
+  const variables = {} as Record<ThemeVariableKey, string>;
+
+  for (const variable of THEME_VARIABLES) {
+    const rawValue = String(form.get(variable.key) ?? variable.defaultValue);
+    const color = normalizeThemeColor(rawValue);
+    if (!color) {
+      return {
+        ok: false,
+        error: `${variable.label} must be a hexadecimal color value.`
+      };
+    }
+    variables[variable.key] = color;
+  }
+
+  return { ok: true, variables };
+}
+
+async function readThemeVariables(db: D1Database): Promise<ThemeVariables> {
+  const row = await db
+    .prepare(
+      `select value_json
+       from plugin_settings
+       where plugin = ? and key = ?`
+    )
+    .bind(THEME_PLUGIN, THEME_VARIABLES_KEY)
+    .first<{ value_json: string }>();
+  if (!row) return {};
+
+  try {
+    const parsed = JSON.parse(row.value_json) as { variables?: Record<string, unknown> };
+    const variables =
+      parsed.variables && typeof parsed.variables === "object" ? parsed.variables : {};
+    return Object.fromEntries(
+      THEME_VARIABLES.flatMap((variable) => {
+        const color = normalizeThemeColor(String(variables[variable.key] ?? ""));
+        return color ? [[variable.key, color]] : [];
+      })
+    ) as ThemeVariables;
+  } catch {
+    return {};
+  }
+}
+
+async function saveThemeVariables(
+  db: D1Database,
+  variables: Record<ThemeVariableKey, string>
+): Promise<void> {
+  await db
+    .prepare(
+      `insert into plugin_settings (plugin, key, value_json, updated_at)
+       values (?, ?, ?, ?)
+       on conflict(plugin, key) do update set
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`
+    )
+    .bind(
+      THEME_PLUGIN,
+      THEME_VARIABLES_KEY,
+      JSON.stringify({ variables }),
+      new Date().toISOString()
+    )
+    .run();
+}
+
+async function deleteThemeVariables(db: D1Database): Promise<void> {
+  await db
+    .prepare("delete from plugin_settings where plugin = ? and key = ?")
+    .bind(THEME_PLUGIN, THEME_VARIABLES_KEY)
+    .run();
+}
+
+function renderThemeCss(variables: ThemeVariables): string {
+  const declarations = THEME_VARIABLES.flatMap((variable) => {
+    const value = normalizeThemeColor(variables[variable.key] ?? "");
+    return value ? [`  ${variable.cssVariable}: ${value};`] : [];
+  });
+
+  if (declarations.length === 0) {
+    return "/* no Pages theme overrides configured */\n";
+  }
+
+  return `:root {\n${declarations.join("\n")}\n}\n`;
+}
+
+function normalizeThemeColor(value: string): string | null {
+  const trimmed = value.trim();
+  const short = /^#?([0-9a-fA-F]{3})$/.exec(trimmed);
+  if (short) {
+    return `#${short[1]
+      .split("")
+      .map((char) => `${char}${char}`)
+      .join("")
+      .toLowerCase()}`;
+  }
+
+  const full = /^#?([0-9a-fA-F]{6})$/.exec(trimmed);
+  return full ? `#${full[1].toLowerCase()}` : null;
+}
+
+function colorInputValue(value: string): string {
+  return normalizeThemeColor(value) ?? "#000000";
 }
 
 function normalizeAclAdminPrincipal(

@@ -2350,6 +2350,7 @@ describe("auth routes", () => {
       ["info", "/diagnostics", "Diagnostics"],
       ["logviewer", "/admin/audit", "Audit log"],
       ["revert", "/admin/revert", "Revert Manager"],
+      ["styling", "/admin/styling", "Template Style Settings"],
       ["usermanager", "/admin/users", "User manager"]
     ];
 
@@ -2391,7 +2392,7 @@ describe("auth routes", () => {
       "Runtime plugin and template installation is not available in this Pages port."
     );
 
-    for (const plugin of ["extension", "popularity", "safefnrecode", "styling"]) {
+    for (const plugin of ["extension", "popularity", "safefnrecode"]) {
       const removed = await handleRequest(
         new Request(`https://example.com/doku.php?do=admin&page=${plugin}`),
         env
@@ -2403,6 +2404,74 @@ describe("auth routes", () => {
         "is not available in this Pages port"
       );
     }
+  });
+
+  it("allows admin users to edit deployment-safe template style variables", async () => {
+    env = createEnv();
+    await seedUser(env.DB);
+    const cookie = await loginAsAlice(env);
+
+    const anonymous = await handleRequest(new Request("https://example.com/admin/styling"), env);
+    const page = await handleRequest(
+      new Request("https://example.com/admin/styling", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const initialCss = await handleRequest(new Request("https://example.com/theme.css"), env);
+
+    expect(anonymous.status).toBe(403);
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("Template Style Settings");
+    expect(html).toContain("Main text color");
+    expect(html).toContain("/theme.css");
+    await expect(initialCss.text()).resolves.toContain("no Pages theme overrides");
+
+    const form = new FormData();
+    form.set("run", "save");
+    form.set("__text__", "#112233");
+    form.set("__background__", "#fefefe");
+
+    const saved = await handleRequest(
+      new Request("https://example.com/api/admin/styling", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(saved.status).toBe(303);
+    expect(saved.headers.get("location")).toBe("/admin/styling?saved=1");
+    const row = await env.DB.prepare(
+      "select value_json from plugin_settings where plugin = 'styling' and key = 'theme_variables'"
+    )
+      .bind()
+      .first();
+    expect(JSON.parse(row.value_json).variables).toMatchObject({
+      __text__: "#112233",
+      __background__: "#fefefe"
+    });
+
+    const css = await handleRequest(new Request("https://example.com/theme.css"), env);
+    expect(css.headers.get("content-type")).toBe("text/css; charset=utf-8");
+    await expect(css.text()).resolves.toContain("--dw-text: #112233;");
+
+    const revert = new FormData();
+    revert.set("run", "revert");
+    const reverted = await handleRequest(
+      new Request("https://example.com/api/admin/styling", {
+        method: "POST",
+        body: revert,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+    expect(reverted.status).toBe(303);
+    expect(reverted.headers.get("location")).toBe("/admin/styling?reverted=1");
+    const revertedCss = await handleRequest(new Request("https://example.com/theme.css"), env);
+    await expect(revertedCss.text()).resolves.toContain("no Pages theme overrides");
   });
 
   it("bypasses shared rendered cache for pages not readable by anonymous users", async () => {

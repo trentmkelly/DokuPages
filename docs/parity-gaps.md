@@ -46,8 +46,9 @@ post-launch monitoring.
 - XML-RPC, JSON-RPC, and OpenAPI method compatibility: endpoints return explicit
   unsupported responses. Implement only if current clients require legacy remote
   method compatibility.
-- Runtime styling editor: build-time checked-in CSS replaces the DokuWiki
-  styling plugin. Revisit only if operators need browser-based theme edits.
+- Runtime styling editor: native `/admin/styling` covers DokuWiki-style template
+  color replacements through D1-backed CSS variables. Full upstream popup
+  preview behavior remains outside the launch surface unless operators need it.
 
 ## Not Planned
 

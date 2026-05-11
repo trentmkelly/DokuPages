@@ -76,8 +76,8 @@ PHP modules to execute. Current decisions:
 - `revert`: replaced by native page/media revert routes plus `/admin/revert`
   for DokuWiki-style spam search and batch reversion.
 - `safefnrecode`: migration-only if needed.
-- `styling`: build-time checked-in theme CSS; runtime styling editor is not
-  loaded on Pages.
+- `styling`: native Template Style Settings editor stores Pages-safe CSS
+  variable overrides in D1 and applies them through `/theme.css`.
 - `usermanager`: replaced by native `/admin/users` user management.
 - `authad`, `authldap`, `authpdo`: supported through the external auth sync
   bridge and Cloudflare Access header authentication.

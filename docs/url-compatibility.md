@@ -40,7 +40,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?do=admin&page=extension`                 | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
 | `/doku.php?do=admin&page=popularity`                | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
 | `/doku.php?do=admin&page=safefnrecode`              | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
-| `/doku.php?do=admin&page=styling`                   | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
+| `/doku.php?do=admin&page=styling`                   | Redirects to `/admin/styling`, a native Pages-safe Template Style Settings editor.                      |
 | `/doku.php?do=register`                             | Redirects to `/register`.                                                                               |
 | `/doku.php?do=profile`                              | Redirects to `/profile`.                                                                                |
 | `/doku.php?do=resendpwd`                            | Redirects to `/resendpwd`.                                                                              |

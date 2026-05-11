@@ -14,6 +14,9 @@ Native admin routes use D1-backed session principals and DokuWiki-style
 - `/admin/extension` keeps a DokuWiki-styled Extension Manager page with the
   upstream tab labels, but it returns `501` and explains that runtime plugin and
   template install/update/uninstall actions are unsupported on Pages.
+- `/admin/styling` provides a native Template Style Settings editor for the
+  DokuWiki-style CSS variables. It writes deployment-safe D1 `plugin_settings`
+  rows and applies them through `/theme.css` without mutating checked-in assets.
 - `/admin/users` manages native D1 users, group membership, and disabled status
   and requires a `SUPERUSER` match.
 - `/admin/audit` shows recent admin audit log entries and requires a
