@@ -23,10 +23,10 @@ describe("accessibility surface", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain('<a href="#dokuwiki__content">Skip to content</a>');
+    expect(html).toContain('<a href="#dokuwiki__content">skip to content</a>');
     expect(html).toContain('<main id="dokuwiki__content">');
-    expect(html).toContain('<nav id="dokuwiki__usertools" aria-label="User tools">');
-    expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Site tools">');
+    expect(html).toContain('<nav id="dokuwiki__usertools" aria-label="User Tools">');
+    expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Site Tools">');
     expect(html).toContain('<label class="a11y" for="qsearch__in">Search</label>');
     expect(html).toContain('<input id="qsearch__in" name="q" type="search"');
     expect(html).toContain('<a href="/media-manager?ns=wiki">Media Manager</a>');
@@ -36,9 +36,9 @@ describe("accessibility surface", () => {
     expect(html).toContain(
       '<nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">'
     );
-    expect(html).toContain('id="dokuwiki__pagetools__heading">Page tools</h3>');
+    expect(html).toContain('id="dokuwiki__pagetools__heading">Page Tools</h3>');
     expect(html).toContain('aria-label="Edit this page"');
-    expect(html).toContain('aria-label="Show page source"');
+    expect(html).toContain('aria-label="Show pagesource"');
     expect(html).toContain('aria-label="Old revisions"');
     expect(html).toContain('aria-label="Backlinks"');
     expect(html).toContain('aria-label="Purge cache"');

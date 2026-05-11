@@ -10,12 +10,26 @@ const DOKUWIKI_ROOT = path.resolve(REPO_ROOT, "..", "dokuwiki");
 const OUTPUT = path.join(REPO_ROOT, "src", "wiki", "auth-language.ts");
 
 const LANGUAGE_KEYS = [
+  "btn_edit",
+  "btn_source",
+  "btn_search",
+  "btn_top",
+  "btn_revs",
+  "btn_recent",
+  "btn_index",
+  "btn_secedit",
   "btn_login",
   "btn_logout",
+  "btn_admin",
+  "btn_backlink",
+  "btn_subscribe",
+  "btn_profile",
   "btn_register",
   "btn_resendpwd",
   "btn_reset",
   "btn_back",
+  "btn_media",
+  "loggedinas",
   "user",
   "pass",
   "newpass",
@@ -48,7 +62,13 @@ const LANGUAGE_KEYS = [
   "resendpwdsuccess",
   "lockedby",
   "lockexpire",
-  "accessdenied"
+  "accessdenied",
+  "tools",
+  "user_tools",
+  "site_tools",
+  "page_tools",
+  "skip_to_content",
+  "youarehere"
 ];
 
 const PAGE_KEYS = ["login", "register", "resendpwd", "resetpwd", "denied", "locked"];

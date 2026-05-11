@@ -50,6 +50,8 @@ describe("language configuration", () => {
   it("uses localized auth labels when available", () => {
     expect(authPageTitle("de", "login")).toBe("Anmelden");
     expect(authLang("de", "user")).toBe("Benutzername");
+    expect(authLang("de", "site_tools")).toBe("Webseiten-Werkzeuge");
+    expect(authLang("de", "page_tools")).toBe("Seiten-Werkzeuge");
     expect(authLang("pt_BR", "btn_logout")).toBe("Sair");
     expect(authPageTitle("zz", "denied")).toBe("Permission Denied");
   });

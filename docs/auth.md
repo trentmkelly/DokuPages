@@ -106,13 +106,15 @@ metadata for revocation, so generating a new token invalidates the previous
 token. Requests can authenticate with either `Authorization: Bearer <token>` or
 `X-DokuWiki-Token: <token>`.
 
-## Localized Auth Text
+## Localized Auth And UI Text
 
 Login, logout, registration, password reset, permission denied, and page-lock
 views use generated language resources from upstream DokuWiki `inc/lang/<lang>`
-files. `WIKI_LANG` selects the localized copy with English fallback. Regenerate
-the native TypeScript resource with `npm run lang:auth` after updating the
-upstream DokuWiki checkout.
+files. The shell also uses upstream strings for the skip link, search, site
+tools, user tools, page tools, media manager, sitemap, recent changes, and
+page-action labels. `WIKI_LANG` selects the localized copy with English
+fallback. Regenerate the native TypeScript resource with `npm run lang:auth`
+after updating the upstream DokuWiki checkout.
 
 Imported `conf/lang/<lang>/lang.php` and matching auth page `.txt` files are
 loaded from D1 at request time and override the generated bundle. This covers

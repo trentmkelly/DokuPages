@@ -151,6 +151,7 @@ describe("handleRequest", () => {
     env.TAGLINE = undefined;
     env.SIDEBAR = undefined;
     env.LICENSE = undefined;
+    env.WIKI_LANG = undefined;
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
     env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
@@ -305,7 +306,7 @@ describe("handleRequest", () => {
       '<div class="docInfo"><bdi>wiki/welcome.txt</bdi> · Last modified: <time datetime="2026-05-07T00:00:00.000Z">2026-05-07T00:00:00.000Z</time></div>'
     );
     expect(html).toContain('id="dokuwiki__usertools"');
-    expect(html).toContain("User tools");
+    expect(html).toContain("User Tools");
     expect(html).toContain('id="mobile__tools"');
     expect(html).toContain(
       '<li class="action login"><a href="/wiki/wiki/welcome?do=login" rel="nofollow">Log In</a></li>'
@@ -338,7 +339,7 @@ describe("handleRequest", () => {
       importedDokuWikiLanguageFile(
         "en",
         "lang.php",
-        "<?php\n$lang['btn_login'] = 'Sign in custom';\n$lang['user'] = 'Custom user';\n"
+        "<?php\n$lang['btn_login'] = 'Sign in custom';\n$lang['btn_media'] = 'Custom media';\n$lang['user'] = 'Custom user';\n"
       ),
       importedDokuWikiLanguageFile(
         "en",
@@ -360,6 +361,39 @@ describe("handleRequest", () => {
     expect(pageHtml).toContain(
       '<li class="action login"><a href="/wiki/wiki/welcome?do=login" rel="nofollow">Sign in custom</a></li>'
     );
+    expect(pageHtml).toContain('<a href="/media-manager?ns=wiki">Custom media</a>');
+  });
+
+  it("uses upstream language packs for non-English shell labels", async () => {
+    env.WIKI_LANG = "de";
+    env.YOUAREHERE = "1";
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<html lang="de">');
+    expect(html).toContain('<a href="#dokuwiki__content">zum Inhalt springen</a>');
+    expect(html).toContain('<nav id="dokuwiki__usertools" aria-label="Benutzer-Werkzeuge">');
+    expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Webseiten-Werkzeuge">');
+    expect(html).toContain('<label class="a11y" for="qsearch__in">Suche</label>');
+    expect(html).toContain('<a href="/recent">Letzte Änderungen</a>');
+    expect(html).toContain('<a href="/media-manager?ns=wiki">Medien-Manager</a>');
+    expect(html).toContain('<a href="/index?ns=wiki">Übersicht</a>');
+    expect(html).toContain(
+      '<option value="/wiki/wiki/welcome?do=edit">Diese Seite bearbeiten</option>'
+    );
+    expect(html).toContain(
+      '<option value="/wiki/wiki/welcome?do=source">Quelltext anzeigen</option>'
+    );
+    expect(html).toContain('id="dokuwiki__pagetools__heading">Seiten-Werkzeuge</h3>');
+    expect(html).toContain('aria-label="Diese Seite bearbeiten"');
+    expect(html).toContain('aria-label="Quelltext anzeigen"');
+    expect(html).toContain('aria-label="Ältere Versionen"');
+    expect(html).toContain('aria-label="Links hierher"');
+    expect(html).toContain('aria-label="Aboverwaltung"');
+    expect(html).toContain('aria-label="Nach oben"');
+    expect(html).toContain("Sie befinden sich hier:");
   });
 
   it("honors the FULLPATH setting for page info paths", async () => {

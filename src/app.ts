@@ -5112,13 +5112,14 @@ function renderBreadcrumbs(id: string): string {
 }
 
 function renderHeaderBreadcrumbs(
+  env: Env,
   pageId: string | undefined,
   startId: string,
   breadcrumbTrace: readonly BreadcrumbEntry[] | undefined,
   showYouAreHere: boolean
 ): string {
   const trace = renderBreadcrumbTrace(breadcrumbTrace);
-  const youAreHere = showYouAreHere ? renderYouAreHereTrail(pageId, startId) : "";
+  const youAreHere = showYouAreHere ? renderYouAreHereTrail(env, pageId, startId) : "";
 
   if (!youAreHere && !trace) {
     return "";
@@ -5127,9 +5128,10 @@ function renderHeaderBreadcrumbs(
   return `<div class="breadcrumbs">${youAreHere}${trace}</div>`;
 }
 
-function renderYouAreHereTrail(pageId: string | undefined, startId: string): string {
+function renderYouAreHereTrail(env: Env, pageId: string | undefined, startId: string): string {
+  const label = localizedAuthText(env, "youarehere");
   if (!pageId) {
-    return `<div class="youarehere"><span>You are here: </span><a href="${pagePath(startId)}">start</a></div>`;
+    return `<div class="youarehere"><span>${escapeHtml(label)} </span><a href="${pagePath(startId)}">start</a></div>`;
   }
 
   const segments = pageId.split(":").filter(Boolean);
@@ -5146,7 +5148,7 @@ function renderYouAreHereTrail(pageId: string | undefined, startId: string): str
     })
     .join(' <span class="bcsep">&raquo;</span> ');
 
-  return `<div class="youarehere"><span>You are here: </span>${crumbs}</div>`;
+  return `<div class="youarehere"><span>${escapeHtml(label)} </span>${crumbs}</div>`;
 }
 
 function renderBreadcrumbTrace(entries: readonly BreadcrumbEntry[] | undefined): string {
@@ -11300,7 +11302,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       ? `<div class="docInfo">${renderPageInfo(config, pageId, options.updatedAt, options.updatedBy)}</div>`
       : "";
   const disabledActions = new Set(config.disabledActions);
-  const pageTools = pageId ? renderPageTools(pageId, disabledActions) : "";
+  const pageTools = pageId ? renderPageTools(env, pageId, disabledActions) : "";
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : namespaceForIndex(startId);
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
@@ -11318,6 +11320,12 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
         </div></nav>`
       : "";
   const siteClasses = `site dokuwiki mode_show tpl_dokuwiki${sidebar ? " showSidebar hasSidebar" : ""}`;
+  const searchLabel = localizedAuthText(env, "btn_search");
+  const recentLabel = localizedAuthText(env, "btn_recent");
+  const mediaLabel = localizedAuthText(env, "btn_media");
+  const sitemapLabel = localizedAuthText(env, "btn_index");
+  const siteToolsLabel = localizedAuthText(env, "site_tools");
+  const skipToContentLabel = localizedAuthText(env, "skip_to_content");
 
   return `<!doctype html>
 <html lang="${escapeAttribute(config.language)}">
@@ -11339,30 +11347,30 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
         <div class="pad group">
         <div class="headings">
           <ul class="a11y skip">
-            <li><a href="#dokuwiki__content">Skip to content</a></li>
+            <li><a href="#dokuwiki__content">${escapeHtml(skipToContentLabel)}</a></li>
           </ul>
           <h1 class="logo"><a href="${startPath}"><img src="${logoPath}" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
           ${tagline ? `<p class="claim">${escapeHtml(tagline)}</p>` : ""}
         </div>
         <div class="tools">
           ${renderUserTools(env, options.principal, pageId, disabledActions)}
-          <nav id="dokuwiki__sitetools" aria-label="Site tools">
-            <h3 class="a11y">Site tools</h3>
+          <nav id="dokuwiki__sitetools" aria-label="${escapeAttribute(siteToolsLabel)}">
+            <h3 class="a11y">${escapeHtml(siteToolsLabel)}</h3>
             <form class="search" method="get" action="/search">
-              <label class="a11y" for="qsearch__in">Search</label>
-              <input id="qsearch__in" name="q" type="search" placeholder="Search">
-              <button type="submit">Search</button>
+              <label class="a11y" for="qsearch__in">${escapeHtml(searchLabel)}</label>
+              <input id="qsearch__in" name="q" type="search" placeholder="${escapeAttribute(searchLabel)}">
+              <button type="submit">${escapeHtml(searchLabel)}</button>
             </form>
             ${renderMobileTools(env, pageId, options.principal, disabledActions)}
             <ul>
-              ${disabledActions.has("recent") ? "" : '<li><a href="/recent">Recent changes</a></li>'}
-              ${disabledActions.has("media") ? "" : `<li><a href="${mediaManagerPath}">Media Manager</a></li>`}
-              ${disabledActions.has("index") ? "" : `<li><a href="${siteIndexPath}">Sitemap</a></li>`}
+              ${disabledActions.has("recent") ? "" : `<li><a href="/recent">${escapeHtml(recentLabel)}</a></li>`}
+              ${disabledActions.has("media") ? "" : `<li><a href="${mediaManagerPath}">${escapeHtml(mediaLabel)}</a></li>`}
+              ${disabledActions.has("index") ? "" : `<li><a href="${siteIndexPath}">${escapeHtml(sitemapLabel)}</a></li>`}
               <li><a href="/diagnostics">Diagnostics</a></li>
             </ul>
           </nav>
         </div>
-        ${renderHeaderBreadcrumbs(pageId, startId, options.breadcrumbs, config.youAreHere)}
+        ${renderHeaderBreadcrumbs(env, pageId, startId, options.breadcrumbs, config.youAreHere)}
         <hr class="a11y">
         </div>
       </header>
@@ -11405,16 +11413,19 @@ function renderUserTools(
   const loginLabel = localizedAuthText(env, "btn_login");
   const logoutLabel = localizedAuthText(env, "btn_logout");
   const registerLabel = localizedAuthText(env, "btn_register");
+  const adminLabel = localizedAuthText(env, "btn_admin");
+  const profileLabel = localizedAuthText(env, "btn_profile");
+  const userToolsLabel = localizedAuthText(env, "user_tools");
   const accountItems =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? '<li class="action admin"><a href="/admin" rel="nofollow">Admin</a></li>' : ""}
-        ${disabledActions.has("profile") ? "" : `<li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">Update Profile</a></li>`}
+      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? `<li class="action admin"><a href="/admin" rel="nofollow">${escapeHtml(adminLabel)}</a></li>` : ""}
+        ${disabledActions.has("profile") ? "" : `<li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">${escapeHtml(profileLabel)}</a></li>`}
         ${disabledActions.has("logout") ? "" : `<li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">${escapeHtml(logoutLabel)}</a></li>`}`
       : `${disabledActions.has("login") ? "" : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">${escapeHtml(loginLabel)}</a></li>`}
         ${disabledActions.has("register") ? "" : `<li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">${escapeHtml(registerLabel)}</a></li>`}`;
 
-  return `<nav id="dokuwiki__usertools" aria-label="User tools">
-            <h3 class="a11y">User tools</h3>
+  return `<nav id="dokuwiki__usertools" aria-label="${escapeAttribute(userToolsLabel)}">
+            <h3 class="a11y">${escapeHtml(userToolsLabel)}</h3>
             <ul>${accountItems}</ul>
           </nav>`;
 }
@@ -11429,33 +11440,45 @@ function renderMobileTools(
   const loginLabel = localizedAuthText(env, "btn_login");
   const logoutLabel = localizedAuthText(env, "btn_logout");
   const registerLabel = localizedAuthText(env, "btn_register");
+  const adminLabel = localizedAuthText(env, "btn_admin");
+  const profileLabel = localizedAuthText(env, "btn_profile");
+  const editLabel = localizedAuthText(env, "btn_edit");
+  const sourceLabel = localizedAuthText(env, "btn_source");
+  const revisionsLabel = localizedAuthText(env, "btn_revs");
+  const backlinksLabel = localizedAuthText(env, "btn_backlink");
+  const subscribeLabel = localizedAuthText(env, "btn_subscribe");
+  const recentLabel = localizedAuthText(env, "btn_recent");
+  const mediaLabel = localizedAuthText(env, "btn_media");
+  const sitemapLabel = localizedAuthText(env, "btn_index");
+  const searchLabel = localizedAuthText(env, "btn_search");
+  const toolsLabel = localizedAuthText(env, "tools");
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : "wiki";
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
   const pageOptions = pageId
-    ? `${disabledActions.has("edit") ? "" : `<option value="${pagePath(pageId)}?do=edit">Edit this page</option>`}
-      ${disabledActions.has("source") ? "" : `<option value="${pagePath(pageId)}?do=source">Show source</option>`}
-      ${disabledActions.has("revisions") ? "" : `<option value="${pagePath(pageId)}?do=revisions">Old revisions</option>`}
-      ${disabledActions.has("backlink") ? "" : `<option value="${pagePath(pageId)}?do=backlink">Backlinks</option>`}
-      ${disabledActions.has("subscribe") ? "" : `<option value="${pagePath(pageId)}?do=subscribe">Subscribe</option>`}`
+    ? `${disabledActions.has("edit") ? "" : `<option value="${pagePath(pageId)}?do=edit">${escapeHtml(editLabel)}</option>`}
+      ${disabledActions.has("source") ? "" : `<option value="${pagePath(pageId)}?do=source">${escapeHtml(sourceLabel)}</option>`}
+      ${disabledActions.has("revisions") ? "" : `<option value="${pagePath(pageId)}?do=revisions">${escapeHtml(revisionsLabel)}</option>`}
+      ${disabledActions.has("backlink") ? "" : `<option value="${pagePath(pageId)}?do=backlink">${escapeHtml(backlinksLabel)}</option>`}
+      ${disabledActions.has("subscribe") ? "" : `<option value="${pagePath(pageId)}?do=subscribe">${escapeHtml(subscribeLabel)}</option>`}`
     : "";
   const accountOptions =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? '<option value="/admin">Admin</option>' : ""}
-        ${disabledActions.has("profile") ? "" : `<option value="${escapeAttribute(actionLinks.profile)}">Update Profile</option>`}
+      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? `<option value="/admin">${escapeHtml(adminLabel)}</option>` : ""}
+        ${disabledActions.has("profile") ? "" : `<option value="${escapeAttribute(actionLinks.profile)}">${escapeHtml(profileLabel)}</option>`}
         ${disabledActions.has("logout") ? "" : `<option value="${escapeAttribute(actionLinks.logout)}">${escapeHtml(logoutLabel)}</option>`}`
       : `${disabledActions.has("login") ? "" : `<option value="${escapeAttribute(actionLinks.login)}">${escapeHtml(loginLabel)}</option>`}
         ${disabledActions.has("register") ? "" : `<option value="${escapeAttribute(actionLinks.register)}">${escapeHtml(registerLabel)}</option>`}`;
 
   return `<div class="mobileTools">
-      <label class="a11y" for="mobile__tools">Tools</label>
+      <label class="a11y" for="mobile__tools">${escapeHtml(toolsLabel)}</label>
       <select id="mobile__tools">
-        <option value="">Tools</option>
+        <option value="">${escapeHtml(toolsLabel)}</option>
         ${pageOptions}
-        ${disabledActions.has("recent") ? "" : '<option value="/recent">Recent changes</option>'}
-        ${disabledActions.has("media") ? "" : `<option value="${mediaManagerPath}">Media Manager</option>`}
-        ${disabledActions.has("index") ? "" : `<option value="${siteIndexPath}">Sitemap</option>`}
-        ${disabledActions.has("search") ? "" : '<option value="/search">Search</option>'}
+        ${disabledActions.has("recent") ? "" : `<option value="/recent">${escapeHtml(recentLabel)}</option>`}
+        ${disabledActions.has("media") ? "" : `<option value="${mediaManagerPath}">${escapeHtml(mediaLabel)}</option>`}
+        ${disabledActions.has("index") ? "" : `<option value="${siteIndexPath}">${escapeHtml(sitemapLabel)}</option>`}
+        ${disabledActions.has("search") ? "" : `<option value="/search">${escapeHtml(searchLabel)}</option>`}
         <option value="/diagnostics">Diagnostics</option>
         ${accountOptions}
       </select>
@@ -11486,18 +11509,26 @@ function accountActionLinks(pageId?: string): {
   };
 }
 
-function renderPageTools(pageId: string, disabledActions = new Set<string>()): string {
+function renderPageTools(env: Env, pageId: string, disabledActions = new Set<string>()): string {
+  const pageToolsLabel = localizedAuthText(env, "page_tools");
+  const editLabel = localizedAuthText(env, "btn_edit");
+  const sourceLabel = localizedAuthText(env, "btn_source");
+  const revisionsLabel = localizedAuthText(env, "btn_revs");
+  const backlinksLabel = localizedAuthText(env, "btn_backlink");
+  const subscribeLabel = localizedAuthText(env, "btn_subscribe");
+  const topLabel = localizedAuthText(env, "btn_top");
+
   return `<nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">
-    <h3 class="a11y" id="dokuwiki__pagetools__heading">Page tools</h3>
+    <h3 class="a11y" id="dokuwiki__pagetools__heading">${escapeHtml(pageToolsLabel)}</h3>
     <div class="tools">
       <ul>
-        ${disabledActions.has("edit") ? "" : `<li class="edit"><a href="${pagePath(pageId)}?do=edit" aria-label="Edit this page"><span class="label">Edit</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("source") ? "" : `<li class="source"><a href="${pagePath(pageId)}?do=source" aria-label="Show page source"><span class="label">Source</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("revisions") ? "" : `<li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="Old revisions"><span class="label">Old revisions</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("backlink") ? "" : `<li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="Backlinks"><span class="label">Backlinks</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("edit") ? "" : `<li class="edit"><a href="${pagePath(pageId)}?do=edit" aria-label="${escapeAttribute(editLabel)}"><span class="label">${escapeHtml(editLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("source") ? "" : `<li class="source"><a href="${pagePath(pageId)}?do=source" aria-label="${escapeAttribute(sourceLabel)}"><span class="label">${escapeHtml(sourceLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("revisions") ? "" : `<li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="${escapeAttribute(revisionsLabel)}"><span class="label">${escapeHtml(revisionsLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        ${disabledActions.has("backlink") ? "" : `<li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="${escapeAttribute(backlinksLabel)}"><span class="label">${escapeHtml(backlinksLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
         ${disabledActions.has("purge") ? "" : `<li class="purge"><a href="${pagePath(pageId)}?do=purge" aria-label="Purge cache"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("subscribe") ? "" : `<li class="subscribe"><a href="${pagePath(pageId)}?do=subscribe" aria-label="Manage subscriptions"><span class="label">Subscribe</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        <li class="top"><a href="#dokuwiki__top" aria-label="Back to top"><span class="label">Back to top</span><span class="icon" aria-hidden="true"></span></a></li>
+        ${disabledActions.has("subscribe") ? "" : `<li class="subscribe"><a href="${pagePath(pageId)}?do=subscribe" aria-label="${escapeAttribute(subscribeLabel)}"><span class="label">${escapeHtml(subscribeLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
+        <li class="top"><a href="#dokuwiki__top" aria-label="${escapeAttribute(topLabel)}"><span class="label">${escapeHtml(topLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>
       </ul>
     </div>
   </nav>`;
