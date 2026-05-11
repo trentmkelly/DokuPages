@@ -20,6 +20,7 @@ const DEFAULT_TAGLINE = "";
 const DEFAULT_SIDEBAR = "sidebar";
 const DEFAULT_LICENSE = "cc-by-nc-sa";
 const DEFAULT_START_PAGE = "wiki:welcome";
+const DEFAULT_SIGNATURE = " --- //[[@MAIL@|@NAME@]] @DATE@//";
 const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
 const DEFAULT_SUPERUSER = "@admin";
 const DEFAULT_MANAGER = "@manager";
@@ -58,6 +59,8 @@ export interface RuntimeConfig {
   canonicalUrls: boolean;
   baseUrl: string | null;
   baseDir: string;
+  recentEntries: number;
+  recentDays: number;
   topTocLevel: number;
   tocMinHeads: number;
   maxTocLevel: number;
@@ -66,6 +69,7 @@ export interface RuntimeConfig {
   youAreHere: boolean;
   fullPath: boolean;
   dateFormat: string;
+  signature: string;
   showUserAs: "loginname" | "username" | "username_link" | "email" | "email_link";
   cacheTime: number;
   lockTime: number;
@@ -164,6 +168,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     canonicalUrls: truthy(env.CANONICAL_URLS),
     baseUrl: normalizedBaseUrl(env.BASE_URL),
     baseDir: normalizedBaseDir(env.BASE_DIR),
+    recentEntries: integerConfig(env.RECENT, 20, 1, 100),
+    recentDays: integerConfig(env.RECENT_DAYS, 7, 0, 3660),
     topTocLevel: integerConfig(env.TOP_TOC_LEVEL, 1, 1, 5),
     tocMinHeads: integerConfig(env.TOC_MIN_HEADS, 3, 0, 99),
     maxTocLevel: integerConfig(env.MAX_TOC_LEVEL, 3, 1, 5),
@@ -172,6 +178,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     youAreHere: truthy(env.YOUAREHERE),
     fullPath: truthy(env.FULLPATH),
     dateFormat: nonEmpty(env.DFORMAT) ?? "%Y/%m/%d %H:%M",
+    signature: env.SIGNATURE === undefined ? DEFAULT_SIGNATURE : (nonEmpty(env.SIGNATURE) ?? ""),
     showUserAs: showUserAsConfig(env.SHOWUSERAS),
     cacheTime: integerConfig(env.CACHETIME, DEFAULT_CACHE_TIME, 0, 365 * 24 * 60 * 60),
     lockTime: integerConfig(env.LOCKTIME, 15 * 60, 0, 604800),
@@ -220,6 +227,8 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateActionList(env.DISABLE_ACTIONS, issues);
   validateBaseUrl(env.BASE_URL, issues);
   validateBaseDir(env.BASE_DIR, issues);
+  validateIntegerRange("RECENT", env.RECENT, 1, 100, issues);
+  validateIntegerRange("RECENT_DAYS", env.RECENT_DAYS, 0, 3660, issues);
   validateIntegerRange("TOP_TOC_LEVEL", env.TOP_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("TOC_MIN_HEADS", env.TOC_MIN_HEADS, 0, 99, issues);
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
@@ -290,6 +299,8 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("CANONICAL_URLS", env.CANONICAL_URLS, String(config.canonicalUrls), "false"),
     configEntry("BASE_URL", env.BASE_URL, config.baseUrl, null),
     configEntry("BASE_DIR", env.BASE_DIR, config.baseDir, ""),
+    configEntry("RECENT", env.RECENT, String(config.recentEntries), "20"),
+    configEntry("RECENT_DAYS", env.RECENT_DAYS, String(config.recentDays), "7"),
     configEntry("TOP_TOC_LEVEL", env.TOP_TOC_LEVEL, String(config.topTocLevel), "1"),
     configEntry("TOC_MIN_HEADS", env.TOC_MIN_HEADS, String(config.tocMinHeads), "3"),
     configEntry("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, String(config.maxTocLevel), "3"),
@@ -303,6 +314,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("YOUAREHERE", env.YOUAREHERE, String(config.youAreHere), "false"),
     configEntry("FULLPATH", env.FULLPATH, String(config.fullPath), "false"),
     configEntry("DFORMAT", env.DFORMAT, config.dateFormat, "%Y/%m/%d %H:%M"),
+    configEntry("SIGNATURE", env.SIGNATURE, config.signature, DEFAULT_SIGNATURE),
     configEntry("SHOWUSERAS", env.SHOWUSERAS, config.showUserAs, "loginname"),
     configEntry("CACHETIME", env.CACHETIME, String(config.cacheTime), String(DEFAULT_CACHE_TIME)),
     configEntry("LOCKTIME", env.LOCKTIME, String(config.lockTime), String(15 * 60)),

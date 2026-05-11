@@ -93,9 +93,18 @@
     replaceSelection(textarea, replacement);
   }
 
+  function insertText(textarea, button) {
+    replaceSelection(textarea, button.dataset.insert || "");
+  }
+
   function bindToolbar(form, textarea) {
     form.querySelectorAll("#tool__bar button").forEach(function (button) {
       button.addEventListener("click", function () {
+        if (button.dataset.insert != null) {
+          insertText(textarea, button);
+          return;
+        }
+
         if (button.dataset.lineBefore || button.dataset.lineAfter) {
           wrapLine(textarea, button);
           return;

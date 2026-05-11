@@ -5386,9 +5386,9 @@ async function renderRecentPage(
   principal: AuthPrincipal,
   defaultNamespace = ""
 ): Promise<string> {
-  const pagination = recentPaginationFromUrl(url);
-  const namespace = cleanPageId(url.searchParams.get("ns") ?? defaultNamespace);
   const config = getRuntimeConfig(env);
+  const pagination = recentPaginationFromUrl(url, config);
+  const namespace = cleanPageId(url.searchParams.get("ns") ?? defaultNamespace);
   const showChanges = recentShowChanges(url, config.mediaRevisions ? "both" : "pages");
   const includeMinor = url.searchParams.get("show_minor") !== "0";
   const { changes, hasNext } = await collectReadableRecentChanges(env, principal, {
@@ -5448,6 +5448,7 @@ async function collectReadableRecentChanges(
       namespace: options.namespace,
       groupBySubject: true,
       includeMinor: options.includeMinor,
+      since: recentSinceIso(config),
       subjectType: recentSubjectType(options.showChanges, config)
     });
     if (batch.length === 0) break;
@@ -5473,12 +5474,18 @@ async function collectReadableRecentChanges(
   };
 }
 
-function recentPaginationFromUrl(url: URL): Pagination {
-  const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
+function recentPaginationFromUrl(url: URL, config: RuntimeConfig): Pagination {
+  const pagination = paginationFromUrl(url, { defaultLimit: config.recentEntries, maxLimit: 100 });
   return {
     ...pagination,
     offset: recentFirstOffset(url) ?? pagination.offset
   };
+}
+
+function recentSinceIso(config: RuntimeConfig): string | undefined {
+  if (config.recentDays <= 0) return undefined;
+
+  return new Date(Date.now() - config.recentDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function recentFirstOffset(url: URL): number | null {
@@ -7380,17 +7387,19 @@ ${urls}
 }
 
 async function renderRssFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+  const config = getRuntimeConfig(env);
   const changes = await filterReadableChanges(
     env,
     principal,
-    await listRecentChanges(env.DB, feedItemLimit(url), 0, {
+    await listRecentChanges(env.DB, feedItemLimit(url, config), 0, {
       includeMinor: url.searchParams.get("minor") === "1",
       onlyCreates: url.searchParams.get("onlynewpages") === "1",
       namespace: cleanPageId(url.searchParams.get("ns") ?? ""),
+      since: recentSinceIso(config),
       subjectType: feedSubjectType(env, url)
     })
   );
-  const title = getRuntimeConfig(env).siteName;
+  const title = config.siteName;
   const items = changes
     .map(
       (change) => `<item>
@@ -7415,17 +7424,19 @@ ${items}
 }
 
 async function renderAtomFeed(env: Env, url: URL, principal: AuthPrincipal): Promise<string> {
+  const config = getRuntimeConfig(env);
   const changes = await filterReadableChanges(
     env,
     principal,
-    await listRecentChanges(env.DB, feedItemLimit(url), 0, {
+    await listRecentChanges(env.DB, feedItemLimit(url, config), 0, {
       includeMinor: url.searchParams.get("minor") === "1",
       onlyCreates: url.searchParams.get("onlynewpages") === "1",
       namespace: cleanPageId(url.searchParams.get("ns") ?? ""),
+      since: recentSinceIso(config),
       subjectType: feedSubjectType(env, url)
     })
   );
-  const title = getRuntimeConfig(env).siteName;
+  const title = config.siteName;
   const updated = changes[0]?.createdAt ?? new Date(0).toISOString();
   const entries = changes
     .map(
@@ -7458,9 +7469,9 @@ function feedSubjectType(env: Env, url: URL): "pages" | "media" | "both" {
   return config.rssMedia;
 }
 
-function feedItemLimit(url: URL): number {
+function feedItemLimit(url: URL, config: RuntimeConfig): number {
   const raw = Number.parseInt(url.searchParams.get("num") ?? "", 10);
-  return Number.isFinite(raw) && raw >= 0 ? raw : 50;
+  return Number.isFinite(raw) && raw >= 0 ? raw : config.recentEntries;
 }
 
 function feedChangeLink(change: RecentChange): string {
@@ -11243,7 +11254,18 @@ async function handleEditPage(
   }
 
   const response = htmlResponse(
-    renderEditPage(id, page, draft, env, templateContent, lockToken, csrf.token, section, notice)
+    renderEditPage(
+      id,
+      page,
+      draft,
+      env,
+      principal,
+      templateContent,
+      lockToken,
+      csrf.token,
+      section,
+      notice
+    )
   );
   if (config.lockTime > 0) {
     response.headers.append(
@@ -12878,6 +12900,7 @@ function renderEditPage(
   page: Awaited<ReturnType<typeof getCurrentPage>>,
   draft: PageDraft | null,
   env: Env,
+  principal: AuthPrincipal,
   templateContent: string | null = null,
   lockToken = "",
   csrfToken = "",
@@ -12912,6 +12935,9 @@ function renderEditPage(
     lockToken && config.lockTime > 0
       ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}"`
       : "";
+  const signatureButton = config.signature
+    ? `<button class="toolbutton" type="button" data-insert="${escapeAttribute(renderEditSignature(config, principal))}" title="Signature">Sig</button>`
+    : "";
 
   return htmlShell(
     env,
@@ -12936,6 +12962,7 @@ function renderEditPage(
           <button class="toolbutton" type="button" data-prefix="  * " data-placeholder="List item" title="Unordered list">UL</button>
           <button class="toolbutton" type="button" data-prefix="  - " data-placeholder="List item" title="Ordered list">OL</button>
           <button class="toolbutton" type="button" data-wrap-before="<code>" data-wrap-after="</code>" data-placeholder="code" title="Code">Code</button>
+          ${signatureButton}
         </div>
         ${draftStatus}
       </div>
@@ -12958,6 +12985,20 @@ function renderEditPage(
   `,
     { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author }
   );
+}
+
+function renderEditSignature(
+  config: RuntimeConfig,
+  principal: AuthPrincipal,
+  now = new Date()
+): string {
+  const name = principal.isAuthenticated ? principal.displayName || principal.username : "";
+  const email = principal.isAuthenticated ? (principal.email ?? "") : "";
+
+  return config.signature
+    .replaceAll("@MAIL@", email)
+    .replaceAll("@NAME@", name)
+    .replaceAll("@DATE@", renderDokuWikiDateFormat(config.dateFormat, now));
 }
 
 function pageLockRefreshDelayMs(lockTimeSeconds: number): number {

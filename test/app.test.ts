@@ -136,6 +136,8 @@ describe("handleRequest", () => {
     env.CAMELCASE = undefined;
     env.TYPOGRAPHY = undefined;
     env.AUTOPLURAL = undefined;
+    env.RECENT = undefined;
+    env.RECENT_DAYS = undefined;
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
@@ -145,6 +147,7 @@ describe("handleRequest", () => {
     env.YOUAREHERE = undefined;
     env.FULLPATH = undefined;
     env.DFORMAT = undefined;
+    env.SIGNATURE = undefined;
     env.LOCKTIME = undefined;
     env.USEDRAFT = undefined;
     env.TARGET_WIKI = undefined;
@@ -2576,6 +2579,7 @@ describe("handleRequest", () => {
   });
 
   it("renders an edit form for existing pages", async () => {
+    env.SIGNATURE = "--sig--";
     const response = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=edit"),
       env
@@ -2594,6 +2598,7 @@ describe("handleRequest", () => {
     expect(html).toContain('name="lockToken" value="');
     expect(html).toContain('id="dw__editform"');
     expect(html).toContain('id="tool__bar"');
+    expect(html).toContain('data-insert="--sig--"');
     expect(html).toContain('id="edbtn__preview"');
     expect(html).toContain('data-draft-url="/api/pages/draft"');
     expect(html).toContain('data-draft-refresh-interval="30000"');
@@ -3068,6 +3073,35 @@ describe("handleRequest", () => {
     expect(older.status).toBe(200);
     expect(olderHtml).toContain("Guide update");
     expect(olderHtml).toContain("&lt;&lt; more recent");
+
+    const configuredLimit = await handleRequest(new Request("https://example.com/recent"), {
+      ...env,
+      RECENT: "1"
+    } satisfies Env);
+    const configuredLimitHtml = await configuredLimit.text();
+    expect(configuredLimit.status).toBe(200);
+    expect(configuredLimitHtml).toContain('name="first[1]"');
+
+    state.changelog.push({
+      id: "page:wiki:fresh@now",
+      subject_type: "page",
+      subject_id: "wiki:fresh",
+      revision_id: "wiki:fresh@now",
+      user_name: "Fresh",
+      ip: "127.0.0.1",
+      change_type: "edit",
+      summary: "Fresh update",
+      size_change: 3,
+      created_at: new Date().toISOString()
+    });
+    const recentWindow = await handleRequest(new Request("https://example.com/recent"), {
+      ...env,
+      RECENT_DAYS: "1"
+    } satisfies Env);
+    const recentWindowHtml = await recentWindow.text();
+    expect(recentWindow.status).toBe(200);
+    expect(recentWindowHtml).toContain("Fresh update");
+    expect(recentWindowHtml).not.toContain("Initial import");
   });
 
   it("renders search results from the page index", async () => {
@@ -4333,6 +4367,12 @@ function createD1Stub(state: D1StubState): D1Database {
               (value): value is string => typeof value === "string" && value.endsWith(":%")
             );
             const namespace = namespacePattern?.slice(0, -2);
+            const since = sql.includes("created_at >= ?")
+              ? values.find(
+                  (value): value is string =>
+                    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)
+                )
+              : undefined;
             const groupBySubject = sql.includes("recent_rank = 1");
             const rows = state.changelog
               .filter((change) => {
@@ -4346,6 +4386,7 @@ function createD1Stub(state: D1StubState): D1Database {
                 if (sql.includes("change_type = 'create'") && change.change_type !== "create") {
                   return false;
                 }
+                if (since && String(change.created_at) < since) return false;
                 return true;
               })
               .sort(

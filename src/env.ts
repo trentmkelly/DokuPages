@@ -24,6 +24,8 @@ export interface Env {
   CANONICAL_URLS?: string;
   BASE_URL?: string;
   BASE_DIR?: string;
+  RECENT?: string;
+  RECENT_DAYS?: string;
   TOP_TOC_LEVEL?: string;
   TOC_MIN_HEADS?: string;
   MAX_TOC_LEVEL?: string;
@@ -32,6 +34,7 @@ export interface Env {
   YOUAREHERE?: string;
   FULLPATH?: string;
   DFORMAT?: string;
+  SIGNATURE?: string;
   SHOWUSERAS?: string;
   CACHETIME?: string;
   LOCKTIME?: string;

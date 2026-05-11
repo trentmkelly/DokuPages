@@ -36,6 +36,8 @@ describe("runtime config", () => {
       canonicalUrls: false,
       baseUrl: null,
       baseDir: "",
+      recentEntries: 20,
+      recentDays: 7,
       topTocLevel: 1,
       tocMinHeads: 3,
       maxTocLevel: 3,
@@ -44,6 +46,7 @@ describe("runtime config", () => {
       youAreHere: false,
       fullPath: false,
       dateFormat: "%Y/%m/%d %H:%M",
+      signature: " --- //[[@MAIL@|@NAME@]] @DATE@//",
       showUserAs: "loginname",
       cacheTime: 86400,
       lockTime: 900,
@@ -105,6 +108,8 @@ describe("runtime config", () => {
       CANONICAL_URLS: "true",
       BASE_URL: "https://wiki.example.test/",
       BASE_DIR: "/docs/",
+      RECENT: "25",
+      RECENT_DAYS: "30",
       TOP_TOC_LEVEL: "2",
       TOC_MIN_HEADS: "4",
       MAX_TOC_LEVEL: "4",
@@ -113,6 +118,7 @@ describe("runtime config", () => {
       YOUAREHERE: "1",
       FULLPATH: "1",
       DFORMAT: "%F %R",
+      SIGNATURE: "-- @NAME@ @DATE@",
       SHOWUSERAS: "email_link",
       CACHETIME: "7200",
       LOCKTIME: "120",
@@ -162,6 +168,8 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).canonicalUrls).toBe(true);
     expect(getRuntimeConfig(env).baseUrl).toBe("https://wiki.example.test");
     expect(getRuntimeConfig(env).baseDir).toBe("/docs");
+    expect(getRuntimeConfig(env).recentEntries).toBe(25);
+    expect(getRuntimeConfig(env).recentDays).toBe(30);
     expect(getRuntimeConfig(env).topTocLevel).toBe(2);
     expect(getRuntimeConfig(env).tocMinHeads).toBe(4);
     expect(getRuntimeConfig(env).maxTocLevel).toBe(4);
@@ -170,6 +178,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).youAreHere).toBe(true);
     expect(getRuntimeConfig(env).fullPath).toBe(true);
     expect(getRuntimeConfig(env).dateFormat).toBe("%F %R");
+    expect(getRuntimeConfig(env).signature).toBe("-- @NAME@ @DATE@");
     expect(getRuntimeConfig(env).showUserAs).toBe("email_link");
     expect(getRuntimeConfig(env).cacheTime).toBe(7200);
     expect(getRuntimeConfig(env).lockTime).toBe(120);
@@ -276,6 +285,18 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "LICENSE",
           effectiveValue: "cc-by-nc-sa"
+        }),
+        expect.objectContaining({
+          key: "RECENT",
+          effectiveValue: "20"
+        }),
+        expect.objectContaining({
+          key: "RECENT_DAYS",
+          effectiveValue: "7"
+        }),
+        expect.objectContaining({
+          key: "SIGNATURE",
+          effectiveValue: " --- //[[@MAIL@|@NAME@]] @DATE@//"
         }),
         expect.objectContaining({
           key: "SEND404",
@@ -471,7 +492,10 @@ describe("runtime config", () => {
         siteName: "Private Wiki",
         tagline: "",
         sidebarPage: "sidebar",
-        licenseId: "cc-by-nc-sa"
+        licenseId: "cc-by-nc-sa",
+        recentEntries: 20,
+        recentDays: 7,
+        signature: " --- //[[@MAIL@|@NAME@]] @DATE@//"
       },
       variables: expect.arrayContaining([
         expect.objectContaining({
@@ -498,6 +522,8 @@ describe("runtime config", () => {
       DISABLE_ACTIONS: "edit,bad action,$",
       BASE_URL: "ftp://example.test",
       BASE_DIR: "../wiki",
+      RECENT: "0",
+      RECENT_DAYS: "-1",
       TOP_TOC_LEVEL: "0",
       TOC_MIN_HEADS: "many",
       MAX_TOC_LEVEL: "9",
@@ -534,6 +560,8 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "DISABLE_ACTIONS", severity: "error" }),
         expect.objectContaining({ key: "BASE_URL", severity: "error" }),
         expect.objectContaining({ key: "BASE_DIR", severity: "error" }),
+        expect.objectContaining({ key: "RECENT", severity: "error" }),
+        expect.objectContaining({ key: "RECENT_DAYS", severity: "error" }),
         expect.objectContaining({ key: "TOP_TOC_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "TOC_MIN_HEADS", severity: "error" }),
         expect.objectContaining({ key: "MAX_TOC_LEVEL", severity: "error" }),

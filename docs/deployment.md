@@ -45,6 +45,11 @@ Optional Pages environment variables:
 - `SEARCH_FRAGMENT`: DokuWiki-compatible default fragment search mode for
   non-search-form queries: `exact`, `starts_with`, `ends_with`, or `contains`.
   Default: `exact`.
+- `RECENT`: default number of recent-change rows shown on `/recent` and feeds
+  when the request does not provide an explicit limit. Default: `20`.
+- `RECENT_DAYS`: DokuWiki-compatible recent-change retention window, in days,
+  used to omit older changelog rows from recent-change views and feeds. Default:
+  `7`; set to `0` to show all retained D1 changelog rows.
 - `BREADCRUMBS`: number of recent visited pages to keep in the DokuWiki-style
   trace. Default: `10`; set to `0` to disable the trace.
 - `YOUAREHERE`: truthy value enables the DokuWiki-style hierarchical "You are
@@ -53,6 +58,9 @@ Optional Pages environment variables:
   instead of the relative page file path. Default: disabled.
 - `DFORMAT`: DokuWiki-style strftime date format used by page template
   `@DATE@` replacement. Default: `%Y/%m/%d %H:%M`.
+- `SIGNATURE`: DokuWiki-compatible editor signature template inserted by the
+  toolbar signature button. Supports `@MAIL@`, `@NAME@`, and `@DATE@`. Default:
+  ` --- //[[@MAIL@|@NAME@]] @DATE@//`.
 - `SHOWUSERAS`: DokuWiki-compatible editor display mode: `loginname`,
   `username`, `username_link`, `email`, or `email_link`. Default: `loginname`.
 - `CACHETIME`: DokuWiki-compatible cache lifetime in seconds. Media fetches use

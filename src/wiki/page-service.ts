@@ -108,6 +108,7 @@ export interface RecentChangeListOptions {
   groupBySubject?: boolean;
   includeMinor?: boolean;
   onlyCreates?: boolean;
+  since?: string;
   subjectType?: "pages" | "media" | "both";
 }
 
@@ -344,6 +345,11 @@ export async function listRecentChanges(
 
   if (options.onlyCreates) {
     where.push("c.change_type = 'create'");
+  }
+
+  if (options.since) {
+    where.push("c.created_at >= ?");
+    values.push(options.since);
   }
 
   const whereSql = where.join(" and ");
