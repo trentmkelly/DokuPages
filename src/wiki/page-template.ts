@@ -1,45 +1,16 @@
 import type { AuthPrincipal } from "../auth/principal";
+import { formatDokuWikiDate, type DokuWikiDateFormatOptions } from "./format";
 import { cleanPageId, type PageIdCleanOptions } from "./page-id";
 
 export interface PageTemplateOptions {
   dateFormat?: string;
+  language?: string;
   now?: Date;
   pageIdCleanOptions?: PageIdCleanOptions;
   principal?: AuthPrincipal;
 }
 
 const DEFAULT_DATE_FORMAT = "%Y/%m/%d %H:%M";
-const SHORT_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SHORT_MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec"
-];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-];
-
 export function pageTemplateCandidates(
   id: string,
   pageIdCleanOptions?: PageIdCleanOptions
@@ -97,11 +68,18 @@ export function applyPageTemplate(
     rendered = rendered.replaceAll(token, value);
   }
 
-  return renderDokuWikiDateFormat(rendered, options.now ?? new Date());
+  return renderDokuWikiDateFormat(rendered, options.now ?? new Date(), {
+    language: options.language,
+    now: options.now
+  });
 }
 
-export function renderDokuWikiDateFormat(format: string, now = new Date()): string {
-  return format.replace(/%./g, (token) => renderDateToken(token, now));
+export function renderDokuWikiDateFormat(
+  format: string,
+  now = new Date(),
+  options: DokuWikiDateFormatOptions = {}
+): string {
+  return formatDokuWikiDate(format, now, options);
 }
 
 function pageNameFromFile(file: string, sepchar: string): string {
@@ -116,82 +94,4 @@ function upperWords(value: string): string {
   return value.replace(/(^|\s)(\S)/g, (_match, prefix: string, char: string) => {
     return `${prefix}${char.toUpperCase()}`;
   });
-}
-
-function renderDateToken(token: string, now: Date): string {
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
-  const day = now.getUTCDate();
-  const hour = now.getUTCHours();
-  const hour12 = hour % 12 || 12;
-  const weekday = now.getUTCDay();
-
-  switch (token) {
-    case "%%":
-      return "%";
-    case "%Y":
-      return String(year);
-    case "%y":
-      return pad(year % 100);
-    case "%m":
-      return pad(month + 1);
-    case "%d":
-      return pad(day);
-    case "%e":
-      return pad(day, " ");
-    case "%H":
-      return pad(hour);
-    case "%k":
-      return pad(hour, " ");
-    case "%I":
-      return pad(hour12);
-    case "%l":
-      return pad(hour12, " ");
-    case "%M":
-      return pad(now.getUTCMinutes());
-    case "%S":
-      return pad(now.getUTCSeconds());
-    case "%p":
-      return hour < 12 ? "AM" : "PM";
-    case "%P":
-      return hour < 12 ? "am" : "pm";
-    case "%F":
-      return `${year}-${pad(month + 1)}-${pad(day)}`;
-    case "%T":
-      return `${pad(hour)}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}`;
-    case "%R":
-      return `${pad(hour)}:${pad(now.getUTCMinutes())}`;
-    case "%D":
-      return `${pad(month + 1)}/${pad(day)}/${pad(year % 100)}`;
-    case "%a":
-      return SHORT_WEEKDAYS[weekday];
-    case "%A":
-      return WEEKDAYS[weekday];
-    case "%b":
-    case "%h":
-      return SHORT_MONTHS[month];
-    case "%B":
-      return MONTHS[month];
-    case "%u":
-      return String(weekday === 0 ? 7 : weekday);
-    case "%w":
-      return String(weekday);
-    case "%j":
-      return pad(dayOfYear(now), "0", 3);
-    case "%s":
-      return String(Math.floor(now.getTime() / 1000));
-    case "%f":
-      return "0 seconds";
-    default:
-      return token;
-  }
-}
-
-function dayOfYear(now: Date): number {
-  const start = Date.UTC(now.getUTCFullYear(), 0, 1);
-  return Math.floor((now.getTime() - start) / 86400000) + 1;
-}
-
-function pad(value: number, fill = "0", length = 2): string {
-  return String(value).padStart(length, fill);
 }

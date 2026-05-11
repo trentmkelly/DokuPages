@@ -1526,6 +1526,7 @@ describe("handleRequest", () => {
     expect(managerHtml).toContain("data-media-tree-toggle");
     expect(managerHtml).toContain("Media Files");
     expect(managerHtml).toContain("logo.svg");
+    expect(managerHtml).toContain("18\u00A0B");
     expect(managerHtml).toContain('class="idx media__manager media-grid"');
     expect(managerHtml).toContain('href="/media-manager?ns=wiki&amp;view=rows"');
     expect(managerHtml).toContain('id="dw__upload"');
@@ -3166,6 +3167,7 @@ describe("handleRequest", () => {
     expect(html).toContain("/wiki/wiki/welcome");
     expect(html).toContain("2026/05/07 00:00");
     expect(html).toContain("sizechange positive");
+    expect(html).toContain("+38\u00A0B");
 
     const paged = await handleRequest(new Request("https://example.com/recent?limit=1"), env);
     const pagedHtml = await paged.text();

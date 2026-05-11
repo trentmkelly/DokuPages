@@ -1,3 +1,4 @@
+import { formatDokuWikiFileSize } from "./format";
 import { mediaName } from "./media-service";
 import type { MimeTypeConfig } from "./mime";
 
@@ -65,7 +66,7 @@ export function validateMediaUpload(input: ValidateMediaUploadInput): MediaUploa
   if (input.body.byteLength > maxBytes) {
     return {
       ok: false,
-      error: `Media uploads are limited to ${maxBytes.toLocaleString("en-US")} bytes.`
+      error: `Media uploads are limited to ${formatDokuWikiFileSize(maxBytes)}.`
     };
   }
 

@@ -142,6 +142,7 @@ import {
   pageTemplateCandidates,
   renderDokuWikiDateFormat
 } from "./wiki/page-template";
+import { formatDokuWikiFileSize, formatDokuWikiInteger } from "./wiki/format";
 import {
   extractCodeBlock,
   getWikiRenderDirectives,
@@ -1749,7 +1750,7 @@ async function handlePagePreview(
     pageIdCleanOptions: config.pageIdCleanOptions,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
-    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
+    rssDateFormatter: (date) => formatRuntimeDate(config, date)
   });
 
   if (acceptsJson(request) || new URL(request.url).pathname.startsWith("/api/")) {
@@ -3400,7 +3401,8 @@ async function renderMediaDetailPage(
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
   if (denied) return denied;
 
-  const mediaRevisions = getRuntimeConfig(env).mediaRevisions;
+  const config = getRuntimeConfig(env);
+  const mediaRevisions = config.mediaRevisions;
   if (url.searchParams.get("mediado") === "diff" || url.searchParams.get("do") === "diff") {
     if (!mediaRevisions) {
       return htmlShell(env, "Media revisions disabled", "<p>Media revisions are disabled.</p>", {
@@ -3445,10 +3447,10 @@ async function renderMediaDetailPage(
         <h1>${escapeHtml(title)}</h1>
         ${preview}
         <div class="img_detail">
-          ${renderMediaDetailMetadata(media, references, displayMetadata)}
+          ${renderMediaDetailMetadata(config, media, references, displayMetadata)}
           <p>Media permissions are checked against the containing namespace.</p>
         </div>
-        ${renderMediaRevisionPanel(id, media, revisions, mediaRevisions)}
+        ${renderMediaRevisionPanel(config, id, media, revisions, mediaRevisions)}
         ${revertForm}
         <form class="media__delete" method="post" action="/api/media/delete">
           ${csrfInput(csrfToken)}
@@ -3473,6 +3475,7 @@ function renderMediaDetailTabs(id: string, mediaRevisions: boolean): string {
 }
 
 function renderMediaDetailMetadata(
+  config: RuntimeConfig,
   media: CurrentMedia,
   references: MediaUsageReference[],
   jpegMetadata?: ParsedJpegMetadata | null
@@ -3481,8 +3484,8 @@ function renderMediaDetailMetadata(
     <dt>Media ID:</dt><dd><code>${escapeHtml(media.id)}</code></dd>
     <dt>Namespace:</dt><dd>${escapeHtml(media.namespace || "(root)")}</dd>
     <dt>MIME type:</dt><dd>${escapeHtml(media.mimeType)}</dd>
-    <dt>Size:</dt><dd>${media.byteLength.toLocaleString("en-US")} bytes</dd>
-    <dt>Updated:</dt><dd>${escapeHtml(media.updatedAt)}</dd>
+    <dt>Size:</dt><dd>${escapeHtml(formatMediaByteLength(media.byteLength))}</dd>
+    <dt>Updated:</dt><dd>${escapeHtml(formatRuntimeDate(config, new Date(media.updatedAt)))}</dd>
     <dt>Current revision:</dt><dd><code>${escapeHtml(media.currentRevisionId ?? "")}</code></dd>
     <dt>Hash:</dt><dd><code>${escapeHtml(media.contentHash)}</code></dd>
     ${renderJpegMetadataDefinitions(jpegMetadata)}
@@ -3513,6 +3516,7 @@ function renderMediaReferenceDefinitions(references: MediaUsageReference[]): str
 }
 
 function renderMediaRevisionPanel(
+  config: RuntimeConfig,
   id: string,
   media: CurrentMedia,
   revisions: MediaRevision[],
@@ -3524,7 +3528,7 @@ function renderMediaRevisionPanel(
     revisions.length === 0
       ? '<li><div class="li">No media revisions found.</div></li>'
       : revisions
-          .map((revision, index) => renderMediaRevisionListItem(id, media, revision, index))
+          .map((revision, index) => renderMediaRevisionListItem(config, id, media, revision, index))
           .join("");
 
   return `<form id="page__revisions" class="changes" method="get" action="${mediaDetailPath(id)}">
@@ -3538,6 +3542,7 @@ function renderMediaRevisionPanel(
 }
 
 function renderMediaRevisionListItem(
+  config: RuntimeConfig,
   id: string,
   media: CurrentMedia,
   revision: MediaRevision,
@@ -3552,7 +3557,7 @@ function renderMediaRevisionListItem(
   return `<li class="${revision.changeType}">
     <div class="li">
       <input type="checkbox" name="${escapeAttribute(checkboxName)}" value="${escapeAttribute(revision.id)}"${index < 2 ? " checked" : ""}>
-      <span class="date"><a href="${escapeAttribute(revisionPath)}">${escapeHtml(revision.createdAt)}</a></span>
+      <span class="date"><a href="${escapeAttribute(revisionPath)}">${escapeHtml(formatRuntimeDate(config, new Date(revision.createdAt)))}</a></span>
       <a class="diff_link" href="${escapeAttribute(diffPath)}">diff</a>
       <span class="mediafile">${escapeHtml(mediaName(revision.mediaId))}</span>
       <div>
@@ -3592,6 +3597,7 @@ async function renderMediaDiffPage(
       principal
     });
   }
+  const config = getRuntimeConfig(env);
 
   return htmlShell(
     env,
@@ -3602,8 +3608,8 @@ async function renderMediaDiffPage(
       <table class="media_diff">
         <thead>
           <tr>
-            <th>${renderMediaDiffTitle(pair.left)}</th>
-            <th>${renderMediaDiffTitle(pair.right)}</th>
+            <th>${renderMediaDiffTitle(config, pair.left)}</th>
+            <th>${renderMediaDiffTitle(config, pair.right)}</th>
           </tr>
         </thead>
         <tbody>
@@ -3728,8 +3734,9 @@ function renderMediaDiffOptions(
   </div>`;
 }
 
-function renderMediaDiffTitle(side: MediaDiffSide): string {
-  const label = side.isCurrent ? `Current media (${side.createdAt})` : side.createdAt;
+function renderMediaDiffTitle(config: RuntimeConfig, side: MediaDiffSide): string {
+  const createdAt = formatRuntimeDate(config, new Date(side.createdAt));
+  const label = side.isCurrent ? `Current media (${createdAt})` : createdAt;
   const summary = side.summary ? ` <span class="sum"> - ${escapeHtml(side.summary)}</span>` : "";
   return `<a href="${mediaDiffSideUrl(side)}">${escapeHtml(label)}</a>${summary}`;
 }
@@ -4018,7 +4025,7 @@ function renderMediaManagerTile(env: Env, item: CurrentMedia): string {
     ${preview}
     <a id="h_:${escapeAttribute(item.id)}" class="media-tile__name select" href="${escapeAttribute(detailPath)}" title="${escapeAttribute(item.id)}" ${selectionAttributes}>${escapeHtml(name)}</a>
     <span class="media-tile__meta">${escapeHtml(item.mimeType)}</span>
-    <span class="media-tile__meta">${escapeHtml(formatMediaDate(item.updatedAt))}</span>
+    <span class="media-tile__meta">${escapeHtml(formatMediaDate(env, item.updatedAt))}</span>
     <span class="media-tile__meta">${escapeHtml(formatMediaByteLength(item.byteLength))}</span>
   </li>`;
 }
@@ -4031,7 +4038,7 @@ function renderMediaManagerRow(env: Env, item: CurrentMedia): string {
   const selectionAttributes = mediaSelectionAttributes(item);
   const info = [
     item.mimeType,
-    formatMediaDate(item.updatedAt),
+    formatMediaDate(env, item.updatedAt),
     formatMediaByteLength(item.byteLength)
   ].join(" ");
   const preview = isPreviewableImage(item)
@@ -4071,32 +4078,14 @@ function mediaFileExtension(name: string): string {
   return name.slice(index + 1, index + 7).toUpperCase();
 }
 
-function formatMediaDate(value: string): string {
+function formatMediaDate(env: Env, value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hour = String(date.getUTCHours()).padStart(2, "0");
-  const minute = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${year}/${month}/${day} ${hour}:${minute}`;
+  return formatRuntimeDate(getRuntimeConfig(env), date);
 }
 
 function formatMediaByteLength(byteLength: number): string {
-  if (byteLength < 1024) {
-    return `${byteLength.toLocaleString("en-US")} bytes`;
-  }
-
-  const units = ["KB", "MB", "GB"];
-  let value = byteLength / 1024;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  const precision = value >= 10 ? 0 : 1;
-  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+  return formatDokuWikiFileSize(byteLength);
 }
 
 function mediaIdFromPath(url: URL, prefix: string): string {
@@ -4340,7 +4329,7 @@ async function renderPageHtml(
     typographyMode: renderConfig.typographyMode,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
-    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
+    rssDateFormatter: (date) => formatRuntimeDate(config, date)
   });
   const title = displayPageTitle(renderConfig, rendered.title, page?.title, id);
 
@@ -4449,7 +4438,7 @@ async function renderPageExport(
     typographyMode: renderConfig.typographyMode,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
-    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
+    rssDateFormatter: (date) => formatRuntimeDate(config, date)
   });
   const title = displayPageTitle(
     renderConfig,
@@ -4654,7 +4643,7 @@ async function renderSidebarForPage(
     typographyMode: renderConfig.typographyMode,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
-    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
+    rssDateFormatter: (date) => formatRuntimeDate(config, date)
   });
 
   return { pageId: sidebar.id, html: rendered.html };
@@ -5082,6 +5071,7 @@ async function resolvePageTemplate(
     if (template) {
       return applyPageTemplate(template.content, id, {
         dateFormat: config.dateFormat,
+        language: config.language,
         pageIdCleanOptions: config.pageIdCleanOptions,
         principal
       });
@@ -5674,22 +5664,15 @@ function recentChangeDiffUrl(change: RecentChange): string {
 function formatRecentDate(env: Env, value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return renderDokuWikiDateFormat(getRuntimeConfig(env).dateFormat, date);
+  return formatRuntimeDate(getRuntimeConfig(env), date);
+}
+
+function formatRuntimeDate(config: RuntimeConfig, date: Date): string {
+  return renderDokuWikiDateFormat(config.dateFormat, date, { language: config.language });
 }
 
 function formatByteLength(byteLength: number): string {
-  if (byteLength < 1024) return `${byteLength.toLocaleString("en-US")} B`;
-
-  const units = ["KB", "MB", "GB"];
-  let value = byteLength / 1024;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  const precision = value >= 10 ? 0 : 1;
-  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+  return formatDokuWikiFileSize(byteLength);
 }
 
 function renderRecentSizeChange(sizeChange: number): string {
@@ -6195,10 +6178,7 @@ function renderRevertManagerCandidate(
   index: number
 ): string {
   const checkboxId = `revert__${index}`;
-  const date = renderDokuWikiDateFormat(
-    getRuntimeConfig(env).dateFormat,
-    new Date(candidate.change.createdAt)
-  );
+  const date = formatRuntimeDate(getRuntimeConfig(env), new Date(candidate.change.createdAt));
   const summary = candidate.change.summary ? ` - ${escapeHtml(candidate.change.summary)}` : "";
   const user = candidate.change.userName
     ? ` <span class="user">${escapeHtml(candidate.change.userName)}</span>`
@@ -7061,7 +7041,7 @@ async function renderMediaCleanupPage(
   const deletedCount = Number(url.searchParams.get("deleted") ?? 0);
   const deletedNotice =
     Number.isFinite(deletedCount) && deletedCount > 0
-      ? `<p class="info">Deleted ${deletedCount.toLocaleString("en-US")} unreferenced media object${deletedCount === 1 ? "" : "s"}.</p>`
+      ? `<p class="info">Deleted ${formatDokuWikiInteger(deletedCount)} unreferenced media object${deletedCount === 1 ? "" : "s"}.</p>`
       : "";
   const scanResult = scanned ? await scanMediaCleanup(env) : null;
   const status = scanResult ? renderMediaCleanupResult(scanResult) : "";
@@ -7095,7 +7075,7 @@ function renderMediaCleanupResult(result: MediaCleanupResult): string {
     .map(
       (object) => `<tr>
         <td><code>${escapeHtml(object.key)}</code></td>
-        <td>${object.size.toLocaleString("en-US")}</td>
+        <td>${escapeHtml(formatMediaByteLength(object.size))}</td>
       </tr>`
     )
     .join("");
@@ -7106,15 +7086,15 @@ function renderMediaCleanupResult(result: MediaCleanupResult): string {
     </table>`
     : "<p>No unreferenced media objects were found.</p>";
   const truncated = result.truncated
-    ? `<p>Showing the first ${result.sampleLimit.toLocaleString("en-US")} unreferenced object${result.sampleLimit === 1 ? "" : "s"}.</p>`
+    ? `<p>Showing the first ${formatDokuWikiInteger(result.sampleLimit)} unreferenced object${result.sampleLimit === 1 ? "" : "s"}.</p>`
     : "";
 
   return `<h2>Scan result</h2>
     <ul>
-      <li>Referenced D1 media objects: ${result.referencedObjectCount.toLocaleString("en-US")}</li>
-      <li>Scanned R2 media objects: ${result.scannedObjectCount.toLocaleString("en-US")}</li>
-      <li>Unreferenced R2 media objects: ${result.unreferencedObjectCount.toLocaleString("en-US")}</li>
-      <li>Deleted R2 media objects: ${result.deletedObjectCount.toLocaleString("en-US")}</li>
+      <li>Referenced D1 media objects: ${formatDokuWikiInteger(result.referencedObjectCount)}</li>
+      <li>Scanned R2 media objects: ${formatDokuWikiInteger(result.scannedObjectCount)}</li>
+      <li>Unreferenced R2 media objects: ${formatDokuWikiInteger(result.unreferencedObjectCount)}</li>
+      <li>Deleted R2 media objects: ${formatDokuWikiInteger(result.deletedObjectCount)}</li>
     </ul>
     ${table}
     ${truncated}`;
@@ -7203,12 +7183,12 @@ function renderUserManagerFilterForm(filters: UserManagerFilter): string {
 
 function renderUserManagerSummary(userList: ManagedUserList, pagination: Pagination): string {
   if (userList.filteredCount === 0) {
-    return `<p>No users found. ${userList.totalCount.toLocaleString("en-US")} users total.</p>`;
+    return `<p>No users found. ${formatDokuWikiInteger(userList.totalCount)} users total.</p>`;
   }
 
   const first = pagination.offset + 1;
   const last = Math.min(pagination.offset + userList.users.length, userList.filteredCount);
-  return `<p>Displaying users ${first.toLocaleString("en-US")}-${last.toLocaleString("en-US")} of ${userList.filteredCount.toLocaleString("en-US")} found. ${userList.totalCount.toLocaleString("en-US")} users total.</p>`;
+  return `<p>Displaying users ${formatDokuWikiInteger(first)}-${formatDokuWikiInteger(last)} of ${formatDokuWikiInteger(userList.filteredCount)} found. ${formatDokuWikiInteger(userList.totalCount)} users total.</p>`;
 }
 
 function renderUserManagerNotice(url: URL): string {
@@ -7218,7 +7198,7 @@ function renderUserManagerNotice(url: URL): string {
 
   const deleted = Number.parseInt(url.searchParams.get("deleted") ?? "", 10);
   if (Number.isFinite(deleted) && deleted > 0) {
-    return `<p class="success">${deleted.toLocaleString("en-US")} users deleted</p>`;
+    return `<p class="success">${formatDokuWikiInteger(deleted)} users deleted</p>`;
   }
 
   return "";
@@ -10289,7 +10269,7 @@ async function sendRegistrationNotifications(
     username: user.username,
     displayName: user.displayName,
     email: user.email,
-    date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date()),
+    date: formatRuntimeDate(runtimeConfig, new Date()),
     browser: request.headers.get("user-agent") ?? "",
     ipAddress: requestClientIp(request, env) ?? "",
     hostname: requestClientIp(request, env) ?? ""
@@ -10538,7 +10518,7 @@ async function recordAndSendPageChangeNotifications(
       actorName: actor.authorName,
       changeType,
       summary,
-      date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(page.updatedAt)),
+      date: formatRuntimeDate(runtimeConfig, new Date(page.updatedAt)),
       browser: request.headers.get("user-agent") ?? "",
       ipAddress: requestClientIp(request, env) ?? "",
       hostname: requestClientIp(request, env) ?? "",
@@ -10561,7 +10541,7 @@ async function recordAndSendPageChangeNotifications(
       actorName: actor.authorName,
       changeType,
       summary,
-      date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(page.updatedAt)),
+      date: formatRuntimeDate(runtimeConfig, new Date(page.updatedAt)),
       browser: request.headers.get("user-agent") ?? "",
       ipAddress: requestClientIp(request, env) ?? "",
       hostname: requestClientIp(request, env) ?? "",
@@ -10599,7 +10579,7 @@ async function sendMediaChangeNotifications(
     summary: revision.summary,
     mimeType: revision.mimeType,
     byteLength: revision.byteLength,
-    date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(revision.createdAt)),
+    date: formatRuntimeDate(runtimeConfig, new Date(revision.createdAt)),
     browser: request.headers.get("user-agent") ?? "",
     ipAddress: requestClientIp(request, env) ?? "",
     hostname: requestClientIp(request, env) ?? ""
@@ -13278,7 +13258,7 @@ function renderLockedPage(env: Env, id: string, lock: PageLockInfo | null): stri
 }
 
 function formatLockExpiration(expiresAt: string, config: RuntimeConfig): string {
-  return renderDokuWikiDateFormat(config.dateFormat, new Date(expiresAt));
+  return formatRuntimeDate(config, new Date(expiresAt));
 }
 
 function lockMinutesRemaining(expiresAt: string): number {
@@ -13515,7 +13495,7 @@ function renderEditSignature(
   return config.signature
     .replaceAll("@MAIL@", email)
     .replaceAll("@NAME@", name)
-    .replaceAll("@DATE@", renderDokuWikiDateFormat(config.dateFormat, now));
+    .replaceAll("@DATE@", formatRuntimeDate(config, now));
 }
 
 function pageLockRefreshDelayMs(lockTimeSeconds: number): number {
@@ -13614,10 +13594,7 @@ function renderDraftPage(
 }
 
 function draftMessage(draft: PageDraft, env: Env): string {
-  return `Draft autosaved on ${renderDokuWikiDateFormat(
-    getRuntimeConfig(env).dateFormat,
-    new Date(draft.updatedAt)
-  )}`;
+  return `Draft autosaved on ${formatRuntimeDate(getRuntimeConfig(env), new Date(draft.updatedAt))}`;
 }
 
 async function purgePageCache(

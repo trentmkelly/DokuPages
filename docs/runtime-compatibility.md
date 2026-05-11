@@ -196,7 +196,7 @@ behavior explicitly.
 | `openpsa/universalfeedcreator`       | RSS/Atom generation.                  | Native feed routes.                                  |
 | `paragonie/constant_time_encoding`   | Constant-time encoding helpers.       | Web Crypto and native JS helpers.                    |
 | `paragonie/random_compat`            | PHP random byte polyfill.             | Web Crypto random values.                            |
-| `php81_bc/strftime`                  | Locale date formatting compatibility. | Native `Intl.DateTimeFormat`; locale parity later.   |
+| `php81_bc/strftime`                  | Locale date formatting compatibility. | Native DokuWiki formatter backed by `Intl`.          |
 | `phpseclib/phpseclib`                | Crypto/SSH/SFTP utilities.            | Not used at request runtime.                         |
 | `simplepie/simplepie`                | RSS feed parsing.                     | Deferred RSS syntax/feed parsing replacement.        |
 | `splitbrain/lesserphp`               | LESS compilation.                     | Build-time CSS assets.                               |

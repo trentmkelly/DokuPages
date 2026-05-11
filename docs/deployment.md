@@ -56,8 +56,10 @@ Optional Pages environment variables:
   here" trail. Default: disabled.
 - `FULLPATH`: truthy value makes page info display the logical data path
   instead of the relative page file path. Default: disabled.
-- `DFORMAT`: DokuWiki-style strftime date format used by page template
-  `@DATE@` replacement. Default: `%Y/%m/%d %H:%M`.
+- `DFORMAT`: DokuWiki-style `strftime` date format used by page template
+  `@DATE@` replacement, recent changes, media views, locks, drafts, signatures,
+  and notification mail. `%f` renders the localized fuzzy age string from the
+  bundled DokuWiki language pack. Default: `%Y/%m/%d %H:%M`.
 - `SIGNATURE`: DokuWiki-compatible editor signature template inserted by the
   toolbar signature button. Supports `@MAIL@`, `@NAME@`, and `@DATE@`. Default:
   ` --- //[[@MAIL@|@NAME@]] @DATE@//`.

@@ -186,7 +186,7 @@ are not fixed by this checklist.
 - [x] Support `trustedproxies`, `realip`, and proxy config semantics where they differ from Cloudflare header handling.
 - [x] Support custom language files imported from `conf/lang` at runtime instead of storing them only as metadata.
 - [x] Port upstream language pack strings for supported locales beyond the current native English UI.
-- [ ] Match upstream date, time, byte-size, and number formatting rules, including locale effects.
+- [x] Match upstream date, time, byte-size, and number formatting rules, including locale effects.
 
 ## Template, Frontend, And Static Assets
 
