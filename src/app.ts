@@ -613,8 +613,23 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap") {
-    return cachedXmlResponse(env, "sitemap", url, "application/xml; charset=utf-8", () =>
-      renderSitemap(env, url, anonymousPrincipal())
+    const config = getRuntimeConfig(env);
+    if (config.sitemapDays < 1) {
+      return xmlResponse(
+        "<error>Sitemap generation is disabled</error>",
+        "application/xml; charset=utf-8",
+        { "cache-control": "no-store" },
+        404
+      );
+    }
+
+    return cachedXmlResponse(
+      env,
+      "sitemap",
+      url,
+      "application/xml; charset=utf-8",
+      () => renderSitemap(env, url, anonymousPrincipal()),
+      config.sitemapDays * 24 * 60 * 60
     );
   }
 
@@ -653,15 +668,15 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/robots.txt") {
-    return new Response(
-      `User-agent: *\nAllow: /\nSitemap: ${new URL("/sitemap.xml", url).href}\n`,
-      {
-        headers: securityHeaders({
-          "content-type": "text/plain; charset=utf-8",
-          "x-content-type-options": "nosniff"
-        })
-      }
-    );
+    const config = getRuntimeConfig(env);
+    const sitemap =
+      config.sitemapDays >= 1 ? `Sitemap: ${new URL("/sitemap.xml", url).href}\n` : "";
+    return new Response(`User-agent: *\nAllow: /\n${sitemap}`, {
+      headers: securityHeaders({
+        "content-type": "text/plain; charset=utf-8",
+        "x-content-type-options": "nosniff"
+      })
+    });
   }
 
   if (url.pathname === "/api/v1" || url.pathname.startsWith("/api/v1/")) {
@@ -11450,9 +11465,11 @@ function renderPageTools(pageId: string, disabledActions = new Set<string>()): s
 function xmlResponse(
   body: string,
   contentType = "application/xml; charset=utf-8",
-  extraHeaders: Record<string, string> = {}
+  extraHeaders: Record<string, string> = {},
+  status = 200
 ): Response {
   return new Response(body, {
+    status,
     headers: securityHeaders({
       "content-type": contentType,
       "x-content-type-options": "nosniff",

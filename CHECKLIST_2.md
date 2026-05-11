@@ -181,7 +181,7 @@ are not fixed by this checklist.
 - [x] Support `target` link settings for wiki, interwiki, extern, media, and windows.
 - [x] Support `mailprefix`, `htmlmail`, `notify`, and upstream mail template settings more closely.
 - [x] Support `rss_type`, `rss_linkto`, `rss_content`, `rss_media`, `rss_show_summary`, and `rss_show_deleted`.
-- [ ] Support `sitemap` frequency instead of always exposing sitemap output.
+- [x] Support `sitemap` frequency instead of always exposing sitemap output.
 - [ ] Support `updatecheck` or explicitly remove update notices from the UI.
 - [ ] Support `trustedproxies`, `realip`, and proxy config semantics where they differ from Cloudflare header handling.
 - [ ] Support custom language files imported from `conf/lang` at runtime instead of storing them only as metadata.
@@ -212,7 +212,7 @@ are not fixed by this checklist.
 - [x] Match deleted-item feed behavior from `rss_show_deleted`.
 - [x] Match feed summaries from `rss_show_summary`.
 - [x] Match feed cache timing from `rss_update`.
-- [ ] Match sitemap frequency behavior from `sitemap`, including disabled sitemap mode.
+- [x] Match sitemap frequency behavior from `sitemap`, including disabled sitemap mode.
 - [ ] Match OpenSearch and manifest output from upstream `inc/Manifest.php` and `lib/exe/opensearch.php`.
 - [ ] Match robots behavior to upstream and site configuration instead of always allowing all.
 

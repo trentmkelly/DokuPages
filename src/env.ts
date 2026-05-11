@@ -55,6 +55,7 @@ export interface Env {
   RSS_UPDATE?: string;
   RSS_SHOW_SUMMARY?: string;
   RSS_SHOW_DELETED?: string;
+  SITEMAP?: string;
   SEARCH_NSLIMIT?: string;
   SEARCH_FRAGMENT?: string;
   DEACCENT?: string;

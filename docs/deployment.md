@@ -134,6 +134,9 @@ Optional Pages environment variables:
   enabled.
 - `RSS_UPDATE`: feed cache lifetime in seconds. Default: `300`; set to `0` to
   bypass KV feed caching.
+- `SITEMAP`: sitemap cache/regeneration frequency in days. Default: `1`; set
+  to `0` to disable `/sitemap.xml` and omit the sitemap line from
+  `/robots.txt`.
 - `EXTERNAL_AUTH_MODE`: set to `cloudflare_access` to resolve request
   principals from trusted Cloudflare Access headers after syncing users/groups
   into D1. Default: `off`.

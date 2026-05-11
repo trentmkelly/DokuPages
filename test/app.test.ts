@@ -144,6 +144,7 @@ describe("handleRequest", () => {
     env.RSS_UPDATE = undefined;
     env.RSS_SHOW_SUMMARY = undefined;
     env.RSS_SHOW_DELETED = undefined;
+    env.SITEMAP = undefined;
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
@@ -3481,6 +3482,27 @@ describe("handleRequest", () => {
     await expect(atom1.text()).resolves.toContain("http://www.w3.org/2005/Atom");
   });
 
+  it("honors DokuWiki sitemap frequency and disabled mode", async () => {
+    env.SITEMAP = "2";
+    const sitemap = await handleRequest(
+      new Request("https://example.com/sitemap.xml?fresh=1"),
+      env
+    );
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.headers.get("cache-control")).toBe("public, max-age=172800");
+
+    env.SITEMAP = "0";
+    const disabled = await handleRequest(
+      new Request("https://example.com/sitemap.xml?disabled=1"),
+      env
+    );
+    const robots = await handleRequest(new Request("https://example.com/robots.txt"), env);
+
+    expect(disabled.status).toBe(404);
+    await expect(disabled.text()).resolves.toContain("Sitemap generation is disabled");
+    await expect(robots.text()).resolves.not.toContain("Sitemap:");
+  });
+
   it("caches sitemap and feed documents in KV", async () => {
     const sitemap = await handleRequest(new Request("https://example.com/sitemap.xml"), env);
     const rss = await handleRequest(new Request("https://example.com/feed.php"), env);
@@ -3490,7 +3512,7 @@ describe("handleRequest", () => {
     const rssText = await rss.text();
     const atomText = await atom.text();
 
-    expect(sitemap.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(sitemap.headers.get("cache-control")).toBe("public, max-age=86400");
     expect(rss.headers.get("cache-control")).toBe("public, max-age=300");
     expect(atom.headers.get("cache-control")).toBe("public, max-age=300");
     expect(cachePuts).toEqual(

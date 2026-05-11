@@ -90,6 +90,7 @@ export interface RuntimeConfig {
   rssUpdate: number;
   rssShowSummary: boolean;
   rssShowDeleted: boolean;
+  sitemapDays: number;
   searchNsLimit: number;
   searchFragment: "exact" | "starts_with" | "ends_with" | "contains";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
@@ -205,6 +206,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     rssUpdate: integerConfig(env.RSS_UPDATE, 5 * 60, 0, 24 * 60 * 60),
     rssShowSummary: booleanConfig(env.RSS_SHOW_SUMMARY, true),
     rssShowDeleted: booleanConfig(env.RSS_SHOW_DELETED, true),
+    sitemapDays: integerConfig(env.SITEMAP, 1, 0, 3650),
     searchNsLimit: integerConfig(env.SEARCH_NSLIMIT, 0, 0, 99),
     searchFragment: searchFragmentConfig(env.SEARCH_FRAGMENT),
     pageIdCleanOptions,
@@ -256,6 +258,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateRssContent(env.RSS_CONTENT, issues);
   validateRssMedia(env.RSS_MEDIA, issues);
   validateIntegerRange("RSS_UPDATE", env.RSS_UPDATE, 0, 24 * 60 * 60, issues);
+  validateIntegerRange("SITEMAP", env.SITEMAP, 0, 3650, issues);
   validateIntegerRange("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, 0, 99, issues);
   validateSearchFragment(env.SEARCH_FRAGMENT, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
@@ -356,6 +359,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("RSS_UPDATE", env.RSS_UPDATE, String(config.rssUpdate), String(5 * 60)),
     configEntry("RSS_SHOW_SUMMARY", env.RSS_SHOW_SUMMARY, String(config.rssShowSummary), "true"),
     configEntry("RSS_SHOW_DELETED", env.RSS_SHOW_DELETED, String(config.rssShowDeleted), "true"),
+    configEntry("SITEMAP", env.SITEMAP, String(config.sitemapDays), "1"),
     configEntry("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, String(config.searchNsLimit), "0"),
     configEntry("SEARCH_FRAGMENT", env.SEARCH_FRAGMENT, config.searchFragment, "exact"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),

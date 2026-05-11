@@ -67,6 +67,7 @@ describe("runtime config", () => {
       rssUpdate: 300,
       rssShowSummary: true,
       rssShowDeleted: true,
+      sitemapDays: 1,
       searchNsLimit: 0,
       searchFragment: "exact",
       pageIdCleanOptions: {
@@ -145,6 +146,7 @@ describe("runtime config", () => {
       RSS_UPDATE: "120",
       RSS_SHOW_SUMMARY: "0",
       RSS_SHOW_DELETED: "0",
+      SITEMAP: "7",
       SEARCH_NSLIMIT: "2",
       SEARCH_FRAGMENT: "contains",
       DEACCENT: "2",
@@ -211,6 +213,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).rssUpdate).toBe(120);
     expect(getRuntimeConfig(env).rssShowSummary).toBe(false);
     expect(getRuntimeConfig(env).rssShowDeleted).toBe(false);
+    expect(getRuntimeConfig(env).sitemapDays).toBe(7);
     expect(getRuntimeConfig(env).searchNsLimit).toBe(2);
     expect(getRuntimeConfig(env).searchFragment).toBe("contains");
     expect(getRuntimeConfig(env).pageIdCleanOptions).toEqual({
@@ -461,6 +464,11 @@ describe("runtime config", () => {
           dokuwikiKey: "rss_show_deleted"
         }),
         expect.objectContaining({
+          key: "SITEMAP",
+          effectiveValue: "1",
+          dokuwikiKey: "sitemap"
+        }),
+        expect.objectContaining({
           key: "DEACCENT",
           effectiveValue: "1"
         }),
@@ -616,6 +624,7 @@ describe("runtime config", () => {
       RSS_UPDATE: "-1",
       RSS_SHOW_SUMMARY: "maybe",
       RSS_SHOW_DELETED: "maybe",
+      SITEMAP: "-1",
       SEARCH_NSLIMIT: "-1",
       SEARCH_FRAGMENT: "middle",
       DEACCENT: "3",
@@ -660,6 +669,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "RSS_UPDATE", severity: "error" }),
         expect.objectContaining({ key: "RSS_SHOW_SUMMARY", severity: "error" }),
         expect.objectContaining({ key: "RSS_SHOW_DELETED", severity: "error" }),
+        expect.objectContaining({ key: "SITEMAP", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_NSLIMIT", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_FRAGMENT", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
