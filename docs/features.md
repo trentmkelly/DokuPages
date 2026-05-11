@@ -68,7 +68,8 @@ PHP modules to execute. Current decisions:
 - `authplain`: replaced by D1-backed native users, groups, and sessions.
 - `config`: permanently read-only in Pages runtime, replaced by runtime env
   validation, `/admin/config`, and redacted configuration export.
-- `extension`: unsupported for production installs on Pages.
+- `extension`: unsupported for production installs on Pages; `/admin/extension`
+  keeps a DokuWiki-styled disabled Extension Manager page.
 - `info`: partially replaced by diagnostics and health endpoints.
 - `logviewer`: replaced by Cloudflare logs plus native admin audit log.
 - `popularity`: unsupported.

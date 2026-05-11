@@ -11,7 +11,7 @@ path.
 | `acl`          | Replaced by native ACL matching and `/admin/acl`.                                                                                 |
 | `authplain`    | Replaced by D1-backed users, groups, sessions, and importer support.                                                              |
 | `config`       | Permanently read-only in Pages runtime; replaced by validated environment variables, `/admin/config`, and redacted config export. |
-| `extension`    | Removed for production Pages runtime; plugin code upload/install is unsupported.                                                  |
+| `extension`    | DokuWiki-styled `/admin/extension` unsupported page; plugin code upload/install is unavailable in production Pages runtime.       |
 | `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, `/api/health`, and native `~~INFO:*~~` syntax output.                             |
 | `logviewer`    | Replaced by Cloudflare logs plus native admin audit log records.                                                                  |
 | `popularity`   | Removed. The port does not phone home usage statistics.                                                                           |

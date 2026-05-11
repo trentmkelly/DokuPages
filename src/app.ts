@@ -468,6 +468,11 @@ async function dispatchRequest(
     return page instanceof Response ? page : htmlResponse(page);
   }
 
+  if (url.pathname === "/admin/extension" && request.method === "GET") {
+    const page = renderExtensionManagerUnsupportedPage(request, env, principal);
+    return page instanceof Response ? page : htmlResponse(page, { status: 501 });
+  }
+
   if (url.pathname === "/admin/config" && request.method === "GET") {
     const page = renderConfigAdminPage(request, env, principal);
     return page instanceof Response ? page : htmlResponse(page);
@@ -5601,6 +5606,9 @@ function renderAdminDashboardPage(
   const configTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/config">Configuration manager</a></li>`
     : "";
+  const extensionTool = isAdminPrincipal(principal, env)
+    ? `<li><a href="/admin/extension">Extension Manager</a></li>`
+    : "";
   const mediaCleanupTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/media-cleanup">Media cleanup</a></li>`
     : "";
@@ -5625,11 +5633,47 @@ function renderAdminDashboardPage(
         ${aclTool}
         ${userTool}
         ${configTool}
+        ${extensionTool}
         ${mediaCleanupTool}
         <li><a href="/admin/revert">Revert Manager</a></li>
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`,
+    { principal }
+  );
+}
+
+function renderExtensionManagerUnsupportedPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): string | Response {
+  if (!isAdminPrincipal(principal, env)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  return htmlShell(
+    env,
+    "Extension Manager",
+    `<h1>Extension Manager</h1>
+    <div class="plugin_extension">
+      <ul class="tabs">
+        <li class="active"><span>Installed Plugins</span></li>
+        <li><span>Installed Templates</span></li>
+        <li><span>Search and Install</span></li>
+        <li><span>Manual Install</span></li>
+      </ul>
+      <p class="info">Runtime plugin and template installation is not available in this Pages port.</p>
+      <p>All executable code must be reviewed, committed, tested, and redeployed with the Pages application. Imported plugin enablement and plugin configuration are retained for diagnostics and native replacement decisions, but uploaded PHP extensions are not executed.</p>
+      <table class="diagnostics">
+        <thead><tr><th>DokuWiki extension action</th><th>Pages runtime status</th></tr></thead>
+        <tbody>
+          <tr><td>Install, update, reinstall, uninstall</td><td>Unsupported at runtime</td></tr>
+          <tr><td>Enable or disable PHP plugins</td><td>Deployment-time code and configuration change</td></tr>
+          <tr><td>Search the DokuWiki extension repository</td><td>Use dokuwiki.org outside production, then port or replace natively</td></tr>
+        </tbody>
+      </table>
+    </div>`,
     { principal }
   );
 }

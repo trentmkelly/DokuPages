@@ -2371,6 +2371,26 @@ describe("auth routes", () => {
       await expect(native.text(), plugin).resolves.toContain(pageText);
     }
 
+    const extensionAnonymous = await handleRequest(
+      new Request("https://example.com/admin/extension"),
+      env
+    );
+    const extensionPage = await handleRequest(
+      new Request("https://example.com/admin/extension", {
+        headers: { cookie }
+      }),
+      env
+    );
+    expect(extensionAnonymous.status).toBe(403);
+    expect(extensionPage.status).toBe(501);
+    const extensionHtml = await extensionPage.text();
+    expect(extensionHtml).toContain("Extension Manager");
+    expect(extensionHtml).toContain("Installed Plugins");
+    expect(extensionHtml).toContain("Search and Install");
+    expect(extensionHtml).toContain(
+      "Runtime plugin and template installation is not available in this Pages port."
+    );
+
     for (const plugin of ["extension", "popularity", "safefnrecode", "styling"]) {
       const removed = await handleRequest(
         new Request(`https://example.com/doku.php?do=admin&page=${plugin}`),
