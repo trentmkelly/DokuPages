@@ -176,7 +176,7 @@ are not fixed by this checklist.
 
 - [x] Map every upstream `conf/dokuwiki.php` setting to one of: implemented, imported metadata only, intentionally unsupported, or not yet evaluated.
 - [x] Use imported `conf/local.php` and `conf/local.protected.php` values where runtime-safe instead of only environment variables.
-- [ ] Support `title`, `tagline`, `sidebar`, and `license` with DokuWiki-compatible names and defaults.
+- [x] Support `title`, `tagline`, `sidebar`, and `license` with DokuWiki-compatible names and defaults.
 - [ ] Support `recent`, `recent_days`, `breadcrumbs`, `fullpath`, `typography`, `dformat`, and `signature` display settings.
 - [x] Support `target` link settings for wiki, interwiki, extern, media, and windows.
 - [ ] Support `mailprefix`, `htmlmail`, `notify`, and upstream mail template settings more closely.

@@ -133,6 +133,9 @@ const IMPLEMENTED = new Set<string>([
   "lang",
   "basedir",
   "baseurl",
+  "tagline",
+  "sidebar",
+  "license",
   "breadcrumbs",
   "youarehere",
   "fullpath",
@@ -184,9 +187,6 @@ const IMPLEMENTED = new Set<string>([
 
 const IMPORTED_METADATA_ONLY = new Set<string>([
   "template",
-  "tagline",
-  "sidebar",
-  "license",
   "recent",
   "recent_days",
   "signature",

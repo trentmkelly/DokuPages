@@ -16,7 +16,10 @@ import type { Env } from "../src/env";
 describe("runtime config", () => {
   it("provides defaults for optional Pages environment variables", () => {
     expect(getRuntimeConfig({} as Env)).toMatchObject({
-      siteName: "DokuWiki Pages",
+      siteName: "DokuWiki",
+      tagline: "",
+      sidebarPage: "sidebar",
+      licenseId: "cc-by-nc-sa",
       startPage: "wiki:welcome",
       language: "en",
       sessionCookieName: "DW_PAGES_SESSION",
@@ -83,6 +86,10 @@ describe("runtime config", () => {
 
   it("normalizes configured page ids and reports warnings", () => {
     const env = {
+      TITLE: "Configured Wiki",
+      TAGLINE: "A local DokuWiki",
+      SIDEBAR: "Wiki/Sidebar",
+      LICENSE: "cc-by",
       START_PAGE: "Wiki/Welcome",
       WIKI_LANG: "pt_BR",
       USEACL: "0",
@@ -136,6 +143,10 @@ describe("runtime config", () => {
       EXTERNAL_AUTH_USERNAME_HEADER: "X-Auth-User"
     } as Env;
 
+    expect(getRuntimeConfig(env).siteName).toBe("Configured Wiki");
+    expect(getRuntimeConfig(env).tagline).toBe("A local DokuWiki");
+    expect(getRuntimeConfig(env).sidebarPage).toBe("wiki:sidebar");
+    expect(getRuntimeConfig(env).licenseId).toBe("cc-by");
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
     expect(getRuntimeConfig(env).language).toBe("pt-br");
     expect(getRuntimeConfig(env).useAcl).toBe(false);
@@ -224,6 +235,13 @@ describe("runtime config", () => {
     expect(getRuntimeConfigEntries(env)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          key: "TITLE",
+          value: "Private Wiki",
+          effectiveValue: "Private Wiki",
+          dokuwikiKey: "title",
+          source: "environment"
+        }),
+        expect.objectContaining({
           key: "SITE_NAME",
           value: "Private Wiki",
           effectiveValue: "Private Wiki",
@@ -246,6 +264,18 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "DISABLE_ACTIONS",
           effectiveValue: ""
+        }),
+        expect.objectContaining({
+          key: "TAGLINE",
+          effectiveValue: ""
+        }),
+        expect.objectContaining({
+          key: "SIDEBAR",
+          effectiveValue: "sidebar"
+        }),
+        expect.objectContaining({
+          key: "LICENSE",
+          effectiveValue: "cc-by-nc-sa"
         }),
         expect.objectContaining({
           key: "SEND404",
@@ -438,11 +468,14 @@ describe("runtime config", () => {
     expect(exported).toMatchObject({
       exportedAt: "2026-05-07T00:00:00.000Z",
       runtime: {
-        siteName: "Private Wiki"
+        siteName: "Private Wiki",
+        tagline: "",
+        sidebarPage: "sidebar",
+        licenseId: "cc-by-nc-sa"
       },
       variables: expect.arrayContaining([
         expect.objectContaining({
-          key: "SITE_NAME",
+          key: "TITLE",
           dokuwikiKey: "title",
           metadata: expect.objectContaining({ handler: "string" })
         })

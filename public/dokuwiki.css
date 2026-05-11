@@ -423,6 +423,33 @@ form.search button {
   margin: 0;
 }
 
+#dokuwiki__aside {
+  float: left;
+  position: relative;
+  display: block;
+  width: var(--dw-sidebar-width);
+}
+
+#dokuwiki__aside > .pad {
+  margin: 0 1.5em 0 0;
+}
+
+.showSidebar #dokuwiki__content {
+  float: right;
+  width: 100%;
+  margin-left: calc(-1 * var(--dw-sidebar-width));
+}
+
+.showSidebar #dokuwiki__content > .pad {
+  margin-left: var(--dw-sidebar-width);
+}
+
+.dokuwiki .aside {
+  overflow: hidden;
+  word-wrap: break-word;
+  font-size: 0.875em;
+}
+
 .dokuwiki .pageId {
   float: right;
   margin-top: -1.5em;
@@ -1885,6 +1912,22 @@ button.media-tree__toggle {
     margin: 0 0 1em;
     border-bottom: 1px solid var(--dw-border);
     border-left-width: 0;
+  }
+
+  #dokuwiki__aside,
+  .showSidebar #dokuwiki__content {
+    float: none;
+    width: auto;
+    margin-left: 0;
+  }
+
+  #dokuwiki__aside > .pad,
+  .showSidebar #dokuwiki__content > .pad {
+    margin: 0;
+  }
+
+  #dokuwiki__aside {
+    margin-bottom: 1em;
   }
 
   .dokuwiki div.page {

@@ -3,7 +3,11 @@ export interface Env {
   MEDIA_BUCKET?: R2Bucket;
   RENDER_CACHE: KVNamespace;
   PAGE_LOCKS?: DurableObjectNamespace;
+  TITLE?: string;
   SITE_NAME?: string;
+  TAGLINE?: string;
+  SIDEBAR?: string;
+  LICENSE?: string;
   START_PAGE?: string;
   WIKI_LANG?: string;
   SESSION_COOKIE_NAME?: string;

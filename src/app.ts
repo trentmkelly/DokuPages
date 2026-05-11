@@ -175,6 +175,7 @@ import {
 } from "./wiki/rss";
 import { renderUserDisplay, type UserDisplaySource } from "./wiki/user-display";
 import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
+import { resolveDefaultLicense } from "./wiki/license";
 import {
   expectedMediaDerivativeStatus,
   generateMediaDerivative,
@@ -4197,6 +4198,7 @@ async function renderPageHtml(
   const config = getRuntimeConfig(env);
   const sectionEdit = !isActionDisabled(env, "edit");
   const renderConfig = await runtimeSafeRenderConfig(env, config);
+  const sidebar = await renderSidebarForPage(env, id, config, renderConfig);
   const cacheableRenderControls = sectionEdit && usesDefaultRenderControls(renderConfig);
   const revisionNotice = revisionDate
     ? `<p><strong>This is an old revision of the document!</strong></p><hr>`
@@ -4241,6 +4243,8 @@ async function renderPageHtml(
         breadcrumbs: options.breadcrumbs,
         pageId: id,
         principal: options.principal,
+        sidebarHtml: sidebar?.html,
+        sidebarPageId: sidebar?.pageId,
         updatedAt: revisionDate ?? page?.updatedAt,
         updatedBy: options.updatedBy ?? page?.author
       }
@@ -4320,6 +4324,8 @@ async function renderPageHtml(
       breadcrumbs: options.breadcrumbs,
       pageId: id,
       principal: options.principal,
+      sidebarHtml: sidebar?.html,
+      sidebarPageId: sidebar?.pageId,
       updatedAt: revisionDate ?? page?.updatedAt,
       updatedBy: options.updatedBy ?? page?.author
     }
@@ -4556,6 +4562,94 @@ async function linkSchemesForRender(env: Env): Promise<string[] | undefined> {
     .map((entry) => entry.protocol);
 
   return entries.length > 0 ? entries : undefined;
+}
+
+async function renderSidebarForPage(
+  env: Env,
+  pageId: string,
+  config: RuntimeConfig,
+  renderConfig: RenderRuntimeConfig
+): Promise<{ pageId: string; html: string } | null> {
+  if (!config.sidebarPage) return null;
+
+  const sidebar = await findNearestSidebarPage(env, pageId, config.sidebarPage, config);
+  if (!sidebar) return null;
+
+  const entityReplacements = await entityReplacementsForRender(env);
+  const smileys = await smileysForRender(env);
+  const acronyms = await acronymsForRender(env);
+  const interwikiTemplates = await interwikiTemplatesForRender(env);
+  const linkSchemes = await linkSchemesForRender(env);
+  const existingPageIds = await existingPageIdsForContent(
+    env,
+    sidebar.content,
+    sidebar.id,
+    renderConfig.camelCaseLinks,
+    renderConfig.autoPluralLinks,
+    config.pageIdCleanOptions
+  );
+  const rssFeeds = await rssFeedsForRender(env, sidebar.content);
+  const rendered = renderWikiText(sidebar.content, {
+    pageId: sidebar.id,
+    existingPageIds,
+    entityReplacements,
+    smileys,
+    acronyms,
+    interwikiTemplates,
+    linkSchemes,
+    relNofollow: renderConfig.relNofollow,
+    linkTargets: renderConfig.linkTargets,
+    autoPluralLinks: renderConfig.autoPluralLinks,
+    pageIdCleanOptions: config.pageIdCleanOptions,
+    sectionEdit: false,
+    topTocLevel: renderConfig.topTocLevel,
+    maxTocLevel: renderConfig.maxTocLevel,
+    maxSectionEditLevel: renderConfig.maxSectionEditLevel,
+    camelCaseLinks: renderConfig.camelCaseLinks,
+    typographyMode: renderConfig.typographyMode,
+    mediaTokenSecret: mediaTokenSecret(env),
+    rssFeeds,
+    rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
+  });
+
+  return { pageId: sidebar.id, html: rendered.html };
+}
+
+async function findNearestSidebarPage(
+  env: Env,
+  currentPageId: string,
+  sidebarPageId: string,
+  config: RuntimeConfig
+): Promise<CurrentPage | null> {
+  for (const candidate of sidebarPageCandidates(
+    currentPageId,
+    sidebarPageId,
+    config.pageIdCleanOptions
+  )) {
+    const page = await getCurrentPage(env.DB, candidate);
+    if (page) return page;
+  }
+
+  return null;
+}
+
+function sidebarPageCandidates(
+  currentPageId: string,
+  configuredSidebarId: string,
+  pageIdCleanOptions: PageIdCleanOptions
+): string[] {
+  const sidebarId = cleanPageId(configuredSidebarId, pageIdCleanOptions);
+  if (!sidebarId) return [];
+  if (sidebarId.includes(":")) return [sidebarId];
+
+  const namespaceParts = cleanPageId(currentPageId, pageIdCleanOptions).split(":").slice(0, -1);
+  const candidates: string[] = [];
+
+  for (let length = namespaceParts.length; length >= 0; length -= 1) {
+    candidates.push([...namespaceParts.slice(0, length), sidebarId].filter(Boolean).join(":"));
+  }
+
+  return [...new Set(candidates)];
 }
 
 async function runtimeSafeRenderConfig(
@@ -10649,6 +10743,8 @@ interface HtmlShellOptions {
   breadcrumbs?: BreadcrumbEntry[];
   pageId?: string;
   principal?: AuthPrincipal;
+  sidebarHtml?: string;
+  sidebarPageId?: string;
   updatedAt?: string;
   updatedBy?: UserDisplaySource | null;
 }
@@ -10680,9 +10776,24 @@ function pageInfoPath(config: ReturnType<typeof getRuntimeConfig>, pageId: strin
   return config.fullPath ? `data/pages/${relativePath}` : relativePath;
 }
 
+function renderFooterLicense(config: RuntimeConfig, appVersion: string): string {
+  const license = config.licenseId
+    ? resolveDefaultLicense(config.licenseId, config.language)
+    : null;
+  const target = config.linkTargets.extern
+    ? ` target="${escapeAttribute(config.linkTargets.extern)}" rel="license noopener"`
+    : ' rel="license"';
+  const contentLicense = license
+    ? `Except where otherwise noted, content on this wiki is licensed under the following license: <bdi><a href="${escapeAttribute(license.url)}" class="urlextern"${target}>${escapeHtml(license.name)}</a></bdi>. `
+    : "";
+
+  return `<div class="license">${contentLicense}Template structure and styling are adapted from DokuWiki's GPL-2.0 default template. DokuWiki Pages.dev Port ${escapeHtml(appVersion)}.</div>`;
+}
+
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
   const config = getRuntimeConfig(env);
   const siteName = config.siteName;
+  const tagline = config.tagline;
   const appVersion = config.appVersion;
   const startId = startPageId(env);
   const startPath = pagePath(startId);
@@ -10706,6 +10817,14 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const faviconPath = versionedAssetPath("/images/favicon.ico", env);
   const appleTouchIconPath = versionedAssetPath("/images/apple-touch-icon.png", env);
   const logoPath = versionedAssetPath("/dokuwiki-logo.png", env);
+  const sidebar =
+    options.sidebarHtml && options.sidebarPageId
+      ? `<nav id="dokuwiki__aside" aria-label="Sidebar"><div class="pad aside include group">
+          <h3 class="toggle">Sidebar</h3>
+          <div class="content"><div class="group">${options.sidebarHtml}</div></div>
+        </div></nav>`
+      : "";
+  const siteClasses = `site dokuwiki mode_show tpl_dokuwiki${sidebar ? " showSidebar hasSidebar" : ""}`;
 
   return `<!doctype html>
 <html lang="${escapeAttribute(config.language)}">
@@ -10722,7 +10841,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
 </head>
 <body class="dokuwiki">
   <div id="dokuwiki__site">
-    <div id="dokuwiki__top" class="site dokuwiki mode_show tpl_dokuwiki">
+    <div id="dokuwiki__top" class="${siteClasses}">
       <header id="dokuwiki__header">
         <div class="pad group">
         <div class="headings">
@@ -10730,7 +10849,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             <li><a href="#dokuwiki__content">Skip to content</a></li>
           </ul>
           <h1 class="logo"><a href="${startPath}"><img src="${logoPath}" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
-          <p class="claim">Cloudflare Pages DokuWiki port</p>
+          ${tagline ? `<p class="claim">${escapeHtml(tagline)}</p>` : ""}
         </div>
         <div class="tools">
           ${renderUserTools(env, options.principal, pageId, disabledActions)}
@@ -10755,6 +10874,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
         </div>
       </header>
       <div class="wrapper group">
+        ${sidebar}
         <main id="dokuwiki__content">
           <div class="pad group">
             ${pageIdHtml}
@@ -10768,7 +10888,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       </div>
       <footer id="dokuwiki__footer">
         <div class="pad">
-          <div class="license">Except where otherwise noted, content is available under the original wiki license. Template structure and styling are adapted from DokuWiki's GPL-2.0 default template. DokuWiki Pages.dev Port ${escapeHtml(appVersion)}.</div>
+          ${renderFooterLicense(config, appVersion)}
           <div class="buttons">
             <a href="https://validator.w3.org/check/referer" title="Valid HTML5"><img src="/images/button-html5.png" width="80" height="15" alt="Valid HTML5"></a>
             <a href="https://jigsaw.w3.org/css-validator/check/referer?profile=css3" title="Valid CSS"><img src="/images/button-css.png" width="80" height="15" alt="Valid CSS"></a>

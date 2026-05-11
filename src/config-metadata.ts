@@ -255,7 +255,11 @@ export const DOKUWIKI_CONFIG_METADATA: readonly DokuWikiConfigMetadata[] = build
 const METADATA_BY_KEY = new Map(DOKUWIKI_CONFIG_METADATA.map((entry) => [entry.key, entry]));
 
 export const RUNTIME_ENV_DOKUWIKI_KEYS: Readonly<Record<string, string>> = {
+  TITLE: "title",
   SITE_NAME: "title",
+  TAGLINE: "tagline",
+  SIDEBAR: "sidebar",
+  LICENSE: "license",
   START_PAGE: "start",
   WIKI_LANG: "lang",
   BASE_DIR: "basedir",

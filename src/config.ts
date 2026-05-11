@@ -15,7 +15,10 @@ import {
   type DokuWikiConfigMetadataSummary
 } from "./config-metadata";
 
-const DEFAULT_SITE_NAME = "DokuWiki Pages";
+const DEFAULT_SITE_NAME = "DokuWiki";
+const DEFAULT_TAGLINE = "";
+const DEFAULT_SIDEBAR = "sidebar";
+const DEFAULT_LICENSE = "cc-by-nc-sa";
 const DEFAULT_START_PAGE = "wiki:welcome";
 const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
 const DEFAULT_SUPERUSER = "@admin";
@@ -36,6 +39,9 @@ const SHOW_USER_AS_VALUES = new Set([
 
 export interface RuntimeConfig {
   siteName: string;
+  tagline: string;
+  sidebarPage: string | null;
+  licenseId: string | null;
   startPage: string;
   language: SupportedLanguage;
   sessionCookieName: string;
@@ -138,7 +144,10 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
   const pageIdCleanOptions = runtimePageIdCleanOptions(env);
 
   return {
-    siteName: nonEmpty(env.SITE_NAME) ?? DEFAULT_SITE_NAME,
+    siteName: nonEmpty(env.TITLE) ?? nonEmpty(env.SITE_NAME) ?? DEFAULT_SITE_NAME,
+    tagline: env.TAGLINE === undefined ? DEFAULT_TAGLINE : (nonEmpty(env.TAGLINE) ?? ""),
+    sidebarPage: normalizedOptionalPageId(env.SIDEBAR, DEFAULT_SIDEBAR, pageIdCleanOptions),
+    licenseId: normalizedLicenseId(env.LICENSE),
     startPage: normalizedStartPage(env.START_PAGE, pageIdCleanOptions),
     language: resolveLanguage(env.WIKI_LANG),
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
@@ -199,7 +208,9 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   const issues: ConfigValidationIssue[] = [];
   const pageIdCleanOptions = runtimePageIdCleanOptions(env);
 
-  validateSiteName(env.SITE_NAME, issues);
+  validateSiteName("TITLE", env.TITLE, issues);
+  validateSiteName("SITE_NAME", env.SITE_NAME, issues);
+  validateOptionalPageId("SIDEBAR", env.SIDEBAR, pageIdCleanOptions, issues);
   validateStartPage(env.START_PAGE, pageIdCleanOptions, issues);
   validateLanguage(env.WIKI_LANG, issues);
   validateSessionCookieName(env.SESSION_COOKIE_NAME, issues);
@@ -248,7 +259,16 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
   const config = getRuntimeConfig(env);
 
   return [
-    configEntry("SITE_NAME", env.SITE_NAME, config.siteName, DEFAULT_SITE_NAME),
+    configEntry(
+      "TITLE",
+      nonEmpty(env.TITLE) !== undefined ? env.TITLE : env.SITE_NAME,
+      config.siteName,
+      DEFAULT_SITE_NAME
+    ),
+    configEntry("SITE_NAME", env.SITE_NAME, nonEmpty(env.SITE_NAME) ?? null, null, "title"),
+    configEntry("TAGLINE", env.TAGLINE, config.tagline, DEFAULT_TAGLINE),
+    configEntry("SIDEBAR", env.SIDEBAR, config.sidebarPage, DEFAULT_SIDEBAR),
+    configEntry("LICENSE", env.LICENSE, config.licenseId, DEFAULT_LICENSE),
     configEntry("START_PAGE", env.START_PAGE, config.startPage, DEFAULT_START_PAGE),
     configEntry("WIKI_LANG", env.WIKI_LANG, config.language, "en"),
     configEntry(
@@ -420,12 +440,33 @@ export function createConfigExport(env: Env, now = new Date()): ConfigExport {
   };
 }
 
-function validateSiteName(value: string | undefined, issues: ConfigValidationIssue[]): void {
+function validateSiteName(
+  key: "TITLE" | "SITE_NAME",
+  value: string | undefined,
+  issues: ConfigValidationIssue[]
+): void {
   if (value !== undefined && !nonEmpty(value)) {
     issues.push({
-      key: "SITE_NAME",
+      key,
       severity: "warning",
-      message: "SITE_NAME is blank; the default site name will be used."
+      message: `${key} is blank; the default site title will be used.`
+    });
+  }
+}
+
+function validateOptionalPageId(
+  key: "SIDEBAR",
+  value: string | undefined,
+  pageIdCleanOptions: RuntimePageIdCleanOptions,
+  issues: ConfigValidationIssue[]
+): void {
+  if (value === undefined || value.trim() === "") return;
+
+  if (!cleanPageId(value, pageIdCleanOptions)) {
+    issues.push({
+      key,
+      severity: "error",
+      message: `${key} does not resolve to a valid DokuWiki page id.`
     });
   }
 }
@@ -911,6 +952,27 @@ function normalizedStartPage(
 ): string {
   const normalized = cleanPageId(value ?? DEFAULT_START_PAGE, pageIdCleanOptions);
   return normalized || DEFAULT_START_PAGE;
+}
+
+function normalizedOptionalPageId(
+  value: string | undefined,
+  fallback: string,
+  pageIdCleanOptions: RuntimePageIdCleanOptions
+): string | null {
+  if (value !== undefined && value.trim() === "") return null;
+
+  const normalized = cleanPageId(value ?? fallback, pageIdCleanOptions);
+  return normalized || null;
+}
+
+function normalizedLicenseId(value: string | undefined): string | null {
+  if (value === undefined) return DEFAULT_LICENSE;
+
+  const normalized = nonEmpty(value);
+  if (!normalized) return null;
+
+  const lower = normalized.toLowerCase();
+  return lower === "none" || lower === "0" || lower === "false" ? null : normalized;
 }
 
 function normalizedSessionCookieName(value: string | undefined): string {

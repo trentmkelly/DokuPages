@@ -19,7 +19,15 @@ Object config changes.
 
 Optional Pages environment variables:
 
-- `SITE_NAME`: wiki display name. Default: `DokuWiki Pages`.
+- `TITLE`: DokuWiki-compatible wiki display title. Default: `DokuWiki`.
+  `SITE_NAME` remains supported as a legacy alias.
+- `TAGLINE`: optional DokuWiki default-template tagline shown below the title.
+  Default: blank.
+- `SIDEBAR`: DokuWiki-compatible sidebar page ID. Default: `sidebar`; set an
+  empty value to disable sidebar lookup.
+- `LICENSE`: DokuWiki-compatible content license ID from the bundled default
+  license map, such as `cc-by-nc-sa` or `cc-by`. Default: `cc-by-nc-sa`; use
+  `none`, `0`, or `false` to hide content-license text.
 - `START_PAGE`: start page ID. Default: `wiki:welcome`.
 - `DEACCENT`: DokuWiki-compatible page ID accent handling. `0` keeps accented
   letters, `1` deaccents, and `2` romanizes before deaccenting. Default: `1`.

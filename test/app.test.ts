@@ -124,6 +124,10 @@ describe("handleRequest", () => {
     cachePuts.length = 0;
     renderCache.clear();
     pageLocks.reset();
+    env.TITLE = undefined;
+    env.TAGLINE = undefined;
+    env.SIDEBAR = undefined;
+    env.LICENSE = undefined;
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
     env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
@@ -492,6 +496,26 @@ describe("handleRequest", () => {
     const html = await response.text();
     expect(html).toContain("CamelCase stays plain.");
     expect(html).not.toContain("/wiki/wiki/camelcase");
+  });
+
+  it("uses DokuWiki-compatible title, tagline, license, and sidebar settings", async () => {
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), {
+      ...env,
+      TITLE: "Configured Wiki",
+      TAGLINE: "Notes from the edge",
+      LICENSE: "cc-by",
+      SIDEBAR: "wiki:welcome"
+    } satisfies Env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("<title>Welcome - Configured Wiki</title>");
+    expect(html).toContain("<span>Configured Wiki</span>");
+    expect(html).toContain('<p class="claim">Notes from the edge</p>');
+    expect(html).toContain('id="dokuwiki__aside"');
+    expect(html).toContain('class="site dokuwiki mode_show tpl_dokuwiki showSidebar hasSidebar"');
+    expect(html).toContain("CC Attribution 4.0 International");
+    expect(html).toContain("https://creativecommons.org/licenses/by/4.0/deed.en");
   });
 
   it("fingerprints static assets with the Pages commit when available", async () => {
