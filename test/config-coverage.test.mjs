@@ -19,8 +19,8 @@ describe("DokuWiki config coverage map", () => {
     expect(DOKUWIKI_CONFIG_COVERAGE).toHaveLength(115);
     expect(DOKUWIKI_CONFIG_COVERAGE.every((entry) => Boolean(entry.status))).toBe(true);
     expect(configCoverageCounts()).toEqual({
-      implemented: 58,
-      imported_metadata_only: 17,
+      implemented: 61,
+      imported_metadata_only: 14,
       intentionally_unsupported: 31,
       not_yet_evaluated: 9
     });

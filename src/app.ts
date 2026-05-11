@@ -23,6 +23,7 @@ import {
   digestEmail,
   emailConfig,
   generatedPasswordEmail,
+  mediaChangeEmail,
   pageChangeEmail,
   passwordResetEmail,
   registrationNotificationEmail,
@@ -2123,6 +2124,7 @@ async function handleNativeApiMediaUpload(
   }
 
   await purgeDependentRenderCache(env, "media", id);
+  await sendMediaChangeNotifications(request, env, result.revision, author);
 
   logMetric("media_metric", {
     operation: "upload",
@@ -9865,13 +9867,18 @@ async function sendRegistrationNotifications(
 ): Promise<void> {
   const config = emailConfig(env);
   if (config.registrationNotify.length === 0) return;
+  const runtimeConfig = getRuntimeConfig(env);
 
   const template = registrationNotificationEmail({
-    siteName: getRuntimeConfig(env).siteName,
+    siteName: runtimeConfig.siteName,
     baseUrl: absoluteEmailUrl(env, request, "/"),
     username: user.username,
     displayName: user.displayName,
-    email: user.email
+    email: user.email,
+    date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date()),
+    browser: request.headers.get("user-agent") ?? "",
+    ipAddress: getClientIp(request) ?? "",
+    hostname: getClientIp(request) ?? ""
   });
 
   await sendWikiEmail(env, {
@@ -10104,8 +10111,33 @@ async function recordAndSendPageChangeNotifications(
   actor: PrincipalAuthor
 ): Promise<void> {
   const event = await recordPageChangeEvent(env.DB, page, changeType, summary, actor);
+  const config = emailConfig(env);
   const recipients = await listPageChangeRecipients(env.DB, page.id, actor.authorId, "immediate");
-  const siteName = getRuntimeConfig(env).siteName;
+  const runtimeConfig = getRuntimeConfig(env);
+  const siteName = runtimeConfig.siteName;
+
+  if (config.notify.length > 0) {
+    const template = pageChangeEmail({
+      siteName,
+      pageId: page.id,
+      pageUrl: absoluteEmailUrl(env, request, pagePath(page.id)),
+      actorName: actor.authorName,
+      changeType,
+      summary,
+      date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(page.updatedAt)),
+      browser: request.headers.get("user-agent") ?? "",
+      ipAddress: getClientIp(request) ?? "",
+      hostname: getClientIp(request) ?? "",
+      newRevision: page.revisionId
+    });
+
+    await sendWikiEmail(env, {
+      kind: "page_change",
+      to: config.notify,
+      ...template,
+      idempotencyKey: `page-change-admin:${event.id}`
+    });
+  }
 
   for (const recipient of recipients) {
     const template = pageChangeEmail({
@@ -10114,7 +10146,12 @@ async function recordAndSendPageChangeNotifications(
       pageUrl: absoluteEmailUrl(env, request, pagePath(page.id)),
       actorName: actor.authorName,
       changeType,
-      summary
+      summary,
+      date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(page.updatedAt)),
+      browser: request.headers.get("user-agent") ?? "",
+      ipAddress: getClientIp(request) ?? "",
+      hostname: getClientIp(request) ?? "",
+      newRevision: page.revisionId
     });
     const result = await sendWikiEmail(env, {
       kind: "page_change",
@@ -10127,6 +10164,39 @@ async function recordAndSendPageChangeNotifications(
       await markDigestDelivered(env.DB, recipient.id, event.id);
     }
   }
+}
+
+async function sendMediaChangeNotifications(
+  request: Request,
+  env: Env,
+  revision: MediaRevision,
+  actor: PrincipalAuthor
+): Promise<void> {
+  const config = emailConfig(env);
+  if (config.notify.length === 0) return;
+
+  const runtimeConfig = getRuntimeConfig(env);
+  const template = mediaChangeEmail({
+    siteName: runtimeConfig.siteName,
+    mediaId: revision.mediaId,
+    mediaUrl: absoluteEmailUrl(env, request, mediaDetailPath(revision.mediaId)),
+    actorName: actor.authorName,
+    changeType: revision.changeType,
+    summary: revision.summary,
+    mimeType: revision.mimeType,
+    byteLength: revision.byteLength,
+    date: renderDokuWikiDateFormat(runtimeConfig.dateFormat, new Date(revision.createdAt)),
+    browser: request.headers.get("user-agent") ?? "",
+    ipAddress: getClientIp(request) ?? "",
+    hostname: getClientIp(request) ?? ""
+  });
+
+  await sendWikiEmail(env, {
+    kind: "media_change",
+    to: config.notify,
+    ...template,
+    idempotencyKey: `media-change-admin:${revision.id}`
+  });
 }
 
 async function recordPageChangeEvent(
@@ -11511,6 +11581,7 @@ async function handleMediaUpload(
   }
 
   await purgeDependentRenderCache(env, "media", id);
+  await sendMediaChangeNotifications(request, env, result.revision, author);
 
   logMetric("media_metric", {
     operation: "upload",

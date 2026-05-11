@@ -6,6 +6,7 @@ import {
   digestEmail,
   emailConfig,
   generatedPasswordEmail,
+  mediaChangeEmail,
   pageChangeEmail,
   passwordResetEmail,
   registrationNotificationEmail,
@@ -28,7 +29,10 @@ describe("email adapter", () => {
     expect(emailConfig(env)).toMatchObject({
       enabled: false,
       provider: "resend",
-      registrationNotify: []
+      registrationNotify: [],
+      notify: [],
+      htmlMail: true,
+      mailPrefix: null
     });
 
     const result = await sendWikiEmail(env, sampleEmail(), async () => {
@@ -83,7 +87,7 @@ describe("email adapter", () => {
     expect(JSON.parse(String(requestInit?.body))).toMatchObject({
       from: "Wiki <wiki@example.test>",
       to: ["alice@example.test"],
-      subject: "Reset password",
+      subject: "[DokuWiki] Reset password",
       reply_to: "support@example.test",
       headers: { "Return-Path": "bounces@example.test" }
     });
@@ -121,6 +125,45 @@ describe("email adapter", () => {
       })
     ]);
   });
+
+  it("supports DokuWiki mail aliases, subject prefixes, notify recipients, and text-only mail", async () => {
+    const env = createEnv({
+      MAILFROM: "DokuWiki <@MAIL@>",
+      MAILRETURNPATH: "bounces@example.test",
+      MAILPREFIX: "Ops Wiki",
+      HTMLMAIL: "0",
+      NOTIFY: "admin@example.test, ops@example.test",
+      REGISTERNOTIFY: "registrar@example.test",
+      RESEND_API_KEY: "resend-token"
+    });
+    let requestBody;
+
+    const result = await sendWikiEmail(env, sampleEmail(), async (_url, init) => {
+      requestBody = JSON.parse(String(init.body));
+      return new Response(JSON.stringify({ id: "email_456" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+
+    expect(result.ok).toBe(true);
+    expect(emailConfig(env)).toMatchObject({
+      enabled: true,
+      from: "DokuWiki <noreply@example.com>",
+      returnPath: "bounces@example.test",
+      registrationNotify: ["registrar@example.test"],
+      notify: ["admin@example.test", "ops@example.test"],
+      mailPrefix: "Ops Wiki",
+      htmlMail: false
+    });
+    expect(requestBody).toMatchObject({
+      from: "DokuWiki <noreply@example.com>",
+      subject: "[Ops Wiki] Reset password",
+      text: "Reset password",
+      headers: { "Return-Path": "bounces@example.test" }
+    });
+    expect(requestBody).not.toHaveProperty("html");
+  });
 });
 
 describe("email templates", () => {
@@ -133,8 +176,8 @@ describe("email templates", () => {
       email: "alice@example.test"
     });
 
-    expect(message.subject).toBe("Test Wiki: new user registration");
-    expect(message.text).toContain("Username: alice<script>");
+    expect(message.subject).toBe("new user: alice<script>");
+    expect(message.text).toContain("User name   : alice<script>");
     expect(message.html).toContain("alice&lt;script&gt;");
     expect(message.html).toContain("Alice &lt;Admin&gt;");
     expect(message.html).not.toContain("Alice <Admin>");
@@ -170,15 +213,29 @@ describe("email templates", () => {
       ]
     });
 
-    expect(reset.subject).toBe("Test Wiki: password reset");
-    expect(reset.text).toContain("reset your Test Wiki password");
+    expect(reset.subject).toBe("Your DokuWiki password");
+    expect(reset.text).toContain("Someone requested a new password");
     expect(reset.html).toContain("Reset password");
-    expect(change.subject).toBe("Test Wiki: wiki:start changed");
-    expect(change.text).toContain("Editor: Anonymous");
+    expect(change.subject).toBe("page changed: wiki:start");
+    expect(change.text).toContain("User                : Anonymous");
     expect(change.html).toContain("<code>wiki:start</code>");
-    expect(digest.subject).toBe("Test Wiki: page change digest");
+    expect(digest.subject).toBe("page change digest");
     expect(digest.text).toContain("- wiki:start (edit) by Bob");
     expect(digest.html).toContain("updated");
+
+    const media = mediaChangeEmail({
+      siteName: "Test Wiki",
+      mediaId: "wiki:logo.png",
+      mediaUrl: "https://wiki.example.test/media/wiki/logo.png",
+      actorName: "Alice",
+      changeType: "create",
+      summary: "Uploaded logo",
+      mimeType: "image/png",
+      byteLength: 1024
+    });
+    expect(media.subject).toBe("file uploaded: wiki:logo.png");
+    expect(media.text).toContain("MIME Type   : image/png");
+    expect(media.html).toContain("Uploaded logo");
   });
 
   it("renders DokuWiki generated password emails", () => {

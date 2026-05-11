@@ -234,6 +234,11 @@ describe("runtime config", () => {
       EMAIL_PROVIDER: "resend",
       EMAIL_FROM: "Wiki <wiki@example.test>",
       EMAIL_REGISTRATION_NOTIFY: "admin@example.test",
+      NOTIFY: "ops@example.test",
+      MAILFROM: "DokuWiki <@MAIL@>",
+      MAILRETURNPATH: "bounces@example.test",
+      MAILPREFIX: "Ops",
+      HTMLMAIL: "0",
       RESEND_API_KEY: "resend-secret-token",
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
       TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
@@ -438,6 +443,30 @@ describe("runtime config", () => {
           effectiveValue: "Wiki <wiki@example.test>"
         }),
         expect.objectContaining({
+          key: "NOTIFY",
+          value: "ops@example.test",
+          effectiveValue: "ops@example.test",
+          dokuwikiKey: "notify"
+        }),
+        expect.objectContaining({
+          key: "MAILFROM",
+          value: "DokuWiki <@MAIL@>",
+          effectiveValue: "DokuWiki <@MAIL@>",
+          dokuwikiKey: "mailfrom"
+        }),
+        expect.objectContaining({
+          key: "MAILPREFIX",
+          value: "Ops",
+          effectiveValue: "Ops",
+          dokuwikiKey: "mailprefix"
+        }),
+        expect.objectContaining({
+          key: "HTMLMAIL",
+          value: "0",
+          effectiveValue: "0",
+          dokuwikiKey: "htmlmail"
+        }),
+        expect.objectContaining({
           key: "TURNSTILE_SITE_KEY",
           value: "1x00000000000000000000AA",
           effectiveValue: "1x00000000000000000000AA"
@@ -593,7 +622,12 @@ describe("runtime config", () => {
       EMAIL_FROM: "bad sender",
       EMAIL_REPLY_TO: "Team <team@example.test>",
       EMAIL_RETURN_PATH: "bounces@example.test",
-      EMAIL_REGISTRATION_NOTIFY: "admin@example.test, broken"
+      EMAIL_REGISTRATION_NOTIFY: "admin@example.test, broken",
+      NOTIFY: "ops@example.test, broken",
+      REGISTERNOTIFY: "registrar@example.test, broken",
+      MAILFROM: "DokuWiki <@MAIL@>",
+      MAILRETURNPATH: "broken return path",
+      HTMLMAIL: "maybe"
     } as Env);
 
     expect(validation.ok).toBe(false);
@@ -601,13 +635,18 @@ describe("runtime config", () => {
       expect.arrayContaining([
         expect.objectContaining({ key: "EMAIL_PROVIDER", severity: "error" }),
         expect.objectContaining({ key: "EMAIL_FROM", severity: "error" }),
-        expect.objectContaining({ key: "EMAIL_REGISTRATION_NOTIFY", severity: "error" })
+        expect.objectContaining({ key: "EMAIL_REGISTRATION_NOTIFY", severity: "error" }),
+        expect.objectContaining({ key: "NOTIFY", severity: "error" }),
+        expect.objectContaining({ key: "REGISTERNOTIFY", severity: "error" }),
+        expect.objectContaining({ key: "MAILRETURNPATH", severity: "error" }),
+        expect.objectContaining({ key: "HTMLMAIL", severity: "error" })
       ])
     );
     expect(validation.issues).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "EMAIL_REPLY_TO", severity: "error" }),
-        expect.objectContaining({ key: "EMAIL_RETURN_PATH", severity: "error" })
+        expect.objectContaining({ key: "EMAIL_RETURN_PATH", severity: "error" }),
+        expect.objectContaining({ key: "MAILFROM", severity: "error" })
       ])
     );
   });

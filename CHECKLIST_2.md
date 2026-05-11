@@ -179,7 +179,7 @@ are not fixed by this checklist.
 - [x] Support `title`, `tagline`, `sidebar`, and `license` with DokuWiki-compatible names and defaults.
 - [x] Support `recent`, `recent_days`, `breadcrumbs`, `fullpath`, `typography`, `dformat`, and `signature` display settings.
 - [x] Support `target` link settings for wiki, interwiki, extern, media, and windows.
-- [ ] Support `mailprefix`, `htmlmail`, `notify`, and upstream mail template settings more closely.
+- [x] Support `mailprefix`, `htmlmail`, `notify`, and upstream mail template settings more closely.
 - [ ] Support `rss_type`, `rss_linkto`, `rss_content`, `rss_media`, `rss_show_summary`, and `rss_show_deleted`.
 - [ ] Support `sitemap` frequency instead of always exposing sitemap output.
 - [ ] Support `updatecheck` or explicitly remove update notices from the UI.

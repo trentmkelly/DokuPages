@@ -73,6 +73,13 @@ export interface Env {
   EMAIL_RETURN_PATH?: string;
   EMAIL_BASE_URL?: string;
   EMAIL_REGISTRATION_NOTIFY?: string;
+  EMAIL_NOTIFY?: string;
+  NOTIFY?: string;
+  REGISTERNOTIFY?: string;
+  MAILFROM?: string;
+  MAILRETURNPATH?: string;
+  MAILPREFIX?: string;
+  HTMLMAIL?: string;
   RESEND_API_KEY?: string;
   EMAIL_API_TOKEN?: string;
   EMAIL_TASK_TOKEN?: string;

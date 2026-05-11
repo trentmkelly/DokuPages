@@ -84,11 +84,21 @@ Optional Pages environment variables:
   `/api/v1` JSON API cross-origin. Default: no cross-origin API access.
 - `EMAIL_PROVIDER`: set to `resend` to enable outbound mail.
 - `EMAIL_PROVIDER_ENDPOINT`: optional Resend-compatible endpoint override.
-- `EMAIL_FROM`: fixed sender address for outbound mail.
+- `EMAIL_FROM`: fixed sender address for outbound mail. `MAILFROM` is the
+  DokuWiki-compatible alias and supports `@MAIL@`, `@USER@`, and `@NAME@`
+  placeholders, resolved to a safe noreply sender in serverless mail.
 - `EMAIL_REPLY_TO`: optional fixed reply-to address.
 - `EMAIL_RETURN_PATH`: optional fixed return-path header value.
+  `MAILRETURNPATH` is the DokuWiki-compatible alias.
 - `EMAIL_BASE_URL`: optional public base URL for email links.
 - `EMAIL_REGISTRATION_NOTIFY`: optional comma-separated registration notification recipients.
+- `REGISTERNOTIFY`: DokuWiki-compatible alias for registration notification
+  recipients.
+- `EMAIL_NOTIFY` or `NOTIFY`: optional comma-separated admin recipients for
+  page change and media upload notifications.
+- `MAILPREFIX`: optional DokuWiki-style subject prefix. When omitted, subjects
+  are prefixed with the wiki title, matching upstream Mailer behavior.
+- `HTMLMAIL`: set to `0` to send text-only provider payloads. Default: enabled.
 - `EMAIL_TASK_TOKEN`: bearer token required by the scheduled email digest
   endpoint.
 - `AUTOPASSWD`: set to `1` to use DokuWiki-style generated-password

@@ -133,7 +133,10 @@ author names are preserved like upstream `authplain` history.
 
 `/register` creates native D1 users and adds them to the `user` group. When
 `EMAIL_REGISTRATION_NOTIFY` is configured, the registration handler sends a
-registration notification through the outbound email adapter. When Turnstile is
+registration notification through the outbound email adapter. The DokuWiki
+aliases `REGISTERNOTIFY`, `MAILFROM`, `MAILRETURNPATH`, `MAILPREFIX`, and
+`HTMLMAIL` are supported by the adapter, and outgoing subjects receive the same
+`[wiki title]` or `[mailprefix]` prefix as upstream. When Turnstile is
 configured, registration submissions are verified through Cloudflare Siteverify
 before the user row is created.
 

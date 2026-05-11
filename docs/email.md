@@ -13,21 +13,31 @@ Selected provider:
 
 Required sender configuration:
 
-- `EMAIL_FROM`: the fixed sender used for every outbound message.
+- `EMAIL_FROM`: the fixed sender used for every outbound message. `MAILFROM`
+  is also accepted for DokuWiki-compatible configuration imports.
 - `RESEND_API_KEY` or `EMAIL_API_TOKEN`: provider token.
 
 Optional sender configuration:
 
 - `EMAIL_PROVIDER_ENDPOINT`: override for a Resend-compatible endpoint.
 - `EMAIL_REPLY_TO`: fixed reply-to address.
-- `EMAIL_RETURN_PATH`: fixed return-path value passed in provider headers.
+- `EMAIL_RETURN_PATH` or `MAILRETURNPATH`: fixed return-path value passed in
+  provider headers.
 - `EMAIL_BASE_URL`: public wiki base URL for email links.
-- `EMAIL_REGISTRATION_NOTIFY`: comma-separated notification recipients.
+- `EMAIL_REGISTRATION_NOTIFY` or `REGISTERNOTIFY`: comma-separated registration
+  notification recipients.
+- `EMAIL_NOTIFY` or `NOTIFY`: comma-separated admin recipients for page change
+  and media upload notifications.
+- `MAILPREFIX`: DokuWiki-style subject prefix. When omitted, subjects use the
+  wiki title as the prefix.
+- `HTMLMAIL`: set to `0` to send text-only provider payloads. Default: `1`.
 - `AUTOPASSWD`: enables generated-password registration emails when set to `1`.
 - `EMAIL_TASK_TOKEN`: bearer token for scheduled digest execution.
 
-The adapter never uses user-supplied addresses as the sender. User input can
-only appear in recipients or escaped template body content.
+The adapter never uses user-supplied addresses as the sender. DokuWiki
+`MAILFROM` placeholders `@MAIL@`, `@USER@`, and `@NAME@` are resolved to a safe
+noreply sender identity in the serverless runtime. User input can only appear in
+recipients or escaped template body content.
 
 Delivery records are stored in `email_deliveries` with kind, recipient, subject,
 status, provider, provider message ID, and error text. Provider errors and
@@ -41,6 +51,8 @@ Implemented flows and templates:
 - generated registration password
 - native password reset request and confirmation forms
 - password reset
+- DokuWiki `notify` admin page-change notification
+- DokuWiki `notify` admin media upload notification
 - page change notification
 - page and namespace subscription management from `?do=subscribe`
 - immediate page-change dispatch from page save and revert workflows

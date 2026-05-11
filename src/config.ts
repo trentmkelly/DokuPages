@@ -255,6 +255,11 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateEmailAddress("EMAIL_REPLY_TO", env.EMAIL_REPLY_TO, issues);
   validateEmailAddress("EMAIL_RETURN_PATH", env.EMAIL_RETURN_PATH, issues);
   validateEmailList("EMAIL_REGISTRATION_NOTIFY", env.EMAIL_REGISTRATION_NOTIFY, issues);
+  validateEmailList("EMAIL_NOTIFY", env.EMAIL_NOTIFY, issues);
+  validateEmailList("NOTIFY", env.NOTIFY, issues);
+  validateEmailList("REGISTERNOTIFY", env.REGISTERNOTIFY, issues);
+  validateEmailAddress("MAILFROM", env.MAILFROM, issues);
+  validateEmailAddress("MAILRETURNPATH", env.MAILRETURNPATH, issues);
   validateMetadataBackedRuntimeConfig(env, issues);
   validateTurnstileConfig(env, issues);
 
@@ -376,12 +381,19 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       null
     ),
     configEntry("EMAIL_BASE_URL", env.EMAIL_BASE_URL, nonEmpty(env.EMAIL_BASE_URL) ?? null, null),
+    configEntry("EMAIL_NOTIFY", env.EMAIL_NOTIFY, nonEmpty(env.EMAIL_NOTIFY) ?? null, null),
     configEntry(
       "EMAIL_REGISTRATION_NOTIFY",
       env.EMAIL_REGISTRATION_NOTIFY,
       nonEmpty(env.EMAIL_REGISTRATION_NOTIFY) ?? null,
       null
     ),
+    configEntry("NOTIFY", env.NOTIFY, nonEmpty(env.NOTIFY) ?? null, null),
+    configEntry("REGISTERNOTIFY", env.REGISTERNOTIFY, nonEmpty(env.REGISTERNOTIFY) ?? null, null),
+    configEntry("MAILFROM", env.MAILFROM, nonEmpty(env.MAILFROM) ?? null, null),
+    configEntry("MAILRETURNPATH", env.MAILRETURNPATH, nonEmpty(env.MAILRETURNPATH) ?? null, null),
+    configEntry("MAILPREFIX", env.MAILPREFIX, nonEmpty(env.MAILPREFIX) ?? null, null),
+    configEntry("HTMLMAIL", env.HTMLMAIL, nonEmpty(env.HTMLMAIL) ?? "true", "true"),
     configEntry(
       "TURNSTILE_SITE_KEY",
       env.TURNSTILE_SITE_KEY,
@@ -814,7 +826,7 @@ function validateEmailAddress(
   const email = nonEmpty(value);
   if (!email) return;
 
-  if (!EMAIL_ADDRESS.test(extractEmailAddress(email))) {
+  if (!EMAIL_ADDRESS.test(extractEmailAddress(emailAddressForValidation(email)))) {
     issues.push({
       key,
       severity: "error",
@@ -835,7 +847,7 @@ function validateEmailList(
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0)
-    .filter((entry) => !EMAIL_ADDRESS.test(extractEmailAddress(entry)));
+    .filter((entry) => !EMAIL_ADDRESS.test(extractEmailAddress(emailAddressForValidation(entry))));
 
   if (invalid.length > 0) {
     issues.push({
@@ -844,6 +856,13 @@ function validateEmailList(
       message: `${key} contains invalid email address entries.`
     });
   }
+}
+
+function emailAddressForValidation(value: string): string {
+  return value
+    .replaceAll("@MAIL@", "noreply@example.test")
+    .replaceAll("@USER@", "noreply")
+    .replaceAll("@NAME@", "DokuWiki");
 }
 
 const METADATA_VALIDATED_RUNTIME_KEYS = [
@@ -862,7 +881,8 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "USESLASH",
   "CANONICAL_URLS",
   "AUTOPLURAL",
-  "SEND404"
+  "SEND404",
+  "HTMLMAIL"
 ] as const satisfies readonly (keyof Env)[];
 
 function validateMetadataBackedRuntimeConfig(env: Env, issues: ConfigValidationIssue[]): void {

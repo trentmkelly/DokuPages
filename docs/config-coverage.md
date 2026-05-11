@@ -19,8 +19,8 @@ Current counts:
 
 | Status                      | Count |
 | --------------------------- | ----: |
-| `implemented`               |    58 |
-| `imported_metadata_only`    |    17 |
+| `implemented`               |    61 |
+| `imported_metadata_only`    |    14 |
 | `intentionally_unsupported` |    31 |
 | `not_yet_evaluated`         |     9 |
 
