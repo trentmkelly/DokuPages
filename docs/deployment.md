@@ -123,6 +123,12 @@ values are never included in the page or export; the backup records only whether
 each supported secret is configured. Runtime variables that map to upstream
 DokuWiki settings include their `lib/plugins/config/settings/config.metadata.php`
 handler, choices, ranges, patterns, and caution level in the page and export.
+Imported `conf/local.php` and `conf/local.protected.php` values are used at
+request time for render-safe parser and display controls such as `camelcase`,
+`typography`, `useheading`, TOC levels, section edit limits, `autoplural`,
+`relnofollow`, and `target.*`. Imported upstream defaults from `dokuwiki.php`
+remain metadata only so a source install's baseline file does not silently
+override Pages environment variables.
 
 Configuration editing is a permanent deployment operation for this Pages port,
 not a writable runtime admin feature like DokuWiki's bundled config plugin.

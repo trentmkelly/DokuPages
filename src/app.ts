@@ -1675,15 +1675,13 @@ async function handlePagePreview(
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
-  const relNofollow = await relNofollowForRender(env, config.relNofollow);
-  const linkTargets = await linkTargetsForRender(env, config.linkTargets);
-  const autoPluralLinks = await autoPluralForRender(env, config.autoPluralLinks);
+  const renderConfig = await runtimeSafeRenderConfig(env, config);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
     pageId || undefined,
-    config.camelCaseLinks,
-    autoPluralLinks,
+    renderConfig.camelCaseLinks,
+    renderConfig.autoPluralLinks,
     config.pageIdCleanOptions
   );
   const rssFeeds = await rssFeedsForRender(env, content);
@@ -1695,11 +1693,14 @@ async function handlePagePreview(
     acronyms,
     interwikiTemplates,
     linkSchemes,
-    relNofollow,
-    linkTargets,
-    autoPluralLinks,
-    camelCaseLinks: config.camelCaseLinks,
-    typographyMode: config.typographyMode,
+    relNofollow: renderConfig.relNofollow,
+    linkTargets: renderConfig.linkTargets,
+    autoPluralLinks: renderConfig.autoPluralLinks,
+    topTocLevel: renderConfig.topTocLevel,
+    maxTocLevel: renderConfig.maxTocLevel,
+    maxSectionEditLevel: renderConfig.maxSectionEditLevel,
+    camelCaseLinks: renderConfig.camelCaseLinks,
+    typographyMode: renderConfig.typographyMode,
     pageIdCleanOptions: config.pageIdCleanOptions,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
@@ -4136,7 +4137,7 @@ function startPageId(env: Env): string {
 }
 
 function displayPageTitle(
-  config: ReturnType<typeof getRuntimeConfig>,
+  config: Pick<RuntimeConfig, "useHeading">,
   headingTitle: string | null,
   storedTitle: string | null | undefined,
   fallback: string
@@ -4148,7 +4149,21 @@ function displayPageTitle(
   return storedTitle ?? headingTitle ?? fallback;
 }
 
-function usesDefaultRenderControls(config: ReturnType<typeof getRuntimeConfig>): boolean {
+type RenderRuntimeConfig = Pick<
+  RuntimeConfig,
+  | "topTocLevel"
+  | "tocMinHeads"
+  | "maxTocLevel"
+  | "maxSectionEditLevel"
+  | "useHeading"
+  | "camelCaseLinks"
+  | "typographyMode"
+  | "autoPluralLinks"
+  | "relNofollow"
+  | "linkTargets"
+>;
+
+function usesDefaultRenderControls(config: RenderRuntimeConfig): boolean {
   return (
     !config.useHeading &&
     config.topTocLevel === 1 &&
@@ -4181,7 +4196,8 @@ async function renderPageHtml(
   const directives = getWikiRenderDirectives(content);
   const config = getRuntimeConfig(env);
   const sectionEdit = !isActionDisabled(env, "edit");
-  const cacheableRenderControls = sectionEdit && usesDefaultRenderControls(config);
+  const renderConfig = await runtimeSafeRenderConfig(env, config);
+  const cacheableRenderControls = sectionEdit && usesDefaultRenderControls(renderConfig);
   const revisionNotice = revisionDate
     ? `<p><strong>This is an old revision of the document!</strong></p><hr>`
     : "";
@@ -4220,7 +4236,7 @@ async function renderPageHtml(
     return htmlShell(
       env,
       cached.title,
-      `${renderBreadcrumbs(id)}${renderToc(cached.toc, config.tocMinHeads)}${revisionNotice}${cached.html}`,
+      `${renderBreadcrumbs(id)}${renderToc(cached.toc, renderConfig.tocMinHeads)}${revisionNotice}${cached.html}`,
       {
         breadcrumbs: options.breadcrumbs,
         pageId: id,
@@ -4245,15 +4261,12 @@ async function renderPageHtml(
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
-  const relNofollow = await relNofollowForRender(env, config.relNofollow);
-  const linkTargets = await linkTargetsForRender(env, config.linkTargets);
-  const autoPluralLinks = await autoPluralForRender(env, config.autoPluralLinks);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
     id,
-    config.camelCaseLinks,
-    autoPluralLinks,
+    renderConfig.camelCaseLinks,
+    renderConfig.autoPluralLinks,
     config.pageIdCleanOptions
   );
   const rssFeeds = await rssFeedsForRender(env, content);
@@ -4266,21 +4279,21 @@ async function renderPageHtml(
     acronyms,
     interwikiTemplates,
     linkSchemes,
-    relNofollow,
-    linkTargets,
-    autoPluralLinks,
+    relNofollow: renderConfig.relNofollow,
+    linkTargets: renderConfig.linkTargets,
+    autoPluralLinks: renderConfig.autoPluralLinks,
     pageIdCleanOptions: config.pageIdCleanOptions,
     sectionEdit,
-    topTocLevel: config.topTocLevel,
-    maxTocLevel: config.maxTocLevel,
-    maxSectionEditLevel: config.maxSectionEditLevel,
-    camelCaseLinks: config.camelCaseLinks,
-    typographyMode: config.typographyMode,
+    topTocLevel: renderConfig.topTocLevel,
+    maxTocLevel: renderConfig.maxTocLevel,
+    maxSectionEditLevel: renderConfig.maxSectionEditLevel,
+    camelCaseLinks: renderConfig.camelCaseLinks,
+    typographyMode: renderConfig.typographyMode,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
     rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
   });
-  const title = displayPageTitle(config, rendered.title, page?.title, id);
+  const title = displayPageTitle(renderConfig, rendered.title, page?.title, id);
 
   if (!rendered.noCache && !privateCache && cacheableRenderControls) {
     await writeRenderCache(env, cacheKey, {
@@ -4302,7 +4315,7 @@ async function renderPageHtml(
   return htmlShell(
     env,
     title,
-    `${renderBreadcrumbs(id)}${renderToc(rendered.toc, config.tocMinHeads)}${revisionNotice}${rendered.html}`,
+    `${renderBreadcrumbs(id)}${renderToc(rendered.toc, renderConfig.tocMinHeads)}${revisionNotice}${rendered.html}`,
     {
       breadcrumbs: options.breadcrumbs,
       pageId: id,
@@ -4356,15 +4369,13 @@ async function renderPageExport(
   const acronyms = await acronymsForRender(env);
   const interwikiTemplates = await interwikiTemplatesForRender(env);
   const linkSchemes = await linkSchemesForRender(env);
-  const relNofollow = await relNofollowForRender(env, config.relNofollow);
-  const linkTargets = await linkTargetsForRender(env, config.linkTargets);
-  const autoPluralLinks = await autoPluralForRender(env, config.autoPluralLinks);
+  const renderConfig = await runtimeSafeRenderConfig(env, config);
   const existingPageIds = await existingPageIdsForContent(
     env,
     content,
     id,
-    config.camelCaseLinks,
-    autoPluralLinks,
+    renderConfig.camelCaseLinks,
+    renderConfig.autoPluralLinks,
     config.pageIdCleanOptions
   );
   const rssFeeds = await rssFeedsForRender(env, content);
@@ -4376,20 +4387,25 @@ async function renderPageExport(
     acronyms,
     interwikiTemplates,
     linkSchemes,
-    relNofollow,
-    linkTargets,
-    autoPluralLinks,
+    relNofollow: renderConfig.relNofollow,
+    linkTargets: renderConfig.linkTargets,
+    autoPluralLinks: renderConfig.autoPluralLinks,
     pageIdCleanOptions: config.pageIdCleanOptions,
-    topTocLevel: config.topTocLevel,
-    maxTocLevel: config.maxTocLevel,
-    maxSectionEditLevel: config.maxSectionEditLevel,
-    camelCaseLinks: config.camelCaseLinks,
-    typographyMode: config.typographyMode,
+    topTocLevel: renderConfig.topTocLevel,
+    maxTocLevel: renderConfig.maxTocLevel,
+    maxSectionEditLevel: renderConfig.maxSectionEditLevel,
+    camelCaseLinks: renderConfig.camelCaseLinks,
+    typographyMode: renderConfig.typographyMode,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
     rssDateFormatter: (date) => renderDokuWikiDateFormat(config.dateFormat, date)
   });
-  const title = displayPageTitle(config, rendered.title, "title" in page ? page.title : null, id);
+  const title = displayPageTitle(
+    renderConfig,
+    rendered.title,
+    "title" in page ? page.title : null,
+    id
+  );
   const language = config.language;
 
   headers.set("content-type", "text/html; charset=utf-8");
@@ -4412,7 +4428,7 @@ async function renderPageExport(
 </head>
 <body>
 <div class="dokuwiki export">
-${revisionComment}${renderToc(rendered.toc, config.tocMinHeads)}
+${revisionComment}${renderToc(rendered.toc, renderConfig.tocMinHeads)}
 ${rendered.html}
 </div>
 </body>
@@ -4542,36 +4558,44 @@ async function linkSchemesForRender(env: Env): Promise<string[] | undefined> {
   return entries.length > 0 ? entries : undefined;
 }
 
-async function relNofollowForRender(env: Env, fallback: boolean): Promise<boolean> {
-  const imported = await importedDokuWikiBooleanConfig(env, "relnofollow");
-  return imported ?? fallback;
-}
-
-async function autoPluralForRender(env: Env, fallback: boolean): Promise<boolean> {
-  const imported = await importedDokuWikiBooleanConfig(env, "autoplural");
-  return imported ?? fallback;
-}
-
-async function linkTargetsForRender(
+async function runtimeSafeRenderConfig(
   env: Env,
-  fallback: ReturnType<typeof getRuntimeConfig>["linkTargets"]
-): Promise<ReturnType<typeof getRuntimeConfig>["linkTargets"]> {
-  const wiki = await importedDokuWikiStringConfig(env, "target.wiki");
-  const interwiki = await importedDokuWikiStringConfig(env, "target.interwiki");
-  const extern = await importedDokuWikiStringConfig(env, "target.extern");
-  const media = await importedDokuWikiStringConfig(env, "target.media");
-  const windows = await importedDokuWikiStringConfig(env, "target.windows");
+  fallback: RuntimeConfig
+): Promise<RenderRuntimeConfig> {
+  const imported = await importedDokuWikiRuntimeConfig(env);
+  const wikiTarget = importedDokuWikiStringConfig(imported, "target.wiki");
+  const interwikiTarget = importedDokuWikiStringConfig(imported, "target.interwiki");
+  const externTarget = importedDokuWikiStringConfig(imported, "target.extern");
+  const mediaTarget = importedDokuWikiStringConfig(imported, "target.media");
+  const windowsTarget = importedDokuWikiStringConfig(imported, "target.windows");
 
   return {
-    wiki: wiki !== undefined ? wiki : fallback.wiki,
-    interwiki: interwiki !== undefined ? interwiki : fallback.interwiki,
-    extern: extern !== undefined ? extern : fallback.extern,
-    media: media !== undefined ? media : fallback.media,
-    windows: windows !== undefined ? windows : fallback.windows
+    topTocLevel:
+      importedDokuWikiIntegerConfig(imported, "toptoclevel", 1, 5) ?? fallback.topTocLevel,
+    tocMinHeads:
+      importedDokuWikiIntegerConfig(imported, "tocminheads", 0, 99) ?? fallback.tocMinHeads,
+    maxTocLevel:
+      importedDokuWikiIntegerConfig(imported, "maxtoclevel", 1, 5) ?? fallback.maxTocLevel,
+    maxSectionEditLevel:
+      importedDokuWikiIntegerConfig(imported, "maxseclevel", 0, 5) ?? fallback.maxSectionEditLevel,
+    useHeading: importedDokuWikiBooleanConfig(imported, "useheading") ?? fallback.useHeading,
+    camelCaseLinks: importedDokuWikiBooleanConfig(imported, "camelcase") ?? fallback.camelCaseLinks,
+    typographyMode:
+      importedDokuWikiIntegerConfig(imported, "typography", 0, 2) ?? fallback.typographyMode,
+    autoPluralLinks:
+      importedDokuWikiBooleanConfig(imported, "autoplural") ?? fallback.autoPluralLinks,
+    relNofollow: importedDokuWikiBooleanConfig(imported, "relnofollow") ?? fallback.relNofollow,
+    linkTargets: {
+      wiki: wikiTarget !== undefined ? wikiTarget : fallback.linkTargets.wiki,
+      interwiki: interwikiTarget !== undefined ? interwikiTarget : fallback.linkTargets.interwiki,
+      extern: externTarget !== undefined ? externTarget : fallback.linkTargets.extern,
+      media: mediaTarget !== undefined ? mediaTarget : fallback.linkTargets.media,
+      windows: windowsTarget !== undefined ? windowsTarget : fallback.linkTargets.windows
+    }
   };
 }
 
-async function importedDokuWikiBooleanConfig(env: Env, key: string): Promise<boolean | null> {
+async function importedDokuWikiRuntimeConfig(env: Env): Promise<Map<string, string>> {
   const result = await env.DB.prepare(
     `select key, value_json
      from metadata
@@ -4580,28 +4604,57 @@ async function importedDokuWikiBooleanConfig(env: Env, key: string): Promise<boo
   )
     .bind("config", "dokuwiki")
     .all<{ key: string; value_json: string }>();
-  const row = result.results.find((entry) => entry.key === `conf:${key}`);
-  if (!row) return null;
 
-  return parseDokuWikiBooleanConfigMetadata(row.value_json);
+  return new Map(
+    result.results
+      .filter((row) => row.key.startsWith("conf:"))
+      .filter((row) => isRuntimeSafeImportedDokuWikiConfig(row.value_json))
+      .map((row) => [row.key.slice("conf:".length), row.value_json])
+  );
 }
 
-async function importedDokuWikiStringConfig(
-  env: Env,
-  key: string
-): Promise<string | null | undefined> {
-  const result = await env.DB.prepare(
-    `select key, value_json
-     from metadata
-     where subject_type = ?
-       and subject_id = ?`
-  )
-    .bind("config", "dokuwiki")
-    .all<{ key: string; value_json: string }>();
-  const row = result.results.find((entry) => entry.key === `conf:${key}`);
-  if (!row) return undefined;
+function importedDokuWikiBooleanConfig(imported: Map<string, string>, key: string): boolean | null {
+  const value = imported.get(key);
+  if (value === undefined) return null;
 
-  return parseDokuWikiStringConfigMetadata(row.value_json);
+  return parseDokuWikiBooleanConfigMetadata(value);
+}
+
+function importedDokuWikiIntegerConfig(
+  imported: Map<string, string>,
+  key: string,
+  min: number,
+  max: number
+): number | null {
+  const value = imported.get(key);
+  if (value === undefined) return null;
+
+  const parsed = parseDokuWikiIntegerConfigMetadata(value);
+  if (parsed === null || parsed < min || parsed > max) return null;
+  return parsed;
+}
+
+function importedDokuWikiStringConfig(
+  imported: Map<string, string>,
+  key: string
+): string | null | undefined {
+  const value = imported.get(key);
+  if (value === undefined) return undefined;
+
+  return parseDokuWikiStringConfigMetadata(value);
+}
+
+function isRuntimeSafeImportedDokuWikiConfig(value: string): boolean {
+  try {
+    const parsed = JSON.parse(value) as { source?: unknown; layer?: unknown };
+    if (parsed.layer === "local" || parsed.layer === "protected") return true;
+    if (parsed.source === "local.php" || parsed.source === "local.protected.php") return true;
+    if (parsed.layer === "default" || parsed.source === "dokuwiki.php") return false;
+
+    return parsed.layer === undefined && parsed.source === undefined;
+  } catch {
+    return false;
+  }
 }
 
 function parseEntityMetadata(
@@ -4675,6 +4728,19 @@ function parseDokuWikiBooleanConfigMetadata(value: string): boolean | null {
       const normalized = parsed.value.trim().toLowerCase();
       if (["1", "true", "yes", "on"].includes(normalized)) return true;
       if (["0", "false", "no", "off", ""].includes(normalized)) return false;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseDokuWikiIntegerConfigMetadata(value: string): number | null {
+  try {
+    const parsed = JSON.parse(value) as { value?: unknown };
+    if (typeof parsed.value === "number" && Number.isInteger(parsed.value)) return parsed.value;
+    if (typeof parsed.value === "string" && /^-?\d+$/.test(parsed.value.trim())) {
+      return Number.parseInt(parsed.value.trim(), 10);
     }
     return null;
   } catch {

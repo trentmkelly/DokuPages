@@ -79,6 +79,33 @@ const env: Env = {
   MAINTENANCE_MODE: undefined
 };
 
+function importedDokuWikiConfigMetadata(
+  key: string,
+  value: unknown,
+  layer: "default" | "local" | "protected" = "local"
+): Record<string, unknown> {
+  const source =
+    layer === "protected"
+      ? "local.protected.php"
+      : layer === "local"
+        ? "local.php"
+        : "dokuwiki.php";
+
+  return {
+    subject_type: "config",
+    subject_id: "dokuwiki",
+    key: `conf:${key}`,
+    value_json: JSON.stringify({
+      key,
+      value,
+      source,
+      layer,
+      locked: layer === "protected"
+    }),
+    updated_at: "2026-05-07T00:00:00.000Z"
+  };
+}
+
 describe("handleRequest", () => {
   beforeEach(() => {
     state.row = currentPageRow();
@@ -340,13 +367,7 @@ describe("handleRequest", () => {
   });
 
   it("honors imported AUTOPLURAL behavior for missing page links", async () => {
-    state.metadata.push({
-      subject_type: "config",
-      subject_id: "dokuwiki",
-      key: "conf:autoplural",
-      value_json: JSON.stringify({ key: "autoplural", value: 1 }),
-      updated_at: "2026-05-07T00:00:00.000Z"
-    });
+    state.metadata.push(importedDokuWikiConfigMetadata("autoplural", 1));
     state.row = {
       ...currentPageRow(),
       id: "wiki:cats",
@@ -400,27 +421,9 @@ describe("handleRequest", () => {
       value_json: JSON.stringify({ protocol: "foo" }),
       updated_at: "2026-05-07T00:00:00.000Z"
     });
-    state.metadata.push({
-      subject_type: "config",
-      subject_id: "dokuwiki",
-      key: "conf:relnofollow",
-      value_json: JSON.stringify({ key: "relnofollow", value: 0 }),
-      updated_at: "2026-05-07T00:00:00.000Z"
-    });
-    state.metadata.push({
-      subject_type: "config",
-      subject_id: "dokuwiki",
-      key: "conf:target.extern",
-      value_json: JSON.stringify({ key: "target.extern", value: "_blank" }),
-      updated_at: "2026-05-07T00:00:00.000Z"
-    });
-    state.metadata.push({
-      subject_type: "config",
-      subject_id: "dokuwiki",
-      key: "conf:target.interwiki",
-      value_json: JSON.stringify({ key: "target.interwiki", value: "_blank" }),
-      updated_at: "2026-05-07T00:00:00.000Z"
-    });
+    state.metadata.push(importedDokuWikiConfigMetadata("relnofollow", 0));
+    state.metadata.push(importedDokuWikiConfigMetadata("target.extern", "_blank"));
+    state.metadata.push(importedDokuWikiConfigMetadata("target.interwiki", "_blank"));
     state.row = {
       ...currentPageRow(),
       content:
@@ -441,6 +444,54 @@ describe("handleRequest", () => {
       '<a href="foo://service/path" class="urlextern" target="_blank" rel="noopener">Foo</a>'
     );
     expect(cachePuts).not.toContain("page:wiki:welcome");
+  });
+
+  it("honors imported local and protected render-safe DokuWiki config", async () => {
+    state.metadata.push(importedDokuWikiConfigMetadata("camelcase", 1));
+    state.metadata.push(importedDokuWikiConfigMetadata("typography", 2));
+    state.metadata.push(importedDokuWikiConfigMetadata("useheading", 1));
+    state.metadata.push(importedDokuWikiConfigMetadata("toptoclevel", 2));
+    state.metadata.push(importedDokuWikiConfigMetadata("tocminheads", 1));
+    state.metadata.push(importedDokuWikiConfigMetadata("maxtoclevel", 2));
+    state.metadata.push(importedDokuWikiConfigMetadata("maxseclevel", 1, "protected"));
+    state.row = {
+      ...currentPageRow(),
+      title: "Stored title",
+      content:
+        "====== Imported heading ======\n\nCamelCase and 'quoted'.\n\n===== Details =====\n\n==== Hidden From TOC ====\n\nMore text."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("<title>Imported heading - Test Wiki</title>");
+    expect(html).toContain(
+      '<a href="/wiki/wiki/camelcase" class="wikilink2" title="This topic does not exist yet">CamelCase</a>'
+    );
+    expect(html).toContain("‘quoted’");
+    expect(html).toContain('id="dw__toc"');
+    expect(html).not.toContain('<a href="#imported-heading">Imported heading</a>');
+    expect(html).toContain('<a href="#details">Details</a>');
+    expect(html).not.toContain('<a href="#hidden-from-toc">Hidden From TOC</a>');
+    expect(html).toContain('href="/wiki/wiki/welcome?do=edit&amp;section=1"');
+    expect(html).not.toContain('href="/wiki/wiki/welcome?do=edit&amp;section=2"');
+    expect(cachePuts).not.toContain("page:wiki:welcome");
+  });
+
+  it("keeps imported dokuwiki.php defaults as metadata-only render config", async () => {
+    state.metadata.push(importedDokuWikiConfigMetadata("camelcase", 1, "default"));
+    state.row = {
+      ...currentPageRow(),
+      content: "====== Welcome ======\n\nCamelCase stays plain."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("CamelCase stays plain.");
+    expect(html).not.toContain("/wiki/wiki/camelcase");
   });
 
   it("fingerprints static assets with the Pages commit when available", async () => {
