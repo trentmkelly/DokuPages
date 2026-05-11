@@ -6,6 +6,9 @@ path.
 
 ## Bundled Plugins
 
+The admin-only `/admin/plugin-compatibility` page exposes this matrix together
+with imported plugin enablement from the source wiki when available.
+
 | Plugin         | Pages decision                                                                                                                                               |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `acl`          | Replaced by native ACL matching and `/admin/acl` with namespace browsing, selected-rule editing, and current-rule bulk edit/delete support.                  |

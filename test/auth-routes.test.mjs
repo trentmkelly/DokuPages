@@ -2538,6 +2538,14 @@ describe("auth routes", () => {
 
     expect(anonymous.status).toBe(403);
     await expect(dashboard.text()).resolves.toContain("Configuration manager");
+    await expect(
+      handleRequest(
+        new Request("https://example.com/admin", {
+          headers: { cookie }
+        }),
+        env
+      ).then((response) => response.text())
+    ).resolves.toContain("Bundled plugin compatibility");
     expect(page.status).toBe(200);
     const html = await page.text();
     expect(html).toContain("Configuration manager");
@@ -2626,6 +2634,29 @@ describe("auth routes", () => {
     expect(extensionHtml).toContain(
       "Runtime plugin and template installation is not available in this Pages port."
     );
+
+    const pluginCompatibilityAnonymous = await handleRequest(
+      new Request("https://example.com/admin/plugin-compatibility"),
+      env
+    );
+    const pluginCompatibilityPage = await handleRequest(
+      new Request("https://example.com/admin/plugin-compatibility", {
+        headers: { cookie }
+      }),
+      env
+    );
+    expect(pluginCompatibilityAnonymous.status).toBe(403);
+    expect(pluginCompatibilityPage.status).toBe(200);
+    const pluginCompatibilityHtml = await pluginCompatibilityPage.text();
+    expect(pluginCompatibilityHtml).toContain("Bundled Plugin Compatibility");
+    expect(pluginCompatibilityHtml).toContain("Unsupported bundled plugins");
+    expect(pluginCompatibilityHtml).toContain("Native replacement");
+    expect(pluginCompatibilityHtml).toContain("Unsupported at runtime");
+    expect(pluginCompatibilityHtml).toContain("Intentionally removed");
+    expect(pluginCompatibilityHtml).toContain("Migration-only");
+    expect(pluginCompatibilityHtml).toContain("plugins.required.php / required");
+    expect(pluginCompatibilityHtml).toContain("<code>popularity</code>");
+    expect(pluginCompatibilityHtml).toContain("No telemetry replacement");
 
     const diagnostics = await handleRequest(
       new Request("https://example.com/api/diagnostics"),

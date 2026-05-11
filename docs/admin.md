@@ -18,6 +18,9 @@ Native admin routes use D1-backed session principals and DokuWiki-style
   `conf/plugins.local.php`, and `conf/plugins.required.php`, but it returns
   `501` and explains that runtime plugin and template install/update/uninstall
   actions are unsupported on Pages.
+- `/admin/plugin-compatibility` shows every bundled upstream plugin, imported
+  enablement state when present, and the Pages native replacement, external
+  bridge, migration-only, removed, or unsupported-runtime status.
 - `/admin/styling` provides a native Template Style Settings editor for the
   DokuWiki-style CSS variables. It writes deployment-safe D1 `plugin_settings`
   rows and applies them through `/theme.css` without mutating checked-in assets.
@@ -45,11 +48,12 @@ Native admin routes use D1-backed session principals and DokuWiki-style
 - `/doku.php?do=admin&page=acl` redirects to `/admin/acl`.
 
 The dashboard links to diagnostics, audit logs, ACL management, user management,
-configuration management, media cleanup, and the media manager for admin users.
-Admin users can trigger a search index rebuild from the dashboard and purge the
-rendered cache. Manager users can view the dashboard but cannot edit ACL rules,
-manage users, inspect audit logs, inspect/export configuration, run rebuild
-actions, clean up media, or purge caches unless they also match `SUPERUSER`.
+configuration management, bundled plugin compatibility, media cleanup, and the
+media manager for admin users. Admin users can trigger a search index rebuild
+from the dashboard and purge the rendered cache. Manager users can view the
+dashboard but cannot edit ACL rules, manage users, inspect audit logs,
+inspect/export configuration, run rebuild actions, clean up media, or purge
+caches unless they also match `SUPERUSER`.
 
 Admin ACL upserts, ACL deletes, ACL bulk edits/deletes, user updates, cache
 purges, media cleanups, and search index rebuilds append rows to the D1

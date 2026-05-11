@@ -18,6 +18,21 @@ export interface DokuWikiPluginInfo {
   types: DokuWikiPluginType[];
 }
 
+export type BundledPluginPagesStatus =
+  | "native_replacement"
+  | "external_bridge"
+  | "migration_only"
+  | "unsupported_runtime"
+  | "removed";
+
+export interface BundledPluginPagesReplacement {
+  base: string;
+  status: BundledPluginPagesStatus;
+  replacement: string;
+  route: string | null;
+  notes: string;
+}
+
 export const BUNDLED_DOKUWIKI_PLUGINS: DokuWikiPluginInfo[] = [
   {
     base: "acl",
@@ -160,3 +175,116 @@ export const BUNDLED_DOKUWIKI_PLUGINS: DokuWikiPluginInfo[] = [
     types: ["admin", "remote"]
   }
 ];
+
+export const BUNDLED_PLUGIN_PAGES_REPLACEMENTS: BundledPluginPagesReplacement[] = [
+  {
+    base: "acl",
+    status: "native_replacement",
+    replacement: "Native ACL resolver and Access Control List Management page",
+    route: "/admin/acl",
+    notes: "D1-backed ACL rules replace the PHP ACL plugin runtime."
+  },
+  {
+    base: "authad",
+    status: "external_bridge",
+    replacement: "External auth sync bridge plus Cloudflare Access header auth",
+    route: null,
+    notes: "The PHP auth plugin is not loaded in Workers."
+  },
+  {
+    base: "authldap",
+    status: "external_bridge",
+    replacement: "External auth sync bridge plus Cloudflare Access header auth",
+    route: null,
+    notes: "The PHP auth plugin is not loaded in Workers."
+  },
+  {
+    base: "authpdo",
+    status: "external_bridge",
+    replacement: "External auth sync bridge plus Cloudflare Access header auth",
+    route: null,
+    notes: "The PHP auth plugin is not loaded in Workers."
+  },
+  {
+    base: "authplain",
+    status: "native_replacement",
+    replacement: "D1-backed users, groups, password hash import, and sessions",
+    route: "/admin/users",
+    notes: "Legacy password hashes are verified and converted through native auth."
+  },
+  {
+    base: "config",
+    status: "native_replacement",
+    replacement: "Read-only Configuration Manager with upstream metadata",
+    route: "/admin/config",
+    notes: "Runtime config edits remain a deployment operation."
+  },
+  {
+    base: "extension",
+    status: "unsupported_runtime",
+    replacement: "DokuWiki-styled unsupported Extension Manager page",
+    route: "/admin/extension",
+    notes:
+      "Plugin/template install, update, upload, enable, and disable actions are unsupported at runtime."
+  },
+  {
+    base: "info",
+    status: "native_replacement",
+    replacement: "Diagnostics, health checks, and native info syntax macros",
+    route: "/diagnostics",
+    notes: "Pages equivalents are exposed without PHP runtime introspection."
+  },
+  {
+    base: "logviewer",
+    status: "native_replacement",
+    replacement: "Cloudflare Logs plus native admin audit log",
+    route: "/admin/audit",
+    notes: "Source data/log files are not imported as a native logviewer equivalent."
+  },
+  {
+    base: "popularity",
+    status: "removed",
+    replacement: "No telemetry replacement",
+    route: null,
+    notes: "The port does not collect or phone home anonymous usage statistics."
+  },
+  {
+    base: "revert",
+    status: "native_replacement",
+    replacement: "Native page/media revert and manager-level Revert Manager",
+    route: "/admin/revert",
+    notes: "Batch revert is implemented against D1 revisions and changelog rows."
+  },
+  {
+    base: "safefnrecode",
+    status: "migration_only",
+    replacement: "Operator migration script",
+    route: null,
+    notes: "Use npm run safefn:recode for old SafeFN source trees."
+  },
+  {
+    base: "styling",
+    status: "native_replacement",
+    replacement: "Template Style Settings backed by D1 plugin_settings",
+    route: "/admin/styling",
+    notes: "Theme variables are applied through /theme.css."
+  },
+  {
+    base: "usermanager",
+    status: "native_replacement",
+    replacement: "Native User Manager",
+    route: "/admin/users",
+    notes:
+      "User, group, filter, validation, and selected-user bulk operations are implemented natively."
+  }
+];
+
+const REPLACEMENTS_BY_PLUGIN = new Map(
+  BUNDLED_PLUGIN_PAGES_REPLACEMENTS.map((replacement) => [replacement.base, replacement])
+);
+
+export function pagesReplacementForBundledPlugin(
+  base: string
+): BundledPluginPagesReplacement | null {
+  return REPLACEMENTS_BY_PLUGIN.get(base) ?? null;
+}

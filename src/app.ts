@@ -161,6 +161,13 @@ import {
   type ImportedPluginEnablementSnapshot
 } from "./wiki/plugin-settings";
 import {
+  BUNDLED_DOKUWIKI_PLUGINS,
+  pagesReplacementForBundledPlugin,
+  type BundledPluginPagesReplacement,
+  type BundledPluginPagesStatus,
+  type DokuWikiPluginInfo
+} from "./wiki/plugin-info";
+import {
   extractRssFeedRequests,
   fetchRssFeed,
   type RssFeedResult,
@@ -492,6 +499,11 @@ async function dispatchRequest(
 
   if (url.pathname === "/admin/config" && request.method === "GET") {
     const page = renderConfigAdminPage(request, env, principal);
+    return page instanceof Response ? page : htmlResponse(page);
+  }
+
+  if (url.pathname === "/admin/plugin-compatibility" && request.method === "GET") {
+    const page = await renderBundledPluginCompatibilityPage(request, env, principal);
     return page instanceof Response ? page : htmlResponse(page);
   }
 
@@ -5679,6 +5691,9 @@ function renderAdminDashboardPage(
   const extensionTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/extension">Extension Manager</a></li>`
     : "";
+  const pluginCompatibilityTool = isAdminPrincipal(principal, env)
+    ? `<li><a href="/admin/plugin-compatibility">Bundled plugin compatibility</a></li>`
+    : "";
   const stylingTool = isAdminPrincipal(principal, env)
     ? `<li><a href="/admin/styling">Template Style Settings</a></li>`
     : "";
@@ -5707,6 +5722,7 @@ function renderAdminDashboardPage(
         ${userTool}
         ${configTool}
         ${extensionTool}
+        ${pluginCompatibilityTool}
         ${stylingTool}
         ${mediaCleanupTool}
         <li><a href="/admin/revert">Revert Manager</a></li>
@@ -5715,6 +5731,83 @@ function renderAdminDashboardPage(
       ${adminActions}`,
     { principal }
   );
+}
+
+async function renderBundledPluginCompatibilityPage(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal
+): Promise<string | Response> {
+  if (!isAdminPrincipal(principal, env)) {
+    return adminDeniedResponse(request, env);
+  }
+
+  const pluginEnablement = await readImportedPluginEnablement(env.DB);
+  const importedByPlugin = new Map(
+    pluginEnablement.plugins.map((plugin) => [plugin.plugin, plugin] as const)
+  );
+  const rows = BUNDLED_DOKUWIKI_PLUGINS.map((plugin) =>
+    renderBundledPluginCompatibilityRow(
+      plugin,
+      pagesReplacementForBundledPlugin(plugin.base),
+      importedByPlugin.get(plugin.base) ?? null
+    )
+  ).join("");
+  const unsupportedCount = BUNDLED_DOKUWIKI_PLUGINS.filter((plugin) =>
+    isUnsupportedBundledPluginStatus(pagesReplacementForBundledPlugin(plugin.base)?.status)
+  ).length;
+
+  return htmlShell(
+    env,
+    "Bundled Plugin Compatibility",
+    `<h1>Bundled Plugin Compatibility</h1>
+    <p class="info">Unsupported bundled plugins and native replacement status are tracked here so imported plugin enablement can be reviewed without executing PHP plugin code.</p>
+    <p>${unsupportedCount} bundled plugin${unsupportedCount === 1 ? "" : "s"} are unsupported, removed, or migration-only in the Pages runtime. Imported enablement comes from ${pluginEnablement.sourceFiles.map(escapeHtml).join(", ")}.</p>
+    <table class="diagnostics plugin__compatibility">
+      <thead><tr><th>Plugin</th><th>Types</th><th>Imported state</th><th>Source</th><th>Pages status</th><th>Native replacement</th><th>Notes</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`,
+    { principal }
+  );
+}
+
+function renderBundledPluginCompatibilityRow(
+  plugin: DokuWikiPluginInfo,
+  replacement: BundledPluginPagesReplacement | null,
+  imported: ImportedPluginEnablement | null
+): string {
+  const status = replacement?.status ?? "unsupported_runtime";
+  const route = replacement?.route;
+  const replacementLabel = replacement?.replacement ?? "No Pages replacement documented";
+
+  return `<tr>
+    <td><a href="${escapeAttribute(plugin.url)}">${escapeHtml(plugin.name)}</a><br><code>${escapeHtml(plugin.base)}</code></td>
+    <td>${plugin.types.map(escapeHtml).join(", ")}</td>
+    <td>${imported ? (imported.enabled ? "enabled" : "disabled") : "not imported"}${imported?.locked ? " (required)" : ""}</td>
+    <td>${imported?.source ? `${escapeHtml(imported.source)} / ${escapeHtml(imported.layer ?? "-")}` : "-"}</td>
+    <td>${escapeHtml(pluginStatusLabel(status))}</td>
+    <td>${route ? `<a href="${escapeAttribute(route)}">${escapeHtml(replacementLabel)}</a>` : escapeHtml(replacementLabel)}</td>
+    <td>${escapeHtml(replacement?.notes ?? "Review before enabling in an imported source wiki.")}</td>
+  </tr>`;
+}
+
+function pluginStatusLabel(status: BundledPluginPagesStatus): string {
+  switch (status) {
+    case "native_replacement":
+      return "Native replacement";
+    case "external_bridge":
+      return "External auth bridge";
+    case "migration_only":
+      return "Migration-only";
+    case "removed":
+      return "Intentionally removed";
+    case "unsupported_runtime":
+      return "Unsupported at runtime";
+  }
+}
+
+function isUnsupportedBundledPluginStatus(status: BundledPluginPagesStatus | undefined): boolean {
+  return status === "unsupported_runtime" || status === "removed" || status === "migration_only";
 }
 
 async function renderExtensionManagerUnsupportedPage(
