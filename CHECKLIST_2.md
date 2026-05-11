@@ -165,7 +165,7 @@ are not fixed by this checklist.
 - [x] Implement logviewer parity for DokuWiki logs imported from `data/log`, or document Cloudflare logs as a non-equivalent replacement.
 - [x] Implement popularity plugin behavior if usage reporting/update checks are desired, or keep it intentionally removed.
 - [x] Implement safefnrecode behavior as an operator migration tool if source wikis need filename recoding after import.
-- [ ] Match usermanager plugin behavior for bulk operations, group editing, search, filters, validation, and messages.
+- [x] Match usermanager plugin behavior for bulk operations, group editing, search, filters, validation, and messages.
 - [ ] Add an operator CLI script that promotes an existing username to the configured superadmin/superuser role without manually editing D1 rows.
 - [ ] Match ACL plugin behavior for bulk ACL edits and namespace browsing.
 - [ ] Match config metadata and validation from `lib/plugins/config/settings/config.metadata.php`.

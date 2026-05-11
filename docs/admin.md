@@ -17,8 +17,9 @@ Native admin routes use D1-backed session principals and DokuWiki-style
 - `/admin/styling` provides a native Template Style Settings editor for the
   DokuWiki-style CSS variables. It writes deployment-safe D1 `plugin_settings`
   rows and applies them through `/theme.css` without mutating checked-in assets.
-- `/admin/users` manages native D1 users, group membership, and disabled status
-  and requires a `SUPERUSER` match.
+- `/admin/users` manages native D1 users, group membership, disabled status,
+  upstream-style filters, and selected-user bulk deletion and requires a
+  `SUPERUSER` match.
 - `/admin/audit` shows recent native admin audit log entries and requires a
   `SUPERUSER` match. This is a non-equivalent replacement for DokuWiki's
   bundled logviewer: upstream logviewer reads daily PHP filesystem logs from

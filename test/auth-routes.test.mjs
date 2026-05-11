@@ -1529,6 +1529,14 @@ describe("auth routes", () => {
       email: "bob@example.test",
       groups: ["user"]
     });
+    await seedUser(env.DB, {
+      userId: "user-charlie",
+      username: "charlie",
+      password: "charlie password",
+      displayName: "Charlie Guest",
+      email: "charlie@example.test",
+      groups: ["guest"]
+    });
     const cookie = await loginAsAlice(env);
 
     const anonymous = await handleRequest(new Request("https://example.com/admin/users"), env);
@@ -1551,6 +1559,46 @@ describe("auth routes", () => {
     const html = await page.text();
     expect(html).toContain("Bob Example");
     expect(html).toContain("bob@example.test");
+    expect(html).toContain("Displaying users 1-3 of 3 found. 3 users total.");
+
+    const filtered = await handleRequest(
+      new Request("https://example.com/admin/users?userid=bob", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const filteredHtml = await filtered.text();
+    expect(filteredHtml).toContain("Bob Example");
+    expect(filteredHtml).not.toContain("Charlie Guest");
+    expect(filteredHtml).toContain("Displaying users 1-1 of 1 found. 3 users total.");
+
+    const groupFiltered = await handleRequest(
+      new Request("https://example.com/admin/users?usergroups=guest", {
+        headers: { cookie }
+      }),
+      env
+    );
+    const groupFilteredHtml = await groupFiltered.text();
+    expect(groupFilteredHtml).toContain("Charlie Guest");
+    expect(groupFilteredHtml).not.toContain("Bob Example");
+
+    const invalidForm = new FormData();
+    invalidForm.set("id", "user-bob");
+    invalidForm.set("displayName", "Bobby User");
+    invalidForm.set("email", "bad-address");
+    invalidForm.set("groups", "user");
+
+    const invalid = await handleRequest(
+      new Request("https://example.com/api/admin/users", {
+        method: "POST",
+        body: invalidForm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(invalid.status).toBe(400);
+    await expect(invalid.text()).resolves.toContain("Bad email address");
 
     const form = new FormData();
     form.set("id", "user-bob");
@@ -1558,6 +1606,7 @@ describe("auth routes", () => {
     form.set("email", "");
     form.set("groups", "user, manager");
     form.set("isDisabled", "1");
+    form.set("returnTo", "/admin/users?userid=bob");
 
     const saved = await handleRequest(
       new Request("https://example.com/api/admin/users", {
@@ -1569,7 +1618,7 @@ describe("auth routes", () => {
     );
 
     expect(saved.status).toBe(303);
-    expect(saved.headers.get("location")).toBe("/admin/users");
+    expect(saved.headers.get("location")).toBe("/admin/users?userid=bob&saved=1");
     await expect(
       env.DB.prepare(
         `select username, display_name, email, is_disabled
@@ -1601,6 +1650,42 @@ describe("auth routes", () => {
     const bobLogin = await postLogin(env, "bob", "bob password");
     expect(bobLogin.status).toBe(401);
     expect(bobLogin.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+
+    const selfDelete = new FormData();
+    selfDelete.set("run", "delete");
+    selfDelete.set("delete", "user-1");
+
+    const rejectedDelete = await handleRequest(
+      new Request("https://example.com/api/admin/users", {
+        method: "POST",
+        body: selfDelete,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(rejectedDelete.status).toBe(400);
+    await expect(rejectedDelete.text()).resolves.toContain("You can&#39;t delete yourself!");
+
+    const deleteForm = new FormData();
+    deleteForm.set("run", "delete");
+    deleteForm.set("delete", "user-charlie");
+    deleteForm.set("returnTo", "/admin/users?usergroups=guest");
+
+    const deleted = await handleRequest(
+      new Request("https://example.com/api/admin/users", {
+        method: "POST",
+        body: deleteForm,
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(deleted.status).toBe(303);
+    expect(deleted.headers.get("location")).toBe("/admin/users?usergroups=guest&deleted=1");
+    await expect(
+      env.DB.prepare("select id from users where id = ?").bind("user-charlie").first()
+    ).resolves.toBeNull();
     await expect(
       env.DB.prepare("select action, target_type, target_id from audit_log where action = ?")
         .bind("user_update")
@@ -1611,6 +1696,19 @@ describe("auth routes", () => {
           action: "user_update",
           target_type: "user",
           target_id: "user-bob"
+        }
+      ]
+    });
+    await expect(
+      env.DB.prepare("select action, target_type, target_id from audit_log where action = ?")
+        .bind("user_delete_bulk")
+        .all()
+    ).resolves.toMatchObject({
+      results: [
+        {
+          action: "user_delete_bulk",
+          target_type: "user",
+          target_id: null
         }
       ]
     });

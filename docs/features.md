@@ -82,6 +82,8 @@ PHP modules to execute. Current decisions:
 - `safefnrecode`: migration-only operator script via `npm run safefn:recode`.
 - `styling`: native Template Style Settings editor stores Pages-safe CSS
   variable overrides in D1 and applies them through `/theme.css`.
-- `usermanager`: replaced by native `/admin/users` user management.
+- `usermanager`: replaced by native `/admin/users` user management with
+  search filters, per-user group editing, disabled status, validation, and
+  selected-user bulk deletion.
 - `authad`, `authldap`, `authpdo`: supported through the external auth sync
   bridge and Cloudflare Access header authentication.

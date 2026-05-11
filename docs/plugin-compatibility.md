@@ -18,7 +18,7 @@ path.
 | `revert`       | Replaced by native page/media revert routes and manager-level `/admin/revert` batch reversion.                                                |
 | `safefnrecode` | Migration-only operator script via `npm run safefn:recode` for old SafeFN source trees.                                                       |
 | `styling`      | Replaced by native `/admin/styling` CSS-variable editor backed by D1 `plugin_settings` and `/theme.css`.                                      |
-| `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.                                                        |
+| `usermanager`  | Replaced by native `/admin/users` management for users, groups, filters, validation, disabled accounts, and selected-user bulk deletion.      |
 | `authad`       | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |
 | `authldap`     | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |
 | `authpdo`      | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |

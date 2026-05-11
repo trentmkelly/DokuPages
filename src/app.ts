@@ -6564,6 +6564,19 @@ interface ManagedUserUpdate {
   isDisabled: boolean;
 }
 
+interface UserManagerFilter {
+  userId: string;
+  name: string;
+  mail: string;
+  groups: string;
+}
+
+interface ManagedUserList {
+  users: ManagedUser[];
+  filteredCount: number;
+  totalCount: number;
+}
+
 interface UserRow {
   id: string;
   username: string;
@@ -6580,6 +6593,9 @@ interface UserGroupRow {
   group_name: string | null;
 }
 
+const USER_MANAGER_EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+const USER_MANAGER_GROUP = /^[^\s,@]+$/;
+
 async function renderUserAdminPage(
   request: Request,
   env: Env,
@@ -6592,16 +6608,29 @@ async function renderUserAdminPage(
   }
 
   const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 200 });
-  const users = await listManagedUsers(env.DB, pagination.limit, pagination.offset);
-  const rows = users.map((user) => renderManagedUserRow(user, csrfToken, principal)).join("");
+  const filters = userManagerFilterFromUrl(url);
+  const userList = await listManagedUsers(env.DB, pagination.limit, pagination.offset, filters);
+  const bulkFormId = "user__manager_bulk";
+  const returnTo = `${url.pathname}${url.search}`;
+  const rows = userList.users
+    .map((user) => renderManagedUserRow(user, csrfToken, principal, bulkFormId, returnTo))
+    .join("");
 
   return htmlShell(
     env,
     "User Manager",
     `<h1>User manager</h1>
+    ${renderUserManagerNotice(url)}
+    ${renderUserManagerFilterForm(filters)}
+    ${renderUserManagerSummary(userList, pagination)}
+    <form id="${bulkFormId}" method="post" action="/api/admin/users">
+      ${csrfInput(csrfToken)}
+      <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
+    </form>
     <table class="inline user__manager">
       <thead>
         <tr>
+          <th>Select</th>
           <th>Username</th>
           <th>Display name</th>
           <th>Email</th>
@@ -6610,9 +6639,10 @@ async function renderUserAdminPage(
           <th>Action</th>
         </tr>
       </thead>
-      <tbody>${rows || '<tr><td colspan="6">No users configured.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="7">No users configured.</td></tr>'}</tbody>
     </table>
-    ${renderPaginationControls(url, pagination, users.length)}`,
+    <p><button form="${bulkFormId}" type="submit" name="run" value="delete">Delete Selected</button></p>
+    ${renderPaginationControls(url, pagination, userList.users.length)}`,
     { principal }
   );
 }
@@ -6715,16 +6745,25 @@ function renderMediaCleanupResult(result: MediaCleanupResult): string {
 function renderManagedUserRow(
   user: ManagedUser,
   csrfToken: string,
-  principal: AuthPrincipal
+  principal: AuthPrincipal,
+  bulkFormId: string,
+  returnTo: string
 ): string {
   const elementId = escapeAttribute(user.id.replace(/[^a-zA-Z0-9_-]/g, "_"));
   const formId = `user__form_${elementId}`;
   const disabledChecked = user.isDisabled ? " checked" : "";
   const disableDisabled = principal.id === user.id ? " disabled" : "";
+  const deleteDisabled = principal.id === user.id ? " disabled" : "";
   const selfDisableGuard =
     principal.id === user.id ? "<small>Current account cannot disable itself.</small>" : "";
+  const selfDeleteGuard = principal.id === user.id ? "<small>Current account</small>" : "";
 
   return `<tr>
+    <td>
+      <label class="a11y" for="user__delete_${elementId}">Select ${escapeHtml(user.username)}</label>
+      <input form="${bulkFormId}" id="user__delete_${elementId}" name="delete" type="checkbox" value="${escapeAttribute(user.id)}"${deleteDisabled}>
+      ${selfDeleteGuard}
+    </td>
     <td><code>${escapeHtml(user.username)}</code></td>
     <td>
       <label class="a11y" for="user__display_${elementId}">Display name</label>
@@ -6749,10 +6788,62 @@ function renderManagedUserRow(
       <form id="${formId}" method="post" action="/api/admin/users">
         ${csrfInput(csrfToken)}
         <input type="hidden" name="id" value="${escapeAttribute(user.id)}">
+        <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
         <button type="submit">Save</button>
       </form>
     </td>
   </tr>`;
+}
+
+function renderUserManagerFilterForm(filters: UserManagerFilter): string {
+  const hasFilter = hasUserManagerFilter(filters);
+  const clear = hasFilter ? '<a href="/admin/users">Reset Search Filter</a>' : "";
+
+  return `<form class="user__manager_filters" method="get" action="/admin/users">
+    <table class="inline">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Real Name</th>
+          <th>Email</th>
+          <th>Groups</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="text" name="userid" value="${escapeAttribute(filters.userId)}"></td>
+          <td><input type="text" name="username" value="${escapeAttribute(filters.name)}"></td>
+          <td><input type="text" name="usermail" value="${escapeAttribute(filters.mail)}"></td>
+          <td><input type="text" name="usergroups" value="${escapeAttribute(filters.groups)}"></td>
+          <td><button type="submit">Search</button> ${clear}</td>
+        </tr>
+      </tbody>
+    </table>
+  </form>`;
+}
+
+function renderUserManagerSummary(userList: ManagedUserList, pagination: Pagination): string {
+  if (userList.filteredCount === 0) {
+    return `<p>No users found. ${userList.totalCount.toLocaleString("en-US")} users total.</p>`;
+  }
+
+  const first = pagination.offset + 1;
+  const last = Math.min(pagination.offset + userList.users.length, userList.filteredCount);
+  return `<p>Displaying users ${first.toLocaleString("en-US")}-${last.toLocaleString("en-US")} of ${userList.filteredCount.toLocaleString("en-US")} found. ${userList.totalCount.toLocaleString("en-US")} users total.</p>`;
+}
+
+function renderUserManagerNotice(url: URL): string {
+  if (url.searchParams.get("saved") === "1") {
+    return '<p class="success">User updated successfully</p>';
+  }
+
+  const deleted = Number.parseInt(url.searchParams.get("deleted") ?? "", 10);
+  if (Number.isFinite(deleted) && deleted > 0) {
+    return `<p class="success">${deleted.toLocaleString("en-US")} users deleted</p>`;
+  }
+
+  return "";
 }
 
 async function renderSearchPage(
@@ -7161,6 +7252,10 @@ async function handleUserAdminUpdate(
     return adminDeniedResponse(request, env);
   }
 
+  if (String(form.get("run") ?? "save") === "delete") {
+    return handleUserAdminBulkDelete(request, env, principal, form);
+  }
+
   const parsed = parseUserAdminForm(form, principal);
   if (!parsed.ok) {
     return userAdminErrorResponse(request, env, parsed.error);
@@ -7189,7 +7284,41 @@ async function handleUserAdminUpdate(
     return jsonResponse({ ok: true, id: parsed.user.id });
   }
 
-  return redirectResponse("/admin/users");
+  return redirectResponse(userAdminRedirectLocation(form, { saved: "1" }));
+}
+
+async function handleUserAdminBulkDelete(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  form: FormData
+): Promise<Response> {
+  const parsed = parseUserAdminDeleteForm(form, principal);
+  if (!parsed.ok) {
+    return userAdminErrorResponse(request, env, parsed.error);
+  }
+
+  const deleted = await deleteManagedUsers(env, parsed.userIds);
+  if (deleted.length === 0) {
+    return userAdminErrorResponse(request, env, "No matching users were found.", 404);
+  }
+
+  await appendAdminAuditLog(request, env, principal, {
+    action: "user_delete_bulk",
+    targetType: "user",
+    targetId: null,
+    details: {
+      deletedCount: deleted.length,
+      userIds: deleted.map((user) => user.id),
+      usernames: deleted.map((user) => user.username)
+    }
+  });
+
+  if (acceptsJson(request)) {
+    return jsonResponse({ ok: true, deletedCount: deleted.length });
+  }
+
+  return redirectResponse(userAdminRedirectLocation(form, { deleted: String(deleted.length) }));
 }
 
 async function handleStylingAdminUpdate(
@@ -7623,28 +7752,39 @@ async function appendAdminAuditLog(
 async function listManagedUsers(
   db: D1Database,
   limit: number,
-  offset: number
-): Promise<ManagedUser[]> {
+  offset: number,
+  filters: UserManagerFilter
+): Promise<ManagedUserList> {
   const safeLimit = Math.max(1, Math.min(limit, 200));
   const safeOffset = Math.max(0, offset);
+  const where = userManagerWhereClause(filters);
+  const totalCount = await countManagedUsers(db, EMPTY_USER_MANAGER_FILTER);
+  const filteredCount = hasUserManagerFilter(filters)
+    ? await countManagedUsers(db, filters)
+    : totalCount;
   const usersResult = await db
     .prepare(
       `select id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
-       from users
+       from users u
+       ${where.sql}
        order by username asc
        limit ? offset ?`
     )
-    .bind(safeLimit, safeOffset)
+    .bind(...where.params, safeLimit, safeOffset)
     .all<UserRow>();
   const users = usersResult.results.map(mapManagedUser);
 
-  if (users.length === 0) return [];
+  if (users.length === 0) return { users: [], filteredCount, totalCount };
 
   const groupRows = await readManagedUserGroups(
     db,
     users.map((user) => user.id)
   );
-  return users.map((user) => ({ ...user, groups: groupRows.get(user.id) ?? [] }));
+  return {
+    users: users.map((user) => ({ ...user, groups: groupRows.get(user.id) ?? [] })),
+    filteredCount,
+    totalCount
+  };
 }
 
 async function getManagedUser(db: D1Database, id: string): Promise<ManagedUser | null> {
@@ -7723,6 +7863,28 @@ async function updateManagedUser(
   await db.batch(statements);
 }
 
+async function deleteManagedUsers(env: Env, userIds: string[]): Promise<ManagedUser[]> {
+  const deleted: ManagedUser[] = [];
+
+  for (const userId of userIds) {
+    const user = await getManagedUser(env.DB, userId);
+    if (!user) continue;
+    await deleteProfileUserRows(env, user.id);
+    deleted.push(user);
+  }
+
+  return deleted;
+}
+
+async function countManagedUsers(db: D1Database, filters: UserManagerFilter): Promise<number> {
+  const where = userManagerWhereClause(filters);
+  const row = await db
+    .prepare(`select count(*) as count from users u ${where.sql}`)
+    .bind(...where.params)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
 function parseUserAdminForm(
   form: FormData,
   principal: AuthPrincipal
@@ -7738,7 +7900,12 @@ function parseUserAdminForm(
   }
 
   const email = String(form.get("email") ?? "").trim() || null;
+  if (email && !USER_MANAGER_EMAIL.test(email)) {
+    return { ok: false, error: "Bad email address" };
+  }
+
   const groups = normalizeUserManagerGroups(String(form.get("groups") ?? ""));
+  if (!groups.ok) return { ok: false, error: groups.error };
   const isSelf = principal.id === id;
   const isDisabled = !isSelf && Boolean(form.get("isDisabled"));
 
@@ -7750,19 +7917,131 @@ function parseUserAdminForm(
       email,
       isDisabled
     },
-    groups
+    groups: groups.groups
   };
 }
 
-function normalizeUserManagerGroups(value: string): string[] {
-  return [
+function parseUserAdminDeleteForm(
+  form: FormData,
+  principal: AuthPrincipal
+): { ok: true; userIds: string[] } | { ok: false; error: string } {
+  const userIds = [
+    ...new Set(
+      [...form.getAll("delete"), ...form.getAll("delete[]")]
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+    )
+  ];
+
+  if (userIds.length === 0) {
+    return { ok: false, error: "No users selected." };
+  }
+
+  if (principal.id && userIds.includes(principal.id)) {
+    return { ok: false, error: "You can't delete yourself!" };
+  }
+
+  return { ok: true, userIds };
+}
+
+function normalizeUserManagerGroups(
+  value: string
+): { ok: true; groups: string[] } | { ok: false; error: string } {
+  const groups = [
     ...new Set(
       value
         .split(/[,\s]+/)
-        .map((group) => group.trim().replace(/^@+/, ""))
+        .map((group) => group.trim().replace(/^@+/, "").toLowerCase())
         .filter(Boolean)
     )
   ].sort((a, b) => a.localeCompare(b));
+
+  const invalid = groups.find((group) => !USER_MANAGER_GROUP.test(group) || group.length > 64);
+  if (invalid) {
+    return { ok: false, error: `Invalid group name '${invalid}'.` };
+  }
+
+  return { ok: true, groups };
+}
+
+const EMPTY_USER_MANAGER_FILTER: UserManagerFilter = {
+  userId: "",
+  name: "",
+  mail: "",
+  groups: ""
+};
+
+function userManagerFilterFromUrl(url: URL): UserManagerFilter {
+  return {
+    userId: filterValue(url.searchParams.get("userid") ?? url.searchParams.get("user")),
+    name: filterValue(url.searchParams.get("username") ?? url.searchParams.get("name")),
+    mail: filterValue(url.searchParams.get("usermail") ?? url.searchParams.get("mail")),
+    groups: filterValue(url.searchParams.get("usergroups") ?? url.searchParams.get("group"))
+  };
+}
+
+function filterValue(value: string | null): string {
+  return (value ?? "").trim();
+}
+
+function hasUserManagerFilter(filters: UserManagerFilter): boolean {
+  return Boolean(filters.userId || filters.name || filters.mail || filters.groups);
+}
+
+function userManagerWhereClause(filters: UserManagerFilter): { sql: string; params: string[] } {
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  addUserManagerLikeClause(clauses, params, "u.username", filters.userId);
+  addUserManagerLikeClause(clauses, params, "u.display_name", filters.name);
+  addUserManagerLikeClause(clauses, params, "coalesce(u.email, '')", filters.mail);
+
+  if (filters.groups) {
+    clauses.push(`exists (
+      select 1
+      from user_groups fug
+      join groups fg on fg.id = fug.group_id
+      where fug.user_id = u.id and lower(fg.name) like ? escape '\\'
+    )`);
+    params.push(sqlLikeContains(filters.groups.replace(/^@+/, "")));
+  }
+
+  return {
+    sql: clauses.length ? `where ${clauses.join(" and ")}` : "",
+    params
+  };
+}
+
+function addUserManagerLikeClause(
+  clauses: string[],
+  params: string[],
+  expression: string,
+  value: string
+): void {
+  if (!value) return;
+  clauses.push(`lower(${expression}) like ? escape '\\'`);
+  params.push(sqlLikeContains(value));
+}
+
+function sqlLikeContains(value: string): string {
+  return `%${value.toLowerCase().replace(/[\\%_]/g, (match) => `\\${match}`)}%`;
+}
+
+function userAdminRedirectLocation(form: FormData, params: Record<string, string>): string {
+  const raw = String(form.get("returnTo") ?? "/admin/users");
+  const url = new URL(safeUserAdminReturnTo(raw), "https://example.com");
+  url.searchParams.delete("saved");
+  url.searchParams.delete("deleted");
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function safeUserAdminReturnTo(value: string): string {
+  if (!value.startsWith("/admin/users")) return "/admin/users";
+  if (value.startsWith("//") || value.includes("://")) return "/admin/users";
+  return value;
 }
 
 function mapManagedUser(row: UserRow): ManagedUser {
