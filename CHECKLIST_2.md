@@ -166,6 +166,7 @@ are not fixed by this checklist.
 - [ ] Implement popularity plugin behavior if usage reporting/update checks are desired, or keep it intentionally removed.
 - [ ] Implement safefnrecode behavior as an operator migration tool if source wikis need filename recoding after import.
 - [ ] Match usermanager plugin behavior for bulk operations, group editing, search, filters, validation, and messages.
+- [ ] Add an operator CLI script that promotes an existing username to the configured superadmin/superuser role without manually editing D1 rows.
 - [ ] Match ACL plugin behavior for bulk ACL edits and namespace browsing.
 - [ ] Match config metadata and validation from `lib/plugins/config/settings/config.metadata.php`.
 - [ ] Match upstream plugin enablement from `conf/plugins.php`, `plugins.local.php`, and `plugins.required.php` in UI and diagnostics.
