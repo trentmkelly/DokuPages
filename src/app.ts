@@ -2612,11 +2612,15 @@ async function handleAjax(
 
   if (call === "index") {
     const namespace = cleanPageId(params.get("idx") ?? params.get("ns") ?? "");
-    const pages = await filterReadablePageItems(
-      env,
-      principal,
-      await listNamespacePages(env.DB, namespace, 200)
-    );
+    const rules = await listAclRules(env);
+    const pages = canListNamespace(env, rules, principal, namespace)
+      ? filterReadablePageItemsWithRules(
+          env,
+          rules,
+          principal,
+          await listNamespacePages(env.DB, namespace, 200)
+        )
+      : [];
     return ajaxHtmlResponse(
       `<ul class="idx">${pages.map((page) => `<li>${ajaxPageLink(page)}</li>`).join("")}</ul>`
     );
@@ -2654,10 +2658,12 @@ async function linkWizardEntries(
 ): Promise<LinkWizardEntry[]> {
   const config = getRuntimeConfig(env);
   const { id, namespace } = parseLinkWizardQuery(query, config.pageIdCleanOptions);
+  const rules = await listAclRules(env);
 
   if (query !== "" && namespace === "") {
-    const pages = await filterReadablePageItems(
+    const pages = filterReadablePageItemsWithRules(
       env,
+      rules,
       principal,
       await lookupPages(env.DB, id, {
         inNamespace: true,
@@ -2672,7 +2678,9 @@ async function linkWizardEntries(
     for (const page of pages) {
       const pageNamespace = namespaceForIndex(page.id);
       if (pageNamespace.includes(id)) {
-        namespaces.add(pageNamespace);
+        if (canListNamespace(env, rules, principal, pageNamespace)) {
+          namespaces.add(pageNamespace);
+        }
       } else {
         entries.push({ id: page.id, title: page.title, type: "f" });
       }
@@ -2689,11 +2697,12 @@ async function linkWizardEntries(
     ];
   }
 
-  const readablePages = await filterReadablePageItems(
+  const readablePages = filterReadablePageItemsWithRules(
     env,
+    rules,
     principal,
     await listAllPages(env.DB, 1000)
-  );
+  ).filter((page) => canListNamespace(env, rules, principal, namespaceForIndex(page.id)));
   const entries: LinkWizardEntry[] = [];
   const directories = new Set<string>();
   const prefix = namespace ? `${namespace}:` : "";
@@ -2711,7 +2720,10 @@ async function linkWizardEntries(
     if (id && !first.startsWith(id)) continue;
 
     if (rest.length > 0) {
-      directories.add(prefix ? `${namespace}:${first}` : first);
+      const directory = prefix ? `${namespace}:${first}` : first;
+      if (canListNamespace(env, rules, principal, directory)) {
+        directories.add(directory);
+      }
     } else {
       entries.push({ id: page.id, title: page.title, type: "f" });
     }
@@ -11507,10 +11519,22 @@ function canListNamespace(
   namespace: string
 ): boolean {
   if (!getRuntimeConfig(env).sneakyIndex) return true;
-  return hasAclPermission(
-    resolveConfiguredAclPermission(env, rules, namespace ? `${namespace}:*` : "*", principal),
-    ACL_READ
+  if (!namespace) return true;
+
+  return namespaceVisibilityScopes(namespace).every((scope) =>
+    hasAclPermission(resolveConfiguredAclPermission(env, rules, scope, principal), ACL_READ)
   );
+}
+
+function namespaceVisibilityScopes(namespace: string): string[] {
+  const parts = namespace.split(":").filter(Boolean);
+  const scopes: string[] = [];
+
+  for (let index = 1; index <= parts.length; index += 1) {
+    scopes.push(`${parts.slice(0, index).join(":")}:*`);
+  }
+
+  return scopes;
 }
 
 function isHiddenPageId(env: Env, id: string): boolean {

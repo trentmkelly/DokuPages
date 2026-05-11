@@ -152,7 +152,7 @@ are not fixed by this checklist.
 - [x] Match upstream disabled ACL mode when `useacl=0`; the port always evaluates native ACL data.
 - [x] Match upstream `admin` and `manager` permission checks based on config values, not only groups.
 - [x] Match upstream ACL plugin UI behavior, validation, sorting, wildcard handling, and page/namespace picker behavior.
-- [ ] Match upstream sneaky index behavior for namespace visibility in all aggregate routes.
+- [x] Match upstream sneaky index behavior for namespace visibility in all aggregate routes.
 - [ ] Match upstream hidden-page behavior for feeds, search, recent changes, index, sitemap, backlinks, wanted, orphan, and media references.
 - [ ] Add fixtures from upstream `acl.auth.php.dist` and tricky real-world ACL combinations.
 

@@ -3043,10 +3043,26 @@ describe("handleRequest", () => {
     expect(await hiddenIndex.text()).not.toContain("/wiki/wiki/guide");
     expect(await hiddenWanted.text()).not.toContain("missing:page");
 
-    state.aclRules = [aclRule("*", "all", "@ALL", 16), aclRule("wiki:*", "all", "@ALL", 0)];
+    state.aclRules = [
+      aclRule("*", "all", "@ALL", 16),
+      aclRule("wiki:*", "all", "@ALL", 0),
+      aclRule("wiki:welcome", "all", "@ALL", 1)
+    ];
     const sneakyEnv = { ...env, SNEAKY_INDEX: "1" } satisfies Env;
     const sneakyIndex = await handleRequest(
       new Request("https://example.com/index?ns=wiki"),
+      sneakyEnv
+    );
+    const sneakyAjaxIndex = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=index&idx=wiki"),
+      sneakyEnv
+    );
+    const sneakyLinkWizard = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=linkwiz&q=wiki"),
+      sneakyEnv
+    );
+    const sneakyMediaManager = await handleRequest(
+      new Request("https://example.com/media-manager"),
       sneakyEnv
     );
 
@@ -3054,6 +3070,34 @@ describe("handleRequest", () => {
     expect(sneakyHtml).toContain("No pages found in this namespace.");
     expect(sneakyHtml).not.toContain("<small>wiki:welcome");
     expect(sneakyHtml).not.toContain("<small>wiki:guide");
+    expect(await sneakyAjaxIndex.text()).not.toContain("wiki:welcome");
+    expect(await sneakyLinkWizard.text()).not.toContain("wiki:");
+    expect(await sneakyMediaManager.text()).not.toContain('href="/media-manager?ns=wiki">wiki');
+
+    state.row = {
+      id: "secret:public:start",
+      namespace: "secret:public",
+      title: "Public Start",
+      revision_id: "secret:public:start@2026-05-07T00:00:00.000Z",
+      content: "====== Public Start ======\n\nReadable child namespace.",
+      updated_at: "2026-05-07T00:00:00.000Z"
+    };
+    state.aclRules = [
+      aclRule("*", "all", "@ALL", 16),
+      aclRule("secret:*", "all", "@ALL", 0),
+      aclRule("secret:public:*", "all", "@ALL", 16)
+    ];
+    const sneakyNestedIndex = await handleRequest(
+      new Request("https://example.com/index?ns=secret:public"),
+      sneakyEnv
+    );
+    const sneakyNestedLinkWizard = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=linkwiz&q=secret"),
+      sneakyEnv
+    );
+
+    expect(await sneakyNestedIndex.text()).not.toContain("secret:public:start");
+    expect(await sneakyNestedLinkWizard.text()).not.toContain("secret:public:");
   });
 
   it("renders media changelog entries in recent changes and feeds", async () => {
