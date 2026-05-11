@@ -2328,6 +2328,7 @@ describe("auth routes", () => {
     const html = await page.text();
     expect(html).toContain("Configuration manager");
     expect(html).toContain("Runtime configuration is read-only inside Pages Functions.");
+    expect(html).toContain("permanent Pages runtime difference");
     expect(html).toContain("API_BEARER_TOKEN");
     expect(html).toContain("[redacted]");
     expect(html).not.toContain("super-secret-token");

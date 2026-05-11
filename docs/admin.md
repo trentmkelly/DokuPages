@@ -7,7 +7,10 @@ Native admin routes use D1-backed session principals and DokuWiki-style
 - `/admin` is the admin dashboard and requires a `MANAGER` or `SUPERUSER` match.
 - `/admin/acl` manages ACL rules and requires a `SUPERUSER` match.
 - `/admin/config` shows validated read-only runtime configuration, secret
-  status, and export links and requires a `SUPERUSER` match.
+  status, and export links and requires a `SUPERUSER` match. Unlike DokuWiki's
+  bundled config plugin, this route is permanently read-only in the Pages
+  runtime because configuration edits must update Cloudflare Pages variables,
+  secrets, or Wrangler configuration followed by a redeploy.
 - `/admin/users` manages native D1 users, group membership, and disabled status
   and requires a `SUPERUSER` match.
 - `/admin/audit` shows recent admin audit log entries and requires a

@@ -122,9 +122,11 @@ download a JSON configuration backup from `/api/admin/config/export`. Secret
 values are never included in the page or export; the backup records only whether
 each supported secret is configured.
 
-Configuration editing remains a deployment operation. Pages Functions cannot
-mutate their own environment variables or secrets safely at runtime; update
-Cloudflare Pages variables/secrets or Wrangler configuration and redeploy.
+Configuration editing is a permanent deployment operation for this Pages port,
+not a writable runtime admin feature like DokuWiki's bundled config plugin.
+Pages Functions cannot mutate their own environment variables or secrets safely
+at runtime; update Cloudflare Pages variables/secrets or Wrangler configuration
+and redeploy.
 
 Set `MAINTENANCE_MODE=1` during final sync or incident response to keep the wiki
 readable while blocking page/media writes, drafts, edit locks, and native API
