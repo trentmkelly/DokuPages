@@ -1,6 +1,6 @@
 # Data Import
 
-The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media manifest. It preserves current page bodies, search postings, current media rows, media revision rows, parsed page/media `.meta` data, custom language files, custom template files, ACL rules, authplain users/groups, and page/media changelog rows.
+The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media manifest. It preserves current page bodies, search postings, current media rows, media revision rows, parsed page/media `.meta` data, custom language files, custom template files, ACL rules, authplain users/groups, and page/media changelog rows. It intentionally does not import `data/log` PHP runtime log files; Cloudflare Logs are the Pages runtime source for request and error events, and D1 `audit_log` rows cover native admin actions.
 
 ## Dry Run
 

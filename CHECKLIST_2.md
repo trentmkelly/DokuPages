@@ -162,7 +162,7 @@ are not fixed by this checklist.
 - [x] Implement extension manager parity or keep a DokuWiki-styled unsupported admin page for the bundled extension plugin.
 - [x] Implement styling plugin parity or add a native theme-variable editor that writes deployment-safe configuration.
 - [x] Implement info plugin parity beyond diagnostics, including environment, PHP, and DokuWiki-specific details that have Pages equivalents.
-- [ ] Implement logviewer parity for DokuWiki logs imported from `data/log`, or document Cloudflare logs as a non-equivalent replacement.
+- [x] Implement logviewer parity for DokuWiki logs imported from `data/log`, or document Cloudflare logs as a non-equivalent replacement.
 - [ ] Implement popularity plugin behavior if usage reporting/update checks are desired, or keep it intentionally removed.
 - [ ] Implement safefnrecode behavior as an operator migration tool if source wikis need filename recoding after import.
 - [ ] Match usermanager plugin behavior for bulk operations, group editing, search, filters, validation, and messages.

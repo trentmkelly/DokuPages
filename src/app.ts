@@ -6006,6 +6006,7 @@ async function renderAuditLogPage(
     env,
     "Audit Log",
     `<h1>Audit log</h1>
+    <p class="info">DokuWiki's bundled logviewer reads PHP log files from <code>data/log</code>. This Pages port does not import or serve those filesystem logs; use Cloudflare Logs for request/runtime events and this D1 audit log for native admin actions.</p>
     <table class="inline audit__log">
       <thead>
         <tr><th>Created</th><th>Actor</th><th>Action</th><th>Target</th><th>Details</th></tr>

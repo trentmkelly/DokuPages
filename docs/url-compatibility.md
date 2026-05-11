@@ -35,7 +35,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?do=admin&page=acl`                       | Redirects to `/admin/acl`.                                                                              |
 | `/doku.php?do=admin&page=config`                    | Redirects to `/admin/config`.                                                                           |
 | `/doku.php?do=admin&page=info`                      | Redirects to `/diagnostics`.                                                                            |
-| `/doku.php?do=admin&page=logviewer`                 | Redirects to `/admin/audit`.                                                                            |
+| `/doku.php?do=admin&page=logviewer`                 | Redirects to `/admin/audit`; `data/log` files are not imported.                                         |
 | `/doku.php?do=admin&page=usermanager`               | Redirects to `/admin/users`.                                                                            |
 | `/doku.php?do=admin&page=extension`                 | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
 | `/doku.php?do=admin&page=popularity`                | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |

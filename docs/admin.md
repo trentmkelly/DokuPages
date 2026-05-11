@@ -19,8 +19,11 @@ Native admin routes use D1-backed session principals and DokuWiki-style
   rows and applies them through `/theme.css` without mutating checked-in assets.
 - `/admin/users` manages native D1 users, group membership, and disabled status
   and requires a `SUPERUSER` match.
-- `/admin/audit` shows recent admin audit log entries and requires a
-  `SUPERUSER` match.
+- `/admin/audit` shows recent native admin audit log entries and requires a
+  `SUPERUSER` match. This is a non-equivalent replacement for DokuWiki's
+  bundled logviewer: upstream logviewer reads daily PHP filesystem logs from
+  `data/log/<facility>/<date>.log`, while Pages request/runtime logs stay in
+  Cloudflare Logs and are not imported into D1.
 - `/admin/media-cleanup` scans R2 media objects against D1 media metadata and
   requires a `SUPERUSER` match.
 - `/api/admin/config/export` downloads a JSON configuration backup with secrets
@@ -45,4 +48,6 @@ actions, clean up media, or purge caches unless they also match `SUPERUSER`.
 
 Admin ACL upserts, ACL deletes, user updates, cache purges, media cleanups, and
 search index rebuilds append rows to the D1 `audit_log` table with the actor,
-action, target, request IP, and action-specific JSON details.
+action, target, request IP, and action-specific JSON details. Legacy
+`data/log` files from a source DokuWiki install are intentionally not imported
+or displayed by this page.

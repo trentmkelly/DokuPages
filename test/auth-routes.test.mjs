@@ -1448,6 +1448,8 @@ describe("auth routes", () => {
     expect(auditPage.status).toBe(200);
     const auditHtml = await auditPage.text();
     expect(auditHtml).toContain("Audit log");
+    expect(auditHtml).toContain("DokuWiki's bundled logviewer reads PHP log files");
+    expect(auditHtml).toContain("Cloudflare Logs");
     expect(auditHtml).toContain("acl_rule_upsert");
     expect(auditHtml).toContain("search_index_rebuild");
   });
@@ -2348,7 +2350,7 @@ describe("auth routes", () => {
       ["acl", "/admin/acl", "Access Control List Management"],
       ["config", "/admin/config", "Configuration manager"],
       ["info", "/diagnostics", "Diagnostics"],
-      ["logviewer", "/admin/audit", "Audit log"],
+      ["logviewer", "/admin/audit", "Cloudflare Logs"],
       ["revert", "/admin/revert", "Revert Manager"],
       ["styling", "/admin/styling", "Template Style Settings"],
       ["usermanager", "/admin/users", "User manager"]

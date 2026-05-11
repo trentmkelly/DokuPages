@@ -73,7 +73,8 @@ PHP modules to execute. Current decisions:
 - `info`: replaced by diagnostics, health endpoints, and native `~~INFO:*~~`
   output for parser/plugin lists plus Pages environment, PHP, and DokuWiki
   compatibility details.
-- `logviewer`: replaced by Cloudflare logs plus native admin audit log.
+- `logviewer`: non-equivalent replacement by Cloudflare Logs plus the native
+  admin audit log; source `data/log` files are not imported.
 - `popularity`: unsupported.
 - `revert`: replaced by native page/media revert routes plus `/admin/revert`
   for DokuWiki-style spam search and batch reversion.

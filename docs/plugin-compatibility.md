@@ -13,7 +13,7 @@ path.
 | `config`       | Permanently read-only in Pages runtime; replaced by validated environment variables, `/admin/config`, and redacted config export.             |
 | `extension`    | DokuWiki-styled `/admin/extension` unsupported page; plugin code upload/install is unavailable in production Pages runtime.                   |
 | `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, `/api/health`, and native `~~INFO:*~~` output including environment/PHP/DokuWiki equivalents. |
-| `logviewer`    | Replaced by Cloudflare logs plus native admin audit log records.                                                                              |
+| `logviewer`    | Non-equivalent replacement by Cloudflare Logs plus native `/admin/audit`; source `data/log` files are not imported.                           |
 | `popularity`   | Removed. The port does not phone home usage statistics.                                                                                       |
 | `revert`       | Replaced by native page/media revert routes and manager-level `/admin/revert` batch reversion.                                                |
 | `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                                                                      |

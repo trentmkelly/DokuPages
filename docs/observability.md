@@ -1,7 +1,10 @@
 # Observability
 
 The Pages port uses structured JSON logs and native diagnostic endpoints rather
-than DokuWiki's PHP logviewer.
+than DokuWiki's PHP logviewer. This is an intentional non-equivalent
+replacement: upstream logviewer reads daily filesystem logs from
+`data/log/<facility>/<date>.log`, but Pages request/runtime logs live in
+Cloudflare Logs and are not imported into D1.
 
 ## Structured Logs
 
@@ -21,7 +24,8 @@ storage service, error code, retry hint, and request ID.
 Auth flows emit `auth_event` logs for login success, login failure, login rate
 limits, logout, profile updates, and profile deletes. Admin ACL changes and
 search index rebuilds also write D1 audit log rows that are visible in
-`/admin/audit`.
+`/admin/audit`. Legacy `data/log` files from a source DokuWiki install are not
+part of the import surface.
 
 ## Metrics
 
