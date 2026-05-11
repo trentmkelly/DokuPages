@@ -137,6 +137,11 @@ Optional Pages environment variables:
 - `SITEMAP`: sitemap cache/regeneration frequency in days. Default: `1`; set
   to `0` to disable `/sitemap.xml` and omit the sitemap line from
   `/robots.txt`.
+- `UPDATECHECK`: DokuWiki-compatible update notice switch. The Pages runtime
+  always keeps upstream PHP update notices disabled; setting this to a truthy
+  value produces a configuration warning instead of fetching or rendering
+  `update.dokuwiki.org` messages. Update the port through git and Cloudflare
+  Pages deployments.
 - `EXTERNAL_AUTH_MODE`: set to `cloudflare_access` to resolve request
   principals from trusted Cloudflare Access headers after syncing users/groups
   into D1. Default: `off`.

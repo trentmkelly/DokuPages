@@ -131,6 +131,15 @@ native replacements above are the compatibility surface.
 | `renderer`  | Provide alternate renderers.               | Native render/export modes only.                                          |
 | `syntax`    | Add wiki syntax modes.                     | Native parser support only; no runtime syntax plugins.                    |
 
+## Update Notices
+
+Upstream `checkUpdateMessages()` downloads manager-only release and security
+messages from `update.dokuwiki.org` when `$conf['updatecheck']` is enabled. The
+Pages port deliberately does not fetch or render those PHP runtime notices.
+`UPDATECHECK` is accepted for DokuWiki config compatibility, but the effective
+runtime policy remains disabled and validation warns operators to update through
+git-reviewed Cloudflare Pages deployments.
+
 ## Farm And Multi-Wiki Decision
 
 Upstream `inc/farm.php` supports named and virtual animals by changing config

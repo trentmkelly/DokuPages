@@ -145,6 +145,7 @@ describe("handleRequest", () => {
     env.RSS_SHOW_SUMMARY = undefined;
     env.RSS_SHOW_DELETED = undefined;
     env.SITEMAP = undefined;
+    env.UPDATECHECK = undefined;
     env.REL_NOFOLLOW = undefined;
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
@@ -293,6 +294,18 @@ describe("handleRequest", () => {
       '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
     );
     expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
+  it("does not render upstream update notices even when UPDATECHECK is enabled", async () => {
+    env.UPDATECHECK = "1";
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).not.toContain("Hotfix release available");
+    expect(html).not.toContain("upgrade now");
+    expect(html).not.toContain("update.dokuwiki.org");
   });
 
   it("honors the FULLPATH setting for page info paths", async () => {

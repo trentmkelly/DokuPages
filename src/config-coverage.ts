@@ -188,6 +188,7 @@ const IMPLEMENTED = new Set<string>([
   "rss_show_summary",
   "rss_show_deleted",
   "sitemap",
+  "updatecheck",
   "useslash",
   "sepchar",
   "canonical",
@@ -204,8 +205,7 @@ const IMPORTED_METADATA_ONLY = new Set<string>([
   "defaultgroup",
   "gdlib",
   "im_convert",
-  "jpg_quality",
-  "updatecheck"
+  "jpg_quality"
 ]);
 
 const INTENTIONALLY_UNSUPPORTED = new Set<string>([

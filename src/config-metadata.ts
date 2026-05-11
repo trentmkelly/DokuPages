@@ -318,6 +318,7 @@ export const RUNTIME_ENV_DOKUWIKI_KEYS: Readonly<Record<string, string>> = {
   RSS_SHOW_SUMMARY: "rss_show_summary",
   RSS_SHOW_DELETED: "rss_show_deleted",
   SITEMAP: "sitemap",
+  UPDATECHECK: "updatecheck",
   USESLASH: "useslash",
   SEPCHAR: "sepchar",
   CANONICAL_URLS: "canonical",

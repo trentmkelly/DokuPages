@@ -68,6 +68,7 @@ describe("runtime config", () => {
       rssShowSummary: true,
       rssShowDeleted: true,
       sitemapDays: 1,
+      updateCheck: false,
       searchNsLimit: 0,
       searchFragment: "exact",
       pageIdCleanOptions: {
@@ -260,6 +261,7 @@ describe("runtime config", () => {
       MAILRETURNPATH: "bounces@example.test",
       MAILPREFIX: "Ops",
       HTMLMAIL: "0",
+      UPDATECHECK: "1",
       RESEND_API_KEY: "resend-secret-token",
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
       TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
@@ -469,6 +471,12 @@ describe("runtime config", () => {
           dokuwikiKey: "sitemap"
         }),
         expect.objectContaining({
+          key: "UPDATECHECK",
+          value: "1",
+          effectiveValue: "false",
+          dokuwikiKey: "updatecheck"
+        }),
+        expect.objectContaining({
           key: "DEACCENT",
           effectiveValue: "1"
         }),
@@ -580,7 +588,8 @@ describe("runtime config", () => {
         licenseId: "cc-by-nc-sa",
         recentEntries: 20,
         recentDays: 7,
-        signature: " --- //[[@MAIL@|@NAME@]] @DATE@//"
+        signature: " --- //[[@MAIL@|@NAME@]] @DATE@//",
+        updateCheck: false
       },
       variables: expect.arrayContaining([
         expect.objectContaining({
@@ -625,6 +634,7 @@ describe("runtime config", () => {
       RSS_SHOW_SUMMARY: "maybe",
       RSS_SHOW_DELETED: "maybe",
       SITEMAP: "-1",
+      UPDATECHECK: "maybe",
       SEARCH_NSLIMIT: "-1",
       SEARCH_FRAGMENT: "middle",
       DEACCENT: "3",
@@ -670,6 +680,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "RSS_SHOW_SUMMARY", severity: "error" }),
         expect.objectContaining({ key: "RSS_SHOW_DELETED", severity: "error" }),
         expect.objectContaining({ key: "SITEMAP", severity: "error" }),
+        expect.objectContaining({ key: "UPDATECHECK", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_NSLIMIT", severity: "error" }),
         expect.objectContaining({ key: "SEARCH_FRAGMENT", severity: "error" }),
         expect.objectContaining({ key: "DEACCENT", severity: "error" }),
@@ -684,6 +695,23 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "API_BEARER_TOKEN", severity: "warning" })
       ])
     );
+  });
+
+  it("keeps DokuWiki update notices disabled in the Pages runtime", () => {
+    const env = { UPDATECHECK: "1" } as Env;
+
+    expect(getRuntimeConfig(env).updateCheck).toBe(false);
+    expect(validateRuntimeConfig(env)).toEqual({
+      ok: true,
+      issues: [
+        {
+          key: "UPDATECHECK",
+          severity: "warning",
+          message:
+            "DokuWiki update notices are intentionally disabled in the Pages runtime; deploy updates through git and Cloudflare Pages."
+        }
+      ]
+    });
   });
 
   it("validates email provider configuration", () => {

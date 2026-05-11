@@ -91,6 +91,7 @@ export interface RuntimeConfig {
   rssShowSummary: boolean;
   rssShowDeleted: boolean;
   sitemapDays: number;
+  updateCheck: boolean;
   searchNsLimit: number;
   searchFragment: "exact" | "starts_with" | "ends_with" | "contains";
   pageIdCleanOptions: RuntimePageIdCleanOptions;
@@ -207,6 +208,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     rssShowSummary: booleanConfig(env.RSS_SHOW_SUMMARY, true),
     rssShowDeleted: booleanConfig(env.RSS_SHOW_DELETED, true),
     sitemapDays: integerConfig(env.SITEMAP, 1, 0, 3650),
+    updateCheck: false,
     searchNsLimit: integerConfig(env.SEARCH_NSLIMIT, 0, 0, 99),
     searchFragment: searchFragmentConfig(env.SEARCH_FRAGMENT),
     pageIdCleanOptions,
@@ -259,6 +261,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateRssMedia(env.RSS_MEDIA, issues);
   validateIntegerRange("RSS_UPDATE", env.RSS_UPDATE, 0, 24 * 60 * 60, issues);
   validateIntegerRange("SITEMAP", env.SITEMAP, 0, 3650, issues);
+  validateUpdateCheckConfig(env, issues);
   validateIntegerRange("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, 0, 99, issues);
   validateSearchFragment(env.SEARCH_FRAGMENT, issues);
   validateIntegerRange("DEACCENT", env.DEACCENT, 0, 2, issues);
@@ -360,6 +363,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("RSS_SHOW_SUMMARY", env.RSS_SHOW_SUMMARY, String(config.rssShowSummary), "true"),
     configEntry("RSS_SHOW_DELETED", env.RSS_SHOW_DELETED, String(config.rssShowDeleted), "true"),
     configEntry("SITEMAP", env.SITEMAP, String(config.sitemapDays), "1"),
+    configEntry("UPDATECHECK", env.UPDATECHECK, String(config.updateCheck), "false"),
     configEntry("SEARCH_NSLIMIT", env.SEARCH_NSLIMIT, String(config.searchNsLimit), "0"),
     configEntry("SEARCH_FRAGMENT", env.SEARCH_FRAGMENT, config.searchFragment, "exact"),
     configEntry("DEACCENT", env.DEACCENT, String(config.pageIdCleanOptions.deaccent), "1"),
@@ -931,7 +935,8 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "SEND404",
   "HTMLMAIL",
   "RSS_SHOW_SUMMARY",
-  "RSS_SHOW_DELETED"
+  "RSS_SHOW_DELETED",
+  "UPDATECHECK"
 ] as const satisfies readonly (keyof Env)[];
 
 function validateMetadataBackedRuntimeConfig(env: Env, issues: ConfigValidationIssue[]): void {
@@ -951,6 +956,17 @@ function validateMetadataBackedRuntimeConfig(env: Env, issues: ConfigValidationI
       message: `${envKey} does not match upstream DokuWiki config metadata for '${dokuwikiKey}': ${validation.message}`
     });
   }
+}
+
+function validateUpdateCheckConfig(env: Env, issues: ConfigValidationIssue[]): void {
+  if (!truthy(env.UPDATECHECK)) return;
+
+  issues.push({
+    key: "UPDATECHECK",
+    severity: "warning",
+    message:
+      "DokuWiki update notices are intentionally disabled in the Pages runtime; deploy updates through git and Cloudflare Pages."
+  });
 }
 
 function validateTurnstileConfig(env: Env, issues: ConfigValidationIssue[]): void {
