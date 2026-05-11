@@ -1,5 +1,11 @@
 import type { Env } from "../env";
 import { getRuntimeConfig, validateRuntimeConfig, type ConfigValidation } from "../config";
+import {
+  dokuWikiCompatibilityInfoRows,
+  infoRowsToRecord,
+  pagesEnvironmentInfoRows,
+  phpCompatibilityInfoRows
+} from "../wiki/info-equivalents";
 
 export type StorageCheckStatus = "ok" | "error" | "not_configured";
 
@@ -39,6 +45,11 @@ export interface DiagnosticsSnapshot {
   };
   migration: MigrationStatus;
   config: ConfigValidation;
+  info: {
+    environment: Record<string, string>;
+    php: Record<string, string>;
+    dokuwiki: Record<string, string>;
+  };
 }
 
 export interface MigrationStatus {
@@ -105,7 +116,12 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     },
     storage,
     migration,
-    config
+    config,
+    info: {
+      environment: infoRowsToRecord(pagesEnvironmentInfoRows()),
+      php: infoRowsToRecord(phpCompatibilityInfoRows()),
+      dokuwiki: infoRowsToRecord(dokuWikiCompatibilityInfoRows())
+    }
   };
 }
 

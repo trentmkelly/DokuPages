@@ -170,12 +170,28 @@ describe("handleRequest", () => {
       },
       config: {
         ok: true
+      },
+      info: {
+        environment: {
+          Runtime: "Cloudflare Pages Functions"
+        },
+        php: {
+          "PHP runtime": "Not loaded; this is a native TypeScript/Workers port"
+        },
+        dokuwiki: {
+          "Upstream DokuWiki source": '2025-05-14b "Librarian"'
+        }
       }
     });
     expect(html.status).toBe(200);
     const diagnosticsHtml = await html.text();
     expect(diagnosticsHtml).toContain("<h2>Configuration</h2>");
     expect(diagnosticsHtml).toContain("<h2>Migration status</h2>");
+    expect(diagnosticsHtml).toContain("<h2>Environment</h2>");
+    expect(diagnosticsHtml).toContain("<h2>PHP compatibility</h2>");
+    expect(diagnosticsHtml).toContain("<h2>DokuWiki compatibility</h2>");
+    expect(diagnosticsHtml).toContain("Cloudflare Pages Functions");
+    expect(diagnosticsHtml).toContain("2025-05-14b &quot;Librarian&quot;");
   });
 
   it("resolves requests as anonymous until session auth is implemented", async () => {

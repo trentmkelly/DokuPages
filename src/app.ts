@@ -58,6 +58,7 @@ import {
   redirectResponse,
   securityHeaders
 } from "./http/responses";
+import type { InfoRows } from "./wiki/info-equivalents";
 import { D1AclStore, D1AuditLogStore } from "./storage/d1";
 import {
   getPageLockStatus,
@@ -5487,17 +5488,27 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
       <tbody>${renderStorageHealthRows(diagnostics)}</tbody>
     </table>
     <h2>Migration status</h2>
-    ${renderMigrationStatus(diagnostics.migration)}`
+    ${renderMigrationStatus(diagnostics.migration)}
+    <h2>Environment</h2>
+    <dl class="diagnostics">${renderDiagnosticsDefinitionList(infoRecordRows(diagnostics.info.environment))}</dl>
+    <h2>PHP compatibility</h2>
+    <dl class="diagnostics">${renderDiagnosticsDefinitionList(infoRecordRows(diagnostics.info.php))}</dl>
+    <h2>DokuWiki compatibility</h2>
+    <dl class="diagnostics">${renderDiagnosticsDefinitionList(infoRecordRows(diagnostics.info.dokuwiki))}</dl>`
   );
 }
 
-function renderDiagnosticsDefinitionList(rows: Array<[string, string]>): string {
+function renderDiagnosticsDefinitionList(rows: InfoRows): string {
   return rows
     .map(
       ([term, value]) =>
         `<dt>${escapeHtml(term)}</dt><dd>${value.startsWith("http") ? `<a href="${escapeAttribute(value)}">${escapeHtml(value)}</a>` : escapeHtml(value)}</dd>`
     )
     .join("");
+}
+
+function infoRecordRows(record: Record<string, string>): InfoRows {
+  return Object.entries(record);
 }
 
 function renderStorageHealthRows(diagnostics: DiagnosticsSnapshot): string {

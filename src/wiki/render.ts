@@ -21,6 +21,11 @@ import {
   type RssFeedResult
 } from "./rss";
 import { BUNDLED_DOKUWIKI_PLUGINS, type DokuWikiPluginType } from "./plugin-info";
+import {
+  dokuWikiCompatibilityInfoRows,
+  pagesEnvironmentInfoRows,
+  phpCompatibilityInfoRows
+} from "./info-equivalents";
 import { highlightSyntax } from "./syntax-highlight";
 
 export interface TocItem {
@@ -1070,6 +1075,12 @@ function renderInfoPluginMacro(kind: string, context: RenderContext): string {
         ["container", "listblock, quote, table"],
         ["baseonly", "header, hr"]
       ]);
+    case "environment":
+      return renderInfoTable(pagesEnvironmentInfoRows());
+    case "php":
+      return renderInfoTable(phpCompatibilityInfoRows());
+    case "dokuwiki":
+      return renderInfoTable(dokuWikiCompatibilityInfoRows());
     case "helpermethods":
     case "hooks":
       return `<p class="plugin_info">Native Pages replacements do not expose DokuWiki PHP ${escapeHtml(

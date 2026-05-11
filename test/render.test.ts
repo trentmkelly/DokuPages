@@ -298,6 +298,16 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain("~~INFO:syntaxplugins~~");
   });
 
+  it("renders Pages equivalents for environment, PHP, and DokuWiki info macros", () => {
+    const rendered = renderWikiText("~~INFO:environment~~\n\n~~INFO:php~~\n\n~~INFO:dokuwiki~~");
+
+    expect(rendered.html).toContain("Cloudflare Pages Functions");
+    expect(rendered.html).toContain("PHP runtime");
+    expect(rendered.html).toContain("Not loaded; this is a native TypeScript/Workers port");
+    expect(rendered.html).toContain("Upstream DokuWiki source");
+    expect(rendered.html).toContain("2025-05-14b &quot;Librarian&quot;");
+  });
+
   it("renders external media through DokuWiki's tokenized fetch endpoint", () => {
     const rendered = renderWikiText(
       "{{https://cdn.example/assets/logo.png|Remote logo}} {{https://cdn.example/files/manual.pdf?linkonly|Manual}}",

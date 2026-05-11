@@ -70,7 +70,9 @@ PHP modules to execute. Current decisions:
   validation, `/admin/config`, and redacted configuration export.
 - `extension`: unsupported for production installs on Pages; `/admin/extension`
   keeps a DokuWiki-styled disabled Extension Manager page.
-- `info`: partially replaced by diagnostics and health endpoints.
+- `info`: replaced by diagnostics, health endpoints, and native `~~INFO:*~~`
+  output for parser/plugin lists plus Pages environment, PHP, and DokuWiki
+  compatibility details.
 - `logviewer`: replaced by Cloudflare logs plus native admin audit log.
 - `popularity`: unsupported.
 - `revert`: replaced by native page/media revert routes plus `/admin/revert`
