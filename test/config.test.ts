@@ -15,6 +15,7 @@ describe("runtime config", () => {
       startPage: "wiki:welcome",
       language: "en",
       sessionCookieName: "DW_PAGES_SESSION",
+      useAcl: true,
       superuser: "@admin",
       manager: "@manager",
       autoPassword: false,
@@ -79,6 +80,7 @@ describe("runtime config", () => {
     const env = {
       START_PAGE: "Wiki/Welcome",
       WIKI_LANG: "pt_BR",
+      USEACL: "0",
       SUPERUSER: "root,@ops",
       MANAGER: "@staff,mona",
       AUTOPASSWD: "1",
@@ -131,6 +133,7 @@ describe("runtime config", () => {
 
     expect(getRuntimeConfig(env).startPage).toBe("wiki:welcome");
     expect(getRuntimeConfig(env).language).toBe("pt-br");
+    expect(getRuntimeConfig(env).useAcl).toBe(false);
     expect(getRuntimeConfig(env).superuser).toBe("root,@ops");
     expect(getRuntimeConfig(env).manager).toBe("@staff,mona");
     expect(getRuntimeConfig(env).autoPassword).toBe(true);
@@ -236,6 +239,10 @@ describe("runtime config", () => {
         }),
         expect.objectContaining({
           key: "SEND404",
+          effectiveValue: "true"
+        }),
+        expect.objectContaining({
+          key: "USEACL",
           effectiveValue: "true"
         }),
         expect.objectContaining({

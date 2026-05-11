@@ -92,6 +92,11 @@ then the root `*` rule. If multiple rules match within the same scope, the highe
 applicable permission wins. `%USER%` and `%GROUP%` rules are expanded for the
 active principal before matching.
 
+Set `USEACL=0` to match DokuWiki's disabled ACL mode. In that mode stored D1 ACL
+rules are ignored and permission checks return upload-level access (`8`) for every
+principal, so read, edit, create, and upload actions are allowed while delete-level
+actions still require explicit delete capability.
+
 Route enforcement applies the matcher to page reads, page edit/create saves, page
 revision/diff/source/revert actions, drafts, edit locks, media reads, media
 manager access, media uploads, media deletes, and media reverts. Search, recent

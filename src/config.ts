@@ -32,6 +32,7 @@ export interface RuntimeConfig {
   startPage: string;
   language: SupportedLanguage;
   sessionCookieName: string;
+  useAcl: boolean;
   superuser: string;
   manager: string;
   autoPassword: boolean;
@@ -132,6 +133,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     startPage: normalizedStartPage(env.START_PAGE, pageIdCleanOptions),
     language: resolveLanguage(env.WIKI_LANG),
     sessionCookieName: normalizedSessionCookieName(env.SESSION_COOKIE_NAME),
+    useAcl: booleanConfig(env.USEACL, true),
     superuser: normalizedMemberList(env.SUPERUSER, DEFAULT_SUPERUSER),
     manager: normalizedMemberList(env.MANAGER, DEFAULT_MANAGER),
     autoPassword: truthy(env.AUTOPASSWD),
@@ -245,6 +247,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       config.sessionCookieName,
       DEFAULT_SESSION_COOKIE_NAME
     ),
+    configEntry("USEACL", env.USEACL, String(config.useAcl), "true"),
     configEntry("SUPERUSER", env.SUPERUSER, config.superuser, DEFAULT_SUPERUSER),
     configEntry("MANAGER", env.MANAGER, config.manager, DEFAULT_MANAGER),
     configEntry("AUTOPASSWD", env.AUTOPASSWD, String(config.autoPassword), "false"),

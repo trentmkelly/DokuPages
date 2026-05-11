@@ -101,6 +101,7 @@ describe("handleRequest", () => {
     env.API_CORS_ORIGINS = "https://client.example";
     env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
     env.MAINTENANCE_MODE = undefined;
+    env.USEACL = undefined;
     env.CAMELCASE = undefined;
     env.TYPOGRAPHY = undefined;
     env.AUTOPLURAL = undefined;
@@ -2577,6 +2578,38 @@ describe("handleRequest", () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toContain("Permission denied");
     expect(cachePuts).toHaveLength(0);
+  });
+
+  it("matches upstream useacl=0 by ignoring ACL rules and returning upload-level access", async () => {
+    env.USEACL = "0";
+    state.aclRules = [aclRule("*", "all", "@ALL", 0)];
+
+    const page = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+    expect(page.status).toBe(200);
+    await expect(page.text()).resolves.toContain("Welcome");
+
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=edit"),
+      env
+    );
+    expect(edit.status).toBe(200);
+
+    const form = new FormData();
+    form.set("id", "wiki:logo.svg");
+    const deleteMedia = await handleRequest(
+      new Request("https://example.com/api/media/delete", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(deleteMedia.status).toBe(403);
+    await expect(deleteMedia.json()).resolves.toMatchObject({
+      permission: 8,
+      requiredPermission: 16
+    });
   });
 
   it("prevents page edit ACL bypasses before locking or saving", async () => {

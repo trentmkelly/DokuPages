@@ -149,7 +149,7 @@ are not fixed by this checklist.
 ## ACL And Permissions
 
 - [x] Confirm the ACL resolver exactly matches DokuWiki precedence when multiple user, group, `%USER%`, `%GROUP%`, namespace, and root rules apply.
-- [ ] Match upstream disabled ACL mode when `useacl=0`; the port always evaluates native ACL data.
+- [x] Match upstream disabled ACL mode when `useacl=0`; the port always evaluates native ACL data.
 - [ ] Match upstream `admin` and `manager` permission checks based on config values, not only groups.
 - [ ] Match upstream ACL plugin UI behavior, validation, sorting, wildcard handling, and page/namespace picker behavior.
 - [ ] Match upstream sneaky index behavior for namespace visibility in all aggregate routes.

@@ -7,6 +7,7 @@ export interface Env {
   START_PAGE?: string;
   WIKI_LANG?: string;
   SESSION_COOKIE_NAME?: string;
+  USEACL?: string;
   SUPERUSER?: string;
   MANAGER?: string;
   AUTOPASSWD?: string;

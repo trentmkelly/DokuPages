@@ -3037,7 +3037,8 @@ function isMediaDownloadRequested(url: URL): boolean {
 async function isPublicMedia(env: Env, id: string): Promise<boolean> {
   const rules = await listAclRules(env);
   const namespace = mediaNamespace(id);
-  const permission = resolveAclPermission(
+  const permission = resolveConfiguredAclPermission(
+    env,
     rules,
     namespace ? `${namespace}:*` : "*",
     anonymousPrincipal()
@@ -3675,7 +3676,7 @@ async function renderMediaManagerPage(
     canListNamespace(env, aclRules, principal, item)
   );
   const canUpload = hasAclPermission(
-    resolveAclPermission(aclRules, namespace ? `${namespace}:*` : "*", principal),
+    resolveConfiguredAclPermission(env, aclRules, namespace ? `${namespace}:*` : "*", principal),
     ACL_UPLOAD
   );
   logMetric("media_metric", {
@@ -10800,17 +10801,35 @@ async function resolveRequestAclPermission(
   principal: AuthPrincipal
 ): Promise<number> {
   const rules = await listAclRules(env);
-  return resolveAclPermission(rules, subjectId, principal);
+  return resolveConfiguredAclPermission(env, rules, subjectId, principal);
 }
 
 async function renderCacheModeForPage(env: Env, subjectId: string): Promise<RenderCacheMode> {
   const rules = await listAclRules(env);
-  const anonymousPermission = resolveAclPermission(rules, subjectId, anonymousPrincipal());
+  const anonymousPermission = resolveConfiguredAclPermission(
+    env,
+    rules,
+    subjectId,
+    anonymousPrincipal()
+  );
   return hasAclPermission(anonymousPermission, ACL_READ) ? "shared" : "private";
 }
 
 async function listAclRules(env: Env) {
   return new D1AclStore(env.DB).listAllRules();
+}
+
+function resolveConfiguredAclPermission(
+  env: Env,
+  rules: Awaited<ReturnType<typeof listAclRules>>,
+  subjectId: string,
+  principal: AuthPrincipal
+): number {
+  if (!getRuntimeConfig(env).useAcl) {
+    return ACL_UPLOAD;
+  }
+
+  return resolveAclPermission(rules, subjectId, principal);
 }
 
 function aclDeniedResponse(
@@ -10977,7 +10996,10 @@ function isReadableChange(
   change: { subjectType: "page" | "media"; subjectId: string }
 ): boolean {
   if (change.subjectType === "media") {
-    return hasAclPermission(resolveAclPermission(rules, change.subjectId, principal), ACL_READ);
+    return hasAclPermission(
+      resolveConfiguredAclPermission(env, rules, change.subjectId, principal),
+      ACL_READ
+    );
   }
 
   return isReadablePageId(env, rules, principal, change.subjectId);
@@ -11000,7 +11022,7 @@ function isReadablePageId(
 ): boolean {
   return (
     !isHiddenPageId(env, id) &&
-    hasAclPermission(resolveAclPermission(rules, id, principal), ACL_READ)
+    hasAclPermission(resolveConfiguredAclPermission(env, rules, id, principal), ACL_READ)
   );
 }
 
@@ -11012,7 +11034,7 @@ function canListNamespace(
 ): boolean {
   if (!getRuntimeConfig(env).sneakyIndex) return true;
   return hasAclPermission(
-    resolveAclPermission(rules, namespace ? `${namespace}:*` : "*", principal),
+    resolveConfiguredAclPermission(env, rules, namespace ? `${namespace}:*` : "*", principal),
     ACL_READ
   );
 }
