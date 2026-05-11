@@ -156,6 +156,11 @@ import {
   type AuthPageKey
 } from "./wiki/auth-language";
 import {
+  readImportedPluginEnablement,
+  type ImportedPluginEnablement,
+  type ImportedPluginEnablementSnapshot
+} from "./wiki/plugin-settings";
+import {
   extractRssFeedRequests,
   fetchRssFeed,
   type RssFeedResult,
@@ -475,7 +480,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/admin/extension" && request.method === "GET") {
-    const page = renderExtensionManagerUnsupportedPage(request, env, principal);
+    const page = await renderExtensionManagerUnsupportedPage(request, env, principal);
     return page instanceof Response ? page : htmlResponse(page, { status: 501 });
   }
 
@@ -5501,6 +5506,8 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
     </table>
     <h2>Migration status</h2>
     ${renderMigrationStatus(diagnostics.migration)}
+    <h2>Plugin enablement</h2>
+    ${renderPluginEnablementTable(diagnostics.plugins)}
     <h2>Environment</h2>
     <dl class="diagnostics">${renderDiagnosticsDefinitionList(infoRecordRows(diagnostics.info.environment))}</dl>
     <h2>PHP compatibility</h2>
@@ -5508,6 +5515,27 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
     <h2>DokuWiki compatibility</h2>
     <dl class="diagnostics">${renderDiagnosticsDefinitionList(infoRecordRows(diagnostics.info.dokuwiki))}</dl>`
   );
+}
+
+function renderPluginEnablementTable(snapshot: ImportedPluginEnablementSnapshot): string {
+  const summary = `${snapshot.summary.total} imported; ${snapshot.summary.enabled} enabled; ${snapshot.summary.disabled} disabled; ${snapshot.summary.locked} locked`;
+  const rows = snapshot.plugins.map(renderPluginEnablementRow).join("");
+
+  return `<p>Imported from ${snapshot.sourceFiles.map(escapeHtml).join(", ")}. ${escapeHtml(summary)}.</p>
+  <table class="diagnostics plugin__enablement">
+    <thead><tr><th>Plugin</th><th>Enabled</th><th>Locked</th><th>Source</th><th>Layer</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5">No imported plugin enablement records.</td></tr>'}</tbody>
+  </table>`;
+}
+
+function renderPluginEnablementRow(plugin: ImportedPluginEnablement): string {
+  return `<tr>
+    <td><code>${escapeHtml(plugin.plugin)}</code></td>
+    <td>${plugin.enabled ? "enabled" : "disabled"}</td>
+    <td>${plugin.locked ? "yes" : "no"}</td>
+    <td>${plugin.source ? escapeHtml(plugin.source) : "-"}</td>
+    <td>${plugin.layer ? escapeHtml(plugin.layer) : "-"}</td>
+  </tr>`;
 }
 
 function renderDiagnosticsDefinitionList(rows: InfoRows): string {
@@ -5689,14 +5717,16 @@ function renderAdminDashboardPage(
   );
 }
 
-function renderExtensionManagerUnsupportedPage(
+async function renderExtensionManagerUnsupportedPage(
   request: Request,
   env: Env,
   principal: AuthPrincipal
-): string | Response {
+): Promise<string | Response> {
   if (!isAdminPrincipal(principal, env)) {
     return adminDeniedResponse(request, env);
   }
+
+  const pluginEnablement = await readImportedPluginEnablement(env.DB);
 
   return htmlShell(
     env,
@@ -5711,6 +5741,8 @@ function renderExtensionManagerUnsupportedPage(
       </ul>
       <p class="info">Runtime plugin and template installation is not available in this Pages port.</p>
       <p>All executable code must be reviewed, committed, tested, and redeployed with the Pages application. Imported plugin enablement and plugin configuration are retained for diagnostics and native replacement decisions, but uploaded PHP extensions are not executed.</p>
+      <h2>Imported plugin enablement</h2>
+      ${renderPluginEnablementTable(pluginEnablement)}
       <table class="diagnostics">
         <thead><tr><th>DokuWiki extension action</th><th>Pages runtime status</th></tr></thead>
         <tbody>

@@ -14,8 +14,10 @@ Native admin routes use D1-backed session principals and DokuWiki-style
   Pages runtime because configuration edits must update Cloudflare Pages
   variables, secrets, or Wrangler configuration followed by a redeploy.
 - `/admin/extension` keeps a DokuWiki-styled Extension Manager page with the
-  upstream tab labels, but it returns `501` and explains that runtime plugin and
-  template install/update/uninstall actions are unsupported on Pages.
+  upstream tab labels and imported plugin enablement from `conf/plugins.php`,
+  `conf/plugins.local.php`, and `conf/plugins.required.php`, but it returns
+  `501` and explains that runtime plugin and template install/update/uninstall
+  actions are unsupported on Pages.
 - `/admin/styling` provides a native Template Style Settings editor for the
   DokuWiki-style CSS variables. It writes deployment-safe D1 `plugin_settings`
   rows and applies them through `/theme.css` without mutating checked-in assets.

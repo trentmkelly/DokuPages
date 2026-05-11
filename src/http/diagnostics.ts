@@ -6,6 +6,10 @@ import {
   pagesEnvironmentInfoRows,
   phpCompatibilityInfoRows
 } from "../wiki/info-equivalents";
+import {
+  readImportedPluginEnablement,
+  type ImportedPluginEnablementSnapshot
+} from "../wiki/plugin-settings";
 
 export type StorageCheckStatus = "ok" | "error" | "not_configured";
 
@@ -45,6 +49,7 @@ export interface DiagnosticsSnapshot {
   };
   migration: MigrationStatus;
   config: ConfigValidation;
+  plugins: ImportedPluginEnablementSnapshot;
   info: {
     environment: Record<string, string>;
     php: Record<string, string>;
@@ -86,6 +91,13 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     durableObjects: checkDurableObjects(env)
   };
   const migration = await readMigrationStatus(env, storage.d1.ok);
+  const plugins = storage.d1.ok
+    ? await readImportedPluginEnablement(env.DB)
+    : {
+        sourceFiles: ["conf/plugins.php", "conf/plugins.local.php", "conf/plugins.required.php"],
+        plugins: [],
+        summary: { total: 0, enabled: 0, disabled: 0, locked: 0 }
+      };
   const ok =
     storage.d1.ok &&
     storage.kv.ok &&
@@ -117,6 +129,7 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     storage,
     migration,
     config,
+    plugins,
     info: {
       environment: infoRowsToRecord(pagesEnvironmentInfoRows()),
       php: infoRowsToRecord(phpCompatibilityInfoRows()),

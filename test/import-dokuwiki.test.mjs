@@ -302,11 +302,15 @@ describe("DokuWiki import planner", () => {
     expect(plan.pluginSettings).toContainEqual({
       plugin: "acl",
       enabled: true,
+      source: "plugins.required.php",
+      layer: "required",
       locked: true
     });
     expect(plan.pluginSettings).toContainEqual({
       plugin: "testing",
       enabled: true,
+      source: "plugins.local.php",
+      layer: "local",
       locked: false
     });
     expect(plan.interwikiTemplates).toContainEqual({

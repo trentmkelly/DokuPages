@@ -30,7 +30,7 @@ npm run import:sql
 npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-import.sql
 ```
 
-The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships. Interrupted D1 imports can be rerun with the same generated SQL after fixing the underlying failure.
+The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships. Plugin enablement records preserve the effective source and layer from `conf/plugins.php`, `conf/plugins.local.php`, and `conf/plugins.required.php` so diagnostics and the Extension Manager replacement can show which file won. Interrupted D1 imports can be rerun with the same generated SQL after fixing the underlying failure.
 
 Legacy `data/index` files are not migrated directly. The importer rebuilds
 search postings from canonical page source during import, which avoids carrying

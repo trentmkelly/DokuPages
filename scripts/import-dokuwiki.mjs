@@ -66,9 +66,9 @@ export async function buildImportPlan(sourceRoot) {
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
   const pluginSettings = await discoverPluginSettings([
-    { file: path.join(confRoot, "plugins.php"), locked: false },
-    { file: path.join(confRoot, "plugins.local.php"), locked: false },
-    { file: path.join(confRoot, "plugins.required.php"), locked: true }
+    { file: path.join(confRoot, "plugins.php"), layer: "default", locked: false },
+    { file: path.join(confRoot, "plugins.local.php"), layer: "local", locked: false },
+    { file: path.join(confRoot, "plugins.required.php"), layer: "required", locked: true }
   ]);
   const interwikiTemplates = await discoverInterwikiTemplates([
     path.join(confRoot, "interwiki.conf"),
@@ -1117,6 +1117,8 @@ export async function discoverPluginSettings(sources) {
       settings.set(plugin, {
         plugin,
         enabled,
+        source: path.basename(source.file),
+        layer: source.layer,
         locked: source.locked
       });
     }

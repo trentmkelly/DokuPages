@@ -171,6 +171,16 @@ describe("handleRequest", () => {
       config: {
         ok: true
       },
+      plugins: {
+        sourceFiles: ["conf/plugins.php", "conf/plugins.local.php", "conf/plugins.required.php"],
+        summary: {
+          total: 0,
+          enabled: 0,
+          disabled: 0,
+          locked: 0
+        },
+        plugins: []
+      },
       info: {
         environment: {
           Runtime: "Cloudflare Pages Functions"
@@ -187,6 +197,8 @@ describe("handleRequest", () => {
     const diagnosticsHtml = await html.text();
     expect(diagnosticsHtml).toContain("<h2>Configuration</h2>");
     expect(diagnosticsHtml).toContain("<h2>Migration status</h2>");
+    expect(diagnosticsHtml).toContain("<h2>Plugin enablement</h2>");
+    expect(diagnosticsHtml).toContain("No imported plugin enablement records.");
     expect(diagnosticsHtml).toContain("<h2>Environment</h2>");
     expect(diagnosticsHtml).toContain("<h2>PHP compatibility</h2>");
     expect(diagnosticsHtml).toContain("<h2>DokuWiki compatibility</h2>");

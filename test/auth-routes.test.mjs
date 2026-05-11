@@ -2560,6 +2560,20 @@ describe("auth routes", () => {
   it("maps bundled plugin admin pages to native replacements or explicit removal", async () => {
     env = createEnv();
     await seedUser(env.DB);
+    await seedPluginEnablement(env.DB, {
+      plugin: "acl",
+      enabled: true,
+      source: "plugins.required.php",
+      layer: "required",
+      locked: true
+    });
+    await seedPluginEnablement(env.DB, {
+      plugin: "popularity",
+      enabled: false,
+      source: "plugins.local.php",
+      layer: "local",
+      locked: false
+    });
     const cookie = await loginAsAlice(env);
     const replacements = [
       ["acl", "/admin/acl", "Access Control List Management"],
@@ -2605,9 +2619,52 @@ describe("auth routes", () => {
     expect(extensionHtml).toContain("Extension Manager");
     expect(extensionHtml).toContain("Installed Plugins");
     expect(extensionHtml).toContain("Search and Install");
+    expect(extensionHtml).toContain("Imported plugin enablement");
+    expect(extensionHtml).toContain("<code>acl</code>");
+    expect(extensionHtml).toContain("plugins.required.php");
+    expect(extensionHtml).toContain("required");
     expect(extensionHtml).toContain(
       "Runtime plugin and template installation is not available in this Pages port."
     );
+
+    const diagnostics = await handleRequest(
+      new Request("https://example.com/api/diagnostics"),
+      env
+    );
+    await expect(diagnostics.json()).resolves.toMatchObject({
+      plugins: {
+        sourceFiles: ["conf/plugins.php", "conf/plugins.local.php", "conf/plugins.required.php"],
+        summary: {
+          total: 2,
+          enabled: 1,
+          disabled: 1,
+          locked: 1
+        },
+        plugins: expect.arrayContaining([
+          expect.objectContaining({
+            plugin: "acl",
+            enabled: true,
+            source: "plugins.required.php",
+            layer: "required",
+            locked: true
+          }),
+          expect.objectContaining({
+            plugin: "popularity",
+            enabled: false,
+            source: "plugins.local.php",
+            layer: "local",
+            locked: false
+          })
+        ])
+      }
+    });
+    const diagnosticsHtml = await handleRequest(
+      new Request("https://example.com/diagnostics"),
+      env
+    );
+    const diagnosticsBody = await diagnosticsHtml.text();
+    expect(diagnosticsBody).toContain("<h2>Plugin enablement</h2>");
+    expect(diagnosticsBody).toContain("plugins.local.php");
 
     for (const plugin of ["extension", "popularity", "safefnrecode"]) {
       const removed = await handleRequest(
@@ -3040,6 +3097,22 @@ async function seedChangelog(
       sizeChange,
       createdAt
     )
+    .run();
+}
+
+async function seedPluginEnablement(
+  d1,
+  { plugin, enabled, source, layer, locked, updatedAt = "2026-05-07T00:00:00.000Z" }
+) {
+  await d1
+    .prepare(
+      `insert into plugin_settings (plugin, key, value_json, updated_at)
+       values (?, 'enabled', ?, ?)
+       on conflict(plugin, key) do update set
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`
+    )
+    .bind(plugin, JSON.stringify({ plugin, enabled, source, layer, locked }), updatedAt)
     .run();
 }
 
