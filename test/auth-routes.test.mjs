@@ -2399,12 +2399,15 @@ describe("auth routes", () => {
         new Request(`https://example.com/doku.php?do=admin&page=${plugin}`),
         env
       );
+      const html = await removed.text();
 
       expect(removed.status, plugin).toBe(501);
       expect(removed.headers.get("content-type"), plugin).toBe("text/html; charset=utf-8");
-      await expect(removed.text(), plugin).resolves.toContain(
-        "is not available in this Pages port"
-      );
+      expect(html, plugin).toContain("is not available in this Pages port");
+      if (plugin === "popularity") {
+        expect(html).toContain("does not collect, autosubmit, or phone home usage statistics");
+        expect(html).toContain("update.dokuwiki.org");
+      }
     }
   });
 

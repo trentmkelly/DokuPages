@@ -95,7 +95,7 @@ replacement surface, or explicit unsupported status.
 | `PARSER_METADATA_RENDER`       | Native metadata rows cover core page metadata; renderer hooks unsupported.      |
 | `PARSER_WIKITEXT_PREPROCESS`   | Native renderer input; generic preprocessing hook unsupported.                  |
 | `PLUGIN_CONFIG_PLUGINLIST`     | Native plugin compatibility report; no runtime plugin loading.                  |
-| `PLUGIN_POPULARITY_DATA_SETUP` | Removed; popularity phone-home is unsupported.                                  |
+| `PLUGIN_POPULARITY_DATA_SETUP` | Removed; popularity usage collection and phone-home are unsupported.            |
 | `RENDERER_CONTENT_POSTPROCESS` | Native renderer output; generic postprocess hook unsupported.                   |
 | `SEARCH_QUERY_FULLPAGE`        | Native search service; exact query hook deferred.                               |
 | `SEARCH_QUERY_PAGELOOKUP`      | Native search service; exact query hook deferred.                               |

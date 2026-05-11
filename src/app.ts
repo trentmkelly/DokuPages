@@ -1077,7 +1077,10 @@ function redirectLegacyAdminPage(request: Request, env: Env, page: string | null
     case "extension":
       return legacyEndpointNotAvailableResponse(request, env, "DokuWiki extension manager", 501);
     case "popularity":
-      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki popularity plugin", 501);
+      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki popularity plugin", 501, [
+        "The upstream popularity plugin gathers anonymous wiki usage statistics and can submit them to update.dokuwiki.org.",
+        "This Pages port intentionally does not collect, autosubmit, or phone home usage statistics."
+      ]);
     case "safefnrecode":
       return legacyEndpointNotAvailableResponse(request, env, "DokuWiki safefnrecode plugin", 501);
     case "styling":
@@ -2517,7 +2520,8 @@ function legacyEndpointNotAvailableResponse(
   request: Request,
   env: Env,
   endpointName: string,
-  status: 410 | 501
+  status: 410 | 501,
+  details: string[] = []
 ): Response {
   const body = {
     error: `${endpointName} is not available in this Pages port.`,
@@ -2534,6 +2538,7 @@ function legacyEndpointNotAvailableResponse(
       endpointName,
       `<h1>${escapeHtml(endpointName)}</h1>
       <p>${escapeHtml(body.error)}</p>
+      ${details.map((detail) => `<p>${escapeHtml(detail)}</p>`).join("")}
       <p><a href="${pagePath(startPageId(env))}">Go to the start page</a></p>`
     ),
     { status }

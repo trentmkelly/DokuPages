@@ -38,7 +38,7 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/doku.php?do=admin&page=logviewer`                 | Redirects to `/admin/audit`; `data/log` files are not imported.                                         |
 | `/doku.php?do=admin&page=usermanager`               | Redirects to `/admin/users`.                                                                            |
 | `/doku.php?do=admin&page=extension`                 | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
-| `/doku.php?do=admin&page=popularity`                | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
+| `/doku.php?do=admin&page=popularity`                | Returns explicit DokuWiki-styled `501` HTML; usage reporting is intentionally removed.                  |
 | `/doku.php?do=admin&page=safefnrecode`              | Returns explicit DokuWiki-styled `501` HTML, or JSON by request.                                        |
 | `/doku.php?do=admin&page=styling`                   | Redirects to `/admin/styling`, a native Pages-safe Template Style Settings editor.                      |
 | `/doku.php?do=register`                             | Redirects to `/register`.                                                                               |

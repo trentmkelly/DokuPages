@@ -75,7 +75,8 @@ PHP modules to execute. Current decisions:
   compatibility details.
 - `logviewer`: non-equivalent replacement by Cloudflare Logs plus the native
   admin audit log; source `data/log` files are not imported.
-- `popularity`: unsupported.
+- `popularity`: intentionally removed; the port does not collect, autosubmit,
+  or phone home anonymous usage statistics.
 - `revert`: replaced by native page/media revert routes plus `/admin/revert`
   for DokuWiki-style spam search and batch reversion.
 - `safefnrecode`: migration-only if needed.
