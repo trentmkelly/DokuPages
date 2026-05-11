@@ -30,7 +30,7 @@ export function resolveAclPermission(
   principal: AuthPrincipal,
   options: ResolveAclOptions = {}
 ): number {
-  const subjects = principalAclSubjects(principal);
+  const subjects = runtimeAclSubjects(principal);
   const expandedRules = expandAclRules(rules, principal);
   const normalizedSubjectId = normalizeAclScope(subjectId);
 
@@ -75,6 +75,42 @@ export function resolveAclAction(
     resolveAclPermission(rules, subjectId, principal, options),
     requiredAclPermission(action)
   );
+}
+
+function runtimeAclSubjects(principal: AuthPrincipal): string[] {
+  return [
+    ...new Set(
+      principalAclSubjects(principal).flatMap((subject) => [
+        subject,
+        dokuWikiAuthNameEncodedSubject(subject)
+      ])
+    )
+  ];
+}
+
+function dokuWikiAuthNameEncodedSubject(subject: string): string {
+  if (subject === EVERYONE_ACL_SUBJECT) return subject;
+  if (subject.startsWith("@")) return `@${dokuWikiAuthNameEncode(subject.slice(1))}`;
+  return dokuWikiAuthNameEncode(subject);
+}
+
+function dokuWikiAuthNameEncode(name: string): string {
+  return [...name]
+    .map((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      if (code > 0x7f) return char;
+      if (
+        (code >= 0x00 && code <= 0x2f) ||
+        (code >= 0x3a && code <= 0x40) ||
+        (code >= 0x5b && code <= 0x60) ||
+        (code >= 0x7b && code <= 0x7f)
+      ) {
+        return `%${code.toString(16)}`;
+      }
+
+      return char;
+    })
+    .join("");
 }
 
 function highestPermissionForScope(
