@@ -25,8 +25,9 @@ paths.
 The launch UI validates `WIKI_LANG` against bundled DokuWiki language tags.
 Authentication pages use generated native TypeScript resources from upstream
 `inc/lang/<lang>` files. Refresh those resources with `npm run lang:auth` after
-updating the upstream DokuWiki checkout. No PHP language files are loaded at
-runtime.
+updating the upstream DokuWiki checkout. Imported custom `conf/lang` files are
+stored in D1 and loaded as runtime overrides for the supported auth/UI strings
+and page intros.
 
 ## Plugin Assets
 

@@ -76,7 +76,7 @@ replacement surface, or explicit unsupported status.
 | `INDEXER_TEXT_PREPARE`         | Native tokenizer; exact upstream hook deferred.                                 |
 | `INDEXER_VERSION_GET`          | Not applicable; native search schema versions replace index version hooks.      |
 | `INFOUTIL_MSG_SHOW`            | Native diagnostics; no plugin hook.                                             |
-| `INIT_LANG_LOAD`               | Deferred with runtime language-pack parity.                                     |
+| `INIT_LANG_LOAD`               | Native generated language packs plus imported `conf/lang` auth/UI overrides.    |
 | `IO_NAMESPACE_CREATED`         | Native D1/R2 namespace materialization; no plugin hook.                         |
 | `IO_NAMESPACE_DELETED`         | Native D1/R2 namespace cleanup; no plugin hook.                                 |
 | `IO_WIKIPAGE_READ`             | Native page reads through D1 services; no plugin hook.                          |

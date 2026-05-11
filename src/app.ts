@@ -149,13 +149,14 @@ import {
   type CacheDependency,
   type TocItem
 } from "./wiki/render";
+import { authLang, type AuthLanguageKey, type AuthPageKey } from "./wiki/auth-language";
 import {
-  authLang,
-  authPageText,
-  authPageTitle,
-  type AuthLanguageKey,
-  type AuthPageKey
-} from "./wiki/auth-language";
+  customAuthLang,
+  customAuthPageText,
+  customAuthPageTitle,
+  ensureCustomAuthLanguageOverrides,
+  refreshCustomAuthLanguageOverrides
+} from "./wiki/custom-language";
 import {
   readImportedPluginEnablement,
   type ImportedPluginEnablement,
@@ -270,6 +271,7 @@ export async function handleRequest(
   assetFallback?: AssetFallback
 ): Promise<Response> {
   const routedRequest = requestForConfiguredBaseDir(request, env);
+  await prepareCustomAuthLanguage(env, routedRequest);
   const response = await dispatchRequest(routedRequest, env, assetFallback);
   return applyPublicUrlPolicyToResponse(response, env);
 }
@@ -9973,6 +9975,36 @@ function sessionIdFromCookie(value: string | null): string | null {
   return value?.split(".")[0] || null;
 }
 
+async function prepareCustomAuthLanguage(env: Env, request: Request): Promise<void> {
+  try {
+    const language = getRuntimeConfig(env).language;
+    if (shouldRefreshCustomAuthLanguage(request)) {
+      await refreshCustomAuthLanguageOverrides(env.DB, language);
+    } else {
+      await ensureCustomAuthLanguageOverrides(env.DB, language);
+    }
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "custom_language_load_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  }
+}
+
+function shouldRefreshCustomAuthLanguage(request: Request): boolean {
+  const url = new URL(request.url);
+  if (["/login", "/logout", "/register", "/resendpwd", "/profile"].includes(url.pathname)) {
+    return true;
+  }
+  const action = url.searchParams.get("do");
+  return Boolean(
+    action && ["login", "logout", "register", "resendpwd", "denied", "locked"].includes(action)
+  );
+}
+
 function requestClientIp(request: Request, env: Env): string | null {
   const config = getRuntimeConfig(env);
   return getClientIp(request, {
@@ -10841,15 +10873,15 @@ function mapSubscriptionRecipient(row: {
 }
 
 function localizedAuthText(env: Env, key: AuthLanguageKey): string {
-  return authLang(getRuntimeConfig(env).language, key);
+  return customAuthLang(getRuntimeConfig(env).language, key, env.DB);
 }
 
 function localizedAuthPageTitle(env: Env, key: AuthPageKey): string {
-  return authPageTitle(getRuntimeConfig(env).language, key);
+  return customAuthPageTitle(getRuntimeConfig(env).language, key, env.DB);
 }
 
 function renderLocalizedAuthPageIntro(env: Env, key: AuthPageKey): string {
-  return renderWikiText(authPageText(getRuntimeConfig(env).language, key)).html;
+  return renderWikiText(customAuthPageText(getRuntimeConfig(env).language, key, env.DB)).html;
 }
 
 function renderRegisterPage(

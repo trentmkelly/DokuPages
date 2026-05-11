@@ -114,6 +114,11 @@ files. `WIKI_LANG` selects the localized copy with English fallback. Regenerate
 the native TypeScript resource with `npm run lang:auth` after updating the
 upstream DokuWiki checkout.
 
+Imported `conf/lang/<lang>/lang.php` and matching auth page `.txt` files are
+loaded from D1 at request time and override the generated bundle. This covers
+custom strings such as `btn_login` plus page intros such as `login.txt`,
+`register.txt`, `resendpwd.txt`, `resetpwd.txt`, `denied.txt`, and `locked.txt`.
+
 ## Profile Updates
 
 Authenticated users can update their display name and email address at

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app";
 import type { Env } from "../src/env";
+import { clearCustomAuthLanguageOverrideCache } from "../src/wiki/custom-language";
 import { PageLockObject } from "../src/storage/page-lock-object";
 import { UPLOAD_XSS_MESSAGE } from "../src/wiki/media-validation";
 import { mediaToken, requestedMediaSize } from "../src/wiki/media-token";
@@ -106,6 +107,27 @@ function importedDokuWikiConfigMetadata(
   };
 }
 
+function importedDokuWikiLanguageFile(
+  language: string,
+  filePath: string,
+  content: string
+): Record<string, unknown> {
+  return {
+    subject_type: "config",
+    subject_id: `language:${language}/${filePath}`,
+    key: "dokuwiki_language_file",
+    value_json: JSON.stringify({
+      kind: "language",
+      language,
+      path: filePath,
+      relativePath: `${language}/${filePath}`,
+      encoding: "utf8",
+      content
+    }),
+    updated_at: "2026-05-07T00:00:00.000Z"
+  };
+}
+
 describe("handleRequest", () => {
   beforeEach(() => {
     state.row = currentPageRow();
@@ -120,6 +142,7 @@ describe("handleRequest", () => {
     state.aclRules = seedAclRules();
     state.deleted = false;
     state.batches = [];
+    clearCustomAuthLanguageOverrideCache(env.DB);
     purgedKeys.length = 0;
     cachePuts.length = 0;
     renderCache.clear();
@@ -308,6 +331,35 @@ describe("handleRequest", () => {
     expect(html).not.toContain("Hotfix release available");
     expect(html).not.toContain("upgrade now");
     expect(html).not.toContain("update.dokuwiki.org");
+  });
+
+  it("uses imported custom language files for runtime auth text", async () => {
+    state.metadata.push(
+      importedDokuWikiLanguageFile(
+        "en",
+        "lang.php",
+        "<?php\n$lang['btn_login'] = 'Sign in custom';\n$lang['user'] = 'Custom user';\n"
+      ),
+      importedDokuWikiLanguageFile(
+        "en",
+        "login.txt",
+        "====== Custom login intro ======\n\nCustom intro body."
+      )
+    );
+
+    const login = await handleRequest(new Request("https://example.com/login"), env);
+    const page = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    const loginHtml = await login.text();
+    const pageHtml = await page.text();
+    expect(login.status).toBe(200);
+    expect(loginHtml).toContain("Custom login intro");
+    expect(loginHtml).toContain("Custom intro body.");
+    expect(loginHtml).toContain("Custom user");
+    expect(loginHtml).toContain("Sign in custom");
+    expect(pageHtml).toContain(
+      '<li class="action login"><a href="/wiki/wiki/welcome?do=login" rel="nofollow">Sign in custom</a></li>'
+    );
   });
 
   it("honors the FULLPATH setting for page info paths", async () => {
@@ -4288,6 +4340,18 @@ function createD1Stub(state: D1StubState): D1Database {
               results: sql.includes("where scope = ?")
                 ? state.aclRules.filter((rule) => rule.scope === idOrLimit)
                 : [...state.aclRules]
+            };
+          }
+
+          if (sql.includes("from metadata") && sql.includes("key = ?")) {
+            const [subjectType, key] = values;
+            return {
+              results: state.metadata
+                .filter((record) => record.subject_type === subjectType && record.key === key)
+                .map((record) => ({
+                  subject_id: record.subject_id,
+                  value_json: record.value_json
+                }))
             };
           }
 
