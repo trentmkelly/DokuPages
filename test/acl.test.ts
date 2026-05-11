@@ -48,6 +48,38 @@ describe("DokuWiki ACL matching", () => {
     expect(resolveAclPermission(rules, "playground", anonymousPrincipal())).toBe(ACL_UPLOAD);
   });
 
+  it("uses the closest matching namespace even when a parent grants more", () => {
+    const rules = [
+      rule("*", "all", "@ALL", ACL_UPLOAD),
+      rule("wiki:*", "group", "editor", ACL_DELETE),
+      rule("wiki:locked:*", "all", "@ALL", ACL_NONE)
+    ];
+
+    expect(
+      resolveAclPermission(rules, "wiki:locked:start", userPrincipal("alice", ["editor"]))
+    ).toBe(ACL_NONE);
+  });
+
+  it("continues outward when a closer scope has no matching principal", () => {
+    const rules = [
+      rule("*", "all", "@ALL", ACL_READ),
+      rule("wiki:*", "group", "editor", ACL_UPLOAD),
+      rule("wiki:team:*", "group", "admin", ACL_DELETE)
+    ];
+
+    expect(resolveAclPermission(rules, "wiki:team:start", userPrincipal("alice", ["editor"]))).toBe(
+      ACL_UPLOAD
+    );
+    expect(resolveAclPermission(rules, "wiki:team:start", anonymousPrincipal())).toBe(ACL_READ);
+  });
+
+  it("checks exact root page rules before the root wildcard", () => {
+    const rules = [rule("*", "all", "@ALL", ACL_UPLOAD), rule("start", "all", "@ALL", ACL_READ)];
+
+    expect(resolveAclPermission(rules, "start", anonymousPrincipal())).toBe(ACL_READ);
+    expect(resolveAclPermission(rules, "playground", anonymousPrincipal())).toBe(ACL_UPLOAD);
+  });
+
   it("uses the highest applicable permission within one matched scope", () => {
     const rules = [
       rule("wiki:start", "all", "@ALL", ACL_READ),
@@ -99,6 +131,22 @@ describe("DokuWiki ACL matching", () => {
     expect(resolveAclPermission(rules, "teams:editor:start", principal)).toBe(ACL_UPLOAD);
     expect(resolveAclPermission(rules, "teams:ops:start", principal)).toBe(ACL_UPLOAD);
     expect(resolveAclPermission(rules, "teams:admin:start", principal)).toBe(ACL_NONE);
+  });
+
+  it("expands combined %USER% and %GROUP% rules before applying scope precedence", () => {
+    const rules = [
+      rule("*", "all", "@ALL", ACL_NONE),
+      rule("spaces:%USER%:%GROUP%:*", "group", "%GROUP%", ACL_UPLOAD)
+    ];
+    const principal = userPrincipal("alice", ["editor", "ops"]);
+
+    expect(resolveAclPermission(rules, "spaces:alice:editor:start", principal)).toBe(ACL_UPLOAD);
+    expect(resolveAclPermission(rules, "spaces:alice:ops:start", principal)).toBe(ACL_UPLOAD);
+    expect(resolveAclPermission(rules, "spaces:alice:admin:start", principal)).toBe(ACL_NONE);
+    expect(resolveAclPermission(rules, "spaces:bob:editor:start", principal)).toBe(ACL_NONE);
+    expect(resolveAclPermission(rules, "spaces:alice:editor:start", anonymousPrincipal())).toBe(
+      ACL_NONE
+    );
   });
 
   it("clamps imported permission levels to DokuWiki ACL bounds", () => {
