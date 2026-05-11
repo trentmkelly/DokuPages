@@ -3032,16 +3032,60 @@ describe("handleRequest", () => {
   });
 
   it("honors hidden page and sneaky index settings in aggregate views", async () => {
-    const hiddenEnv = { ...env, HIDE_PAGES: "guide|missing" } satisfies Env;
+    const hiddenEnv = { ...env, HIDE_PAGES: "welcome|guide|missing" } satisfies Env;
 
+    const hiddenSearch = await handleRequest(
+      new Request("https://example.com/search?q=welcome"),
+      hiddenEnv
+    );
+    const hiddenRecent = await handleRequest(new Request("https://example.com/recent"), hiddenEnv);
     const hiddenIndex = await handleRequest(
       new Request("https://example.com/index?ns=wiki"),
       hiddenEnv
     );
+    const hiddenSitemap = await handleRequest(
+      new Request("https://example.com/sitemap.xml"),
+      hiddenEnv
+    );
+    const hiddenRss = await handleRequest(new Request("https://example.com/feed.php"), hiddenEnv);
+    const hiddenAtom = await handleRequest(new Request("https://example.com/atom.xml"), hiddenEnv);
+    const hiddenBacklinks = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome?do=backlink"),
+      hiddenEnv
+    );
     const hiddenWanted = await handleRequest(new Request("https://example.com/wanted"), hiddenEnv);
+    const hiddenOrphans = await handleRequest(
+      new Request("https://example.com/orphans"),
+      hiddenEnv
+    );
 
+    expect(await hiddenSearch.text()).toContain("No matching pages found.");
+    expect(await hiddenRecent.text()).not.toContain("Initial import");
     expect(await hiddenIndex.text()).not.toContain("/wiki/wiki/guide");
+    expect(await hiddenSitemap.text()).not.toContain("https://example.com/wiki/wiki/welcome");
+    expect(await hiddenRss.text()).not.toContain("wiki:welcome");
+    expect(await hiddenAtom.text()).not.toContain("wiki:welcome");
+    expect(await hiddenBacklinks.text()).not.toContain("/wiki/wiki/guide");
     expect(await hiddenWanted.text()).not.toContain("missing:page");
+    expect(await hiddenOrphans.text()).not.toContain("/wiki/wiki/guide");
+
+    state.metadata.push({
+      subject_type: "page",
+      subject_id: "wiki:welcome",
+      key: "relation",
+      value_json: JSON.stringify({
+        references: {},
+        media: {
+          "wiki:logo.svg": true
+        }
+      })
+    });
+    const hiddenMediaReferences = await handleRequest(
+      new Request("https://example.com/media-detail/wiki/logo.svg"),
+      hiddenEnv
+    );
+
+    expect(await hiddenMediaReferences.text()).toContain("<dt>Reference:</dt><dd>Nothing found.");
 
     state.aclRules = [
       aclRule("*", "all", "@ALL", 16),
