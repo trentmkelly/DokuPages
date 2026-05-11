@@ -2408,6 +2408,9 @@ describe("auth routes", () => {
         expect(html).toContain("does not collect, autosubmit, or phone home usage statistics");
         expect(html).toContain("update.dokuwiki.org");
       }
+      if (plugin === "safefnrecode") {
+        expect(html).toContain("npm run safefn:recode");
+      }
     }
   });
 

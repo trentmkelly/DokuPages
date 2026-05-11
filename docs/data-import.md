@@ -18,6 +18,11 @@ before walking `data/pages`, `data/attic`, `data/media`, `data/media_attic`, and
 metadata trees. URL-encoded, SafeFN-encoded, and UTF-8 file names are decoded
 back to DokuWiki page/media IDs during import.
 
+Older SafeFN source trees may still use DokuWiki's pre-2012 `.` post-indicator
+inside encoded media and metadata names. Run `npm run safefn:recode` for a dry
+run, then `npm run safefn:recode -- --write` to rename the source tree before
+generating import SQL and media manifests.
+
 ## D1 SQL
 
 ```sh

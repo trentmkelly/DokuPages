@@ -1082,7 +1082,9 @@ function redirectLegacyAdminPage(request: Request, env: Env, page: string | null
         "This Pages port intentionally does not collect, autosubmit, or phone home usage statistics."
       ]);
     case "safefnrecode":
-      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki safefnrecode plugin", 501);
+      return legacyEndpointNotAvailableResponse(request, env, "DokuWiki safefnrecode plugin", 501, [
+        "Safe filename recoding is available as an operator migration step: run npm run safefn:recode for a dry run, then npm run safefn:recode -- --write before import."
+      ]);
     case "styling":
       return redirectResponse("/admin/styling", 301);
     default:

@@ -16,7 +16,7 @@ path.
 | `logviewer`    | Non-equivalent replacement by Cloudflare Logs plus native `/admin/audit`; source `data/log` files are not imported.                           |
 | `popularity`   | Intentionally removed. The port does not collect, autosubmit, or phone home anonymous usage statistics.                                       |
 | `revert`       | Replaced by native page/media revert routes and manager-level `/admin/revert` batch reversion.                                                |
-| `safefnrecode` | Migration-only if a source wiki needs filename recoding.                                                                                      |
+| `safefnrecode` | Migration-only operator script via `npm run safefn:recode` for old SafeFN source trees.                                                       |
 | `styling`      | Replaced by native `/admin/styling` CSS-variable editor backed by D1 `plugin_settings` and `/theme.css`.                                      |
 | `usermanager`  | Replaced by native `/admin/users` management for users, groups, and disabled accounts.                                                        |
 | `authad`       | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |

@@ -79,7 +79,7 @@ PHP modules to execute. Current decisions:
   or phone home anonymous usage statistics.
 - `revert`: replaced by native page/media revert routes plus `/admin/revert`
   for DokuWiki-style spam search and batch reversion.
-- `safefnrecode`: migration-only if needed.
+- `safefnrecode`: migration-only operator script via `npm run safefn:recode`.
 - `styling`: native Template Style Settings editor stores Pages-safe CSS
   variable overrides in D1 and applies them through `/theme.css`.
 - `usermanager`: replaced by native `/admin/users` user management.
