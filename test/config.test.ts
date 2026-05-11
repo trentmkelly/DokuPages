@@ -6,6 +6,11 @@ import {
   getSecretConfigStatus,
   validateRuntimeConfig
 } from "../src/config";
+import {
+  DOKUWIKI_CONFIG_METADATA,
+  configMetadataForDokuWikiKey,
+  validateDokuWikiConfigMetadataValue
+} from "../src/config-metadata";
 import type { Env } from "../src/env";
 
 describe("runtime config", () => {
@@ -222,6 +227,11 @@ describe("runtime config", () => {
           key: "SITE_NAME",
           value: "Private Wiki",
           effectiveValue: "Private Wiki",
+          dokuwikiKey: "title",
+          metadata: expect.objectContaining({
+            handler: "string",
+            source: "lib/plugins/config/settings/config.metadata.php"
+          }),
           source: "environment"
         }),
         expect.objectContaining({
@@ -339,7 +349,12 @@ describe("runtime config", () => {
         }),
         expect.objectContaining({
           key: "RSS_MEDIA",
-          effectiveValue: "both"
+          effectiveValue: "both",
+          dokuwikiKey: "rss_media",
+          metadata: expect.objectContaining({
+            handler: "multichoice",
+            choices: ["both", "pages", "media"]
+          })
         }),
         expect.objectContaining({
           key: "DEACCENT",
@@ -425,6 +440,13 @@ describe("runtime config", () => {
       runtime: {
         siteName: "Private Wiki"
       },
+      variables: expect.arrayContaining([
+        expect.objectContaining({
+          key: "SITE_NAME",
+          dokuwikiKey: "title",
+          metadata: expect.objectContaining({ handler: "string" })
+        })
+      ]),
       validation: {
         ok: true
       }
@@ -434,6 +456,7 @@ describe("runtime config", () => {
   it("rejects unsafe cookie names, empty start pages, and unknown languages", () => {
     const validation = validateRuntimeConfig({
       START_PAGE: "::",
+      USEACL: "maybe",
       WIKI_LANG: "zz",
       SESSION_COOKIE_NAME: "bad cookie",
       SUPERUSER: "@,bad user",
@@ -457,6 +480,8 @@ describe("runtime config", () => {
       FNENCODE: "base64",
       SEPCHAR: "/",
       SHOWUSERAS: "avatar",
+      CANONICAL_URLS: "sometimes",
+      REL_NOFOLLOW: "never",
       EXTERNAL_AUTH_MODE: "ldap",
       EXTERNAL_AUTH_EMAIL_HEADER: "bad header",
       EXTERNAL_AUTH_USERNAME_HEADER: "bad:header",
@@ -467,6 +492,7 @@ describe("runtime config", () => {
     expect(validation.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "START_PAGE", severity: "error" }),
+        expect.objectContaining({ key: "USEACL", severity: "error" }),
         expect.objectContaining({ key: "WIKI_LANG", severity: "error" }),
         expect.objectContaining({ key: "SESSION_COOKIE_NAME", severity: "error" }),
         expect.objectContaining({ key: "SUPERUSER", severity: "error" }),
@@ -490,6 +516,8 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "FNENCODE", severity: "error" }),
         expect.objectContaining({ key: "SEPCHAR", severity: "error" }),
         expect.objectContaining({ key: "SHOWUSERAS", severity: "error" }),
+        expect.objectContaining({ key: "CANONICAL_URLS", severity: "error" }),
+        expect.objectContaining({ key: "REL_NOFOLLOW", severity: "error" }),
         expect.objectContaining({ key: "EXTERNAL_AUTH_MODE", severity: "error" }),
         expect.objectContaining({ key: "EXTERNAL_AUTH_EMAIL_HEADER", severity: "error" }),
         expect.objectContaining({ key: "EXTERNAL_AUTH_USERNAME_HEADER", severity: "error" }),
@@ -540,6 +568,35 @@ describe("runtime config", () => {
     ).toMatchObject({
       ok: false,
       issues: [expect.objectContaining({ key: "TURNSTILE_SITE_KEY", severity: "error" })]
+    });
+  });
+
+  it("exposes upstream config plugin metadata and validates metadata-backed values", () => {
+    expect(DOKUWIKI_CONFIG_METADATA).toHaveLength(127);
+    expect(configMetadataForDokuWikiKey("rss_media")).toMatchObject({
+      key: "rss_media",
+      handler: "multichoice",
+      group: "syndication",
+      choices: ["both", "pages", "media"],
+      source: "lib/plugins/config/settings/config.metadata.php"
+    });
+    expect(configMetadataForDokuWikiKey("superuser")).toMatchObject({
+      handler: "string",
+      caution: "danger"
+    });
+    expect(validateDokuWikiConfigMetadataValue("rss_media", "media")).toEqual({ ok: true });
+    expect(validateDokuWikiConfigMetadataValue("rss_media", "files")).toMatchObject({
+      ok: false
+    });
+    expect(validateDokuWikiConfigMetadataValue("useacl", "true")).toEqual({ ok: true });
+    expect(validateDokuWikiConfigMetadataValue("useacl", "maybe")).toMatchObject({
+      ok: false
+    });
+    expect(validateDokuWikiConfigMetadataValue("proxy____host", "proxy.example")).toEqual({
+      ok: true
+    });
+    expect(validateDokuWikiConfigMetadataValue("proxy____host", "bad host!")).toMatchObject({
+      ok: false
     });
   });
 });

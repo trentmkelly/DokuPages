@@ -120,7 +120,9 @@ scan:secrets` guards tracked files for high-signal tokens.
 Admins can inspect the effective runtime configuration at `/admin/config` and
 download a JSON configuration backup from `/api/admin/config/export`. Secret
 values are never included in the page or export; the backup records only whether
-each supported secret is configured.
+each supported secret is configured. Runtime variables that map to upstream
+DokuWiki settings include their `lib/plugins/config/settings/config.metadata.php`
+handler, choices, ranges, patterns, and caution level in the page and export.
 
 Configuration editing is a permanent deployment operation for this Pages port,
 not a writable runtime admin feature like DokuWiki's bundled config plugin.

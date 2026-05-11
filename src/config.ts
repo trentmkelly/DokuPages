@@ -7,6 +7,13 @@ import {
   type SupportedLanguage
 } from "./wiki/language";
 import { cleanPageId, type DokuWikiFnEncode, type PageIdCleanOptions } from "./wiki/page-id";
+import {
+  configMetadataForDokuWikiKey,
+  dokuwikiConfigKeyForRuntimeEnv,
+  summarizeDokuWikiConfigMetadata,
+  validateDokuWikiConfigMetadataValue,
+  type DokuWikiConfigMetadataSummary
+} from "./config-metadata";
 
 const DEFAULT_SITE_NAME = "DokuWiki Pages";
 const DEFAULT_START_PAGE = "wiki:welcome";
@@ -97,6 +104,8 @@ export interface RuntimeConfigEntry {
   value: string | null;
   effectiveValue: string | null;
   source: "environment" | "default" | "cloudflare";
+  dokuwikiKey: string | null;
+  metadata: DokuWikiConfigMetadataSummary | null;
 }
 
 export interface SecretConfigStatus {
@@ -226,6 +235,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateEmailAddress("EMAIL_REPLY_TO", env.EMAIL_REPLY_TO, issues);
   validateEmailAddress("EMAIL_RETURN_PATH", env.EMAIL_RETURN_PATH, issues);
   validateEmailList("EMAIL_REGISTRATION_NOTIFY", env.EMAIL_REGISTRATION_NOTIFY, issues);
+  validateMetadataBackedRuntimeConfig(env, issues);
   validateTurnstileConfig(env, issues);
 
   return {
@@ -783,6 +793,44 @@ function validateEmailList(
   }
 }
 
+const METADATA_VALIDATED_RUNTIME_KEYS = [
+  "USEACL",
+  "AUTOPASSWD",
+  "PROFILECONFIRM",
+  "SNEAKY_INDEX",
+  "YOUAREHERE",
+  "FULLPATH",
+  "CAMELCASE",
+  "REL_NOFOLLOW",
+  "IEXSSPROTECT",
+  "USEDRAFT",
+  "MEDIAREVISIONS",
+  "REFCHECK",
+  "USESLASH",
+  "CANONICAL_URLS",
+  "AUTOPLURAL",
+  "SEND404"
+] as const satisfies readonly (keyof Env)[];
+
+function validateMetadataBackedRuntimeConfig(env: Env, issues: ConfigValidationIssue[]): void {
+  for (const envKey of METADATA_VALIDATED_RUNTIME_KEYS) {
+    const value = env[envKey];
+    if (value === undefined) continue;
+
+    const dokuwikiKey = dokuwikiConfigKeyForRuntimeEnv(envKey);
+    if (!dokuwikiKey) continue;
+
+    const validation = validateDokuWikiConfigMetadataValue(dokuwikiKey, value);
+    if (validation.ok) continue;
+
+    issues.push({
+      key: envKey,
+      severity: "error",
+      message: `${envKey} does not match upstream DokuWiki config metadata for '${dokuwikiKey}': ${validation.message}`
+    });
+  }
+}
+
 function validateTurnstileConfig(env: Env, issues: ConfigValidationIssue[]): void {
   const siteKey = nonEmpty(env.TURNSTILE_SITE_KEY);
   const secretKey = nonEmpty(env.TURNSTILE_SECRET_KEY);
@@ -829,12 +877,16 @@ function configEntry(
   key: string,
   rawValue: string | undefined,
   effectiveValue: string | null,
-  defaultValue: string | null
+  defaultValue: string | null,
+  dokuwikiKey = dokuwikiConfigKeyForRuntimeEnv(key)
 ): RuntimeConfigEntry {
+  const metadata = dokuwikiKey ? configMetadataForDokuWikiKey(dokuwikiKey) : null;
   return {
     key,
     value: nonEmpty(rawValue) ?? null,
     effectiveValue,
+    dokuwikiKey,
+    metadata: summarizeDokuWikiConfigMetadata(metadata),
     source:
       nonEmpty(rawValue) === undefined && effectiveValue === defaultValue
         ? "default"
@@ -847,6 +899,8 @@ function cloudflareEntry(key: string, value: string | undefined): RuntimeConfigE
     key,
     value: nonEmpty(value) ?? null,
     effectiveValue: nonEmpty(value) ?? null,
+    dokuwikiKey: null,
+    metadata: null,
     source: "cloudflare"
   };
 }

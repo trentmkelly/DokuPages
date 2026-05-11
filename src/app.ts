@@ -39,6 +39,7 @@ import {
   type RuntimeConfigEntry,
   type SecretConfigStatus
 } from "./config";
+import { describeDokuWikiConfigMetadata } from "./config-metadata";
 import type { Env } from "./env";
 import {
   collectDiagnostics,
@@ -5965,6 +5966,8 @@ function renderConfigEntryTable(entries: RuntimeConfigEntry[]): string {
     .map(
       (entry) => `<tr>
         <td><code>${escapeHtml(entry.key)}</code></td>
+        <td>${entry.dokuwikiKey ? `<code>${escapeHtml(entry.dokuwikiKey)}</code>` : "-"}</td>
+        <td>${entry.metadata ? escapeHtml(describeDokuWikiConfigMetadata(entry.metadata)) : "-"}</td>
         <td>${entry.effectiveValue === null ? "-" : `<code>${escapeHtml(entry.effectiveValue)}</code>`}</td>
         <td>${entry.value === null ? "-" : `<code>${escapeHtml(entry.value)}</code>`}</td>
         <td>${escapeHtml(entry.source)}</td>
@@ -5973,7 +5976,7 @@ function renderConfigEntryTable(entries: RuntimeConfigEntry[]): string {
     .join("");
 
   return `<table class="diagnostics config__entries">
-    <thead><tr><th>Key</th><th>Effective value</th><th>Configured value</th><th>Source</th></tr></thead>
+    <thead><tr><th>Key</th><th>Upstream key</th><th>Upstream metadata</th><th>Effective value</th><th>Configured value</th><th>Source</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }

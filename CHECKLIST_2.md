@@ -168,7 +168,7 @@ are not fixed by this checklist.
 - [x] Match usermanager plugin behavior for bulk operations, group editing, search, filters, validation, and messages.
 - [x] Add an operator CLI script that promotes an existing username to the configured superadmin/superuser role without manually editing D1 rows.
 - [x] Match ACL plugin behavior for bulk ACL edits and namespace browsing.
-- [ ] Match config metadata and validation from `lib/plugins/config/settings/config.metadata.php`.
+- [x] Match config metadata and validation from `lib/plugins/config/settings/config.metadata.php`.
 - [ ] Match upstream plugin enablement from `conf/plugins.php`, `plugins.local.php`, and `plugins.required.php` in UI and diagnostics.
 - [ ] Add an admin page showing unsupported bundled plugins with native replacement status.
 

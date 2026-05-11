@@ -6,22 +6,22 @@ path.
 
 ## Bundled Plugins
 
-| Plugin         | Pages decision                                                                                                                                |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `acl`          | Replaced by native ACL matching and `/admin/acl` with namespace browsing, selected-rule editing, and current-rule bulk edit/delete support.   |
-| `authplain`    | Replaced by D1-backed users, groups, sessions, and importer support.                                                                          |
-| `config`       | Permanently read-only in Pages runtime; replaced by validated environment variables, `/admin/config`, and redacted config export.             |
-| `extension`    | DokuWiki-styled `/admin/extension` unsupported page; plugin code upload/install is unavailable in production Pages runtime.                   |
-| `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, `/api/health`, and native `~~INFO:*~~` output including environment/PHP/DokuWiki equivalents. |
-| `logviewer`    | Non-equivalent replacement by Cloudflare Logs plus native `/admin/audit`; source `data/log` files are not imported.                           |
-| `popularity`   | Intentionally removed. The port does not collect, autosubmit, or phone home anonymous usage statistics.                                       |
-| `revert`       | Replaced by native page/media revert routes and manager-level `/admin/revert` batch reversion.                                                |
-| `safefnrecode` | Migration-only operator script via `npm run safefn:recode` for old SafeFN source trees.                                                       |
-| `styling`      | Replaced by native `/admin/styling` CSS-variable editor backed by D1 `plugin_settings` and `/theme.css`.                                      |
-| `usermanager`  | Replaced by native `/admin/users` management for users, groups, filters, validation, disabled accounts, and selected-user bulk deletion.      |
-| `authad`       | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |
-| `authldap`     | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |
-| `authpdo`      | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                           |
+| Plugin         | Pages decision                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `acl`          | Replaced by native ACL matching and `/admin/acl` with namespace browsing, selected-rule editing, and current-rule bulk edit/delete support.                  |
+| `authplain`    | Replaced by D1-backed users, groups, sessions, and importer support.                                                                                         |
+| `config`       | Permanently read-only in Pages runtime; replaced by validated environment variables, upstream metadata display, `/admin/config`, and redacted config export. |
+| `extension`    | DokuWiki-styled `/admin/extension` unsupported page; plugin code upload/install is unavailable in production Pages runtime.                                  |
+| `info`         | Replaced by `/diagnostics`, `/api/diagnostics`, `/api/health`, and native `~~INFO:*~~` output including environment/PHP/DokuWiki equivalents.                |
+| `logviewer`    | Non-equivalent replacement by Cloudflare Logs plus native `/admin/audit`; source `data/log` files are not imported.                                          |
+| `popularity`   | Intentionally removed. The port does not collect, autosubmit, or phone home anonymous usage statistics.                                                      |
+| `revert`       | Replaced by native page/media revert routes and manager-level `/admin/revert` batch reversion.                                                               |
+| `safefnrecode` | Migration-only operator script via `npm run safefn:recode` for old SafeFN source trees.                                                                      |
+| `styling`      | Replaced by native `/admin/styling` CSS-variable editor backed by D1 `plugin_settings` and `/theme.css`.                                                     |
+| `usermanager`  | Replaced by native `/admin/users` management for users, groups, filters, validation, disabled accounts, and selected-user bulk deletion.                     |
+| `authad`       | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                                          |
+| `authldap`     | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                                          |
+| `authpdo`      | Supported through the external auth sync bridge plus Cloudflare Access header auth.                                                                          |
 
 ## Extension API Boundary
 

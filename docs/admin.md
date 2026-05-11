@@ -7,11 +7,12 @@ Native admin routes use D1-backed session principals and DokuWiki-style
 - `/admin` is the admin dashboard and requires a `MANAGER` or `SUPERUSER` match.
 - `/admin/acl` manages ACL rules, supports namespace browsing, supports
   current-rule bulk permission edits/deletes, and requires a `SUPERUSER` match.
-- `/admin/config` shows validated read-only runtime configuration, secret
-  status, and export links and requires a `SUPERUSER` match. Unlike DokuWiki's
-  bundled config plugin, this route is permanently read-only in the Pages
-  runtime because configuration edits must update Cloudflare Pages variables,
-  secrets, or Wrangler configuration followed by a redeploy.
+- `/admin/config` shows validated read-only runtime configuration, upstream
+  DokuWiki config metadata from `lib/plugins/config/settings/config.metadata.php`,
+  secret status, and export links and requires a `SUPERUSER` match. Unlike
+  DokuWiki's bundled config plugin, this route is permanently read-only in the
+  Pages runtime because configuration edits must update Cloudflare Pages
+  variables, secrets, or Wrangler configuration followed by a redeploy.
 - `/admin/extension` keeps a DokuWiki-styled Extension Manager page with the
   upstream tab labels, but it returns `501` and explains that runtime plugin and
   template install/update/uninstall actions are unsupported on Pages.
