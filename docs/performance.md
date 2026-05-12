@@ -131,6 +131,15 @@ dependencies. Current page entries are invalidated on save, private ACL pages
 bypass the shared cache, and old revision entries are immutable until
 renderer-version invalidation.
 
+This is an intentional compatibility difference. DokuWiki's `data/cache`
+instruction files preserve PHP parser internals and cache dependency state tied
+to local file mtimes. The Pages runtime does not import or recreate those
+instruction arrays; it caches final trusted render output in KV/D1 and treats
+the canonical D1 revision ID plus renderer version as the freshness contract.
+When the source revision, renderer version, ACL privacy, `~~NOCACHE~~`, or a
+tracked page/media dependency changes, the port re-renders instead of attempting
+to reuse DokuWiki instruction-cache payloads.
+
 Cache dependency tracking is mirrored in D1 `cache_dependencies` rows with an
 index on `(dependency_type, dependency_id, cache_key)`. Page saves and media
 uploads/deletes/reverts use that index to purge rendered pages that reference

@@ -24,6 +24,9 @@ This avoids a second parser-specific cache format while preserving the same
 runtime goal: repeated page views bypass parsing and rendering unless the source
 revision, renderer version, privacy rules, or `~~NOCACHE~~` directive require a
 fresh render.
+Exact PHP instruction-cache file parity is intentionally out of scope for the
+Pages runtime because those payloads encode parser internals and local
+filesystem dependency checks that are not portable to Workers KV/D1.
 
 ## Supported
 
@@ -128,5 +131,5 @@ reflects that Pages has no PHP runtime for embedded snippets.
 
 ## Still Pending
 
-- parser instruction caching
+- exact PHP parser instruction-cache file parity
 - plugin syntax hooks
