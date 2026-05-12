@@ -236,6 +236,7 @@ const PAGE_LOCK_TOKEN_BYTES = 24;
 const CSRF_COOKIE_NAME = "DW_CSRF_TOKEN";
 const CSRF_TOKEN_BYTES = 32;
 const CSRF_TTL_SECONDS = 60 * 60 * 24;
+const SECURITY_TOKEN_ERROR = "Security Token did not match. Possible CSRF attack.";
 const FLASH_COOKIE_NAME = "DW_FLASH_MESSAGES";
 const FLASH_TTL_SECONDS = 5 * 60;
 const LOGIN_RATE_LIMIT_ATTEMPTS = 5;
@@ -1530,12 +1531,12 @@ function isActionDisabled(env: Env, action: string): boolean {
 }
 
 function disabledActionResponse(env: Env, pageId: string, action: string): Response {
+  const message = `Action disabled: ${action}`;
   return htmlResponse(
     htmlShell(
       env,
       "Action disabled",
-      `<h1>Action disabled</h1>
-      <p>The action <code>${escapeHtml(action)}</code> has been disabled for this wiki.</p>
+      `${renderMessageArea([flashMessage("error", message)])}
       <p><a href="${pagePath(pageId)}">Back to ${escapeHtml(pageId)}</a></p>`,
       { pageId }
     ),
@@ -3203,7 +3204,7 @@ async function handleAjaxMediaDetails(
   if (!media) return ajaxHtmlResponse("<p>Media not found.</p>");
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
-  if (denied) return ajaxAclDeniedResponse(id);
+  if (denied) return ajaxAclDeniedResponse(env);
 
   const csrf = csrfContext(request, env, principal);
   return ajaxHtmlResponse(await renderMediaDetailContent(env, principal, csrf.token, id, media));
@@ -3223,7 +3224,7 @@ async function handleAjaxMediaDiff(
   if (!media) return ajaxHtmlResponse("<p>Media diff source not found.</p>");
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
-  if (denied) return ajaxAclDeniedResponse(id);
+  if (denied) return ajaxAclDeniedResponse(env);
 
   if (!getRuntimeConfig(env).mediaRevisions) {
     return ajaxHtmlResponse("<p>Media revisions are disabled.</p>");
@@ -3393,7 +3394,7 @@ function ajaxBooleanParam(value: string | null): boolean {
   return !["0", "false", "off", "no"].includes(value.toLowerCase());
 }
 
-const AJAX_SECURITY_TOKEN_ERROR = "Security Token did not match. Possible CSRF attack.";
+const AJAX_SECURITY_TOKEN_ERROR = SECURITY_TOKEN_ERROR;
 
 function ajaxSecurityTokenValid(
   request: Request,
@@ -3404,9 +3405,9 @@ function ajaxSecurityTokenValid(
   return securityTokenValid(request, null, env, principal, params);
 }
 
-function ajaxAclDeniedResponse(subjectId: string): Response {
+function ajaxAclDeniedResponse(env: Env): Response {
   return ajaxHtmlResponse(
-    `<div class="error">Permission denied for '${escapeHtml(subjectId)}'.</div>`
+    renderMessageArea([flashMessage("error", localizedAuthText(env, "accessdenied"))])
   );
 }
 
@@ -12795,6 +12796,16 @@ function flashRedirectResponse(
   return response;
 }
 
+function htmlMessageResponse(
+  env: Env,
+  title: string,
+  messages: FlashMessage[],
+  status = 403,
+  body = ""
+): Response {
+  return htmlResponse(htmlShell(env, title, `${renderMessageArea(messages)}${body}`), { status });
+}
+
 function renderMessageArea(messages: readonly FlashMessage[]): string {
   const shown = new Set<string>();
   const rendered: string[] = [];
@@ -12838,12 +12849,18 @@ function validateCsrf(
   }
 
   if (acceptsJson(request)) {
-    return jsonResponse({ error: "Invalid CSRF token." }, { status: 403 });
+    return jsonResponse({ error: SECURITY_TOKEN_ERROR }, { status: 403 });
   }
 
-  return htmlResponse("<h1>Invalid CSRF token</h1><p>Invalid CSRF token.</p>", {
-    status: 403
-  });
+  if (!env) {
+    return htmlResponse(renderMessageArea([flashMessage("error", SECURITY_TOKEN_ERROR)]), {
+      status: 403
+    });
+  }
+
+  return htmlMessageResponse(env, "Security token mismatch", [
+    flashMessage("error", SECURITY_TOKEN_ERROR)
+  ]);
 }
 
 function appendCsrfCookie(response: Response, request: Request, csrf: CsrfContext): void {
@@ -14138,6 +14155,7 @@ function aclDeniedResponse(
   requiredPermission: number
 ): Response {
   const message = `Permission denied for '${subjectId}'.`;
+  const accessDenied = localizedAuthText(env, "accessdenied");
   const title = localizedAuthPageTitle(env, "denied");
 
   if (acceptsJson(request)) {
@@ -14155,9 +14173,8 @@ function aclDeniedResponse(
     htmlShell(
       env,
       title,
-      `${renderLocalizedAuthPageIntro(env, "denied")}
-      <p>${escapeHtml(message)}</p>
-      <p>Required permission: ${requiredPermission}. Current permission: ${permission}.</p>`
+      `${renderMessageArea([flashMessage("error", accessDenied)])}
+      ${renderLocalizedAuthPageIntro(env, "denied")}`
     ),
     { status: 403 }
   );
@@ -14172,7 +14189,7 @@ function adminDeniedResponse(request: Request, env: Env): Response {
     htmlShell(
       env,
       "Admin access required",
-      "<h1>Admin access required</h1><p>Admin privileges are required.</p>"
+      renderMessageArea([flashMessage("error", "Admin privileges are required.")])
     ),
     { status: 403 }
   );
@@ -14195,7 +14212,7 @@ function managerDeniedResponse(request: Request, env: Env): Response {
     htmlShell(
       env,
       "Manager access required",
-      "<h1>Manager access required</h1><p>Manager privileges are required.</p>"
+      renderMessageArea([flashMessage("error", "Manager privileges are required.")])
     ),
     { status: 403 }
   );

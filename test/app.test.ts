@@ -969,7 +969,7 @@ describe("handleRequest", () => {
     expect(html).not.toContain("Log In");
     expect(html).not.toContain("Register");
     expect(edit.status).toBe(403);
-    await expect(edit.text()).resolves.toContain("<h1>Action disabled</h1>");
+    await expect(edit.text()).resolves.toContain('<div class="error">Action disabled: edit</div>');
     expect(save.status).toBe(403);
     expect(state.row?.content).not.toContain("Disabled edit");
   });
@@ -1281,7 +1281,7 @@ describe("handleRequest", () => {
       env
     );
     expect(details.status).toBe(200);
-    await expect(details.text()).resolves.toContain("Permission denied for 'wiki:logo.svg'.");
+    await expect(details.text()).resolves.toContain("You are not allowed to view this page.");
   });
 
   it("returns explicit not-implemented responses for legacy remote API entrypoints", async () => {
@@ -3413,7 +3413,10 @@ describe("handleRequest", () => {
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
 
     expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toContain("Permission denied");
+    const deniedHtml = await response.text();
+    expect(deniedHtml).toContain("Permission Denied");
+    expect(deniedHtml).toContain('<div class="error">You are not allowed to view this page.</div>');
+    expect(deniedHtml).not.toContain("Required permission:");
     expect(cachePuts).toHaveLength(0);
   });
 
@@ -4572,11 +4575,27 @@ describe("handleRequest", () => {
       }),
       env
     );
+    const htmlPageResponse = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: pageForm,
+        headers: { "cf-access-authenticated-user-email": "kiwi@example.com" }
+      }),
+      env
+    );
 
     expect(pageResponse.status).toBe(403);
-    await expect(pageResponse.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
+    await expect(pageResponse.json()).resolves.toMatchObject({
+      error: "Security Token did not match. Possible CSRF attack."
+    });
     expect(mediaResponse.status).toBe(403);
-    await expect(mediaResponse.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
+    await expect(mediaResponse.json()).resolves.toMatchObject({
+      error: "Security Token did not match. Possible CSRF attack."
+    });
+    expect(htmlPageResponse.status).toBe(403);
+    await expect(htmlPageResponse.text()).resolves.toContain(
+      '<div class="error">Security Token did not match. Possible CSRF attack.</div>'
+    );
     expect(state.batches).toHaveLength(0);
     expect(state.media).toHaveLength(1);
   });
