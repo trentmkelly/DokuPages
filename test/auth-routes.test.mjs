@@ -1,14 +1,130 @@
 /* global FormData, Request, Response */
 
 import { DatabaseSync } from "node:sqlite";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app.ts";
 import { hashPassword } from "../src/auth/password.ts";
 import { hmacMd5Hex } from "../src/crypto/hmac-md5.ts";
+import {
+  BUNDLED_DOKUWIKI_PLUGINS,
+  BUNDLED_PLUGIN_PAGES_REPLACEMENTS
+} from "../src/wiki/plugin-info.ts";
 import { readMigrationSql } from "./support/migrations.mjs";
 
 const migrationSql = readMigrationSql();
 const TEST_CSRF_TOKEN = "test-csrf-token";
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const upstreamPluginsRoot = resolve(repoRoot, "../dokuwiki/lib/plugins");
+
+const adminPluginReplacementExpectations = new Map([
+  [
+    "acl",
+    {
+      legacyPage: "acl",
+      legacyStatus: 301,
+      nativeRoute: "/admin/acl",
+      nativeStatus: 200,
+      pageText: "Access Control List Management"
+    }
+  ],
+  [
+    "authplain",
+    {
+      nativeRoute: "/admin/users",
+      nativeStatus: 200,
+      pageText: "User manager"
+    }
+  ],
+  [
+    "config",
+    {
+      legacyPage: "config",
+      legacyStatus: 301,
+      nativeRoute: "/admin/config",
+      nativeStatus: 200,
+      pageText: "Configuration manager"
+    }
+  ],
+  [
+    "extension",
+    {
+      legacyPage: "extension",
+      legacyStatus: 501,
+      nativeRoute: "/admin/extension",
+      nativeStatus: 501,
+      pageText: "Extension Manager"
+    }
+  ],
+  [
+    "info",
+    {
+      legacyPage: "info",
+      legacyStatus: 301,
+      nativeRoute: "/diagnostics",
+      nativeStatus: 200,
+      pageText: "Diagnostics"
+    }
+  ],
+  [
+    "logviewer",
+    {
+      legacyPage: "logviewer",
+      legacyStatus: 301,
+      nativeRoute: "/admin/audit",
+      nativeStatus: 200,
+      pageText: "Cloudflare Logs"
+    }
+  ],
+  [
+    "popularity",
+    {
+      legacyPage: "popularity",
+      legacyStatus: 501,
+      legacyText: "DokuWiki popularity plugin"
+    }
+  ],
+  [
+    "revert",
+    {
+      legacyPage: "revert",
+      legacyStatus: 301,
+      nativeRoute: "/admin/revert",
+      nativeStatus: 200,
+      pageText: "Revert Manager"
+    }
+  ],
+  [
+    "safefnrecode",
+    {
+      legacyPage: "safefnrecode",
+      legacyStatus: 501,
+      legacyText: "DokuWiki safefnrecode plugin"
+    }
+  ],
+  [
+    "styling",
+    {
+      legacyPage: "styling",
+      legacyStatus: 301,
+      nativeRoute: "/admin/styling",
+      nativeStatus: 200,
+      pageText: "Template Style Settings"
+    }
+  ],
+  [
+    "usermanager",
+    {
+      legacyPage: "usermanager",
+      legacyStatus: 301,
+      nativeRoute: "/admin/users",
+      nativeStatus: 200,
+      pageText: "User manager"
+    }
+  ]
+]);
 
 describe("auth routes", () => {
   let db;
@@ -2738,46 +2854,84 @@ describe("auth routes", () => {
       locked: true
     });
     const cookie = await loginAsAlice(env);
-    const replacements = [
-      ["acl", "/admin/acl", "Access Control List Management"],
-      ["config", "/admin/config", "Configuration manager"],
-      ["info", "/diagnostics", "Diagnostics"],
-      ["logviewer", "/admin/audit", "Cloudflare Logs"],
-      ["revert", "/admin/revert", "Revert Manager"],
-      ["styling", "/admin/styling", "Template Style Settings"],
-      ["usermanager", "/admin/users", "User manager"]
-    ];
 
-    for (const [plugin, location, pageText] of replacements) {
-      const legacy = await handleRequest(
-        new Request(`https://example.com/doku.php?do=admin&page=${plugin}`),
-        env
-      );
-      const native = await handleRequest(
-        new Request(`https://example.com${location}`, {
-          headers: { cookie }
-        }),
-        env
-      );
+    const upstreamAdminPluginBases = BUNDLED_DOKUWIKI_PLUGINS.filter((plugin) =>
+      existsSync(resolve(upstreamPluginsRoot, plugin.base, "admin.php"))
+    ).map((plugin) => plugin.base);
+    const routeReplacementBases = BUNDLED_PLUGIN_PAGES_REPLACEMENTS.filter(
+      (replacement) => replacement.route
+    ).map((replacement) => replacement.base);
+    const expectedParityBases = [
+      ...new Set([...upstreamAdminPluginBases, ...routeReplacementBases, "safefnrecode"])
+    ].sort();
 
-      expect(legacy.status, plugin).toBe(301);
-      expect(legacy.headers.get("location"), plugin).toBe(location);
-      expect(native.status, plugin).toBe(200);
-      await expect(native.text(), plugin).resolves.toContain(pageText);
+    expect([...adminPluginReplacementExpectations.keys()].sort()).toEqual(expectedParityBases);
+    expect(routeReplacementBases.sort()).toEqual(
+      [...adminPluginReplacementExpectations]
+        .filter(([, expectation]) => expectation.nativeRoute)
+        .map(([base]) => base)
+        .sort()
+    );
+
+    for (const base of upstreamAdminPluginBases) {
+      expect(
+        BUNDLED_PLUGIN_PAGES_REPLACEMENTS.some((replacement) => replacement.base === base),
+        base
+      ).toBe(true);
     }
 
-    const extensionAnonymous = await handleRequest(
-      new Request("https://example.com/admin/extension"),
-      env
-    );
+    for (const [plugin, expectation] of adminPluginReplacementExpectations) {
+      const documented = BUNDLED_PLUGIN_PAGES_REPLACEMENTS.find(
+        (replacement) => replacement.base === plugin
+      );
+
+      if (expectation.nativeRoute) {
+        expect(documented?.route, plugin).toBe(expectation.nativeRoute);
+
+        const anonymous = await handleRequest(
+          new Request(`https://example.com${expectation.nativeRoute}`),
+          env
+        );
+        if (expectation.nativeRoute.startsWith("/admin/")) {
+          expect(anonymous.status, `${plugin} anonymous`).toBe(403);
+        }
+
+        const native = await handleRequest(
+          new Request(`https://example.com${expectation.nativeRoute}`, {
+            headers: { cookie }
+          }),
+          env
+        );
+
+        expect(native.status, `${plugin} native`).toBe(expectation.nativeStatus);
+        await expect(native.text(), `${plugin} native`).resolves.toContain(expectation.pageText);
+      } else {
+        expect(documented?.route ?? null, plugin).toBeNull();
+      }
+
+      if (expectation.legacyPage) {
+        const legacy = await handleRequest(
+          new Request(`https://example.com/doku.php?do=admin&page=${expectation.legacyPage}`),
+          env
+        );
+
+        expect(legacy.status, `${plugin} legacy`).toBe(expectation.legacyStatus);
+        if (expectation.legacyStatus === 301) {
+          expect(legacy.headers.get("location"), `${plugin} legacy`).toBe(expectation.nativeRoute);
+        } else if (expectation.legacyText) {
+          await expect(legacy.text(), `${plugin} legacy`).resolves.toContain(
+            expectation.legacyText
+          );
+        }
+      }
+    }
+
     const extensionPage = await handleRequest(
       new Request("https://example.com/admin/extension", {
         headers: { cookie }
       }),
       env
     );
-    expect(extensionAnonymous.status).toBe(403);
-    expect(extensionPage.status).toBe(501);
     const extensionHtml = await extensionPage.text();
     expect(extensionHtml).toContain("Extension Manager");
     expect(extensionHtml).toContain("Installed Plugins");
@@ -2821,6 +2975,14 @@ describe("auth routes", () => {
     expect(pluginCompatibilityHtml).toContain("[redacted]");
     expect(pluginCompatibilityHtml).not.toContain("super-secret-bind-password");
     expect(pluginCompatibilityHtml).toContain("No telemetry replacement");
+    for (const replacement of BUNDLED_PLUGIN_PAGES_REPLACEMENTS) {
+      expect(pluginCompatibilityHtml, replacement.base).toContain(
+        `<code>${replacement.base}</code>`
+      );
+      if (replacement.route) {
+        expect(pluginCompatibilityHtml, replacement.base).toContain(`href="${replacement.route}"`);
+      }
+    }
 
     const diagnostics = await handleRequest(
       new Request("https://example.com/api/diagnostics"),

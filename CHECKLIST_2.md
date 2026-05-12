@@ -273,7 +273,7 @@ are not fixed by this checklist.
 - [x] Add media parity tests against upstream `lib/exe/fetch.php`, `detail.php`, and `mediamanager.php` outputs.
 - [x] Add feed parity tests for all upstream feed types and feed configuration combinations.
 - [x] Add search parity tests comparing query parsing, ranking, snippets, namespace filters, and ACL filtering.
-- [ ] Add admin parity tests for every bundled plugin replacement page.
+- [x] Add admin parity tests for every bundled plugin replacement page.
 - [ ] Add auth parity tests for imported legacy users, unsupported hash types, remember-me, profile deletion, and superuser/manager config expressions.
 - [ ] Add localization parity tests for at least one non-English DokuWiki language pack.
 - [ ] Add visual regression baselines captured from a running upstream DokuWiki instance, not only the Pages port.
