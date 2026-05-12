@@ -98,7 +98,12 @@ Content hashes are stored explicitly on page and media revisions. SHA-256 is the
 
 ## Compression
 
-Compressed DokuWiki attic files are decompressed during import and stored as normal revision content. Original compression metadata can be retained in import reports if needed.
+Compressed DokuWiki attic files are decompressed during import and stored as
+normal revision content. `.txt.gz` attic revisions use Node's built-in zlib
+support. `.txt.bz2` attic revisions require an operator-installed `bzip2`
+executable on `PATH`; the importer invokes `bzip2 -dc` during artifact
+generation. Original compression metadata can be retained in import reports if
+needed.
 
 ## Large Media
 

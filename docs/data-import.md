@@ -23,6 +23,22 @@ inside encoded media and metadata names. Run `npm run safefn:recode` for a dry
 run, then `npm run safefn:recode -- --write` to rename the source tree before
 generating import SQL and media manifests.
 
+## Compression Prerequisite
+
+The importer decompresses `.txt.gz` attic revisions with Node's built-in zlib
+support. Source wikis that contain `.txt.bz2` page attic revisions require the
+operator machine to have a `bzip2` executable on `PATH`; the importer shells out
+to `bzip2 -dc` for those files. Verify the prerequisite before dry runs with:
+
+```sh
+command -v bzip2
+```
+
+If `bzip2` is unavailable, install the OS package before running
+`npm run import:dry-run`, `npm run import:sql`, or
+`npm run import:hash-manifest` against a source tree with bzip2-compressed
+attic revisions.
+
 ## D1 SQL
 
 ```sh

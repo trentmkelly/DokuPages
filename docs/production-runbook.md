@@ -56,6 +56,7 @@ page and media writes return HTTP 503.
 Generate and review final import artifacts from the frozen source tree:
 
 ```sh
+command -v bzip2 # required only when data/attic contains .txt.bz2 revisions
 npm run import:dry-run
 npm run import:sql
 npm run import:media-manifest
@@ -65,6 +66,9 @@ npm run import:hash-manifest
 The dry run report must match expected counts for pages, attic page revisions,
 media, media revisions, ACL rules, users, metadata, config, plugin settings,
 custom language files, and custom template files.
+If the source wiki uses bzip2-compressed page attic files and `command -v bzip2`
+does not find an executable, install the OS `bzip2` package before generating
+import artifacts.
 
 ## Final Import
 

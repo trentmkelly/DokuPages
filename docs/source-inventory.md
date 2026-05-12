@@ -207,6 +207,10 @@ Compressed revision paths:
 - Output/cache compression: `doku.php`, `lib/exe/css.php`, `inc/httputils.php`, `inc/init.php`, `inc/TaskRunner.php`, `inc/Sitemap/Mapper.php`.
 - Extension install/package compression: `lib/plugins/extension/Installer.php`.
 
+Porting note: gzip attic import is handled with Node zlib. Bzip2 attic import is
+documented as an operator prerequisite and requires `bzip2` on the artifact
+generation host's `PATH`.
+
 ### Extension And Plugin Hooks
 
 Hook inventory:
