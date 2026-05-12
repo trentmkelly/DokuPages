@@ -27,7 +27,7 @@ This review covers the current Pages-native validation build.
 | Brute-force login             | KV-backed login rate limit by client IP and username.                                                                                       |
 | Edit/upload abuse             | KV-backed page edit and media upload rate limits by client IP and actor.                                                                    |
 | Partial R2/D1 write failure   | Media upload rolls back the newly written R2 object if D1 metadata writes fail.                                                             |
-| Session theft impact          | Session cookies are HTTP-only, `SameSite=Lax`, and `Secure` on HTTPS; only token hashes are stored in D1.                                   |
+| Session theft impact          | Session cookies are HTTP-only, follow DokuWiki-compatible SameSite and HTTPS `Secure` settings, and store only token hashes in D1.          |
 | Secret leakage                | No runtime secret is required; `npm run scan:secrets` and CI scan tracked files for high-signal secrets.                                    |
 | Storage outage ambiguity      | Storage errors map to stable JSON and emit structured `storage_error` logs with service and retry hints.                                    |
 

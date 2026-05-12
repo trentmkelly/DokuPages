@@ -26,6 +26,8 @@ export interface Env {
   BASE_DIR?: string;
   COOKIE_DIR?: string;
   COOKIEDIR?: string;
+  SECURECOOKIE?: string;
+  SAMESITECOOKIE?: string;
   RECENT?: string;
   RECENT_DAYS?: string;
   DONTLOG?: string;

@@ -1204,6 +1204,43 @@ describe("auth routes", () => {
     }
   });
 
+  it("honors DokuWiki securecookie and samesitecookie for native session cookies", async () => {
+    env = createEnv({ SECURECOOKIE: "0", SAMESITECOOKIE: "Strict" });
+    await seedUser(env.DB);
+    const login = new FormData();
+    login.set("username", "alice");
+    login.set("password", "correct horse battery staple");
+
+    const loginResponse = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: login,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+
+    expect(loginResponse.status).toBe(303);
+    expect(cookie).toContain("DW_PAGES_SESSION=");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).not.toContain("Secure");
+
+    env.SAMESITECOOKIE = "";
+    const blankSameSiteLogin = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: login,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+    const blankSameSiteCookie = blankSameSiteLogin.headers.get("set-cookie") ?? "";
+
+    expect(blankSameSiteCookie).not.toContain("SameSite=");
+    expect(blankSameSiteCookie).not.toContain("Secure");
+  });
+
   it("resolves synced external users from Cloudflare Access headers", async () => {
     env = createEnv({
       EXTERNAL_AUTH_MODE: "cloudflare_access",

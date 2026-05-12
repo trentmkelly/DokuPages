@@ -12,8 +12,8 @@ that value as `sectok`.
 The previous `DW_CSRF_TOKEN` cookie plus `x-csrf-token` header remains accepted
 as a compatibility fallback for native AJAX callers, external auth principals,
 and deployments without `DOKUWIKI_COOKIE_SALT`. That fallback cookie is
-HTTP-only, `SameSite=Lax`, marked `Secure` on HTTPS, and scoped to the
-DokuWiki-compatible `cookiedir` path.
+HTTP-only and follows the DokuWiki-compatible `cookiedir`, `securecookie`, and
+`samesitecookie` settings.
 
 Preview rendering is exempt because it does not write storage.
 
@@ -35,9 +35,10 @@ before R2 is opened.
 
 The Pages port does not issue upstream DokuWiki `rememberme` sticky cookies.
 Login always creates an opaque D1-backed session token with a 24 hour
-HTTP-only, `SameSite=Lax` cookie, and the database stores only the token's
-SHA-256 hash. Longer-lived identity should be provided by an external layer
-such as Cloudflare Access or by a future session policy change that preserves
+HTTP-only cookie, and the database stores only the token's SHA-256 hash. Cookie
+path, `Secure`, and SameSite attributes follow DokuWiki-compatible runtime
+settings. Longer-lived identity should be provided by an external layer such as
+Cloudflare Access or by a future session policy change that preserves
 server-side revocation; encrypted password-derived persistent cookies are not
 part of the port.
 

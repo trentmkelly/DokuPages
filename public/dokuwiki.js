@@ -59,18 +59,12 @@
 
   function writeCookie(name, value, days) {
     var expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
-    var secure = window.location.protocol === "https:" ? "; Secure" : "";
-    var cookiePath = (window.DOKU_COOKIE_PARAM && window.DOKU_COOKIE_PARAM.path) || "/";
+    var cookieParam = window.DOKU_COOKIE_PARAM || {};
+    var secure = cookieParam.secure && window.location.protocol === "https:" ? "; Secure" : "";
+    var sameSite = cookieParam.sameSite ? "; SameSite=" + cookieParam.sameSite : "";
+    var cookiePath = cookieParam.path || "/";
     document.cookie =
-      name +
-      "=" +
-      value +
-      "; expires=" +
-      expires +
-      "; path=" +
-      cookiePath +
-      "; SameSite=Lax" +
-      secure;
+      name + "=" + value + "; expires=" + expires + "; path=" + cookiePath + sameSite + secure;
   }
 
   function decodeCookieData(value) {

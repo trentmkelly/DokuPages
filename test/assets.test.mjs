@@ -23,6 +23,8 @@ describe("public assets", () => {
     const js = await readFile("public/dokuwiki.js", "utf8");
 
     expect(js).toContain("DokuCookie");
+    expect(js).toContain("cookieParam.secure");
+    expect(js).toContain("cookieParam.sameSite");
     expect(js).toContain("bindHotkeys");
     expect(js).toContain("bindMediaManager");
     expect(js).toContain("bindQuickSearch");

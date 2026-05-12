@@ -19,10 +19,10 @@ describe("DokuWiki config coverage map", () => {
     expect(DOKUWIKI_CONFIG_COVERAGE).toHaveLength(115);
     expect(DOKUWIKI_CONFIG_COVERAGE.every((entry) => Boolean(entry.status))).toBe(true);
     expect(configCoverageCounts()).toEqual({
-      implemented: 77,
+      implemented: 79,
       imported_metadata_only: 6,
       intentionally_unsupported: 30,
-      not_yet_evaluated: 2
+      not_yet_evaluated: 0
     });
   });
 
@@ -39,8 +39,9 @@ describe("DokuWiki config coverage map", () => {
     expect(coverageStatusForDokuWikiConfigKey("usewordblock")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("mailguard")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("cookiedir")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("securecookie")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("samesitecookie")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("savedir")).toBe("intentionally_unsupported");
-    expect(coverageStatusForDokuWikiConfigKey("securecookie")).toBe("not_yet_evaluated");
   });
 });
 

@@ -97,6 +97,11 @@ Optional Pages environment variables:
 - `COOKIE_DIR`: DokuWiki-compatible `cookiedir` cookie path. Default: the
   normalized `BASE_DIR` with a trailing slash when `BASE_DIR` is configured, or
   `/` for root deployments. `COOKIEDIR` remains accepted as an alias.
+- `SECURECOOKIE`: DokuWiki-compatible secure-cookie toggle. Default: enabled,
+  which marks cookies `Secure` only on HTTPS requests.
+- `SAMESITECOOKIE`: DokuWiki-compatible SameSite value for native browser
+  cookies: `Lax`, `Strict`, `None`, or blank to omit the attribute. Default:
+  `Lax`.
 - `SUPERUSER`: DokuWiki-style comma-separated user/group member list for full
   admin access. Default: `@admin`.
 - `MANAGER`: DokuWiki-style comma-separated user/group member list for

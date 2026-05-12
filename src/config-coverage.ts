@@ -162,6 +162,8 @@ const IMPLEMENTED = new Set<string>([
   "profileconfirm",
   "disableactions",
   "auth_security_timeout",
+  "securecookie",
+  "samesitecookie",
   "remote",
   "remoteuser",
   "remotecors",

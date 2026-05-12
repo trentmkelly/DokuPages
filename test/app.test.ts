@@ -162,6 +162,8 @@ describe("handleRequest", () => {
     env.BASE_DIR = undefined;
     env.COOKIE_DIR = undefined;
     env.COOKIEDIR = undefined;
+    env.SECURECOOKIE = undefined;
+    env.SAMESITECOOKIE = undefined;
     env.CANONICAL_URLS = undefined;
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
@@ -321,7 +323,9 @@ describe("handleRequest", () => {
     expect(html).toContain('<a href="/index?ns=wiki">wiki</a> / <span>welcome</span>');
     expect(html).toContain('<link rel="canonical" href="/wiki/wiki/welcome">');
     expect(html).toContain('<link rel="stylesheet" href="/dokuwiki.css?v=0.1.0">');
-    expect(html).toContain('<script>window.DOKU_COOKIE_PARAM = {"path":"/"};</script>');
+    expect(html).toContain(
+      '<script>window.DOKU_COOKIE_PARAM = {"path":"/","secure":true,"sameSite":"Lax"};</script>'
+    );
     expect(html).toContain('<script src="/dokuwiki.js?v=0.1.0" defer></script>');
     expect(html).toContain('id="qsearch__out"');
     expect(html).toContain('class="ajax_qsearch JSpopup"');
@@ -475,7 +479,26 @@ describe("handleRequest", () => {
     expect(response.headers.get("set-cookie")).toContain("DW_PAGES_BC=");
     expect(response.headers.get("set-cookie")).toContain("Path=/wiki/");
     const html = await response.text();
-    expect(html).toContain('<script>window.DOKU_COOKIE_PARAM = {"path":"/wiki/"};</script>');
+    expect(html).toContain(
+      '<script>window.DOKU_COOKIE_PARAM = {"path":"/wiki/","secure":true,"sameSite":"Lax"};</script>'
+    );
+  });
+
+  it("uses the configured DokuWiki cookie security flags for browser cookies", async () => {
+    env.SECURECOOKIE = "0";
+    env.SAMESITECOOKIE = "";
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("DW_PAGES_BC=");
+    expect(setCookie).not.toContain("SameSite=");
+    expect(setCookie).not.toContain("Secure");
+    const html = await response.text();
+    expect(html).toContain(
+      '<script>window.DOKU_COOKIE_PARAM = {"path":"/","secure":false,"sameSite":null};</script>'
+    );
   });
 
   it("honors the YOUAREHERE setting for hierarchical header breadcrumbs", async () => {

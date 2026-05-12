@@ -18,6 +18,12 @@ interface SessionCookie {
   token: string;
 }
 
+export interface CookieHeaderOptions {
+  path?: string;
+  secure?: boolean;
+  sameSite?: "Lax" | "Strict" | "None" | null;
+}
+
 interface SessionUserRow {
   session_id: string;
   user_id: string;
@@ -152,15 +158,30 @@ export function sessionCookieHeader(
   name: string,
   session: LoginSession,
   request: Request,
-  path = "/"
+  options: CookieHeaderOptions = {}
 ): string {
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=${session.id}.${session.token}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
+  return `${name}=${session.id}.${session.token}; ${cookieHeaderAttributes(request, options, SESSION_TTL_SECONDS)}`;
 }
 
-export function clearSessionCookieHeader(name: string, request: Request, path = "/"): string {
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+export function clearSessionCookieHeader(
+  name: string,
+  request: Request,
+  options: CookieHeaderOptions = {}
+): string {
+  return `${name}=; ${cookieHeaderAttributes(request, options, 0)}`;
+}
+
+function cookieHeaderAttributes(
+  request: Request,
+  options: CookieHeaderOptions,
+  maxAgeSeconds: number
+): string {
+  const sameSite = options.sameSite === undefined ? "Lax" : options.sameSite;
+  const attributes = [`Path=${options.path ?? "/"}`, "HttpOnly"];
+  if (sameSite) attributes.push(`SameSite=${sameSite}`);
+  attributes.push(`Max-Age=${maxAgeSeconds}`);
+  if (options.secure ?? new URL(request.url).protocol === "https:") attributes.push("Secure");
+  return attributes.join("; ");
 }
 
 async function getUserByUsername(db: D1Database, username: string): Promise<UserRecord | null> {

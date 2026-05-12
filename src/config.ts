@@ -51,8 +51,10 @@ const SHOW_USER_AS_VALUES = new Set([
 ]);
 const LOG_FACILITY_VALUES = new Set(["error", "debug", "deprecated"] as const);
 const MAILGUARD_VALUES = ["visible", "hex", "none"] as const;
+const SAME_SITE_COOKIE_VALUES = ["Lax", "Strict", "None"] as const;
 
 export type DokuWikiLogFacility = "error" | "debug" | "deprecated";
+export type SameSiteCookie = (typeof SAME_SITE_COOKIE_VALUES)[number];
 
 export interface RuntimeConfig {
   siteName: string;
@@ -76,6 +78,8 @@ export interface RuntimeConfig {
   baseUrl: string | null;
   baseDir: string;
   cookiePath: string;
+  secureCookie: boolean;
+  sameSiteCookie: SameSiteCookie | null;
   recentEntries: number;
   recentDays: number;
   dontLog: DokuWikiLogFacility[];
@@ -204,6 +208,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     baseUrl: normalizedBaseUrl(env.BASE_URL),
     baseDir,
     cookiePath: normalizedCookiePath(env.COOKIE_DIR ?? env.COOKIEDIR, baseDir),
+    secureCookie: booleanConfig(env.SECURECOOKIE, true),
+    sameSiteCookie: normalizedSameSiteCookie(env.SAMESITECOOKIE),
     recentEntries: integerConfig(env.RECENT, 20, 1, 100),
     recentDays: integerConfig(env.RECENT_DAYS, 7, 0, 3660),
     dontLog: parseLogFacilityList(env.DONTLOG),
@@ -376,6 +382,8 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       defaultCookiePath,
       "cookiedir"
     ),
+    configEntry("SECURECOOKIE", env.SECURECOOKIE, String(config.secureCookie), "true"),
+    configEntry("SAMESITECOOKIE", env.SAMESITECOOKIE, config.sameSiteCookie, "Lax"),
     configEntry("RECENT", env.RECENT, String(config.recentEntries), "20"),
     configEntry("RECENT_DAYS", env.RECENT_DAYS, String(config.recentDays), "7"),
     configEntry("DONTLOG", env.DONTLOG, config.dontLog.join(","), DEFAULT_DONTLOG),
@@ -1027,6 +1035,8 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "AUTOPASSWD",
   "PROFILECONFIRM",
   "SNEAKY_INDEX",
+  "SECURECOOKIE",
+  "SAMESITECOOKIE",
   "YOUAREHERE",
   "FULLPATH",
   "CAMELCASE",
@@ -1256,6 +1266,17 @@ function normalizedCookiePath(value: string | undefined, baseDir: string): strin
   const trailingSlash = cookieDir.endsWith("/") ? "/" : "";
   const normalized = `/${cookieDir.split("/").filter(Boolean).join("/")}${trailingSlash}`;
   return normalized === "//" ? "/" : normalized;
+}
+
+function normalizedSameSiteCookie(value: string | undefined): SameSiteCookie | null {
+  const raw = value?.trim();
+  if (raw === undefined) return "Lax";
+  if (raw === "") return null;
+
+  const match = SAME_SITE_COOKIE_VALUES.find(
+    (candidate) => candidate.toLowerCase() === raw.toLowerCase()
+  );
+  return match ?? "Lax";
 }
 
 function normalizedLinkTarget(value: string | undefined): string | null {

@@ -266,6 +266,8 @@ export const RUNTIME_ENV_DOKUWIKI_KEYS: Readonly<Record<string, string>> = {
   BASE_URL: "baseurl",
   COOKIE_DIR: "cookiedir",
   COOKIEDIR: "cookiedir",
+  SECURECOOKIE: "securecookie",
+  SAMESITECOOKIE: "samesitecookie",
   RECENT: "recent",
   RECENT_DAYS: "recent_days",
   DONTLOG: "dontlog",
