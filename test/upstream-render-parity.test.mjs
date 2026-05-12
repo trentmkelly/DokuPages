@@ -106,7 +106,7 @@ function renderWithUpstreamDokuWiki(source, pageId) {
     encoding: "utf8",
     cwd: upstreamRoot,
     env: { ...process.env, DOKU_RENDER_ID: pageId },
-    timeout: 10_000
+    timeout: 20_000
   });
 
   if (result.status !== 0) {

@@ -1,6 +1,9 @@
 # Media
 
 Media storage uses D1 for metadata and R2 for object bodies.
+`test/upstream-media-entrypoints.test.mjs` keeps the native fetch, detail, and
+media-manager route signatures aligned with upstream `lib/exe/fetch.php`,
+`detail.php`, and `mediamanager.php` output from the bundled media fixtures.
 
 ## Routes
 
