@@ -30,6 +30,7 @@
     "limits:measure": "node scripts/measure-performance.mjs",
     "backup:export": "node scripts/export-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
     "backup:restore": "node scripts/restore-cloudflare-backup.mjs --database dokuwiki_pages_dev --bucket dokuwiki-pages-dev-media --remote",
+    "backup:verify": "node scripts/verify-cloudflare-backup.mjs",
     "cache:warm": "node scripts/warm-cache.mjs",
     "smoke": "node scripts/smoke-pages.mjs",
     "test:e2e": "node scripts/smoke-pages.mjs",

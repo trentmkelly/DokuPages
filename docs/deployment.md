@@ -321,6 +321,7 @@ Export the validation D1 database and referenced R2 media objects:
 
 ```sh
 npm run backup:export
+npm run backup:verify -- --backup .wrangler/backups/<timestamp>
 ```
 
 Restore a backup into the configured validation resources:
@@ -331,3 +332,9 @@ npm run backup:restore -- --backup .wrangler/backups/<timestamp> --yes
 
 Use `--dry-run` on either command to print the Wrangler operations before
 performing writes.
+
+Recurring production backups are automated by
+`.github/workflows/scheduled-backup.yml`. Configure `CLOUDFLARE_ACCOUNT_ID` and
+`CLOUDFLARE_API_TOKEN` GitHub secrets, then adjust `BACKUP_DATABASE`,
+`BACKUP_BUCKET`, and `BACKUP_ARTIFACT_RETENTION_DAYS` repository variables when
+the production resource names or retention policy differ from `dokutest`.

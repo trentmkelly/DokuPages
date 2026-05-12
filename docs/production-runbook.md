@@ -23,6 +23,7 @@ Before starting the final sync, confirm:
 - production D1 database, KV namespace, R2 bucket, and `PAGE_LOCKS` binding
 - DNS rollback target for the existing DokuWiki deployment, if DNS is changing
 - final write-freeze window and launch approval
+- GitHub Actions backup schedule enabled with Cloudflare backup credentials
 - scheduler location that will call `/api/tasks/email-digests`
 - Cloudflare Turnstile site key and secret if login/registration bot gating is
   required on the target
@@ -42,6 +43,7 @@ operator-controlled storage. Verify the manifest exists:
 
 ```sh
 test -f .wrangler/backups/pre-launch/backup-manifest.json
+npm run backup:verify -- --backup .wrangler/backups/pre-launch
 ```
 
 ## Source Freeze
@@ -174,8 +176,8 @@ After the launch watch period:
 - fix launch blockers and rerun regression tests
 - tune cache, database indexes, search behavior, and media delivery from real
   traffic data
-- verify recurring backups and perform a test restore into a non-production
-  target
+- verify the scheduled backup workflow is producing retained artifacts and
+  perform a test restore into a non-production target
 - review Cloudflare billing and quotas
 - revisit the parity gap register in `docs/parity-gaps.md`
 - archive the old DokuWiki deployment after the agreed retention period

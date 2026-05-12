@@ -31,9 +31,6 @@ post-launch monitoring.
 
 ## P1
 
-- Production backup automation: the manual backup and restore scripts are
-  implemented and verified, but a recurring production scheduler still needs an
-  operator-owned runner and credential policy.
 - Downloadable file block metadata: file labels render, but generated downloads
   are not emitted. Add generated attachment routes only if production content
   uses this DokuWiki behavior.

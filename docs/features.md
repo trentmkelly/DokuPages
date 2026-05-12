@@ -57,7 +57,7 @@ of full PHP DokuWiki runtime compatibility.
 - Full ImageMagick/GD feature parity beyond Photon-backed PNG/JPEG/WebP resize and crop derivatives.
 - Raw HTML embedding. HTML-like content is escaped unless handled by an explicitly supported safe syntax form.
 - Thumbnail cache and stale fallback.
-- Scheduled production backup automation and final launch rehearsal verification.
+- Final launch rehearsal verification.
 
 ## Plugin Compatibility
 

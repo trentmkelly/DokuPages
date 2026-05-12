@@ -249,7 +249,7 @@ are not fixed by this checklist.
 - [x] Implement the upstream task runner queue behavior from `inc/TaskRunner.php` and `lib/exe/taskrunner.php`, or document all replaced scheduled jobs.
 - [x] Implement indexer locking and background indexing semantics from upstream `inc/indexer.php`.
 - [x] Match DokuWiki log retention and `dontlog` behavior with D1/Cloudflare logs.
-- [ ] Add scheduled backup automation equivalent to an operator-run production backup policy.
+- [x] Add scheduled backup automation equivalent to an operator-run production backup policy.
 - [ ] Add operational checks for Cloudflare quotas that replace local disk free-space checks.
 - [ ] Add a production rehearsal using final source import, remote D1/R2/KV resources, and rollback verification.
 

@@ -1,0 +1,54 @@
+name: Scheduled Backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_label:
+        description: Backup label appended to the artifact directory.
+        required: false
+        default: manual
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BACKUP_DATABASE: ${{ vars.BACKUP_DATABASE || 'dokuwiki_pages_dev' }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET || 'dokuwiki-pages-dev-media' }}
+      BACKUP_ARTIFACT_RETENTION_DAYS: ${{ vars.BACKUP_ARTIFACT_RETENTION_DAYS || 14 }}
+      BACKUP_LABEL: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_label || 'scheduled' }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Export Cloudflare backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +'%Y-%m-%dT%H%M%SZ')"
+          label="$(printf '%s' "${BACKUP_LABEL:-scheduled}" | tr -c 'A-Za-z0-9_.-' '-')"
+          backup_dir=".wrangler/backups/${stamp}-${label}"
+          echo "BACKUP_DIR=${backup_dir}" >> "$GITHUB_ENV"
+          npm run backup:export -- \
+            --database "$BACKUP_DATABASE" \
+            --bucket "$BACKUP_BUCKET" \
+            --output "$backup_dir"
+      - name: Verify backup manifest
+        run: npm run backup:verify -- --backup "$BACKUP_DIR" --report "$BACKUP_DIR/backup-verification.json"
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dokuwiki-pages-backup-${{ github.run_id }}
+          path: ${{ env.BACKUP_DIR }}
+          if-no-files-found: error
+          retention-days: ${{ env.BACKUP_ARTIFACT_RETENTION_DAYS }}

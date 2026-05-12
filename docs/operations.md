@@ -28,6 +28,40 @@ Backup directories are intentionally ignored by git. Move launch-critical
 backups to durable operator-controlled storage after verifying the manifest and
 object count.
 
+Verify a completed backup directory before treating it as a restore point:
+
+```sh
+npm run backup:verify -- --backup .wrangler/backups/pre-launch
+```
+
+## Scheduled Backup Workflow
+
+`.github/workflows/scheduled-backup.yml` runs the same remote export every day at
+04:17 UTC and can also be started manually from GitHub Actions. The workflow:
+
+- installs dependencies with `npm ci`
+- runs `npm run backup:export` against the configured D1 database and R2 bucket
+- runs `npm run backup:verify` and writes `backup-verification.json`
+- uploads the verified backup directory as a GitHub Actions artifact
+
+Configure these repository secrets before enabling the schedule:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN` with read access for the target D1 database and R2
+  bucket
+
+Optional repository variables:
+
+- `BACKUP_DATABASE`, defaulting to `dokuwiki_pages_dev`
+- `BACKUP_BUCKET`, defaulting to `dokuwiki-pages-dev-media`
+- `BACKUP_ARTIFACT_RETENTION_DAYS`, defaulting to `14`
+
+Backup artifacts contain wiki page bodies, auth metadata, media metadata, and
+media files. Keep workflow access limited to operators who are allowed to read a
+full production backup. For longer retention, download or mirror the artifact to
+operator-owned durable storage and rehearse restores against a non-production
+target.
+
 ## Restore Workflow
 
 Restore into an empty preview target first when possible:

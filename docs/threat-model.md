@@ -52,6 +52,9 @@ Operational permissions:
 
 - `npm run deploy` and `npm run deploy:locks` require Wrangler account access.
 - `npm run backup:export` reads remote D1 and R2 through Wrangler.
+- `.github/workflows/scheduled-backup.yml` runs the same backup export with
+  GitHub-stored Cloudflare credentials and stores the result as a retained
+  Actions artifact.
 - `npm run backup:restore` writes D1 and R2 and requires explicit `--yes`.
 - Remote D1 migrations require Wrangler access to `dokuwiki_pages_dev`.
 
