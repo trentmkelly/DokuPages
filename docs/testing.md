@@ -54,6 +54,11 @@ Responsive CSS tests cover the mobile navigation breakpoints, narrow-viewport
 header controls, long-word wrapping, diagnostic/media detail overflow behavior,
 and fixed-size font rules.
 
+Asset tests cover converted upstream CSS module selectors for forms, tabs,
+media popup and fullscreen manager views, search assistant UI, modal/link
+wizard surfaces, uploader hooks, and admin task pages. They also verify that
+the upstream image assets referenced by those converted rules are shipped.
+
 Visual regression checks use local Chromium to capture desktop welcome, mobile
 welcome, and desktop login screenshots from a deployed Pages URL. The committed
 `test/visual-baselines.json` records viewport sizes and screenshot hashes; run

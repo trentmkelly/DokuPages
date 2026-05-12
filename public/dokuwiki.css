@@ -389,6 +389,180 @@ form.search button {
   text-indent: -99999px;
 }
 
+.dokuwiki .search_hit {
+  background-color: var(--dw-highlight);
+  color: var(--dw-text);
+}
+
+.dokuwiki div.nothing {
+  margin-bottom: 1.4em;
+}
+
+.dokuwiki .search-results-form fieldset.search-form {
+  width: 100%;
+  margin: 1em 0;
+}
+
+.dokuwiki .search-results-form fieldset.search-form input[name="q"] {
+  width: 50%;
+}
+
+.dokuwiki .search-results-form fieldset.search-form button.toggleAssistant {
+  float: right;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions {
+  padding: 1em 0;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions > div {
+  position: relative;
+  display: inline-block;
+  margin: 0 0.5em;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle div.current {
+  max-width: 10em;
+  overflow: hidden;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle div.current::after {
+  color: var(--dw-text-alt);
+  font-size: smaller;
+  content: "\25BC";
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle div.changed {
+  font-weight: bold;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle ul {
+  position: absolute;
+  z-index: 100;
+  display: none;
+  min-width: 10em;
+  max-width: 15em;
+  max-height: 50vh;
+  padding: 0.25em 0.5em;
+  overflow: auto;
+  border: 1px solid var(--dw-border);
+  background-color: var(--dw-background);
+  text-align: left;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle ul li {
+  margin: 0.25em 0;
+  list-style: none;
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle ul li a {
+  display: block;
+}
+
+.dokuwiki
+  .search-results-form
+  fieldset.search-form
+  .advancedOptions
+  div.toggle.open
+  div.current::after {
+  content: "\25B2";
+}
+
+.dokuwiki .search-results-form fieldset.search-form .advancedOptions div.toggle.open ul {
+  display: block;
+}
+
+[dir="rtl"] .search-results-form fieldset.search-form .advancedOptions div.toggle ul {
+  text-align: right;
+}
+
+.dokuwiki div.search_quickresult {
+  margin-bottom: 1.4em;
+}
+
+.dokuwiki div.search_quickresult ul {
+  padding: 0;
+}
+
+.dokuwiki div.search_quickresult ul li {
+  float: left;
+  width: 12em;
+  margin: 0 1.5em;
+}
+
+[dir="rtl"] .dokuwiki div.search_quickresult ul li {
+  float: right;
+}
+
+.dokuwiki dl.search_results {
+  margin-bottom: 1.2em;
+}
+
+.dokuwiki dl.search_results dt {
+  margin-bottom: 0.2em;
+  font-weight: normal;
+}
+
+.dokuwiki dl.search_results dd.meta {
+  margin: 0 0 0.2em;
+}
+
+.dokuwiki dl.search_results dd.snippet {
+  margin: 0 0 1.2em;
+  background-color: inherit;
+  color: var(--dw-text-alt);
+}
+
+.dokuwiki dl.search_results dd.snippet strong.search_hit {
+  font-weight: normal;
+}
+
+.dokuwiki dl.search_results dd.snippet .search_sep {
+  background-color: inherit;
+  color: var(--dw-text);
+}
+
+.dokuwiki form.search div.no {
+  position: relative;
+}
+
+.dokuwiki form.search div.ajax_qsearch {
+  position: absolute;
+  top: 0;
+  left: -13.5em;
+  z-index: 20;
+  display: none;
+  width: 12em;
+  padding: 0.5em;
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.dokuwiki form.search div.ajax_qsearch strong {
+  display: block;
+  margin-bottom: 0.3em;
+}
+
+.dokuwiki form.search div.ajax_qsearch ul {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.dokuwiki form.search div.ajax_qsearch ul li {
+  display: block !important;
+  margin: 0;
+  padding: 0;
+}
+
+[dir="rtl"] .dokuwiki form.search div.ajax_qsearch {
+  right: -13.5em;
+  left: auto;
+  text-align: right;
+}
+
 .dokuwiki div.breadcrumbs {
   clear: both;
   margin-bottom: 0.5em;
@@ -823,6 +997,344 @@ form.search button {
 #dw__toc ul li.level4,
 #dw__toc ul li.level5 {
   margin-left: 2em;
+}
+
+.dokuwiki form {
+  border: 0;
+}
+
+.dokuwiki label.block {
+  display: block;
+  text-align: right;
+  font-weight: bold;
+}
+
+[dir="rtl"] .dokuwiki label.block {
+  text-align: left;
+}
+
+.dokuwiki label.simple {
+  display: block;
+  text-align: left;
+  font-weight: normal;
+}
+
+[dir="rtl"] .dokuwiki label.simple {
+  text-align: right;
+}
+
+.dokuwiki label.block select,
+.dokuwiki label.block input.edit {
+  width: 50%;
+}
+
+.dokuwiki label span {
+  vertical-align: middle;
+}
+
+.dokuwiki fieldset {
+  padding: 0.5em;
+  border: 1px solid var(--dw-border);
+}
+
+.dokuwiki input.edit,
+.dokuwiki select.edit {
+  vertical-align: middle;
+}
+
+.dokuwiki select.edit {
+  padding: 0.1em 0;
+}
+
+.dokuwiki button {
+  vertical-align: middle;
+}
+
+#dw__login label[for="remember__me"] {
+  margin-bottom: 1.4em;
+  margin-left: 50%;
+}
+
+#dw__login fieldset,
+#dw__resendpwd fieldset,
+#dw__register fieldset {
+  padding-bottom: 0.7em;
+}
+
+#dw__profiledelete {
+  display: block;
+  margin-top: 2.8em;
+}
+
+#subscribe__form {
+  display: block;
+  width: 400px;
+  text-align: center;
+}
+
+#subscribe__form fieldset {
+  margin: 0.5em 0;
+  text-align: left;
+}
+
+[dir="rtl"] #subscribe__form fieldset {
+  text-align: right;
+}
+
+#subscribe__form label {
+  display: block;
+  margin: 0 0.5em 0.5em;
+}
+
+.dokuwiki .tabs > ul,
+.dokuwiki ul.tabs {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.dokuwiki .tabs > ul::after,
+.dokuwiki ul.tabs::after {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  border-bottom: 1px solid var(--dw-border);
+  content: "";
+}
+
+.dokuwiki .tabs > ul li,
+.dokuwiki ul.tabs li {
+  float: left;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[dir="rtl"] .dokuwiki .tabs > ul li,
+[dir="rtl"] .dokuwiki ul.tabs li {
+  float: right;
+}
+
+.dokuwiki .tabs > ul li a,
+.dokuwiki ul.tabs li strong,
+.dokuwiki ul.tabs li span,
+.dokuwiki ul.tabs li a {
+  position: relative;
+  z-index: 0;
+  display: inline-block;
+  margin: 0 0 0 0.3em;
+  padding: 0.3em 0.8em;
+  border: 1px solid var(--dw-border);
+  border-radius: 0.5em 0.5em 0 0;
+  background-color: var(--dw-background-neutral);
+  color: var(--dw-text);
+}
+
+[dir="rtl"] .dokuwiki .tabs > ul li a,
+[dir="rtl"] .dokuwiki ul.tabs li strong,
+[dir="rtl"] .dokuwiki ul.tabs li span,
+[dir="rtl"] .dokuwiki ul.tabs li a {
+  margin: 0 0.3em 0 0;
+}
+
+.dokuwiki ul.tabs li strong,
+.dokuwiki ul.tabs li span {
+  font-weight: normal;
+}
+
+.dokuwiki .tabs > ul li a:hover,
+.dokuwiki .tabs > ul li a:active,
+.dokuwiki .tabs > ul li a:focus,
+.dokuwiki .tabs > ul li .curid a,
+.dokuwiki .tabs > ul .active a,
+.dokuwiki ul.tabs li a:hover,
+.dokuwiki ul.tabs li a:active,
+.dokuwiki ul.tabs li a:focus,
+.dokuwiki ul.tabs li.active a,
+.dokuwiki ul.tabs li.active span,
+.dokuwiki ul.tabs li strong {
+  background-color: var(--dw-background-alt);
+  color: var(--dw-text);
+  font-weight: normal;
+  text-decoration: none;
+}
+
+.dokuwiki .tabs > ul li .curid a,
+.dokuwiki .tabs > ul li .active a,
+.dokuwiki .tabs > ul .active a,
+.dokuwiki ul.tabs li.active a,
+.dokuwiki ul.tabs li.active span,
+.dokuwiki ul.tabs li strong {
+  z-index: 2;
+  border-bottom-color: var(--dw-background-alt);
+}
+
+.dokuwiki .ui-widget {
+  font-size: 100%;
+}
+
+[dir="rtl"] #link__wiz_close {
+  float: left;
+}
+
+#link__wiz_result {
+  width: 293px;
+  height: 193px;
+  margin: 3px auto;
+  overflow: auto;
+  border: 1px solid var(--dw-border);
+  background-color: var(--dw-background);
+  line-height: 1;
+  text-align: left;
+}
+
+[dir="rtl"] #link__wiz_result {
+  text-align: right;
+}
+
+#link__wiz_result div {
+  padding: 3px 3px 3px 0;
+}
+
+#link__wiz_result div a {
+  display: block;
+  min-height: 16px;
+  padding-left: 22px;
+  background: transparent 3px center no-repeat;
+}
+
+[dir="rtl"] #link__wiz_result div a {
+  padding: 3px 22px 3px 3px;
+  background-position: 257px 3px;
+}
+
+#link__wiz_result div.type_u a {
+  background-image: url("/images/up.png");
+}
+
+#link__wiz_result div.type_f a {
+  background-image: url("/images/page.png");
+}
+
+#link__wiz_result div.type_d a {
+  background-image: url("/images/ns.png");
+}
+
+#link__wiz_result div.even {
+  background-color: var(--dw-background-neutral);
+}
+
+#link__wiz_result div.selected {
+  background-color: var(--dw-background-alt);
+}
+
+#link__wiz_result span {
+  display: block;
+  margin-left: 22px;
+  color: var(--dw-text-neutral);
+}
+
+#media__popup {
+  display: none;
+}
+
+#media__popup_content p {
+  margin: 0 0 0.5em;
+}
+
+#media__popup_content label {
+  margin-right: 0.5em;
+  cursor: default;
+}
+
+#media__popup_content button {
+  margin-right: 1px;
+  cursor: pointer;
+}
+
+.dokuwiki div.ui-admin ul.admin_tasks,
+.dokuwiki ul.admin__tools {
+  float: left;
+  width: 40%;
+  padding: 0;
+  list-style-type: none;
+  font-size: 1.125em;
+}
+
+[dir="rtl"] .dokuwiki div.ui-admin ul.admin_tasks,
+[dir="rtl"] .dokuwiki ul.admin__tools {
+  float: right;
+}
+
+.dokuwiki div.ui-admin ul,
+.dokuwiki ul.admin__tools {
+  padding: 0;
+}
+
+.dokuwiki div.ui-admin ul li,
+.dokuwiki ul.admin__tools li {
+  margin: 0 0 1em;
+  font-weight: bold;
+  list-style-type: none;
+  white-space: nowrap;
+}
+
+.dokuwiki div.ui-admin ul li a,
+.dokuwiki ul.admin__tools li a {
+  display: flex;
+}
+
+.dokuwiki div.ui-admin ul li a span,
+.dokuwiki ul.admin__tools li a span {
+  display: inline-block;
+}
+
+.dokuwiki div.ui-admin ul li a span.icon,
+.dokuwiki ul.admin__tools li a span.icon {
+  width: 1.5em;
+  min-height: 1.5em;
+  margin: 0 0.5em;
+  vertical-align: top;
+}
+
+.dokuwiki div.ui-admin ul li a span.icon svg,
+.dokuwiki ul.admin__tools li a span.icon svg {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  fill: var(--dw-link);
+}
+
+.dokuwiki div.ui-admin ul li a span.icon svg path,
+.dokuwiki ul.admin__tools li a span.icon svg path {
+  fill: var(--dw-link);
+}
+
+.dokuwiki div.ui-admin ul li a span.prompt,
+.dokuwiki ul.admin__tools li a span.prompt {
+  white-space: normal;
+}
+
+.dokuwiki div.ui-admin #admin__version,
+.dokuwiki #admin__version {
+  clear: left;
+  float: right;
+  background-color: inherit;
+  color: var(--dw-text-neutral);
+}
+
+[dir="rtl"] .dokuwiki div.ui-admin #admin__version,
+[dir="rtl"] .dokuwiki #admin__version {
+  clear: right;
+  float: left;
+}
+
+.dokuwiki div.ui-admin #security__check,
+.dokuwiki #security__check {
+  float: right;
+  max-width: 20em;
 }
 
 .dokuwiki .page form {
@@ -1373,6 +1885,835 @@ form.search button {
 #dokuwiki__detail div.img_detail dl dd {
   margin-left: 9.5em;
   overflow-wrap: anywhere;
+}
+
+html.popup {
+  overflow: auto;
+}
+
+html.popup #media__manager {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.popup #mediamgr__aside {
+  position: absolute;
+  left: 0;
+  width: 30%;
+  height: 100%;
+  overflow: auto;
+  border-right: 1px solid var(--dw-border);
+}
+
+[dir="rtl"] html.popup #mediamgr__aside {
+  right: 0;
+  left: auto;
+  border-right-width: 0;
+  border-left: 1px solid var(--dw-border);
+}
+
+html.popup #mediamgr__aside .pad {
+  padding: 0.5em;
+}
+
+html.popup #mediamgr__content {
+  position: absolute;
+  right: 0;
+  width: 69.7%;
+  height: 100%;
+  overflow: auto;
+}
+
+[dir="rtl"] html.popup #mediamgr__content {
+  right: auto;
+  left: 0;
+}
+
+html.popup #mediamgr__content .pad {
+  padding: 0.5em;
+}
+
+html.popup #media__manager h1,
+html.popup #media__manager h2 {
+  margin-bottom: 0.5em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--dw-border);
+  font-size: 1.5em;
+}
+
+#media__opts {
+  margin-bottom: 0.5em;
+}
+
+#media__opts input {
+  margin-right: 0.3em;
+}
+
+[dir="rtl"] #media__opts input {
+  margin-right: 0;
+  margin-left: 0.3em;
+}
+
+#media__tree ul {
+  padding-left: 0.2em;
+}
+
+[dir="rtl"] #media__tree ul {
+  padding-right: 0.2em;
+  padding-left: 0;
+}
+
+#media__tree ul li {
+  clear: left;
+  margin-left: 0;
+  list-style-type: none;
+  list-style-image: none;
+}
+
+[dir="rtl"] #media__tree ul li {
+  clear: right;
+  margin-right: 0;
+}
+
+#media__tree ul li img {
+  float: left;
+  padding: 0.5em 0.3em 0 0;
+}
+
+[dir="rtl"] #media__tree ul li img {
+  float: right;
+  padding: 0.5em 0 0 0.3em;
+}
+
+#media__tree ul li div.li {
+  display: inline;
+}
+
+#media__tree ul li li {
+  margin-left: 1.5em;
+}
+
+[dir="rtl"] #media__tree ul li li {
+  margin-right: 1.5em;
+  margin-left: 0;
+}
+
+#media__content div.upload {
+  margin-bottom: 0.5em;
+  font-size: 0.9em;
+}
+
+#mediamanager__uploader {
+  margin-bottom: 1em;
+}
+
+#mediamanager__uploader p {
+  margin-bottom: 0.5em;
+}
+
+#media__content img.load {
+  margin: 1em auto;
+}
+
+#media__content .odd,
+#media__content .even {
+  padding: 0.5em;
+}
+
+#media__content .odd {
+  background-color: var(--dw-background-alt);
+}
+
+#media__content #scroll__here {
+  border: 1px dashed var(--dw-border);
+}
+
+#media__content a.mediafile {
+  margin-right: 1.5em;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+[dir="rtl"] #media__content a.mediafile {
+  margin-right: 0;
+  margin-left: 1.5em;
+}
+
+#media__content img.btn {
+  vertical-align: text-bottom;
+}
+
+#media__content div.example {
+  margin-left: 1em;
+  color: var(--dw-text-neutral);
+}
+
+#media__content div.detail {
+  padding: 0.2em 0;
+}
+
+#media__content div.detail div.thumb {
+  float: left;
+  margin: 0 0.5em 0 18px;
+}
+
+[dir="rtl"] #media__content div.detail div.thumb {
+  float: right;
+  margin: 0 18px 0 0.5em;
+}
+
+#media__content div.detail div.thumb a {
+  display: block;
+  cursor: pointer;
+}
+
+#media__content div.detail p {
+  margin-bottom: 0;
+}
+
+#mediamanager__page h1 {
+  margin-bottom: 0.5em;
+}
+
+#mediamanager__page {
+  min-width: 50em;
+  width: 100%;
+  text-align: left;
+}
+
+[dir="rtl"] #mediamanager__page {
+  text-align: right;
+}
+
+#mediamanager__page .panel {
+  float: left;
+}
+
+[dir="rtl"] #mediamanager__page .panel {
+  float: right;
+}
+
+#mediamanager__page .namespaces {
+  left: 0 !important;
+  width: 20%;
+  min-width: 10em;
+}
+
+#mediamanager__page .filelist {
+  left: 0 !important;
+  width: 50%;
+  min-width: 25em;
+}
+
+#mediamanager__page .file {
+  width: 30%;
+  min-width: 15em;
+}
+
+#mediamanager__page .tabs li {
+  white-space: nowrap;
+}
+
+#mediamanager__page .panelHeader {
+  min-height: 20px;
+  margin: 0 10px 10px 0;
+  padding: 10px 10px 8px;
+  overflow: hidden;
+  background-color: var(--dw-background-alt);
+  text-align: left;
+}
+
+[dir="rtl"] #mediamanager__page .panelHeader {
+  margin: 0 0 10px 10px;
+  text-align: right;
+}
+
+#mediamanager__page .panelContent {
+  position: relative;
+  margin: 0 10px 10px 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+[dir="rtl"] #mediamanager__page .panelContent {
+  margin: 0 0 10px 10px;
+  text-align: right;
+}
+
+#mediamanager__page .file .panelHeader,
+#mediamanager__page .file .panelContent {
+  margin-right: 0;
+}
+
+[dir="rtl"] #mediamanager__page .file .panelHeader,
+[dir="rtl"] #mediamanager__page .file .panelContent {
+  margin-left: 0;
+}
+
+#mediamanager__page .ui-resizable-e {
+  right: 2px;
+  width: 6px;
+  background: transparent url("/images/resizecol.png") center center no-repeat;
+}
+
+#mediamanager__page .ui-resizable-e:hover {
+  background-color: var(--dw-background-alt);
+}
+
+[dir="rtl"] #mediamanager__page .ui-resizable-w {
+  left: 2px;
+  width: 6px;
+  background: transparent url("/images/resizecol.png") center center no-repeat;
+}
+
+[dir="rtl"] #mediamanager__page .ui-resizable-w:hover {
+  background-color: var(--dw-background-alt);
+}
+
+#mediamanager__page dd {
+  margin: 0;
+}
+
+#mediamanager__page .panelHeader h3 {
+  float: left;
+  margin: 0 0 3px;
+  padding: 0;
+  font-size: 1em;
+  font-weight: normal;
+}
+
+[dir="rtl"] #mediamanager__page .panelHeader h3 {
+  float: right;
+}
+
+[dir="rtl"] #mediamanager__page .namespaces {
+  text-align: right;
+}
+
+#mediamanager__page .namespaces h2 {
+  position: relative;
+  bottom: -1px;
+  z-index: 2;
+  display: inline-block;
+  margin: 0 0 0 0.3em;
+  padding: 0.3em 0.8em;
+  border: 1px solid var(--dw-border);
+  border-bottom-color: var(--dw-background-alt);
+  border-radius: 0.5em 0.5em 0 0;
+  background-color: var(--dw-background-alt);
+  color: var(--dw-text);
+  font-size: 1em;
+  font-weight: normal;
+  line-height: 1.4em;
+}
+
+[dir="rtl"] #mediamanager__page .namespaces h2 {
+  right: 10px;
+  margin: 0 0.3em 0 0;
+}
+
+#mediamanager__page .namespaces .panelHeader {
+  z-index: 1;
+  border-top: 1px solid var(--dw-border);
+}
+
+#mediamanager__page .namespaces ul {
+  margin-bottom: 0;
+  margin-left: 0.2em;
+  padding: 0;
+  list-style: none;
+}
+
+[dir="rtl"] #mediamanager__page .namespaces ul {
+  margin-right: 0.2em;
+  margin-left: 0;
+}
+
+#mediamanager__page .namespaces ul ul {
+  margin-left: 1em;
+}
+
+[dir="rtl"] #mediamanager__page .namespaces ul ul {
+  margin-right: 1em;
+  margin-left: 0;
+}
+
+#mediamanager__page .namespaces ul ul li {
+  margin: 0;
+}
+
+#mediamanager__page .namespaces ul .selected {
+  background-color: var(--dw-highlight);
+  font-weight: bold;
+}
+
+#mediamanager__page .panelHeader form.options {
+  float: right;
+  margin-top: -3px;
+}
+
+[dir="rtl"] #mediamanager__page .panelHeader form.options {
+  float: left;
+}
+
+#mediamanager__page .panelHeader ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#mediamanager__page .panelHeader ul li {
+  float: left;
+  padding-left: 3px;
+  color: var(--dw-text);
+  line-height: 1;
+}
+
+[dir="rtl"] #mediamanager__page .panelHeader ul li {
+  float: right;
+  padding-right: 3px;
+  padding-left: 0;
+}
+
+#mediamanager__page .panelHeader ul li.ui-controlgroup-horizontal {
+  margin: 0 0 0 5px;
+  padding-left: 30px;
+}
+
+#mediamanager__page .panelHeader ul li.listType {
+  background: url("/images/icon-list.png") 3px 1px no-repeat;
+}
+
+#mediamanager__page .panelHeader ul li.sortBy {
+  background: url("/images/icon-sort.png") 3px 1px no-repeat;
+}
+
+[dir="rtl"] #mediamanager__page .panelHeader ul li.ui-controlgroup-horizontal {
+  margin: 0 5px 0 0;
+  padding-right: 30px;
+  padding-left: 0;
+  background-position: right 1px;
+}
+
+#mediamanager__page .panelHeader form.options .ui-controlgroup-horizontal label {
+  margin-right: -0.4em;
+  padding: 0.3em 0.5em;
+  font-size: 90%;
+  line-height: 1;
+}
+
+#mediamanager__page .filelist ul {
+  margin: 0 10px 0 0;
+  padding: 0;
+}
+
+[dir="rtl"] #mediamanager__page .filelist ul {
+  margin: 0 0 0 10px;
+}
+
+#mediamanager__page .filelist ul.rows {
+  margin: 0;
+}
+
+#mediamanager__page .filelist .panelContent ul li:hover {
+  background-color: var(--dw-background-alt);
+}
+
+#mediamanager__page .filelist li dt a {
+  display: table-cell;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+#mediamanager__page .filelist .thumbs li {
+  position: relative;
+  display: inline-block;
+  width: 100px;
+  min-height: 130px;
+  margin: 0 6px 10px 0;
+  padding: 5px;
+  background-color: var(--dw-background-neutral);
+  color: var(--dw-text);
+  line-height: 1.2;
+  text-align: center;
+  vertical-align: top;
+}
+
+[dir="rtl"] #mediamanager__page .filelist .thumbs li {
+  margin-right: 0;
+  margin-left: 6px;
+}
+
+#mediamanager__page .filelist .thumbs li dt a {
+  width: 100px;
+  height: 90px;
+}
+
+#mediamanager__page .filelist .thumbs li dt a img {
+  max-width: 90px;
+  max-height: 90px;
+}
+
+#mediamanager__page .filelist .thumbs li .name,
+#mediamanager__page .filelist .thumbs li .size,
+#mediamanager__page .filelist .thumbs li .filesize,
+#mediamanager__page .filelist .thumbs li .date {
+  display: block;
+  width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#mediamanager__page .filelist .thumbs li .name {
+  padding: 5px 0;
+  font-weight: bold;
+}
+
+#mediamanager__page .filelist .thumbs li .date {
+  font-style: italic;
+  white-space: normal;
+}
+
+#mediamanager__page .filelist .rows li {
+  position: relative;
+  display: block;
+  max-height: 50px;
+  margin: 0 0 3px;
+  overflow: hidden;
+  background-color: var(--dw-background);
+  color: var(--dw-text);
+  list-style: none;
+}
+
+#mediamanager__page .filelist .rows li:nth-child(2n + 1) {
+  background-color: var(--dw-background-neutral);
+}
+
+#mediamanager__page .filelist .rows li dt {
+  float: left;
+  width: 10%;
+  height: 40px;
+  text-align: center;
+}
+
+[dir="rtl"] #mediamanager__page .filelist .rows li dt {
+  float: right;
+}
+
+#mediamanager__page .filelist .rows li dt a {
+  width: 100px;
+  height: 40px;
+}
+
+#mediamanager__page .filelist .rows li dt a img {
+  max-width: 40px;
+  max-height: 40px;
+}
+
+#mediamanager__page .filelist .rows li .name,
+#mediamanager__page .filelist .rows li .size,
+#mediamanager__page .filelist .rows li .filesize,
+#mediamanager__page .filelist .rows li .date {
+  float: left;
+  margin-left: 1%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[dir="rtl"] #mediamanager__page .filelist .rows li .name,
+[dir="rtl"] #mediamanager__page .filelist .rows li .size,
+[dir="rtl"] #mediamanager__page .filelist .rows li .filesize,
+[dir="rtl"] #mediamanager__page .filelist .rows li .date {
+  float: right;
+  margin-right: 1%;
+  margin-left: 0;
+}
+
+#mediamanager__page .filelist .rows li .name {
+  width: 30%;
+  font-weight: bold;
+}
+
+#mediamanager__page .filelist .rows li .size,
+#mediamanager__page .filelist .rows li .filesize {
+  width: 15%;
+}
+
+#mediamanager__page .filelist .rows li .date {
+  width: 20%;
+  font-style: italic;
+  white-space: normal;
+}
+
+#mediamanager__page div.upload {
+  padding-bottom: 0.5em;
+}
+
+#mediamanager__page .file ul.actions {
+  margin: 0 0 5px;
+  padding: 0;
+  text-align: center;
+  list-style: none;
+}
+
+#mediamanager__page .file ul.actions li {
+  display: inline;
+  margin: 0;
+}
+
+#mediamanager__page .file div.image {
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+#mediamanager__page .file div.image img {
+  width: 100%;
+}
+
+#mediamanager__page .file dl {
+  margin-bottom: 0;
+}
+
+#mediamanager__page .file dl dt {
+  display: block;
+  background-color: var(--dw-background-alt);
+  font-weight: bold;
+}
+
+#mediamanager__page .file dl dd {
+  display: block;
+  background-color: var(--dw-background-neutral);
+}
+
+#mediamanager__page form.meta div.row {
+  margin-bottom: 5px;
+}
+
+#mediamanager__page form.meta label span {
+  display: block;
+}
+
+#mediamanager__page form.meta input {
+  width: 50%;
+}
+
+#mediamanager__page form.meta button {
+  width: auto;
+}
+
+#mediamanager__page form.meta textarea.edit {
+  width: 95%;
+  min-width: 95%;
+  max-width: 95%;
+  height: 6em;
+}
+
+#mediamanager__page form.changes ul {
+  margin-left: 10px;
+  padding: 0;
+  list-style-type: none;
+}
+
+[dir="rtl"] #mediamanager__page form.changes ul {
+  margin-right: 10px;
+  margin-left: 0;
+}
+
+#mediamanager__page form.changes ul li div.li div {
+  padding-left: 18px;
+  color: var(--dw-text-neutral);
+  font-size: 90%;
+}
+
+[dir="rtl"] #mediamanager__page form.changes ul li div.li div {
+  padding-right: 18px;
+  padding-left: 0;
+}
+
+#mediamanager__page form.changes ul li div.li input {
+  position: relative;
+  top: 1px;
+}
+
+#mediamanager__diff table {
+  table-layout: fixed;
+  border-width: 0;
+}
+
+#mediamanager__diff td,
+#mediamanager__diff th {
+  width: 48%;
+  margin: 0 5px 10px 0;
+  padding: 0;
+  border-color: var(--dw-background);
+  text-align: left;
+  vertical-align: top;
+}
+
+[dir="rtl"] #mediamanager__diff td,
+[dir="rtl"] #mediamanager__diff th {
+  margin: 0 0 10px 5px;
+  text-align: right;
+}
+
+#mediamanager__diff th {
+  background-color: var(--dw-background);
+  font-weight: normal;
+  line-height: 1.2;
+}
+
+#mediamanager__diff th a {
+  font-weight: bold;
+}
+
+#mediamanager__diff th span {
+  font-size: 90%;
+}
+
+#mediamanager__diff dl dd strong {
+  background-color: var(--dw-highlight);
+  color: var(--dw-text);
+  font-weight: normal;
+}
+
+#mediamanager__page .file form.diffView {
+  display: block;
+  margin-bottom: 10px;
+}
+
+#mediamanager__diff div.slider {
+  width: 95%;
+  margin: 10px;
+}
+
+#mediamanager__diff .imageDiff {
+  position: relative;
+}
+
+#mediamanager__diff .imageDiff .image2 {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#mediamanager__diff .imageDiff.opacity .image2 {
+  opacity: 0.5;
+}
+
+#mediamanager__diff .imageDiff.portions .image2 {
+  overflow: hidden;
+  border-right: 1px solid red;
+}
+
+#mediamanager__diff .imageDiff.portions img {
+  float: left;
+}
+
+#mediamanager__diff .imageDiff img {
+  width: 100%;
+  max-width: none;
+}
+
+.qq-uploader {
+  position: relative;
+  width: 100%;
+}
+
+.qq-uploader .error {
+  background-color: #fff;
+  color: #f00;
+}
+
+.qq-upload-button {
+  display: inline-block;
+  margin: 1px 1px 5px;
+  cursor: pointer;
+  font-size: 100%;
+  text-decoration: none;
+}
+
+.qq-upload-button-focus {
+  outline: 1px dotted;
+}
+
+.qq-upload-drop-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 70px;
+  background: var(--dw-background-neutral);
+  color: var(--dw-text);
+  text-align: center;
+}
+
+.qq-upload-drop-area span {
+  position: absolute;
+  top: 50%;
+  display: block;
+  width: 100%;
+  margin-top: -8px;
+  font-size: 120%;
+}
+
+.qq-upload-drop-area-active {
+  background: var(--dw-background-alt);
+}
+
+div.qq-uploader ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qq-uploader li {
+  margin: 0 0 5px;
+  color: var(--dw-text);
+}
+
+.qq-uploader li span,
+.qq-uploader li input,
+.qq-uploader li a {
+  margin-right: 5px;
+}
+
+.qq-upload-file {
+  display: block;
+  font-weight: bold;
+}
+
+.qq-upload-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  background: url("/images/throbber.gif");
+  vertical-align: text-bottom;
+}
+
+.qq-upload-size,
+.qq-upload-cancel {
+  font-size: 85%;
+}
+
+.qq-upload-failed-text {
+  display: none;
+}
+
+.qq-upload-fail .qq-upload-failed-text {
+  display: inline;
+}
+
+.qq-action-container * {
+  vertical-align: middle;
+}
+
+.qq-overwrite-check input {
+  margin-left: 10px;
 }
 
 #media__manager {
