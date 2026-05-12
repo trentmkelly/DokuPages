@@ -535,12 +535,16 @@ describe("DokuWiki import planner", () => {
       path.join(root, "data/meta/_dokuwiki.changes"),
       [
         "1767225600\t203.0.113.7\tE\twiki:welcome\talice\tEdited old page\t\t5",
-        "1767225602\t203.0.113.9\tD\twiki:welcome\talice\tDeleted page\t\t-24"
+        "1767225602\t203.0.113.9\tD\twiki:welcome\talice\tDeleted page\t\t-24",
+        "1767225604\t203.0.113.10\tD\twiki:old\talice\tDeleted old page\t\t-12"
       ].join("\n")
     );
     await writeFile(
       path.join(root, "data/meta/_media.changes"),
-      "1767225600\t203.0.113.8\tE\twiki:logo.svg\tbob\tEdited old logo\t\t3\n"
+      [
+        "1767225600\t203.0.113.8\tE\twiki:logo.svg\tbob\tEdited old logo\t\t3",
+        "1767225605\t203.0.113.11\tD\twiki:gone.png\tbob\tDeleted old image\t\t-9"
+      ].join("\n")
     );
     await writeFile(
       path.join(root, "data/meta/wiki/welcome.meta"),
@@ -586,6 +590,9 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'wiki:welcome@2026-01-01T00:00:00.000Z'");
     expect(sql).toContain("Imported from DokuWiki flat files");
     expect(sql).toContain("'user:alice', 'alice',\n  'Edited old page', 'edit', 5");
+    expect(sql).toContain("'wiki:old', 'wiki', 'old', 'wiki:old@2026-01-01T00:00:04.000Z', 1");
+    expect(sql).toContain("'wiki:old@2026-01-01T00:00:04.000Z', 'wiki:old', '',");
+    expect(sql).toContain("'Deleted old page', 'delete', -12");
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("term_length");
     expect(sql).not.toContain("values ('aber'");
@@ -595,6 +602,9 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'media/current/wiki/logo.svg'");
     expect(sql).toContain("'wiki:logo.svg@2026-01-01T00:00:00.000Z'");
     expect(sql).toContain("'user:bob', 'Edited old logo', 'edit'");
+    expect(sql).toContain("'wiki:gone.png', 'wiki', 'media/deleted/wiki/gone.png/");
+    expect(sql).toContain("'wiki:gone.png@2026-01-01T00:00:05.000Z', 1");
+    expect(sql).toContain("'Deleted old image', 'delete'");
     expect(sql).toContain("insert or replace into metadata");
     expect(sql).toContain("dokuwiki_language_file");
     expect(sql).toContain("dokuwiki_template_file");

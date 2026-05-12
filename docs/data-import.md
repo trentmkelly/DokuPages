@@ -39,6 +39,9 @@ summary, change type, and size delta on the D1 `page_revisions` row.
 Media revisions imported from `data/media` and `data/media_attic` use the same
 timestamp correlation against `data/meta/_media.changes` to preserve the
 DokuWiki username, upload summary, and media change type on `media_revisions`.
+Delete changelog rows for subjects that no longer have a current file are
+imported as deleted D1 page/media tombstones with delete revisions, so old
+history and recent-change views can still reference those IDs after migration.
 
 Imported DokuWiki config metadata preserves whether a value came from
 `conf/dokuwiki.php`, `conf/local.php`, or `conf/local.protected.php`. The

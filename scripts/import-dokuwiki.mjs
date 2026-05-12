@@ -156,6 +156,8 @@ export async function writePageImportSql(plan, outputFile) {
   const searchStopWords = stopWordsForLanguage(plan.language);
   const pageChangesByRevision = changelogEntriesByRevision(plan.pageChangelogEntries);
   const mediaChangesByRevision = changelogEntriesByRevision(plan.mediaChangelogEntries);
+  const currentPageIds = new Set(plan.pages.map((page) => page.id));
+  const currentMediaIds = new Set(plan.media.map((media) => media.id));
 
   for (const page of plan.pages) {
     const content = await fs.readFile(page.sourcePath, "utf8");
@@ -214,6 +216,45 @@ on conflict(term, page_id) do update set
   updated_at = excluded.updated_at;`
       );
     }
+  }
+
+  for (const deletedPage of deletedChangelogEntries(plan.pageChangelogEntries, currentPageIds)) {
+    const namespace = deletedPage.subjectId.includes(":")
+      ? deletedPage.subjectId.slice(0, deletedPage.subjectId.lastIndexOf(":"))
+      : "";
+    const title = deletedPage.subjectId.includes(":")
+      ? deletedPage.subjectId.slice(deletedPage.subjectId.lastIndexOf(":") + 1)
+      : deletedPage.subjectId;
+    const revisionChange = revisionImportMetadata(deletedPage, {
+      summary: "Deleted page",
+      changeType: "delete",
+      sizeChange: 0
+    });
+    const content = "";
+
+    statements.push(
+      `insert into pages (id, namespace, title, current_revision_id, is_deleted, created_at, updated_at)
+values (${sql(deletedPage.subjectId)}, ${sql(namespace)}, ${sql(title)}, ${sql(
+        deletedPage.revisionId
+      )}, 1, ${sql(deletedPage.createdAt)}, ${sql(deletedPage.createdAt)})
+on conflict(id) do update set
+  namespace = excluded.namespace,
+  title = excluded.title,
+  current_revision_id = excluded.current_revision_id,
+  is_deleted = excluded.is_deleted,
+  updated_at = excluded.updated_at;`
+    );
+
+    statements.push(
+      `insert or replace into page_revisions (
+  id, page_id, content, content_hash, author_id, author_name, summary, change_type, size_change, created_at
+) values (
+  ${sql(deletedPage.revisionId)}, ${sql(deletedPage.subjectId)}, ${sql(content)}, ${sql(
+    sha256(content)
+  )}, ${sql(revisionChange.authorId)}, ${sql(revisionChange.authorName)},
+  ${sql(revisionChange.summary)}, 'delete', ${revisionChange.sizeChange}, ${sql(deletedPage.createdAt)}
+);`
+    );
   }
 
   for (const revision of plan.pageRevisions) {
@@ -291,6 +332,52 @@ on conflict(id) do update set
   )},
   ${sql(revisionChange.authorId)}, ${sql(revisionChange.summary)}, ${sql(revisionChange.changeType)}, ${sql(
     media.modifiedAt
+  )}
+);`
+    );
+  }
+
+  for (const deletedMedia of deletedChangelogEntries(plan.mediaChangelogEntries, currentMediaIds)) {
+    const namespace = mediaNamespace(deletedMedia.subjectId);
+    const mimeType = mediaMimeType(deletedMedia.subjectId, plan.mimeTypes);
+    const revisionChange = mediaRevisionImportMetadata(deletedMedia, {
+      summary: "Deleted media",
+      changeType: "delete"
+    });
+    const objectKey = `media/deleted/${deletedMedia.subjectId.replaceAll(":", "/")}/${deletedMedia.createdAt}`;
+    const contentHash = sha256("");
+
+    statements.push(
+      `insert into media (
+  id, namespace, object_key, mime_type, byte_length, content_hash,
+  current_revision_id, is_deleted, created_at, updated_at
+) values (
+  ${sql(deletedMedia.subjectId)}, ${sql(namespace)}, ${sql(objectKey)}, ${sql(mimeType)}, 0, ${sql(
+    contentHash
+  )},
+  ${sql(deletedMedia.revisionId)}, 1, ${sql(deletedMedia.createdAt)}, ${sql(deletedMedia.createdAt)}
+)
+on conflict(id) do update set
+  namespace = excluded.namespace,
+  object_key = excluded.object_key,
+  mime_type = excluded.mime_type,
+  byte_length = excluded.byte_length,
+  content_hash = excluded.content_hash,
+  current_revision_id = excluded.current_revision_id,
+  is_deleted = excluded.is_deleted,
+  updated_at = excluded.updated_at;`
+    );
+
+    statements.push(
+      `insert or replace into media_revisions (
+  id, media_id, object_key, mime_type, byte_length, content_hash,
+  author_id, summary, change_type, created_at
+) values (
+  ${sql(deletedMedia.revisionId)}, ${sql(deletedMedia.subjectId)}, ${sql(objectKey)}, ${sql(
+    mimeType
+  )}, 0, ${sql(contentHash)},
+  ${sql(revisionChange.authorId)}, ${sql(revisionChange.summary)}, 'delete', ${sql(
+    deletedMedia.createdAt
   )}
 );`
     );
@@ -491,6 +578,16 @@ function changelogEntriesByRevision(entries) {
     if (!byRevision.has(entry.revisionId)) byRevision.set(entry.revisionId, entry);
   }
   return byRevision;
+}
+
+function deletedChangelogEntries(entries, currentIds) {
+  const bySubject = new Map();
+  for (const entry of entries) {
+    if (entry.changeType !== "delete" || currentIds.has(entry.subjectId)) continue;
+    const existing = bySubject.get(entry.subjectId);
+    if (!existing || entry.createdAt > existing.createdAt) bySubject.set(entry.subjectId, entry);
+  }
+  return [...bySubject.values()].sort((a, b) => a.subjectId.localeCompare(b.subjectId));
 }
 
 function revisionImportMetadata(change, fallback) {
