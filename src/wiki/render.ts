@@ -71,6 +71,7 @@ export interface RenderWikiTextOptions {
   linkTargets?: LinkTargets;
   autoPluralLinks?: boolean;
   sectionEdit?: boolean;
+  sectionEditLabel?: string;
   topTocLevel?: number;
   maxTocLevel?: number;
   maxSectionEditLevel?: number;
@@ -231,6 +232,7 @@ export function renderWikiText(
     linkTargets: normalizeLinkTargets(options.linkTargets),
     autoPluralLinks: options.autoPluralLinks ?? false,
     sectionEdit: options.sectionEdit ?? true,
+    sectionEditLabel: options.sectionEditLabel ?? "Edit",
     topTocLevel: clampHeadingLevel(options.topTocLevel, 1),
     maxTocLevel: clampHeadingLevel(options.maxTocLevel, 5),
     maxSectionEditLevel: clampHeadingLevel(options.maxSectionEditLevel, 5, 0),
@@ -301,12 +303,13 @@ export function renderWikiText(
       }
       title.value ??= heading.title;
       context.sectionIndex += 1;
+      const sectionEditClass = renderSectionEditClass(heading.level, context);
       blocks.push(
-        `<h${heading.level} id="${id}">${renderInline(heading.title, context)}${renderSectionEditLink(
+        `<h${heading.level}${sectionEditClass} id="${id}">${renderInline(heading.title, context)}</h${heading.level}>${renderSectionEditButton(
           heading.title,
           heading.level,
           context
-        )}</h${heading.level}>`
+        )}`
       );
       continue;
     }
@@ -481,6 +484,7 @@ interface RenderContext {
   linkTargets: Required<Record<LinkTargetKind, string | null>>;
   autoPluralLinks: boolean;
   sectionEdit: boolean;
+  sectionEditLabel: string;
   topTocLevel: number;
   maxTocLevel: number;
   maxSectionEditLevel: number;
@@ -504,12 +508,20 @@ function parseHeading(line: string): { level: number; title: string } | null {
   };
 }
 
-function renderSectionEditLink(title: string, level: number, context: RenderContext): string {
+function renderSectionEditClass(level: number, context: RenderContext): string {
   if (!context.pageId || !context.sectionEdit || level > context.maxSectionEditLevel) return "";
 
-  const href = `${pageIdToRoutePath(context.pageId, context.pageIdCleanOptions)}?do=edit&section=${context.sectionIndex}`;
+  return ` class="sectionedit${context.sectionIndex}"`;
+}
 
-  return `<a class="secedit" href="${escapeAttribute(href)}" aria-label="Edit section ${escapeAttribute(title)}">Edit</a>`;
+function renderSectionEditButton(title: string, level: number, context: RenderContext): string {
+  if (!context.pageId || !context.sectionEdit || level > context.maxSectionEditLevel) return "";
+
+  const action = pageIdToRoutePath(context.pageId, context.pageIdCleanOptions);
+  const section = String(context.sectionIndex);
+  const label = context.sectionEditLabel;
+
+  return `<div class="secedit editbutton_section editbutton_${section}"><form class="button btn_secedit" method="get" action="${escapeAttribute(action)}"><div class="no"><input type="hidden" name="do" value="edit"><input type="hidden" name="section" value="${section}"><input type="hidden" name="summary" value="${escapeAttribute(`[${title}] `)}"><button type="submit" title="${escapeAttribute(label)}">${escapeHtml(label)}</button></div></form></div>`;
 }
 
 function flushAll(blocks: string[], state: ParserState, context: RenderContext): void {
@@ -848,6 +860,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             linkTargets: context.linkTargets,
             autoPluralLinks: context.autoPluralLinks,
             sectionEdit: context.sectionEdit,
+            sectionEditLabel: context.sectionEditLabel,
             topTocLevel: context.topTocLevel,
             maxTocLevel: context.maxTocLevel,
             maxSectionEditLevel: context.maxSectionEditLevel,

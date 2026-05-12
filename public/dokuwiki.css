@@ -25,7 +25,7 @@
  * - css/content.less (screen) sha256:7453d93120c0
  * - css/mobile.less (all) sha256:09a3b90a3a6f
  * - css/print.css (print) sha256:d981e16413f2
- * Pages override source: src/styles/dokuwiki-pages-overrides.css sha256:c138de413484
+ * Pages override source: src/styles/dokuwiki-pages-overrides.css sha256:759fe46f9824
  *
  * This stylesheet compiles and adapts the upstream DokuWiki default template
  * (GPL-2.0), then appends the Cloudflare Pages port overrides.
@@ -6648,8 +6648,24 @@ button.media-tree__toggle {
   background-image: url("/images/pagetools/01_edit.png");
 }
 
+#dokuwiki__pagetools .create span.icon {
+  background-image: url("/images/pagetools/02_create.png");
+}
+
+#dokuwiki__pagetools .draft span.icon {
+  background-image: url("/images/pagetools/03_draft.png");
+}
+
+#dokuwiki__pagetools .show span.icon {
+  background-image: url("/images/pagetools/04_show.png");
+}
+
 #dokuwiki__pagetools .source span.icon {
   background-image: url("/images/pagetools/05_source.png");
+}
+
+#dokuwiki__pagetools .revert span.icon {
+  background-image: url("/images/pagetools/06_revert.png");
 }
 
 #dokuwiki__pagetools .revisions span.icon {
@@ -6665,7 +6681,7 @@ button.media-tree__toggle {
 }
 
 #dokuwiki__pagetools .subscribe span.icon {
-  background-image: url("/images/pagetools/04_show.png");
+  background-image: url("/images/pagetools/09_subscribe.png");
 }
 
 #dokuwiki__pagetools .top span.icon {

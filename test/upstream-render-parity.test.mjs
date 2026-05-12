@@ -61,6 +61,10 @@ function normalizeRenderedHtml(html) {
     .replace(/href="[^"]*\/doku\.php\?id=([^"]+)"/g, (_match, id) => {
       return `href="/wiki/${String(id).replaceAll(":", "/")}"`;
     })
+    .replace(
+      /<div class="secedit editbutton_section editbutton_\d+"><form class="button btn_secedit"[\s\S]*?<\/form><\/div>/g,
+      ""
+    )
     .replace(/<div class="level\d+">\s*/g, "")
     .replace(/\s*<\/div>/g, "")
     .replace(/\s*class="sectionedit\d+"/g, "")

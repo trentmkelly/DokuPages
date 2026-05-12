@@ -31,7 +31,9 @@ describe("upstream parser mode coverage", () => {
     expect(
       rendered("**bold** //em// __under__ ''mono'' ,,sub,, <sup>sup</sup> <del>del</del>")
     ).toContain("<strong>bold</strong>");
-    expect(rendered("====== Heading ======")).toContain('<h1 id="heading">Heading');
+    expect(rendered("====== Heading ======")).toContain(
+      '<h1 class="sectionedit1" id="heading">Heading</h1>'
+    );
     expect(rendered("before\n\n----\n\nafter")).toContain("<hr>");
     expect(rendered("[[wiki:syntax|Syntax]]")).toContain('href="/wiki/wiki/syntax"');
     expect(rendered("one \\\\\ntwo")).toContain("one <br>two");

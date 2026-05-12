@@ -29,6 +29,7 @@ describe("public assets", () => {
     expect(js).toContain("formatLines");
     expect(js).toContain("autoHeadline");
     expect(js).toContain("pickerToggle");
+    expect(js).toContain("bindSectionEditHighlights");
     expect(js).toContain("bindEditorKeyHelpers");
     expect(js).toContain("lockWarningDelay");
     expect(js).toContain("data-media-tree-toggle");
@@ -57,7 +58,10 @@ describe("public assets", () => {
       "#mediamanager__diff .imageDiff.opacity .image2",
       ".qq-upload-drop-area",
       ".dokuwiki div.ui-admin ul.admin_tasks",
-      ".dokuwiki ul.admin__tools"
+      ".dokuwiki ul.admin__tools",
+      "#dokuwiki__pagetools .create span.icon",
+      "#dokuwiki__pagetools .show span.icon",
+      "#dokuwiki__pagetools .subscribe span.icon"
     ];
 
     for (const selector of selectors) {
@@ -78,6 +82,19 @@ describe("public assets", () => {
       "public/images/icon-list.png",
       "public/images/icon-sort.png",
       "public/images/ns.png",
+      "public/images/pagetools/00_default.png",
+      "public/images/pagetools/01_edit.png",
+      "public/images/pagetools/02_create.png",
+      "public/images/pagetools/03_draft.png",
+      "public/images/pagetools/04_show.png",
+      "public/images/pagetools/05_source.png",
+      "public/images/pagetools/06_revert.png",
+      "public/images/pagetools/07_revisions.png",
+      "public/images/pagetools/08_backlink.png",
+      "public/images/pagetools/09_subscribe.png",
+      "public/images/pagetools/10_top.png",
+      "public/images/pagetools/11_mediamanager.png",
+      "public/images/pagetools/12_back.png",
       "public/images/open.png",
       "public/images/page.png",
       "public/images/resizecol.png",

@@ -10,8 +10,11 @@ describe("renderWikiText", () => {
     expect(rendered.title).toBe("Welcome Page");
     expect(rendered.toc).toEqual([{ id: "welcome-page", level: 1, title: "Welcome Page" }]);
     expect(rendered.html).toContain(
-      '<h1 id="welcome-page">Welcome Page<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome Page">Edit</a></h1>'
+      '<h1 class="sectionedit1" id="welcome-page">Welcome Page</h1><div class="secedit editbutton_section editbutton_1"><form class="button btn_secedit" method="get" action="/wiki/wiki/welcome">'
     );
+    expect(rendered.html).toContain('<input type="hidden" name="do" value="edit">');
+    expect(rendered.html).toContain('<input type="hidden" name="section" value="1">');
+    expect(rendered.html).toContain('<input type="hidden" name="summary" value="[Welcome Page] ">');
   });
 
   it("deduplicates heading anchors without rescanning the table of contents", () => {
@@ -59,8 +62,8 @@ describe("renderWikiText", () => {
       { id: "two", level: 2, title: "Two" },
       { id: "three", level: 3, title: "Three" }
     ]);
-    expect(rendered.html).toContain('href="/wiki/wiki/levels?do=edit&amp;section=1"');
-    expect(rendered.html).toContain('href="/wiki/wiki/levels?do=edit&amp;section=2"');
+    expect(rendered.html).toContain('<input type="hidden" name="section" value="1">');
+    expect(rendered.html).toContain('<input type="hidden" name="section" value="2">');
     expect(rendered.html).not.toContain('section=3"');
     expect(rendered.html).not.toContain('section=4"');
   });

@@ -310,6 +310,13 @@ describe("handleRequest", () => {
     expect(html).toContain('id="dokuwiki__usertools"');
     expect(html).toContain("User Tools");
     expect(html).toContain('id="mobile__tools"');
+    expect(html).toContain('<li class="edit"><a href="/wiki/wiki/welcome?do=edit"');
+    expect(html).toContain(
+      '<span class="label">Edit this page</span><span class="icon" aria-hidden="true"></span>'
+    );
+    expect(html).toContain('<li class="revisions"><a href="/wiki/wiki/welcome?do=revisions"');
+    expect(html).toContain('<li class="backlink"><a href="/wiki/wiki/welcome?do=backlink"');
+    expect(html).toContain('<li class="top"><a href="#dokuwiki__top"');
     expect(html).toContain(
       '<li class="action login"><a href="/wiki/wiki/welcome?do=login" title="Log In" rel="nofollow">Log In</a></li>'
     );
@@ -319,8 +326,9 @@ describe("handleRequest", () => {
     expect(html).toContain('<option value="/wiki/wiki/welcome?do=login">Log In</option>');
     expect(html).toContain('<option value="/wiki/wiki/welcome?do=register">Register</option>');
     expect(html).toContain(
-      '<h1 id="welcome">Welcome<a class="secedit" href="/wiki/wiki/welcome?do=edit&amp;section=1" aria-label="Edit section Welcome">Edit</a></h1>'
+      '<h1 class="sectionedit1" id="welcome">Welcome</h1><div class="secedit editbutton_section editbutton_1"><form class="button btn_secedit" method="get" action="/wiki/wiki/welcome">'
     );
+    expect(html).toContain('<input type="hidden" name="section" value="1">');
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
@@ -594,8 +602,8 @@ describe("handleRequest", () => {
     expect(html).not.toContain('<a href="#imported-heading">Imported heading</a>');
     expect(html).toContain('<a href="#details">Details</a>');
     expect(html).not.toContain('<a href="#hidden-from-toc">Hidden From TOC</a>');
-    expect(html).toContain('href="/wiki/wiki/welcome?do=edit&amp;section=1"');
-    expect(html).not.toContain('href="/wiki/wiki/welcome?do=edit&amp;section=2"');
+    expect(html).toContain('<input type="hidden" name="section" value="1">');
+    expect(html).not.toContain('<input type="hidden" name="section" value="2">');
     expect(cachePuts).not.toContain("page:wiki:welcome");
   });
 
@@ -852,6 +860,7 @@ describe("handleRequest", () => {
     expect(view.status).toBe(200);
     const html = await view.text();
     expect(html).not.toContain("/wiki/wiki/welcome?do=edit");
+    expect(html).not.toContain("btn_secedit");
     expect(html).not.toContain("/wiki/wiki/welcome?do=revisions");
     expect(html).not.toContain("Media Manager");
     expect(html).not.toContain("Log In");
@@ -2582,8 +2591,8 @@ describe("handleRequest", () => {
     expect(html).toContain('<a href="#welcome">Welcome</a>');
     expect(html).toContain('<a href="#details">Details</a>');
     expect(html).not.toContain('<a href="#hidden-from-toc">Hidden From TOC</a>');
-    expect(html).toContain('href="/wiki/wiki/welcome?do=edit&amp;section=1"');
-    expect(html).not.toContain('href="/wiki/wiki/welcome?do=edit&amp;section=2"');
+    expect(html).toContain('<input type="hidden" name="section" value="1">');
+    expect(html).not.toContain('<input type="hidden" name="section" value="2">');
   });
 
   it("honors the DokuWiki useheading title setting", async () => {
@@ -2635,6 +2644,7 @@ describe("handleRequest", () => {
     expect(html).toContain(
       '<a class="action" href="/wiki/missing/page?do=edit" rel="nofollow" title="Create this page">Create this page</a>'
     );
+    expect(html).toContain('<li class="create"><a href="/wiki/missing/page?do=edit"');
     expect(html).not.toContain('class="action create" href="/wiki/missing/page?do=edit"');
     expect(html).not.toContain('class="wikilink2" href="/wiki/missing/page?do=edit"');
     expect(html).toContain('<link rel="canonical" href="/wiki/missing/page">');

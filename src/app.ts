@@ -4338,6 +4338,7 @@ async function renderPageHtml(
     autoPluralLinks: renderConfig.autoPluralLinks,
     pageIdCleanOptions: config.pageIdCleanOptions,
     sectionEdit,
+    sectionEditLabel: localizedAuthText(env, "btn_secedit"),
     topTocLevel: renderConfig.topTocLevel,
     maxTocLevel: renderConfig.maxTocLevel,
     maxSectionEditLevel: renderConfig.maxSectionEditLevel,

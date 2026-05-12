@@ -1039,6 +1039,29 @@
     setOpen(DokuCookie.getValue("sa") === "on");
   }
 
+  function bindSectionEditHighlights() {
+    document.querySelectorAll("form.btn_secedit").forEach(function (form) {
+      var button = form.closest(".secedit");
+      var match = button ? button.className.match(/(?:^|\s)editbutton_(\d+)(?:\s|$)/) : null;
+      var section = match ? document.querySelector(".sectionedit" + match[1]) : null;
+
+      if (!button || !section) {
+        return;
+      }
+
+      [form, button].forEach(function (target) {
+        target.addEventListener("mouseover", function () {
+          button.classList.add("section_highlight");
+          section.classList.add("section_highlight");
+        });
+        target.addEventListener("mouseout", function () {
+          button.classList.remove("section_highlight");
+          section.classList.remove("section_highlight");
+        });
+      });
+    });
+  }
+
   function mediaDetailUrl(id) {
     return (
       "/media-detail/" +
@@ -1239,6 +1262,7 @@
     bindMobileTools();
     bindQuickSearch();
     bindSearchAssistant();
+    bindSectionEditHighlights();
     bindEditor();
     bindMediaManager();
   });
