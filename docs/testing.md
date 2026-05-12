@@ -38,9 +38,10 @@ plugins.
 Auth event tests cover the native replacement hook boundary used by login,
 logout, rate-limit, profile-update, and profile-delete flows.
 
-Accessibility tests cover rendered wiki shell landmarks, the keyboard skip link,
-the header search label, the mobile tools label, and accessible names for
-icon-only page tools.
+Accessibility tests cover rendered wiki shell landmarks, document direction,
+the keyboard skip link, upstream search form access keys, localized breadcrumb
+and sidebar text, the mobile tools label, search assistant ARIA state hooks,
+and accessible names for icon-only page tools.
 
 Template shell parity tests compare the Pages shell landmarks and `mode_$ACT`
 classes with upstream `lib/tpl/dokuwiki/main.php`, `tpl_header.php`, and

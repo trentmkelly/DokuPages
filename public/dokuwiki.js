@@ -1001,6 +1001,7 @@
       button.textContent = "Search tools";
       form.querySelector("fieldset").prepend(button);
     }
+    button.setAttribute("aria-controls", options.id || "dw__search__assist");
 
     function setOpen(open) {
       options.hidden = !open;
@@ -1013,14 +1014,56 @@
       setOpen(options.hidden);
     });
 
-    options.querySelectorAll(".toggle div.current").forEach(function (toggle) {
-      toggle.addEventListener("click", function () {
-        var parent = toggle.parentElement;
+    function setToggleOpen(toggle, open) {
+      var list = toggle.querySelector("ul");
+
+      toggle.classList.toggle("open", open);
+      if (list) {
+        list.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+    }
+
+    options.querySelectorAll(".toggle div.current").forEach(function (current) {
+      function toggleCurrent() {
+        var parent = current.parentElement;
+        var open = !parent.classList.contains("open");
+
         options.querySelectorAll(".toggle").forEach(function (other) {
-          if (other !== parent) other.classList.remove("open");
+          if (other !== parent) setToggleOpen(other, false);
         });
-        parent.classList.toggle("open");
+        setToggleOpen(parent, open);
+      }
+
+      current.addEventListener("click", function () {
+        toggleCurrent();
       });
+      current.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleCurrent();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          options.querySelectorAll(".toggle").forEach(function (other) {
+            setToggleOpen(other, false);
+          });
+        }
+      });
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!options.contains(event.target)) {
+        options.querySelectorAll(".toggle").forEach(function (toggle) {
+          setToggleOpen(toggle, false);
+        });
+      }
+    });
+
+    options.querySelectorAll(".toggle").forEach(function (toggle) {
+      if (!toggle.hasAttribute("aria-haspopup")) {
+        toggle.setAttribute("aria-haspopup", "true");
+      }
+      setToggleOpen(toggle, toggle.classList.contains("open"));
     });
 
     options.addEventListener("click", function (event) {

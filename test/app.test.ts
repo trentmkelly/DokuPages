@@ -384,7 +384,7 @@ describe("handleRequest", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain('<html lang="de">');
+    expect(html).toContain('<html lang="de" dir="ltr" class="no-js">');
     expect(html).toContain('<a href="#dokuwiki__content">zum Inhalt springen</a>');
     expect(html).toContain('<nav id="dokuwiki__usertools" aria-label="Benutzer-Werkzeuge">');
     expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Webseiten-Werkzeuge">');
@@ -406,7 +406,7 @@ describe("handleRequest", () => {
     expect(html).toContain('aria-label="Ältere Versionen"');
     expect(html).toContain('aria-label="Links hierher"');
     expect(html).toContain('aria-label="Nach oben"');
-    expect(html).toContain("Sie befinden sich hier:");
+    expect(html).toContain('<span class="bchead">Sie befinden sich hier: </span>');
   });
 
   it("honors the FULLPATH setting for page info paths", async () => {
@@ -453,7 +453,7 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain(
-      '<div class="youarehere"><span>You are here: </span><a href="/wiki/wiki">wiki</a> <span class="bcsep">&raquo;</span> <span>welcome</span></div>'
+      '<div class="youarehere"><span class="bchead">You are here: </span><a href="/wiki/wiki">wiki</a> <span class="bcsep">&raquo;</span> <span>welcome</span></div>'
     );
   });
 
@@ -693,7 +693,9 @@ describe("handleRequest", () => {
     expect(html).toContain(
       '<li class="action login"><a href="/docs/wiki/wiki/welcome?do=login" title="Log In" rel="nofollow">Log In</a></li>'
     );
-    expect(html).toContain('<form class="search" method="get" action="/docs/search">');
+    expect(html).toContain(
+      '<form id="dw__search" class="search" method="get" action="/docs/search" role="search" accept-charset="utf-8">'
+    );
     expect(html).toContain('<option value="/docs/media-manager?ns=wiki">Media Manager</option>');
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get("location")).toBe("/docs/wiki/wiki/welcome");

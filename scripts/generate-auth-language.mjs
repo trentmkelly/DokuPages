@@ -72,12 +72,15 @@ const LANGUAGE_KEYS = [
   "hours",
   "minutes",
   "seconds",
+  "direction",
+  "breadcrumb",
   "tools",
   "user_tools",
   "site_tools",
   "page_tools",
   "skip_to_content",
-  "youarehere"
+  "youarehere",
+  "sidebar"
 ];
 
 const PAGE_KEYS = ["login", "register", "resendpwd", "resetpwd", "denied", "locked"];

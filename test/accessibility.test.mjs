@@ -23,12 +23,20 @@ describe("accessibility surface", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
+    expect(html).toContain('<html lang="en" dir="ltr" class="no-js">');
     expect(html).toContain('<a href="#dokuwiki__content">skip to content</a>');
+    expect(html).toContain('accesskey="h" title="Home [h]"');
     expect(html).toContain('<main id="dokuwiki__content">');
     expect(html).toContain('<nav id="dokuwiki__usertools" aria-label="User Tools">');
     expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Site Tools">');
+    expect(html).toContain(
+      '<form id="dw__search" class="search" method="get" action="/search" role="search" accept-charset="utf-8">'
+    );
     expect(html).toContain('<label class="a11y" for="qsearch__in">Search</label>');
-    expect(html).toContain('<input id="qsearch__in" name="q" type="search"');
+    expect(html).toContain(
+      '<input id="qsearch__in" class="edit" name="q" type="text" title="[F]" accesskey="f"'
+    );
+    expect(html).toContain('<input type="hidden" name="id" value="wiki:welcome">');
     expect(html).toContain('<div id="qsearch__out" class="ajax_qsearch JSpopup" hidden');
     expect(html).toContain(
       '<a href="/media-manager?ns=wiki" title="Media Manager" rel="nofollow">Media Manager</a>'
@@ -46,13 +54,48 @@ describe("accessibility surface", () => {
     expect(html).toContain('aria-label="Old revisions"');
     expect(html).toContain('aria-label="Backlinks"');
     expect(html).toContain('aria-label="Back to top"');
+    expect(html).toContain('<span class="bchead">Trace:</span>');
+  });
+
+  it("uses upstream localized document direction and shell text", async () => {
+    const env = createEnv();
+    env.WIKI_LANG = "ar";
+    env.SIDEBAR = "wiki:welcome";
+    await seedPage(env.DB);
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<html lang="ar" dir="rtl" class="no-js">');
+    expect(html).toContain('accesskey="h" title="Home [h]"');
+    expect(html).toContain('<span class="bchead">أثر:</span>');
+    expect(html).toContain('aria-label="العمود الجانبي"');
+  });
+
+  it("renders upstream ARIA hooks for search assistance toggles", async () => {
+    const env = createEnv();
+    await seedPage(env.DB);
+
+    const response = await handleRequest(new Request("https://example.com/search?q=welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<div id="dw__search__assist" class="advancedOptions" hidden aria-hidden="true">'
+    );
+    expect(html).toContain('<div class="toggle" aria-haspopup="true">');
+    expect(html).toContain('<ul aria-expanded="false">');
   });
 
   it("keeps the skip link available when it receives keyboard focus", async () => {
     const css = await readFile("public/dokuwiki.css", "utf8");
+    const js = await readFile("public/dokuwiki.js", "utf8");
 
     expect(css).toContain(".a11y.skip:focus-within");
     expect(css).toContain(".a11y.skip a:focus");
+    expect(js).toContain('button.setAttribute("aria-controls"');
+    expect(js).toContain('list.setAttribute("aria-expanded"');
   });
 });
 

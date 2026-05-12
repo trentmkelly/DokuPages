@@ -64,12 +64,15 @@ export const AUTH_LANGUAGE_KEYS = [
   "hours",
   "minutes",
   "seconds",
+  "direction",
+  "breadcrumb",
   "tools",
   "user_tools",
   "site_tools",
   "page_tools",
   "skip_to_content",
-  "youarehere"
+  "youarehere",
+  "sidebar"
 ] as const;
 export type AuthLanguageKey = (typeof AUTH_LANGUAGE_KEYS)[number];
 
@@ -189,12 +192,15 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d ساعة مضت",
       minutes: "%d دقيقة مضت",
       seconds: "%d ثانية مضت",
+      direction: "rtl",
+      breadcrumb: "أثر:",
       tools: "أدوات",
       user_tools: "أدوات المستخدم",
       site_tools: "أدوات الموقع",
       page_tools: "أدوات الصفحة",
       skip_to_content: "تجاوز إلى المحتوى",
-      youarehere: "أنت هنا:"
+      youarehere: "أنت هنا:",
+      sidebar: "العمود الجانبي"
     },
     pages: {
       login:
@@ -267,6 +273,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d saat əvvəl",
       minutes: "%d dəqiqə əvvəl",
       seconds: "%d saniyə əvvəl",
+      breadcrumb: "Siz ziyarət etdiniz:",
       youarehere: "Siz burdasınız:"
     },
     pages: {
@@ -349,12 +356,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d гадзіну (-ов) назад",
       minutes: "%d хвілін таму",
       seconds: "%d секунд назад",
+      breadcrumb: "Вы наведалі:",
       tools: "Інструменты",
       user_tools: "Інструменты карыстальніка",
       site_tools: "Інструменты сайта",
       page_tools: "Інструменты старонкі",
       skip_to_content: "Перайсці да зместу",
-      youarehere: "Вы знаходзіцеся тут:"
+      youarehere: "Вы знаходзіцеся тут:",
+      sidebar: "Бакавая панэль"
     },
     pages: {
       login:
@@ -438,12 +447,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "преди %d часа",
       minutes: "преди %d минути",
       seconds: "преди %d секунди",
+      breadcrumb: "Следа:",
       tools: "Инструменти",
       user_tools: "Инструменти за потребители",
       site_tools: "Инструменти за сайта",
       page_tools: "Инструменти за страници",
       skip_to_content: "към съдържанието",
-      youarehere: "Намирате се в:"
+      youarehere: "Намирате се в:",
+      sidebar: "Странична лента"
     },
     pages: {
       login:
@@ -518,12 +529,14 @@ export const AUTH_LANGUAGE_PACKS = {
       lockedby: "বর্তমানে দ্বারা লক:",
       lockexpire: "তালা এ মেয়াদ শেষ:",
       accessdenied: "আপনি এই পৃষ্ঠাটি দেখতে অনুমতি দেওয়া হয়নি",
+      breadcrumb: "ট্রেস:",
       tools: "সরঞ্জামসমূহ",
       user_tools: "ব্যবহারকারীর সরঞ্জামসমূহ",
       site_tools: "সাইটের সরঞ্জামসমূহ",
       page_tools: "পৃষ্ঠার সরঞ্জামসমূহ",
       skip_to_content: "বিষয়ে এড়িয়ে যান",
-      youarehere: "আপনি এখানে আছেন:"
+      youarehere: "আপনি এখানে আছেন:",
+      sidebar: "সাইডবার"
     },
     pages: {
       denied: "====== অনুমতি অস্বীকার =====\n\nদুঃখিত, আপনি কি এগিয়ে যেতে যথেষ্ট অধিকার নেই."
@@ -595,12 +608,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "fa %d hores",
       minutes: "fa %d minuts",
       seconds: "fa %d segons",
+      breadcrumb: "Camí:",
       tools: "Eines",
       user_tools: "Eines de l'usuari",
       site_tools: "Eines del lloc",
       page_tools: "Eines de la pàgina",
       skip_to_content: "salta al contingut",
-      youarehere: "Sou aquí:"
+      youarehere: "Sou aquí:",
+      sidebar: "Barra lateral"
     },
     pages: {
       login:
@@ -677,6 +692,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "fa %d hores",
       minutes: "fa %d minuts",
       seconds: "fa %d segons",
+      breadcrumb: "Traça:",
       youarehere: "Vosté està ací:"
     },
     pages: {
@@ -758,12 +774,15 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d کاتژمێر لەمەوپێش",
       minutes: "%d خولەک لەمەوپێش",
       seconds: "%d چرکە لەمەوپێش",
+      direction: "rtl",
+      breadcrumb: "شوێن پێهەڵوا:",
       tools: "ئامێرەکان",
       user_tools: "ئامێرەکانی بەکارهێنەر",
       site_tools: "ئامێرەکانی سایت",
       page_tools: "ئامێرەکانی لاپەڕە",
       skip_to_content: "بازدان بۆ ناوەڕۆک",
-      youarehere: "تۆ لێرەیت:"
+      youarehere: "تۆ لێرەیت:",
+      sidebar: "شریتی لا"
     },
     pages: {
       login:
@@ -845,12 +864,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "před %d hodinami",
       minutes: "před %d minutami",
       seconds: "před %d sekundami",
+      breadcrumb: "Historie:",
       tools: "Nástroje",
       user_tools: "Uživatelské nástroje",
       site_tools: "Nástroje pro tento web",
       page_tools: "Nástroje pro stránku",
       skip_to_content: "jít k obsahu",
-      youarehere: "Umístění:"
+      youarehere: "Umístění:",
+      sidebar: "Postranní lišta"
     },
     pages: {
       login:
@@ -933,12 +954,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d awr yn ôl",
       minutes: "%d munud yn ôl",
       seconds: "%d eiliad yn ôl",
+      breadcrumb: "Olrhain:",
       tools: "Teclynnau",
       user_tools: "Teclynnau Defnyddiwr",
       site_tools: "Teclynnau Safle",
       page_tools: "Teclynnau Tudalennau",
       skip_to_content: "nedio i'r cynnwys",
-      youarehere: "Rydych chi yma:"
+      youarehere: "Rydych chi yma:",
+      sidebar: "Bar ochr"
     },
     pages: {
       login:
@@ -1018,12 +1041,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d timer siden",
       minutes: "%d minutter siden",
       seconds: "%d sekunder siden",
+      breadcrumb: "Sti:",
       tools: "Værktøjer",
       user_tools: "Brugerværktøjer",
       site_tools: "Webstedsværktøjer",
       page_tools: "Sideværktøjer",
       skip_to_content: "hop til indhold",
-      youarehere: "Du er her:"
+      youarehere: "Du er her:",
+      sidebar: "Sidepanel"
     },
     pages: {
       login:
@@ -1105,12 +1130,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "vor %d Stunden",
       minutes: "vor %d Minuten",
       seconds: "vor %d Sekunden",
+      breadcrumb: "Zuletzt angesehen:",
       tools: "Werkzeuge",
       user_tools: "Benutzer-Werkzeuge",
       site_tools: "Webseiten-Werkzeuge",
       page_tools: "Seiten-Werkzeuge",
       skip_to_content: "zum Inhalt springen",
-      youarehere: "Sie befinden sich hier:"
+      youarehere: "Sie befinden sich hier:",
+      sidebar: "Seitenleiste"
     },
     pages: {
       login:
@@ -1193,12 +1220,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "vor %d Stunden",
       minutes: "vor %d Minuten",
       seconds: "vor %d Sekunden",
+      breadcrumb: "Zuletzt angesehen:",
       tools: "Werkzeuge",
       user_tools: "Benutzer-Werkzeuge",
       site_tools: "Webseiten-Werkzeuge",
       page_tools: "Seiten-Werkzeuge",
       skip_to_content: "zum Inhalt springen",
-      youarehere: "Du befindest dich hier:"
+      youarehere: "Du befindest dich hier:",
+      sidebar: "Seitenleiste"
     },
     pages: {
       login:
@@ -1281,6 +1310,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "πριν %d ώρες",
       minutes: "πριν %d λεπτά",
       seconds: "πριν %d δευτερόλεπτα",
+      breadcrumb: "Ιστορικό:",
       tools: "Εργαλεία",
       user_tools: "Εργαλεία Χρήστη",
       site_tools: "Εργαλεία ιστότοπου",
@@ -1370,12 +1400,15 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d hours ago",
       minutes: "%d minutes ago",
       seconds: "%d seconds ago",
+      direction: "ltr",
+      breadcrumb: "Trace:",
       tools: "Tools",
       user_tools: "User Tools",
       site_tools: "Site Tools",
       page_tools: "Page Tools",
       skip_to_content: "skip to content",
-      youarehere: "You are here:"
+      youarehere: "You are here:",
+      sidebar: "Sidebar"
     },
     pages: {
       login:
@@ -1458,12 +1491,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "antaŭ %d horoj",
       minutes: "antaŭ %d minutoj",
       seconds: "antaŭ %d sekundoj",
+      breadcrumb: "Paŝoj:",
       tools: "Iloj",
       user_tools: "Uzantaj iloj",
       site_tools: "Retejaj iloj",
       page_tools: "Paĝaj iloj",
       skip_to_content: "al la enhavo",
-      youarehere: "Vi estas ĉi tie:"
+      youarehere: "Vi estas ĉi tie:",
+      sidebar: "Flanka strio"
     },
     pages: {
       login:
@@ -1545,12 +1580,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "hace %d horas",
       minutes: "hace %d minutos",
       seconds: "hace %d segundos",
+      breadcrumb: "Traza:",
       tools: "Herramientas",
       user_tools: "Herramientas de usuario",
       site_tools: "Herramientas del sitio",
       page_tools: "Herramientas de la página",
       skip_to_content: "Saltar a contenido",
-      youarehere: "Estás aquí:"
+      youarehere: "Estás aquí:",
+      sidebar: "Barra lateral"
     },
     pages: {
       login:
@@ -1632,12 +1669,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d tunni eest",
       minutes: "%d minuti eest",
       seconds: "%d sekundi eest",
+      breadcrumb: "Käidud rada:",
       tools: "Tööriistad",
       user_tools: "Kasutaja tarvikud",
       site_tools: "Lehe tööriistad",
       page_tools: "Lehekülje tarvikud",
       skip_to_content: "mine sisule",
-      youarehere: "Sa oled siin:"
+      youarehere: "Sa oled siin:",
+      sidebar: "Külgriba"
     },
     pages: {
       login:
@@ -1719,12 +1758,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "duela %d ordu",
       minutes: "duela %d minutu",
       seconds: "duela %d segundu",
+      breadcrumb: "Traza:",
       tools: "Tresnak",
       user_tools: "Erabiltzaile Tresnak",
       site_tools: "Gune Tresnak",
       page_tools: "Orri Tresnak",
       skip_to_content: "edukira sahiestu",
-      youarehere: "Hemen zaude:"
+      youarehere: "Hemen zaude:",
+      sidebar: "Alboko-barra"
     },
     pages: {
       login:
@@ -1805,12 +1846,15 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d ساعت پیش",
       minutes: "%d دقیقه‌ی پیش",
       seconds: "%d ثانیه‌ی پیش",
+      direction: "rtl",
+      breadcrumb: "ردپا:",
       tools: "ابزار",
       user_tools: "ابزار کاربر",
       site_tools: "ابزار سایت",
       page_tools: "ابزار صفحه",
       skip_to_content: "پرش به محتوا",
-      youarehere: "محل شما:"
+      youarehere: "محل شما:",
+      sidebar: "نوار کناری"
     },
     pages: {
       login:
@@ -1893,12 +1937,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d tuntia sitten",
       minutes: "%d minuuttia sitten",
       seconds: "%d sekuntia sitten",
+      breadcrumb: "Jäljet:",
       tools: "Työkalut",
       user_tools: "Käyttäjän työkalut",
       site_tools: "Sivuston työkalut",
       page_tools: "Sivutyökalut",
       skip_to_content: "Siirry sisältöön",
-      youarehere: "Olet täällä:"
+      youarehere: "Olet täällä:",
+      sidebar: "Sivupalkki"
     },
     pages: {
       login:
@@ -1965,6 +2011,7 @@ export const AUTH_LANGUAGE_PACKS = {
       resendpwdsuccess: "Títt nýggja loyniorð er sent við t-posti.",
       lockedby: "Fyribils læst av:",
       lockexpire: "Lásið ferð úr gildi kl.:",
+      breadcrumb: "Leið:",
       youarehere: "Tú ert her:"
     },
     pages: {
@@ -2046,12 +2093,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "il y a %d heures",
       minutes: "il y a %d minutes",
       seconds: "il y a %d secondes",
+      breadcrumb: "Piste :",
       tools: "Outils",
       user_tools: "Outils pour utilisateurs",
       site_tools: "Outils du site",
       page_tools: "Outils de la page",
       skip_to_content: "Aller au contenu",
-      youarehere: "Vous êtes ici :"
+      youarehere: "Vous êtes ici :",
+      sidebar: "Panneau latéral"
     },
     pages: {
       login:
@@ -2132,12 +2181,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "hai %d horas",
       minutes: "hai %d minutos",
       seconds: "hai %d segundos",
+      breadcrumb: "Trazado:",
       tools: "Ferramentas",
       user_tools: "Ferramentas de usuario",
       site_tools: "Ferramentas do sitio",
       page_tools: "Ferramentas de páxina",
       skip_to_content: "Pasar ao contido",
-      youarehere: "Estás aquí:"
+      youarehere: "Estás aquí:",
+      sidebar: "Barra lateral"
     },
     pages: {
       login:
@@ -2219,12 +2270,15 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "לפני %d שעות",
       minutes: "לפני %d דקות",
       seconds: "לפני %d שניות",
+      direction: "rtl",
+      breadcrumb: "ביקורים אחרונים:",
       tools: "כלים",
       user_tools: "כלים של משתמש",
       site_tools: "כלים של אתר",
       page_tools: "כלים של דף",
       skip_to_content: "עבור לתוכן",
-      youarehere: "זהו מיקומך:"
+      youarehere: "זהו מיקומך:",
+      sidebar: "הסרגל הצידי"
     },
     pages: {
       login:
@@ -2346,12 +2400,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d sati prije",
       minutes: "%d minuta prije",
       seconds: "%d sekundi prije",
+      breadcrumb: "Zadnje viđeno:",
       tools: "Alati",
       user_tools: "Korisnički alati",
       site_tools: "Site alati",
       page_tools: "Stranični alati",
       skip_to_content: "preskoči na sadržaj",
-      youarehere: "Vi ste ovdje:"
+      youarehere: "Vi ste ovdje:",
+      sidebar: "Bočna traka"
     },
     pages: {
       login: "====== Prijava ======\n\nUpišite korisničko ime i lozinku da biste se prijavili.",
@@ -2431,12 +2487,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d órával ezelőtt",
       minutes: "%d perccel ezelőtt",
       seconds: "%d másodperccel ezelőtt",
+      breadcrumb: "Nyomvonal:",
       tools: "Eszközök",
       user_tools: "Felhasználói eszközök",
       site_tools: "Eszközök a webhelyen",
       page_tools: "Eszközök az oldalon",
       skip_to_content: "ugrás a tartalomhoz",
-      youarehere: "Itt vagy:"
+      youarehere: "Itt vagy:",
+      sidebar: "Oldalsáv"
     },
     pages: {
       login:
@@ -2577,6 +2635,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d horas retro",
       minutes: "%d minutas retro",
       seconds: "%d secundas retro",
+      breadcrumb: "Tracia:",
       youarehere: "Tu es hic:"
     },
     pages: {
@@ -2654,12 +2713,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d jam yang lalu",
       minutes: "%d menit yang lalu",
       seconds: "%d detik yang lalu",
+      breadcrumb: "Jejak:",
       tools: "Alat",
       user_tools: "Alat Pengguna",
       site_tools: "Alat Situs",
       page_tools: "Alat Halaman",
       skip_to_content: "lewati ke konten",
-      youarehere: "Anda disini:"
+      youarehere: "Anda disini:",
+      sidebar: "Bilah Sisi"
     },
     pages: {
       login:
@@ -2777,6 +2838,7 @@ export const AUTH_LANGUAGE_PACKS = {
       resendpwdsuccess: "Nýja aðgangsorðið hefur verið sent með tölvupósti.",
       lockedby: "Læstur af:",
       lockexpire: "Læsing rennur út eftir:",
+      breadcrumb: "Snefill:",
       youarehere: "Þú ert hér:"
     },
     pages: {
@@ -2852,12 +2914,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d ore fa",
       minutes: "%d minuti fa",
       seconds: "%d secondi fa",
+      breadcrumb: "Traccia:",
       tools: "Strumenti",
       user_tools: "Strumenti Utente",
       site_tools: "Strumenti Sito",
       page_tools: "Strumenti Pagina",
       skip_to_content: "salta al contenuto",
-      youarehere: "Ti trovi qui:"
+      youarehere: "Ti trovi qui:",
+      sidebar: "Barra laterale"
     },
     pages: {
       login:
@@ -2941,12 +3005,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d時間前",
       minutes: "%d分前",
       seconds: "%d秒前",
+      breadcrumb: "トレース:",
       tools: "ツール",
       user_tools: "ユーザ用ツール",
       site_tools: "サイト用ツール",
       page_tools: "ページ用ツール",
       skip_to_content: "内容へ移動",
-      youarehere: "現在位置:"
+      youarehere: "現在位置:",
+      sidebar: "サイドバー"
     },
     pages: {
       login:
@@ -3032,7 +3098,8 @@ export const AUTH_LANGUAGE_PACKS = {
       site_tools: "საიტის ინსტრუმენტები",
       page_tools: "გვერდის ინსტრუმენტები",
       skip_to_content: "მასალა",
-      youarehere: "თვენ ხართ აქ:"
+      youarehere: "თვენ ხართ აქ:",
+      sidebar: "გვერდითი პანელი"
     },
     pages: {
       denied:
@@ -3146,6 +3213,7 @@ export const AUTH_LANGUAGE_PACKS = {
       resendpwdsuccess: "ពាក្សសម្ងាតអ្នកបានផ្ញើហើយ។",
       lockedby: "ឥឡូវនេះចកជាប់​:",
       lockexpire: "សោជាប់ផុត​កំណត់ម៉ោង:",
+      breadcrumb: "ដាន:",
       youarehere: "ដាន:"
     },
     pages: {
@@ -3220,12 +3288,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d시간 전",
       minutes: "%d분 전",
       seconds: "%d초 전",
+      breadcrumb: "추적:",
       tools: "도구",
       user_tools: "사용자 도구",
       site_tools: "사이트 도구",
       page_tools: "문서 도구",
       skip_to_content: "내용으로 건너뛰기",
-      youarehere: "현재 위치:"
+      youarehere: "현재 위치:",
+      sidebar: "사이드바"
     },
     pages: {
       login:
@@ -3267,7 +3337,8 @@ export const AUTH_LANGUAGE_PACKS = {
       passchk: "باریکی دیکە",
       remember: "Min bi bîr bîne",
       fullname: "Navê rastîn",
-      badlogin: "Bibore, navê bikarhêneriyê an jî pêborîn çewt bû."
+      badlogin: "Bibore, navê bikarhêneriyê an jî pêborîn çewt bû.",
+      breadcrumb: "Şop:"
     },
     pages: {}
   },
@@ -3329,6 +3400,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "a horis %d",
       minutes: "a minutis %d",
       seconds: "a secundis %d",
+      breadcrumb: "Vestigium",
       youarehere: "Hic es"
     },
     pages: {
@@ -3401,6 +3473,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "virun %d Stonnen",
       minutes: "virun %d Minutten",
       seconds: "virun %d Sekonnen",
+      breadcrumb: "Spuer:",
       youarehere: "Du bass hei:"
     },
     pages: {
@@ -3482,12 +3555,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "prieš %d valandas",
       minutes: "prieš %d minutes",
       seconds: "prieš %d sekundes",
+      breadcrumb: "Seka:",
       tools: "Įrankiai",
       user_tools: "Vartotojo įrankiai",
       site_tools: "Svetainės įrankiai",
       page_tools: "Puslapio įrankiai",
       skip_to_content: "tiesiai prie turinio",
-      youarehere: "Jūs esate čia:"
+      youarehere: "Jūs esate čia:",
+      sidebar: "Šoninė juosta"
     },
     pages: {
       login:
@@ -3568,12 +3643,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "pirms %d stundām",
       minutes: "pirms %d minūtēm",
       seconds: "pirms %d sekundēm",
+      breadcrumb: "Apmeklēts:",
       tools: "Rīki",
       user_tools: "Lietotāja rīki",
       site_tools: "Vietnes rīki",
       page_tools: "Lapas rīki",
       skip_to_content: "uz rakstu",
-      youarehere: "Tu atrodies šeit:"
+      youarehere: "Tu atrodies šeit:",
+      sidebar: "Izvēlne"
     },
     pages: {
       login:
@@ -3622,7 +3699,8 @@ export const AUTH_LANGUAGE_PACKS = {
       regpwmail: "Ny alahidy Wiki-nao",
       reghere: "Mbola tsy manana kaonty ianao? Manaova vaovao",
       lockedby: "Mbola voahidin'i:",
-      lockexpire: "Afaka ny hidy amin'ny:"
+      lockexpire: "Afaka ny hidy amin'ny:",
+      breadcrumb: "Taiza ianao:"
     },
     pages: {
       login:
@@ -3695,6 +3773,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "пред %d часа",
       minutes: "пред %d минути",
       seconds: "пред %d секунди",
+      breadcrumb: "Следи:",
       youarehere: "Вие сте тука:"
     },
     pages: {}
@@ -3755,6 +3834,7 @@ export const AUTH_LANGUAGE_PACKS = {
       lockedby: "सध्या लॉक करणारा :",
       lockexpire: "सध्या लॉक करणारा :",
       accessdenied: "तुम्हाला हे पान बघायची परवानगी नाही.",
+      breadcrumb: "मागमूस:",
       tools: "साधने",
       user_tools: "युजरची साधने",
       site_tools: "साईटची साधने",
@@ -3912,6 +3992,7 @@ export const AUTH_LANGUAGE_PACKS = {
       resendpwdsuccess: "तपाईको प्रवेशशव्द इमेलबाट पठाइएको छ। ",
       lockedby: "अहिले ताल्चा लगाइएको:",
       lockexpire: "ताल्चा अवधि सकिने :",
+      breadcrumb: "छुट्ट्याउनुहोस् :",
       youarehere: "तपाई यहा हुनुहुन्छ:"
     },
     pages: {
@@ -3989,12 +4070,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d uren geleden",
       minutes: "%d minuten geleden",
       seconds: "%d seconden geleden",
+      breadcrumb: "Spoor:",
       tools: "Hulpmiddelen",
       user_tools: "Gebruikershulpmiddelen",
       site_tools: "Site-hulpmiddelen",
       page_tools: "Paginahulpmiddelen",
       skip_to_content: "spring naar tekst",
-      youarehere: "Je bent hier:"
+      youarehere: "Je bent hier:",
+      sidebar: "Zijbalk"
     },
     pages: {
       login:
@@ -4077,12 +4160,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d timer siden",
       minutes: "%d minutter siden",
       seconds: "%d sekunder siden",
+      breadcrumb: "Spor:",
       tools: "Verktøy",
       user_tools: "Brukerverktøy",
       site_tools: "Nettstedverktøy",
       page_tools: "Sideverktøy",
       skip_to_content: "Hopp til innhold",
-      youarehere: "Du er her:"
+      youarehere: "Du er her:",
+      sidebar: "Sidefelt"
     },
     pages: {
       login:
@@ -4234,12 +4319,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d godzin temu",
       minutes: "%d minut temu",
       seconds: "%d sekund temu",
+      breadcrumb: "Ślad:",
       tools: "Narzędzia",
       user_tools: "Narzędzia użytkownika",
       site_tools: "Narzędzia witryny",
       page_tools: "Narzędzia strony",
       skip_to_content: "przejście do zawartości",
-      youarehere: "Jesteś tutaj:"
+      youarehere: "Jesteś tutaj:",
+      sidebar: "Pasek boczny"
     },
     pages: {
       login:
@@ -4322,12 +4409,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d horas atrás",
       minutes: "%d minutos atrás",
       seconds: "%d segundos atrás",
+      breadcrumb: "Está em:",
       tools: "Ferramentas",
       user_tools: "Ferramentas de Usuário",
       site_tools: "Ferramentas de Site",
       page_tools: "Ferramentas de Página",
       skip_to_content: "ir ao conteúdo",
-      youarehere: "Está aqui:"
+      youarehere: "Está aqui:",
+      sidebar: "Barra Lateral"
     },
     pages: {
       login:
@@ -4411,12 +4500,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d horas atrás",
       minutes: "%d minutos atrás",
       seconds: "%d segundos atrás",
+      breadcrumb: "Visitou:",
       tools: "Ferramentas",
       user_tools: "Ferramentas do usuário",
       site_tools: "Ferramentas do site",
       page_tools: "Ferramentas da página",
       skip_to_content: "ir para o conteúdo",
-      youarehere: "Você está aqui:"
+      youarehere: "Você está aqui:",
+      sidebar: "Barra lateral"
     },
     pages: {
       login:
@@ -4500,12 +4591,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "acum %d ore",
       minutes: "acum %d minute",
       seconds: "acum %d secunde",
+      breadcrumb: "Traseu:",
       tools: "Unelte",
       user_tools: "Unelte utilizator",
       site_tools: "Unelte site",
       page_tools: "Unelte pagină",
       skip_to_content: "mergi la conținut",
-      youarehere: "Ești aici:"
+      youarehere: "Ești aici:",
+      sidebar: "Bara de navigare"
     },
     pages: {
       login:
@@ -4589,12 +4682,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d ч. назад",
       minutes: "%d мин. назад",
       seconds: "%d сек. назад",
+      breadcrumb: "Вы посетили:",
       tools: "Инструменты",
       user_tools: "Инструменты пользователя",
       site_tools: "Инструменты сайта",
       page_tools: "Инструменты страницы",
       skip_to_content: "Перейти к содержанию",
-      youarehere: "Вы находитесь здесь:"
+      youarehere: "Вы находитесь здесь:",
+      sidebar: "Боковая панель"
     },
     pages: {
       login:
@@ -4691,12 +4786,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "pred %d hodinami",
       minutes: "pred %d minútami",
       seconds: "pred %d sekundami",
+      breadcrumb: "Cesta:",
       tools: "Nástroje",
       user_tools: "Nástroje používateľa",
       site_tools: "Nástoje správy stránok",
       page_tools: "Nástoje stránky",
       skip_to_content: "skok na obsah",
-      youarehere: "Nachádzate sa:"
+      youarehere: "Nachádzate sa:",
+      sidebar: "Bočný panel"
     },
     pages: {
       login:
@@ -4780,12 +4877,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d ur nazaj",
       minutes: "%d minut nazaj",
       seconds: "%d sekund nazaj",
+      breadcrumb: "Sled:",
       tools: "Orodja",
       user_tools: "Uporabniška orodja",
       site_tools: "Orodja spletišča",
       page_tools: "Orodja strani",
       skip_to_content: "preskoči na vsebino",
-      youarehere: "Trenutno dejavna stran:"
+      youarehere: "Trenutno dejavna stran:",
+      sidebar: "Stranska vrstica"
     },
     pages: {
       login:
@@ -4864,6 +4963,7 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d orë më parë",
       minutes: "%d minuta më parë",
       seconds: "%d sekonda më parë",
+      breadcrumb: "Gjurmë:",
       youarehere: "Ju jeni këtu:"
     },
     pages: {
@@ -4946,12 +5046,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "Пре %d сати",
       minutes: "Пре %d минута",
       seconds: "Пре %d секунди",
+      breadcrumb: "Траг:",
       tools: "Алатке",
       user_tools: "Корисничке алатке",
       site_tools: "Алатке сајта",
       page_tools: "Алатке странице",
       skip_to_content: "скочи на садржај",
-      youarehere: "Сада сте овде:"
+      youarehere: "Сада сте овде:",
+      sidebar: "Страничник"
     },
     pages: {
       login:
@@ -5033,12 +5135,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d timmar sedan",
       minutes: "%d minuter sedan",
       seconds: "%d sekunder sedan",
+      breadcrumb: "Spår:",
       tools: "Verktyg",
       user_tools: "Användarverktyg",
       site_tools: "Webbverktyg",
       page_tools: "Sidverktyg",
       skip_to_content: "hoppa till innehåll",
-      youarehere: "Här är du:"
+      youarehere: "Här är du:",
+      sidebar: "Sidmeny"
     },
     pages: {
       login:
@@ -5154,12 +5258,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d ชั่วโมงก่อน",
       minutes: "%d นาทีก่อน",
       seconds: "%d วินาทีก่อน",
+      breadcrumb: "ตามรอย:",
       tools: "เครื่องมือ",
       user_tools: "เครื่องมือสำหรับผู้ใช้",
       site_tools: "เครื่องมือของไซต์",
       page_tools: "เครื่องมือของหน้าเพจ",
       skip_to_content: "ข้ามไปยังเนื้อหา",
-      youarehere: "คุณอยู่ที่นี่:"
+      youarehere: "คุณอยู่ที่นี่:",
+      sidebar: "แถบด้านข้าง"
     },
     pages: {
       login:
@@ -5240,12 +5346,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d saat önce",
       minutes: "%d dakika önce",
       seconds: "%d saniye önce",
+      breadcrumb: "İz:",
       tools: "Alet",
       user_tools: "Kullanıcı Aletleri",
       site_tools: "Site Aletleri",
       page_tools: "Sayfa Aletleri",
       skip_to_content: "Bağlanmak için kaydır",
-      youarehere: "Buradasınız:"
+      youarehere: "Buradasınız:",
+      sidebar: "kaydırma çubuğu"
     },
     pages: {
       login:
@@ -5326,12 +5434,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d годин тому",
       minutes: "%d хвилин тому",
       seconds: "%d секунд тому",
+      breadcrumb: "Відвідано:",
       tools: "Налаштування",
       user_tools: "Користувальницькі налаштування",
       site_tools: "Налаштування сайту",
       page_tools: "Налаштування сторінки",
       skip_to_content: "Перейти до змісту",
-      youarehere: "Ви тут:"
+      youarehere: "Ви тут:",
+      sidebar: "Сайдбар"
     },
     pages: {
       login:
@@ -5435,12 +5545,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d giờ trước",
       minutes: "%d phút trước",
       seconds: "%d giây trước",
+      breadcrumb: "Trang đã xem:",
       tools: "Công cụ",
       user_tools: "Công cụ thành viên",
       site_tools: "Công cụ trang web",
       page_tools: "Công cụ trang",
       skip_to_content: "đi đến nội dung",
-      youarehere: "Bạn đang ở đây:"
+      youarehere: "Bạn đang ở đây:",
+      sidebar: "Thanh bên"
     },
     pages: {
       login:
@@ -5520,12 +5632,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d小时前",
       minutes: "%d分钟前",
       seconds: "%d秒前",
+      breadcrumb: "您的足迹:",
       tools: "工具",
       user_tools: "用户工具",
       site_tools: "站点工具",
       page_tools: "页面工具",
       skip_to_content: "跳至内容",
-      youarehere: "您在这里:"
+      youarehere: "您在这里:",
+      sidebar: "侧边栏"
     },
     pages: {
       login:
@@ -5604,12 +5718,14 @@ export const AUTH_LANGUAGE_PACKS = {
       hours: "%d 個小時前",
       minutes: "%d 分鐘前",
       seconds: "%d 秒鐘前",
+      breadcrumb: "足跡:",
       tools: "工具",
       user_tools: "使用者工具",
       site_tools: "網站工具",
       page_tools: "頁面工具",
       skip_to_content: "跳至內容",
-      youarehere: "您在這裏:"
+      youarehere: "您在這裏:",
+      sidebar: "側欄"
     },
     pages: {
       login:

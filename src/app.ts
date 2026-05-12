@@ -158,6 +158,7 @@ import {
   ensureCustomAuthLanguageOverrides,
   refreshCustomAuthLanguageOverrides
 } from "./wiki/custom-language";
+import { templateLang } from "./wiki/template-language";
 import {
   readImportedPluginEnablement,
   type ImportedPluginEnablement,
@@ -5169,7 +5170,7 @@ function renderHeaderBreadcrumbs(
   showYouAreHere: boolean,
   showBreadcrumbShell = false
 ): string {
-  const trace = renderBreadcrumbTrace(breadcrumbTrace);
+  const trace = renderBreadcrumbTrace(env, breadcrumbTrace);
   const youAreHere = showYouAreHere ? renderYouAreHereTrail(env, pageId, startId) : "";
 
   if (!youAreHere && !trace && !showBreadcrumbShell) {
@@ -5182,7 +5183,7 @@ function renderHeaderBreadcrumbs(
 function renderYouAreHereTrail(env: Env, pageId: string | undefined, startId: string): string {
   const label = localizedAuthText(env, "youarehere");
   if (!pageId) {
-    return `<div class="youarehere"><span>${escapeHtml(label)} </span><a href="${pagePath(startId)}">start</a></div>`;
+    return `<div class="youarehere"><span class="bchead">${escapeHtml(label)} </span><a href="${pagePath(startId)}">start</a></div>`;
   }
 
   const segments = pageId.split(":").filter(Boolean);
@@ -5199,11 +5200,12 @@ function renderYouAreHereTrail(env: Env, pageId: string | undefined, startId: st
     })
     .join(' <span class="bcsep">&raquo;</span> ');
 
-  return `<div class="youarehere"><span>${escapeHtml(label)} </span>${crumbs}</div>`;
+  return `<div class="youarehere"><span class="bchead">${escapeHtml(label)} </span>${crumbs}</div>`;
 }
 
-function renderBreadcrumbTrace(entries: readonly BreadcrumbEntry[] | undefined): string {
+function renderBreadcrumbTrace(env: Env, entries: readonly BreadcrumbEntry[] | undefined): string {
   if (!entries || entries.length === 0) return "";
+  const label = localizedAuthText(env, "breadcrumb");
 
   const lastIndex = entries.length - 1;
   const links = entries
@@ -5213,7 +5215,7 @@ function renderBreadcrumbTrace(entries: readonly BreadcrumbEntry[] | undefined):
     })
     .join(' <span class="bcsep">•</span> ');
 
-  return `<div class="trace"><span class="bchead">Trace:</span> ${links}</div>`;
+  return `<div class="trace"><span class="bchead">${escapeHtml(label)}</span> ${links}</div>`;
 }
 
 function renderToc(toc: TocItem[], minimumHeadings = 2): string {
@@ -7328,8 +7330,8 @@ async function renderSearchPage(
         <label for="search__ns">Namespace</label>
         <input id="search__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
         <button type="submit">Search</button>
-        <div class="advancedOptions" hidden aria-hidden="true">
-          <div class="toggle">
+        <div id="dw__search__assist" class="advancedOptions" hidden aria-hidden="true">
+          <div class="toggle" aria-haspopup="true">
             <div class="current" role="button" tabindex="0">Operators</div>
             <ul aria-expanded="false">
               <li><a href="#" data-search-insert="&quot;exact phrase&quot;">Exact phrase</a></li>
@@ -7337,7 +7339,7 @@ async function renderSearchPage(
               <li><a href="#" data-search-insert="@${escapeAttribute(assistantNamespace)}">Namespace filter</a></li>
             </ul>
           </div>
-          <div class="toggle">
+          <div class="toggle" aria-haspopup="true">
             <div class="current" role="button" tabindex="0">Wildcards</div>
             <ul aria-expanded="false">
               <li><a href="#" data-search-insert="prefix*">Prefix wildcard</a></li>
@@ -11373,6 +11375,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const appVersion = config.appVersion;
   const startId = startPageId(env);
   const startPath = pagePath(startId);
+  const documentDirection = htmlDirection(env);
   const pageId = options.pageId;
   const pageIdHtml = pageId ? `<div class="pageId"><span>${escapeHtml(pageId)}</span></div>` : "";
   const canonicalLink = pageId
@@ -11404,8 +11407,8 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const hasSidebar = Boolean(options.sidebarPageId);
   const sidebar =
     showSidebar && options.sidebarPageId
-      ? `<nav id="dokuwiki__aside" aria-label="Sidebar"><div class="pad aside include group">
-          <h3 class="toggle">Sidebar</h3>
+      ? `<nav id="dokuwiki__aside" aria-label="${escapeAttribute(localizedAuthText(env, "sidebar"))}"><div class="pad aside include group">
+          <h3 class="toggle">${escapeHtml(localizedAuthText(env, "sidebar"))}</h3>
           <div class="content"><div class="group">${options.sidebarHtml}</div></div>
         </div></nav>`
       : "";
@@ -11416,9 +11419,13 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const sitemapLabel = localizedAuthText(env, "btn_index");
   const siteToolsLabel = localizedAuthText(env, "site_tools");
   const skipToContentLabel = localizedAuthText(env, "skip_to_content");
+  const homeTitle = menuTitle(templateLang(config.language, "home"), "h");
+  const currentSearchIdInput = pageId
+    ? `<input type="hidden" name="id" value="${escapeAttribute(pageId)}">`
+    : "";
 
   return `<!doctype html>
-<html lang="${escapeAttribute(config.language)}">
+<html lang="${escapeAttribute(config.language)}" dir="${documentDirection}" class="no-js">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11439,18 +11446,22 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <ul class="a11y skip">
             <li><a href="#dokuwiki__content">${escapeHtml(skipToContentLabel)}</a></li>
           </ul>
-          <h1 class="logo"><a href="${startPath}"><img src="${logoPath}" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
+          <h1 class="logo"><a href="${startPath}" accesskey="h" title="${escapeAttribute(homeTitle)}"><img src="${logoPath}" alt=""><span>${escapeHtml(siteName)}</span></a></h1>
           ${tagline ? `<p class="claim">${escapeHtml(tagline)}</p>` : ""}
         </div>
         <div class="tools">
           ${renderUserTools(env, options.principal, pageId, disabledActions)}
           <nav id="dokuwiki__sitetools" aria-label="${escapeAttribute(siteToolsLabel)}">
             <h3 class="a11y">${escapeHtml(siteToolsLabel)}</h3>
-            <form class="search" method="get" action="/search">
-              <label class="a11y" for="qsearch__in">${escapeHtml(searchLabel)}</label>
-              <input id="qsearch__in" name="q" type="search" placeholder="${escapeAttribute(searchLabel)}">
-              <button type="submit">${escapeHtml(searchLabel)}</button>
-              <div id="qsearch__out" class="ajax_qsearch JSpopup" hidden aria-live="polite"></div>
+            <form id="dw__search" class="search" method="get" action="/search" role="search" accept-charset="utf-8">
+              <div class="no">
+                <input type="hidden" name="do" value="search">
+                ${currentSearchIdInput}
+                <label class="a11y" for="qsearch__in">${escapeHtml(searchLabel)}</label>
+                <input id="qsearch__in" class="edit" name="q" type="text" title="[F]" accesskey="f" placeholder="${escapeAttribute(searchLabel)}" autocomplete="on" aria-controls="qsearch__out">
+                <button type="submit" title="${escapeAttribute(searchLabel)}">${escapeHtml(searchLabel)}</button>
+                <div id="qsearch__out" class="ajax_qsearch JSpopup" hidden aria-live="polite"></div>
+              </div>
             </form>
             ${renderMobileTools(env, pageId, options.principal, disabledActions)}
             <ul>
@@ -11508,6 +11519,10 @@ function shellModeClass(mode = "show"): string {
     .replace(/[^a-z0-9_-]+/g, "_")
     .replace(/^_+|_+$/g, "");
   return normalized || "show";
+}
+
+function htmlDirection(env: Env): "ltr" | "rtl" {
+  return localizedAuthText(env, "direction").toLowerCase() === "rtl" ? "rtl" : "ltr";
 }
 
 function renderUserTools(

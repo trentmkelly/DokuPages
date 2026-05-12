@@ -198,7 +198,7 @@ are not fixed by this checklist.
 - [x] Port upstream JavaScript behaviors from `lib/scripts`, including toolbar, hotkeys, lock timer, qsearch, link wizard, media popup, tree expansion, search assistant, cookies, and editor helpers.
 - [x] Match upstream editor toolbar buttons, picker dialogs, shortcut keys, and insertion behavior.
 - [x] Match upstream section edit buttons, action icons, and disabled-action hiding.
-- [ ] Match upstream accessibility text, skip links, access keys, and ARIA behavior.
+- [x] Match upstream accessibility text, skip links, access keys, and ARIA behavior.
 - [ ] Match upstream validation badges, license footer behavior, and template messages.
 - [ ] Remove or replace the stale static `public/index.html` status page so future asset fallback cannot expose obsolete UI.
 - [ ] Add visual parity screenshots against a real upstream DokuWiki instance for page view, edit, revisions, diff, media manager, login, register, admin, and missing page states.
