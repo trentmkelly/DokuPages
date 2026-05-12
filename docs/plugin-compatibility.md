@@ -7,7 +7,10 @@ path.
 ## Bundled Plugins
 
 The admin-only `/admin/plugin-compatibility` page exposes this matrix together
-with imported plugin enablement from the source wiki when available.
+with imported plugin enablement and plugin-specific `$conf['plugin'][...]`
+configuration from the source wiki when available. Sensitive configuration keys
+such as passwords, tokens, credentials, API keys, and bind passwords are redacted
+in the user-visible report and diagnostics JSON.
 
 | Plugin         | Pages decision                                                                                                                                               |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |

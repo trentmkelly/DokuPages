@@ -162,6 +162,7 @@ import {
 import { templateLang } from "./wiki/template-language";
 import {
   readImportedPluginEnablement,
+  type ImportedPluginConfigSetting,
   type ImportedPluginEnablement,
   type ImportedPluginEnablementSnapshot
 } from "./wiki/plugin-settings";
@@ -6446,6 +6447,8 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
     ${renderMigrationStatus(diagnostics.migration)}
     <h2>Plugin enablement</h2>
     ${renderPluginEnablementTable(diagnostics.plugins)}
+    <h2>Plugin configuration</h2>
+    ${renderPluginConfigTable(diagnostics.plugins)}
     <h2>Environment</h2>
     <dl class="diagnostics">${renderDiagnosticsDefinitionList(infoRecordRows(diagnostics.info.environment))}</dl>
     <h2>PHP compatibility</h2>
@@ -6474,6 +6477,36 @@ function renderPluginEnablementRow(plugin: ImportedPluginEnablement): string {
     <td>${plugin.source ? escapeHtml(plugin.source) : "-"}</td>
     <td>${plugin.layer ? escapeHtml(plugin.layer) : "-"}</td>
   </tr>`;
+}
+
+function renderPluginConfigTable(snapshot: ImportedPluginEnablementSnapshot): string {
+  const summary = `${snapshot.configSummary.total} imported setting${snapshot.configSummary.total === 1 ? "" : "s"} across ${snapshot.configSummary.plugins} plugin${snapshot.configSummary.plugins === 1 ? "" : "s"}; ${snapshot.configSummary.locked} locked`;
+  const rows = snapshot.configs.map(renderPluginConfigRow).join("");
+
+  return `<p>${escapeHtml(summary)}.</p>
+  <table class="diagnostics plugin__configuration">
+    <thead><tr><th>Plugin</th><th>Setting</th><th>Value</th><th>Locked</th><th>Source</th><th>Layer</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6">No imported plugin configuration records.</td></tr>'}</tbody>
+  </table>`;
+}
+
+function renderPluginConfigRow(setting: ImportedPluginConfigSetting): string {
+  return `<tr>
+    <td><code>${escapeHtml(setting.plugin)}</code></td>
+    <td><code>${escapeHtml(setting.key)}</code></td>
+    <td>${escapeHtml(formatImportedPluginConfigValue(setting))}</td>
+    <td>${setting.locked ? "yes" : "no"}</td>
+    <td>${setting.source ? escapeHtml(setting.source) : "-"}</td>
+    <td>${setting.layer ? escapeHtml(setting.layer) : "-"}</td>
+  </tr>`;
+}
+
+function formatImportedPluginConfigValue(setting: ImportedPluginConfigSetting): string {
+  if (setting.sensitive) return "[redacted]";
+
+  const value = typeof setting.value === "string" ? setting.value : JSON.stringify(setting.value);
+  if (!value) return "";
+  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
 }
 
 function renderDiagnosticsDefinitionList(rows: InfoRows): string {
@@ -6672,11 +6705,13 @@ async function renderBundledPluginCompatibilityPage(
   const importedByPlugin = new Map(
     pluginEnablement.plugins.map((plugin) => [plugin.plugin, plugin] as const)
   );
+  const pluginConfigCounts = importedPluginConfigCounts(pluginEnablement.configs);
   const rows = BUNDLED_DOKUWIKI_PLUGINS.map((plugin) =>
     renderBundledPluginCompatibilityRow(
       plugin,
       pagesReplacementForBundledPlugin(plugin.base),
-      importedByPlugin.get(plugin.base) ?? null
+      importedByPlugin.get(plugin.base) ?? null,
+      pluginConfigCounts.get(plugin.base) ?? 0
     )
   ).join("");
   const unsupportedCount = BUNDLED_DOKUWIKI_PLUGINS.filter((plugin) =>
@@ -6690,9 +6725,11 @@ async function renderBundledPluginCompatibilityPage(
     <p class="info">Unsupported bundled plugins and native replacement status are tracked here so imported plugin enablement can be reviewed without executing PHP plugin code.</p>
     <p>${unsupportedCount} bundled plugin${unsupportedCount === 1 ? "" : "s"} are unsupported, removed, or migration-only in the Pages runtime. Imported enablement comes from ${pluginEnablement.sourceFiles.map(escapeHtml).join(", ")}.</p>
     <table class="diagnostics plugin__compatibility">
-      <thead><tr><th>Plugin</th><th>Types</th><th>Imported state</th><th>Source</th><th>Pages status</th><th>Native replacement</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Plugin</th><th>Types</th><th>Imported state</th><th>Source</th><th>Imported config</th><th>Pages status</th><th>Native replacement</th><th>Notes</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>`,
+    </table>
+    <h2>Imported plugin configuration</h2>
+    ${renderPluginConfigTable(pluginEnablement)}`,
     { principal, mode: "admin" }
   );
 }
@@ -6700,7 +6737,8 @@ async function renderBundledPluginCompatibilityPage(
 function renderBundledPluginCompatibilityRow(
   plugin: DokuWikiPluginInfo,
   replacement: BundledPluginPagesReplacement | null,
-  imported: ImportedPluginEnablement | null
+  imported: ImportedPluginEnablement | null,
+  configCount: number
 ): string {
   const status = replacement?.status ?? "unsupported_runtime";
   const route = replacement?.route;
@@ -6711,10 +6749,21 @@ function renderBundledPluginCompatibilityRow(
     <td>${plugin.types.map(escapeHtml).join(", ")}</td>
     <td>${imported ? (imported.enabled ? "enabled" : "disabled") : "not imported"}${imported?.locked ? " (required)" : ""}</td>
     <td>${imported?.source ? `${escapeHtml(imported.source)} / ${escapeHtml(imported.layer ?? "-")}` : "-"}</td>
+    <td>${configCount === 0 ? "-" : `${configCount} setting${configCount === 1 ? "" : "s"}`}</td>
     <td>${escapeHtml(pluginStatusLabel(status))}</td>
     <td>${route ? `<a href="${escapeAttribute(route)}">${escapeHtml(replacementLabel)}</a>` : escapeHtml(replacementLabel)}</td>
     <td>${escapeHtml(replacement?.notes ?? "Review before enabling in an imported source wiki.")}</td>
   </tr>`;
+}
+
+function importedPluginConfigCounts(
+  settings: readonly ImportedPluginConfigSetting[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const setting of settings) {
+    counts.set(setting.plugin, (counts.get(setting.plugin) ?? 0) + 1);
+  }
+  return counts;
 }
 
 function pluginStatusLabel(status: BundledPluginPagesStatus): string {
@@ -6762,6 +6811,8 @@ async function renderExtensionManagerUnsupportedPage(
       <p>All executable code must be reviewed, committed, tested, and redeployed with the Pages application. Imported plugin enablement and plugin configuration are retained for diagnostics and native replacement decisions, but uploaded PHP extensions are not executed.</p>
       <h2>Imported plugin enablement</h2>
       ${renderPluginEnablementTable(pluginEnablement)}
+      <h2>Imported plugin configuration</h2>
+      ${renderPluginConfigTable(pluginEnablement)}
       <table class="diagnostics">
         <thead><tr><th>DokuWiki extension action</th><th>Pages runtime status</th></tr></thead>
         <tbody>

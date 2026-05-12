@@ -46,8 +46,10 @@ The runtime emits structured metric events to Cloudflare logs:
 - `/api/health`: machine-readable health result for D1, R2, KV, Durable Objects,
   config, migrations, and version.
 - `/api/diagnostics`: full diagnostics JSON, including imported plugin
-  enablement and source files when a DokuWiki source import supplied them.
-- `/diagnostics`: HTML diagnostics view with the same plugin enablement summary.
+  enablement, plugin configuration, and source files when a DokuWiki source
+  import supplied them. Sensitive plugin configuration values are redacted.
+- `/diagnostics`: HTML diagnostics view with the same plugin enablement and
+  redacted plugin configuration summary.
 - `/admin`: admin dashboard linking to diagnostics, ACL management, audit logs,
   media manager, and search index rebuild.
 

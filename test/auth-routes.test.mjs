@@ -2629,6 +2629,24 @@ describe("auth routes", () => {
       layer: "local",
       locked: false
     });
+    await seedPluginConfig(env.DB, {
+      plugin: "popularity",
+      key: "submit",
+      value: 0,
+      rawValue: "0",
+      source: "local.php",
+      layer: "local",
+      locked: false
+    });
+    await seedPluginConfig(env.DB, {
+      plugin: "authad",
+      key: "bindpw",
+      value: "super-secret-bind-password",
+      rawValue: "'super-secret-bind-password'",
+      source: "local.protected.php",
+      layer: "protected",
+      locked: true
+    });
     const cookie = await loginAsAlice(env);
     const replacements = [
       ["acl", "/admin/acl", "Access Control List Management"],
@@ -2675,7 +2693,11 @@ describe("auth routes", () => {
     expect(extensionHtml).toContain("Installed Plugins");
     expect(extensionHtml).toContain("Search and Install");
     expect(extensionHtml).toContain("Imported plugin enablement");
+    expect(extensionHtml).toContain("Imported plugin configuration");
     expect(extensionHtml).toContain("<code>acl</code>");
+    expect(extensionHtml).toContain("<code>submit</code>");
+    expect(extensionHtml).toContain("[redacted]");
+    expect(extensionHtml).not.toContain("super-secret-bind-password");
     expect(extensionHtml).toContain("plugins.required.php");
     expect(extensionHtml).toContain("required");
     expect(extensionHtml).toContain(
@@ -2702,14 +2724,20 @@ describe("auth routes", () => {
     expect(pluginCompatibilityHtml).toContain("Intentionally removed");
     expect(pluginCompatibilityHtml).toContain("Migration-only");
     expect(pluginCompatibilityHtml).toContain("plugins.required.php / required");
+    expect(pluginCompatibilityHtml).toContain("1 setting");
+    expect(pluginCompatibilityHtml).toContain("Imported plugin configuration");
     expect(pluginCompatibilityHtml).toContain("<code>popularity</code>");
+    expect(pluginCompatibilityHtml).toContain("<code>submit</code>");
+    expect(pluginCompatibilityHtml).toContain("[redacted]");
+    expect(pluginCompatibilityHtml).not.toContain("super-secret-bind-password");
     expect(pluginCompatibilityHtml).toContain("No telemetry replacement");
 
     const diagnostics = await handleRequest(
       new Request("https://example.com/api/diagnostics"),
       env
     );
-    await expect(diagnostics.json()).resolves.toMatchObject({
+    const diagnosticsPayload = await diagnostics.json();
+    expect(diagnosticsPayload).toMatchObject({
       plugins: {
         sourceFiles: ["conf/plugins.php", "conf/plugins.local.php", "conf/plugins.required.php"],
         summary: {
@@ -2718,6 +2746,32 @@ describe("auth routes", () => {
           disabled: 1,
           locked: 1
         },
+        configSummary: {
+          total: 2,
+          plugins: 2,
+          locked: 1
+        },
+        configs: expect.arrayContaining([
+          expect.objectContaining({
+            plugin: "popularity",
+            key: "submit",
+            value: 0,
+            sensitive: false,
+            source: "local.php",
+            layer: "local",
+            locked: false
+          }),
+          expect.objectContaining({
+            plugin: "authad",
+            key: "bindpw",
+            value: "[redacted]",
+            rawValue: null,
+            sensitive: true,
+            source: "local.protected.php",
+            layer: "protected",
+            locked: true
+          })
+        ]),
         plugins: expect.arrayContaining([
           expect.objectContaining({
             plugin: "acl",
@@ -2736,12 +2790,16 @@ describe("auth routes", () => {
         ])
       }
     });
+    expect(JSON.stringify(diagnosticsPayload)).not.toContain("super-secret-bind-password");
     const diagnosticsHtml = await handleRequest(
       new Request("https://example.com/diagnostics"),
       env
     );
     const diagnosticsBody = await diagnosticsHtml.text();
     expect(diagnosticsBody).toContain("<h2>Plugin enablement</h2>");
+    expect(diagnosticsBody).toContain("<h2>Plugin configuration</h2>");
+    expect(diagnosticsBody).toContain("[redacted]");
+    expect(diagnosticsBody).not.toContain("super-secret-bind-password");
     expect(diagnosticsBody).toContain("plugins.local.php");
 
     for (const plugin of ["extension", "popularity", "safefnrecode"]) {
@@ -3191,6 +3249,36 @@ async function seedPluginEnablement(
          updated_at = excluded.updated_at`
     )
     .bind(plugin, JSON.stringify({ plugin, enabled, source, layer, locked }), updatedAt)
+    .run();
+}
+
+async function seedPluginConfig(
+  d1,
+  { plugin, key, value, rawValue, source, layer, locked, updatedAt = "2026-05-07T00:00:00.000Z" }
+) {
+  await d1
+    .prepare(
+      `insert into plugin_settings (plugin, key, value_json, updated_at)
+       values (?, ?, ?, ?)
+       on conflict(plugin, key) do update set
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`
+    )
+    .bind(
+      plugin,
+      key,
+      JSON.stringify({
+        plugin,
+        key,
+        path: key.split("."),
+        value,
+        rawValue,
+        source,
+        layer,
+        locked
+      }),
+      updatedAt
+    )
     .run();
 }
 

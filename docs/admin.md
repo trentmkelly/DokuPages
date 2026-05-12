@@ -17,10 +17,13 @@ Native admin routes use D1-backed session principals and DokuWiki-style
   upstream tab labels and imported plugin enablement from `conf/plugins.php`,
   `conf/plugins.local.php`, and `conf/plugins.required.php`, but it returns
   `501` and explains that runtime plugin and template install/update/uninstall
-  actions are unsupported on Pages.
+  actions are unsupported on Pages. Imported plugin-specific configuration from
+  `$conf['plugin'][...]` is shown for compatibility review with sensitive values
+  redacted.
 - `/admin/plugin-compatibility` shows every bundled upstream plugin, imported
-  enablement state when present, and the Pages native replacement, external
-  bridge, migration-only, removed, or unsupported-runtime status.
+  enablement state when present, imported plugin configuration counts and
+  redacted details, and the Pages native replacement, external bridge,
+  migration-only, removed, or unsupported-runtime status.
 - `/admin/styling` provides a native Template Style Settings editor for the
   DokuWiki-style CSS variables. It writes deployment-safe D1 `plugin_settings`
   rows and applies them through `/theme.css` without mutating checked-in assets.

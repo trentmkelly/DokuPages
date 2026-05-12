@@ -96,7 +96,9 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     : {
         sourceFiles: ["conf/plugins.php", "conf/plugins.local.php", "conf/plugins.required.php"],
         plugins: [],
-        summary: { total: 0, enabled: 0, disabled: 0, locked: 0 }
+        summary: { total: 0, enabled: 0, disabled: 0, locked: 0 },
+        configs: [],
+        configSummary: { total: 0, plugins: 0, locked: 0 }
       };
   const ok =
     storage.d1.ok &&
