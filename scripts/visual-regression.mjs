@@ -10,22 +10,94 @@ const DEFAULT_BASELINE = "test/visual-baselines.json";
 const DEFAULT_OUTPUT_DIR = ".wrangler/visual-regression";
 const CASES = [
   {
-    name: "welcome-desktop",
-    path: "/wiki/wiki/welcome",
+    name: "page-view-desktop",
+    state: "page view",
+    pagesPath: "/wiki/wiki/welcome",
+    upstreamPath: "/doku.php?id=wiki:welcome",
     width: 1280,
-    height: 900
+    height: 900,
+    hashGate: true
   },
   {
-    name: "welcome-mobile",
-    path: "/wiki/wiki/welcome",
+    name: "page-view-mobile",
+    state: "page view",
+    pagesPath: "/wiki/wiki/welcome",
+    upstreamPath: "/doku.php?id=wiki:welcome",
     width: 390,
-    height: 844
+    height: 844,
+    hashGate: true
+  },
+  {
+    name: "edit-desktop",
+    state: "edit",
+    pagesPath: "/wiki/wiki/welcome?do=edit",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=edit",
+    width: 1280,
+    height: 900,
+    hashGate: false
+  },
+  {
+    name: "revisions-desktop",
+    state: "revisions",
+    pagesPath: "/wiki/wiki/welcome?do=revisions",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=revisions",
+    width: 1280,
+    height: 900,
+    hashGate: false
+  },
+  {
+    name: "diff-desktop",
+    state: "diff",
+    pagesPath: "/wiki/wiki/welcome?do=diff",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=diff",
+    width: 1280,
+    height: 900,
+    hashGate: false
+  },
+  {
+    name: "media-manager-desktop",
+    state: "media manager",
+    pagesPath: "/media-manager?ns=wiki",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=media&ns=wiki",
+    width: 1280,
+    height: 900,
+    hashGate: false
   },
   {
     name: "login-desktop",
-    path: "/login",
+    state: "login",
+    pagesPath: "/wiki/wiki/welcome?do=login",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=login",
     width: 1024,
-    height: 768
+    height: 768,
+    hashGate: false
+  },
+  {
+    name: "register-desktop",
+    state: "register",
+    pagesPath: "/wiki/wiki/welcome?do=register",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=register",
+    width: 1024,
+    height: 768,
+    hashGate: false
+  },
+  {
+    name: "admin-desktop",
+    state: "admin",
+    pagesPath: "/admin",
+    upstreamPath: "/doku.php?id=wiki:welcome&do=admin",
+    width: 1280,
+    height: 900,
+    hashGate: false
+  },
+  {
+    name: "missing-page-desktop",
+    state: "missing page",
+    pagesPath: "/wiki/start",
+    upstreamPath: "/doku.php?id=start",
+    width: 1280,
+    height: 900,
+    hashGate: true
   }
 ];
 
@@ -41,22 +113,59 @@ async function main() {
 
   const results = [];
   for (const item of CASES) {
-    const screenshotPath = path.join(args.outputDir, `${item.name}.png`);
-    const url = new URL(item.path, args.baseUrl);
-    await captureScreenshot(chromium, url.href, screenshotPath, item.width, item.height);
-    results.push(await screenshotResult(item, screenshotPath));
+    const pagesScreenshotPath = path.join(args.outputDir, `${item.name}.pages.png`);
+    const pagesUrl = new URL(item.pagesPath, args.baseUrl);
+    await captureScreenshot(chromium, pagesUrl.href, pagesScreenshotPath, item.width, item.height);
+    const sources = {
+      pages: await screenshotResult(item, pagesScreenshotPath)
+    };
+
+    if (args.upstreamUrl) {
+      const upstreamScreenshotPath = path.join(args.outputDir, `${item.name}.upstream.png`);
+      const upstreamUrl = new URL(item.upstreamPath, args.upstreamUrl);
+      await captureScreenshot(
+        chromium,
+        upstreamUrl.href,
+        upstreamScreenshotPath,
+        item.width,
+        item.height
+      );
+      sources.upstream = await screenshotResult(item, upstreamScreenshotPath);
+    }
+
+    results.push({
+      name: item.name,
+      state: item.state,
+      paths: {
+        pages: item.pagesPath,
+        upstream: item.upstreamPath
+      },
+      viewport: {
+        width: item.width,
+        height: item.height
+      },
+      hashGate: item.hashGate,
+      sources
+    });
   }
 
   if (args.update) {
-    await writeFile(args.baseline, `${JSON.stringify({ version: 1, cases: results }, null, 2)}\n`);
+    await writeFile(args.baseline, `${JSON.stringify({ version: 2, cases: results }, null, 2)}\n`);
     console.log(`updated ${args.baseline}`);
     return;
   }
 
   const baseline = JSON.parse(await readFile(args.baseline, "utf8"));
-  compareResults(baseline.cases ?? [], results);
+  compareResults(baseline.cases ?? [], results, {
+    requireUpstream: Boolean(args.upstreamUrl)
+  });
+  const gatedCount = results.filter((item) => item.hashGate).length;
+  const parityCount = results.length - gatedCount;
+  const upstreamNote = args.upstreamUrl ? " with upstream parity captures" : "";
   console.log(
-    `visual regression passed for ${results.length} screenshot${results.length === 1 ? "" : "s"}`
+    `visual regression passed for ${gatedCount} gated Pages screenshot${
+      gatedCount === 1 ? "" : "s"
+    } and ${parityCount} parity capture${parityCount === 1 ? "" : "s"}${upstreamNote}`
   );
 }
 
@@ -66,6 +175,7 @@ function parseArgs(argv) {
     baseline: DEFAULT_BASELINE,
     outputDir: DEFAULT_OUTPUT_DIR,
     chromium: process.env.CHROMIUM_BIN || "",
+    upstreamUrl: process.env.UPSTREAM_BASE_URL || "",
     update: false
   };
 
@@ -79,6 +189,8 @@ function parseArgs(argv) {
       args.outputDir = argv[++index];
     } else if (arg === "--chromium") {
       args.chromium = argv[++index];
+    } else if (arg === "--upstream-url") {
+      args.upstreamUrl = argv[++index];
     } else if (arg === "--update") {
       args.update = true;
     }
@@ -125,12 +237,6 @@ async function screenshotResult(item, screenshotPath) {
   }
 
   return {
-    name: item.name,
-    path: item.path,
-    viewport: {
-      width: item.width,
-      height: item.height
-    },
     byteLength: buffer.byteLength,
     sha256: createHash("sha256").update(buffer).digest("hex")
   };
@@ -148,7 +254,7 @@ function pngDimensions(buffer) {
   };
 }
 
-function compareResults(expectedCases, actualCases) {
+function compareResults(expectedCases, actualCases, options = { requireUpstream: false }) {
   const expectedByName = new Map(expectedCases.map((item) => [item.name, item]));
 
   for (const actual of actualCases) {
@@ -161,11 +267,38 @@ function compareResults(expectedCases, actualCases) {
       throw new Error(`Viewport changed for ${actual.name}.`);
     }
 
-    if (expected.sha256 !== actual.sha256) {
-      throw new Error(
-        `Visual hash changed for ${actual.name}. Run npm run test:visual -- --update after reviewing the screenshot.`
-      );
+    if (JSON.stringify(expected.paths) !== JSON.stringify(actual.paths)) {
+      throw new Error(`Paths changed for ${actual.name}.`);
     }
+
+    if (Boolean(expected.hashGate) !== Boolean(actual.hashGate)) {
+      throw new Error(`Hash gate changed for ${actual.name}.`);
+    }
+
+    compareSourcePresence(actual.name, "pages", actual.sources.pages);
+    if (actual.hashGate) {
+      compareSourceHash(actual.name, "pages", expected.sources?.pages, actual.sources.pages);
+    }
+    if (options.requireUpstream)
+      compareSourcePresence(actual.name, "upstream", actual.sources.upstream);
+  }
+}
+
+function compareSourcePresence(caseName, sourceName, actual) {
+  if (!actual) {
+    throw new Error(`Missing ${sourceName} visual capture for ${caseName}.`);
+  }
+}
+
+function compareSourceHash(caseName, sourceName, expected, actual) {
+  if (!expected || !actual) {
+    throw new Error(`Missing ${sourceName} visual baseline for ${caseName}.`);
+  }
+
+  if (expected.sha256 !== actual.sha256) {
+    throw new Error(
+      `Visual hash changed for ${caseName}. Run npm run test:visual -- --update after reviewing the screenshot.`
+    );
   }
 }
 

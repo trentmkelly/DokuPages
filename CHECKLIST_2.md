@@ -201,7 +201,7 @@ are not fixed by this checklist.
 - [x] Match upstream accessibility text, skip links, access keys, and ARIA behavior.
 - [x] Match upstream validation badges, license footer behavior, and template messages.
 - [x] Remove or replace the stale static `public/index.html` status page so future asset fallback cannot expose obsolete UI.
-- [ ] Add visual parity screenshots against a real upstream DokuWiki instance for page view, edit, revisions, diff, media manager, login, register, admin, and missing page states.
+- [x] Add visual parity screenshots against a real upstream DokuWiki instance for page view, edit, revisions, diff, media manager, login, register, admin, and missing page states.
 
 ## Feeds, Sitemap, Manifest, And Discovery
 

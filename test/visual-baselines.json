@@ -1,35 +1,235 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
-      "name": "welcome-desktop",
-      "path": "/wiki/wiki/welcome",
+      "name": "page-view-desktop",
+      "state": "page view",
+      "paths": {
+        "pages": "/wiki/wiki/welcome",
+        "upstream": "/doku.php?id=wiki:welcome"
+      },
       "viewport": {
         "width": 1280,
         "height": 900
       },
-      "byteLength": 136897,
-      "sha256": "32a8fcbfafddf997243a98ceb76e5bda939e79b9453fb3b7017c929c5c793cfa"
+      "hashGate": true,
+      "sources": {
+        "pages": {
+          "byteLength": 130903,
+          "sha256": "f12aae27f71e86bf691b177bcc07cb369690282a2102d650357daa93005b3731"
+        },
+        "upstream": {
+          "byteLength": 136469,
+          "sha256": "e09965168ac75e42973a76b559979f408c83d3468d6b1708dd2106084d3b796c"
+        }
+      }
     },
     {
-      "name": "welcome-mobile",
-      "path": "/wiki/wiki/welcome",
+      "name": "page-view-mobile",
+      "state": "page view",
+      "paths": {
+        "pages": "/wiki/wiki/welcome",
+        "upstream": "/doku.php?id=wiki:welcome"
+      },
       "viewport": {
         "width": 390,
         "height": 844
       },
-      "byteLength": 78076,
-      "sha256": "0401194828e73681636fffda88c4a0815ad3946a87f414aad0acfecbeef2b2ce"
+      "hashGate": true,
+      "sources": {
+        "pages": {
+          "byteLength": 76117,
+          "sha256": "73aeae5e8e9a9e5f662e53a9c440d15b0757a65a9f5b4dc1023b3d1fd173d698"
+        },
+        "upstream": {
+          "byteLength": 72153,
+          "sha256": "38e653301cdb87fba881aead5353c84b6948b1692d1ba5896819f8b53ad503a9"
+        }
+      }
+    },
+    {
+      "name": "edit-desktop",
+      "state": "edit",
+      "paths": {
+        "pages": "/wiki/wiki/welcome?do=edit",
+        "upstream": "/doku.php?id=wiki:welcome&do=edit"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 66291,
+          "sha256": "6d5ba4e0985b86584907a00972d850d5d6ebd4f4b6131cdd0b4079fc6d25e9b8"
+        },
+        "upstream": {
+          "byteLength": 117965,
+          "sha256": "3de5a9765b3590c500fb539ee9d0dc5119437fc2f39776f529529af5ed784bc2"
+        }
+      }
+    },
+    {
+      "name": "revisions-desktop",
+      "state": "revisions",
+      "paths": {
+        "pages": "/wiki/wiki/welcome?do=revisions",
+        "upstream": "/doku.php?id=wiki:welcome&do=revisions"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 67279,
+          "sha256": "6f1ab259a53049f7f916375933b7566c3d68cfb30d722ab24e6f4565a0f5f2af"
+        },
+        "upstream": {
+          "byteLength": 63150,
+          "sha256": "a7556ccf3f833a79480ccb7cb9f8cae987dc433adf364438a47027a99534ea9e"
+        }
+      }
+    },
+    {
+      "name": "diff-desktop",
+      "state": "diff",
+      "paths": {
+        "pages": "/wiki/wiki/welcome?do=diff",
+        "upstream": "/doku.php?id=wiki:welcome&do=diff"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 105716,
+          "sha256": "9992253b1c9e3cfee039d406bb65ce2326b3d93e1a91f40ec386930604c7f9ff"
+        },
+        "upstream": {
+          "byteLength": 99784,
+          "sha256": "4d0241155091aaff65722e71405b362f7dd520ab3d92e8f88b6095337e60ea01"
+        }
+      }
+    },
+    {
+      "name": "media-manager-desktop",
+      "state": "media manager",
+      "paths": {
+        "pages": "/media-manager?ns=wiki",
+        "upstream": "/doku.php?id=wiki:welcome&do=media&ns=wiki"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 107321,
+          "sha256": "2c5e83d510b7fcf24ace39e2ea3cd57918fb21f45a7def568a100a873dba0e71"
+        },
+        "upstream": {
+          "byteLength": 83483,
+          "sha256": "ef3d729c22e19f6e21b28a324c3ddb2a0291a248531376635ae87dea8dbe9fa9"
+        }
+      }
     },
     {
       "name": "login-desktop",
-      "path": "/login",
+      "state": "login",
+      "paths": {
+        "pages": "/wiki/wiki/welcome?do=login",
+        "upstream": "/doku.php?id=wiki:welcome&do=login"
+      },
       "viewport": {
         "width": 1024,
         "height": 768
       },
-      "byteLength": 49089,
-      "sha256": "a43ea0ab6b3aae56363bb3a5ac807d93457d21e2beb2c6cb7950131482b41224"
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 65648,
+          "sha256": "aa5a11253e97a7b8a69ed5c7bf2a7171d843bb6aea27be61b3ee9d8ee84c5ae0"
+        },
+        "upstream": {
+          "byteLength": 114052,
+          "sha256": "312840780bed76efa85622103868ab7866267e467e4a40189cf6083041d68330"
+        }
+      }
+    },
+    {
+      "name": "register-desktop",
+      "state": "register",
+      "paths": {
+        "pages": "/wiki/wiki/welcome?do=register",
+        "upstream": "/doku.php?id=wiki:welcome&do=register"
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 52897,
+          "sha256": "0da91e48a8648c77f36350a9b57455a1c2ed0cdca9828ee82c947b6aed48e359"
+        },
+        "upstream": {
+          "byteLength": 114052,
+          "sha256": "312840780bed76efa85622103868ab7866267e467e4a40189cf6083041d68330"
+        }
+      }
+    },
+    {
+      "name": "admin-desktop",
+      "state": "admin",
+      "paths": {
+        "pages": "/admin",
+        "upstream": "/doku.php?id=wiki:welcome&do=admin"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "hashGate": false,
+      "sources": {
+        "pages": {
+          "byteLength": 53753,
+          "sha256": "7f304caef81de78b3888b39ed0c461715ecbe9956ebba0eff8a27796e04c6d7c"
+        },
+        "upstream": {
+          "byteLength": 136469,
+          "sha256": "e09965168ac75e42973a76b559979f408c83d3468d6b1708dd2106084d3b796c"
+        }
+      }
+    },
+    {
+      "name": "missing-page-desktop",
+      "state": "missing page",
+      "paths": {
+        "pages": "/wiki/start",
+        "upstream": "/doku.php?id=start"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "hashGate": true,
+      "sources": {
+        "pages": {
+          "byteLength": 66531,
+          "sha256": "f9f9962833d1d0b96e7c294f5ee84a4b505cb026ec3f1e0cb64aa00ccaeb36b9"
+        },
+        "upstream": {
+          "byteLength": 54552,
+          "sha256": "eebbcfbf07f2b2b93cd5a334dacd36b568fa167244ea40b04b571cb1ea1b30f2"
+        }
+      }
     }
   ]
 }

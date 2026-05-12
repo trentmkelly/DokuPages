@@ -73,11 +73,19 @@ license notices.
 `public/dokuwiki.css` cannot drift from upstream `style.ini`, upstream template
 CSS modules, or `src/styles/dokuwiki-pages-overrides.css`.
 
-Visual regression checks use local Chromium to capture desktop welcome, mobile
-welcome, and desktop login screenshots from a deployed Pages URL. The committed
-`test/visual-baselines.json` records viewport sizes and screenshot hashes; run
-`npm run test:visual -- --base-url <url> --update` only after reviewing changed
-screenshots in `.wrangler/visual-regression/`.
+Visual regression checks use local Chromium to capture Pages screenshots for
+page view, edit, revisions, diff, media manager, login, register, admin, and
+missing-page states. Pass `--upstream-url <url>` to capture matching screenshots
+from a real DokuWiki instance beside the Pages images. The committed
+`test/visual-baselines.json` records viewport sizes, paths, screenshot hashes,
+and whether a state is hash-gated. Stable page-view and missing-page Pages
+screenshots are enforced as the regression gate; edit, history, media, auth, and
+admin screens are captured as parity references because lock, token, and session
+state can emit byte-different browser captures. Upstream screenshots are also
+captured as parity references. Run
+`npm run test:visual -- --base-url <url> --upstream-url <url> --update` only
+after reviewing changed `.pages.png` and `.upstream.png` screenshots in
+`.wrangler/visual-regression/`.
 
 Storage performance tests cover D1 query plans for indexed high-cardinality
 lookups, bounded query counts for paginated storage calls, search-index batch
