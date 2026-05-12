@@ -3,6 +3,11 @@
 A proof-of-concept port of DokuWiki to Cloudflare Pages, Pages Functions, D1,
 KV, R2, and Durable Objects.
 
+**IMPORTANT:** The code in this repo was written almost entirely by AI. Basic
+functionality has been verified but this code has not been thoroughly audited
+for security. You should consider it experimental and deploy it at your own
+risk.
+
 This repository was based on DokuWiki `2025-05-14b "Librarian"`. It was built
 primarily with `gpt-5.5-xhigh`, with some supporting work done with
 `gpt-5.5-low`. The project is mainly a demonstration of long-term goal pursuit
