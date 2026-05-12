@@ -7310,18 +7310,41 @@ async function renderSearchPage(
     )
     .join("");
   const emptyState = query && results.length === 0 ? "<p>No matching pages found.</p>" : "";
+  const pageScopedNamespace = cleanPageId(currentPageId).split(":").slice(0, -1).join(":");
+  const assistantNamespace =
+    namespace || pageScopedNamespace || namespaceForIndex(startPageId(env));
 
   return htmlShell(
     env,
     "Search",
     `<h1>Search</h1>
-    <form method="get" action="/search">
-      <input type="hidden" name="sf" value="1">
-      <label for="q">Search pages</label>
-      <input id="q" name="q" type="search" value="${escapeHtml(rawQuery || query)}">
-      <label for="search__ns">Namespace</label>
-      <input id="search__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
-      <button type="submit">Search</button>
+    <form class="search-results-form" method="get" action="/search">
+      <fieldset class="search-form">
+        <legend>Search pages</legend>
+        <input type="hidden" name="sf" value="1">
+        <label for="q">Search pages</label>
+        <input id="q" name="q" type="search" value="${escapeAttribute(rawQuery || query)}">
+        <label for="search__ns">Namespace</label>
+        <input id="search__ns" name="ns" type="search" value="${escapeAttribute(namespace)}">
+        <button type="submit">Search</button>
+        <div class="advancedOptions" hidden aria-hidden="true">
+          <div class="toggle">
+            <div class="current" role="button" tabindex="0">Operators</div>
+            <ul aria-expanded="false">
+              <li><a href="#" data-search-insert="&quot;exact phrase&quot;">Exact phrase</a></li>
+              <li><a href="#" data-search-insert="-excluded">Exclude term</a></li>
+              <li><a href="#" data-search-insert="@${escapeAttribute(assistantNamespace)}">Namespace filter</a></li>
+            </ul>
+          </div>
+          <div class="toggle">
+            <div class="current" role="button" tabindex="0">Wildcards</div>
+            <ul aria-expanded="false">
+              <li><a href="#" data-search-insert="prefix*">Prefix wildcard</a></li>
+              <li><a href="#" data-search-insert="*fragment*">Fragment wildcard</a></li>
+            </ul>
+          </div>
+        </div>
+      </fieldset>
     </form>
     ${namespace ? `<p>Search scope: ${escapeHtml(namespace)}</p>` : ""}
     ${emptyState}
@@ -11426,6 +11449,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
               <label class="a11y" for="qsearch__in">${escapeHtml(searchLabel)}</label>
               <input id="qsearch__in" name="q" type="search" placeholder="${escapeAttribute(searchLabel)}">
               <button type="submit">${escapeHtml(searchLabel)}</button>
+              <div id="qsearch__out" class="ajax_qsearch JSpopup" hidden aria-live="polite"></div>
             </form>
             ${renderMobileTools(env, pageId, options.principal, disabledActions)}
             <ul>
@@ -13589,7 +13613,7 @@ function renderEditPage(
     : "";
   const lockAttributes =
     lockToken && config.lockTime > 0
-      ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}"`
+      ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}" data-lock-warning-delay="${config.lockTime * 1000}"`
       : "";
   const signatureButton = config.signature
     ? `<button class="toolbutton" type="button" data-insert="${escapeAttribute(renderEditSignature(config, principal))}" title="Signature">Sig</button>`
@@ -13614,7 +13638,8 @@ function renderEditPage(
           <button class="toolbutton" type="button" data-wrap-before="//" data-wrap-after="//" data-placeholder="emphasized text" title="Italic"><em>I</em></button>
           <button class="toolbutton" type="button" data-line-before="====== " data-line-after=" ======" data-placeholder="Headline" title="Level 1 headline">H1</button>
           <button class="toolbutton" type="button" data-line-before="===== " data-line-after=" =====" data-placeholder="Headline" title="Level 2 headline">H2</button>
-          <button class="toolbutton" type="button" data-wrap-before="[[" data-wrap-after="]]" data-placeholder="page:id|Link text" title="Internal link">Link</button>
+          <button id="edbtn__link" class="toolbutton" type="button" data-link-wizard="1" data-wrap-before="[[" data-wrap-after="]]" data-placeholder="page:id|Link text" title="Internal link">Link</button>
+          <button id="edbtn__media" class="toolbutton" type="button" data-media-popup="1" title="Media">Media</button>
           <button class="toolbutton" type="button" data-prefix="  * " data-placeholder="List item" title="Unordered list">UL</button>
           <button class="toolbutton" type="button" data-prefix="  - " data-placeholder="List item" title="Ordered list">OL</button>
           <button class="toolbutton" type="button" data-wrap-before="<code>" data-wrap-after="</code>" data-placeholder="code" title="Code">Code</button>
@@ -13622,10 +13647,11 @@ function renderEditPage(
         </div>
         ${draftStatus}
       </div>
-      <textarea id="content" class="edit" name="content" rows="24" cols="100" data-preview-url="/api/pages/preview"${draftAttributes}>${escapeHtml(content)}</textarea>
+      <textarea id="wiki__text" class="edit" name="content" rows="24" cols="100" data-preview-url="/api/pages/preview"${draftAttributes}>${escapeHtml(content)}</textarea>
+      <div id="size__ctl" class="a11y"></div>
       <div class="editBar">
         <div class="editButtons">
-          <button type="submit">Save</button>
+          <button id="edbtn__save" type="submit" accesskey="s">Save</button>
           <button id="edbtn__preview" type="button">Preview</button>
           ${draftButtons}
         </div>

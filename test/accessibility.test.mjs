@@ -29,6 +29,7 @@ describe("accessibility surface", () => {
     expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Site Tools">');
     expect(html).toContain('<label class="a11y" for="qsearch__in">Search</label>');
     expect(html).toContain('<input id="qsearch__in" name="q" type="search"');
+    expect(html).toContain('<div id="qsearch__out" class="ajax_qsearch JSpopup" hidden');
     expect(html).toContain(
       '<a href="/media-manager?ns=wiki" title="Media Manager" rel="nofollow">Media Manager</a>'
     );

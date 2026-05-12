@@ -58,6 +58,9 @@ Asset tests cover converted upstream CSS module selectors for forms, tabs,
 media popup and fullscreen manager views, search assistant UI, modal/link
 wizard surfaces, uploader hooks, and admin task pages. They also verify that
 the upstream image assets referenced by those converted rules are shipped.
+They pin native browser hooks for upstream-style cookies, hotkeys, quick
+search, search assistant toggles, link wizard insertion, media popups, editor
+helpers, lock warnings, and media manager uploads.
 `npm run format:check` runs `npm run style:check` before Prettier so generated
 `public/dokuwiki.css` cannot drift from upstream `style.ini`, upstream template
 CSS modules, or `src/styles/dokuwiki-pages-overrides.css`.

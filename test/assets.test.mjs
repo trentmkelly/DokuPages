@@ -18,7 +18,15 @@ describe("public assets", () => {
   it("keeps DokuWiki media manager frontend hooks available", async () => {
     const js = await readFile("public/dokuwiki.js", "utf8");
 
+    expect(js).toContain("DokuCookie");
+    expect(js).toContain("bindHotkeys");
     expect(js).toContain("bindMediaManager");
+    expect(js).toContain("bindQuickSearch");
+    expect(js).toContain("bindSearchAssistant");
+    expect(js).toContain("openLinkWizard");
+    expect(js).toContain("openMediaPopup");
+    expect(js).toContain("bindEditorKeyHelpers");
+    expect(js).toContain("lockWarningDelay");
     expect(js).toContain("data-media-tree-toggle");
     expect(js).toContain("dokuwiki-media-select");
     expect(js).toContain("#dw__upload[data-media-upload]");

@@ -302,6 +302,8 @@ describe("handleRequest", () => {
     expect(html).toContain('<link rel="canonical" href="/wiki/wiki/welcome">');
     expect(html).toContain('<link rel="stylesheet" href="/dokuwiki.css?v=0.1.0">');
     expect(html).toContain('<script src="/dokuwiki.js?v=0.1.0" defer></script>');
+    expect(html).toContain('id="qsearch__out"');
+    expect(html).toContain('class="ajax_qsearch JSpopup"');
     expect(html).toContain(
       '<div class="docInfo"><bdi>wiki/welcome.txt</bdi> · Last modified: <time datetime="2026-05-07T00:00:00.000Z">2026-05-07T00:00:00.000Z</time></div>'
     );
@@ -2710,12 +2712,20 @@ describe("handleRequest", () => {
     expect(html).toContain('name="lockToken" value="');
     expect(html).toContain('id="dw__editform"');
     expect(html).toContain('id="tool__bar"');
+    expect(html).toContain('id="wiki__text"');
+    expect(html).toContain('id="edbtn__link"');
+    expect(html).toContain('data-link-wizard="1"');
+    expect(html).toContain('id="edbtn__media"');
+    expect(html).toContain('data-media-popup="1"');
+    expect(html).toContain('id="size__ctl"');
     expect(html).toContain('data-insert="--sig--"');
     expect(html).toContain('id="edbtn__preview"');
+    expect(html).toContain('id="edbtn__save"');
     expect(html).toContain('data-draft-url="/api/pages/draft"');
     expect(html).toContain('data-draft-refresh-interval="30000"');
     expect(html).toContain('data-lock-url="/api/pages/lock"');
     expect(html).toContain('data-lock-refresh-delay="840000"');
+    expect(html).toContain('data-lock-warning-delay="900000"');
     expect(html).toContain('name="minor" type="checkbox"');
   });
 
@@ -2731,6 +2741,7 @@ describe("handleRequest", () => {
     expect(response.headers.get("set-cookie")).toContain("Max-Age=120");
     const html = await response.text();
     expect(html).toContain('data-lock-refresh-delay="60000"');
+    expect(html).toContain('data-lock-warning-delay="120000"');
   });
 
   it("edits and saves only the requested page section", async () => {
@@ -2787,6 +2798,7 @@ describe("handleRequest", () => {
     expect(response.headers.get("set-cookie")).not.toContain("DW_LOCK_");
     const html = await response.text();
     expect(html).not.toContain('data-lock-url="/api/pages/lock"');
+    expect(html).not.toContain("data-lock-warning-delay");
     expect(html).toContain('name="lockToken" value=""');
   });
 
@@ -3227,6 +3239,9 @@ describe("handleRequest", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Search");
+    expect(html).toContain('class="search-results-form"');
+    expect(html).toContain('class="advancedOptions"');
+    expect(html).toContain('data-search-insert="&quot;exact phrase&quot;"');
     expect(html).toContain("/wiki/wiki/welcome");
     expect(html).toContain("Imported page.");
     expect(scoped.status).toBe(200);

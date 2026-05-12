@@ -4,7 +4,7 @@
  * This is a small native replacement for the default template/editor
  * JavaScript paths that cannot run directly in Workers.
  */
-/* global document, Event, fetch, FormData, navigator, window, XMLHttpRequest */
+/* global AbortController, document, Event, fetch, FormData, navigator, window, XMLHttpRequest */
 (function () {
   function ready(callback) {
     if (document.readyState === "loading") {
@@ -15,6 +15,74 @@
     callback();
   }
 
+  var isMac = navigator.platform && /mac/i.test(navigator.platform);
+  var DOKU_PREFS_COOKIE = "DOKU_PREFS";
+  var DokuCookie = {
+    data: null,
+    getValue: function (key, fallback) {
+      this.init();
+      return Object.prototype.hasOwnProperty.call(this.data, key) ? this.data[key] : fallback;
+    },
+    setValue: function (key, value) {
+      this.init();
+      if (value === false || value == null) {
+        delete this.data[key];
+      } else {
+        this.data[key] = String(value);
+      }
+      writeCookie(DOKU_PREFS_COOKIE, encodeCookieData(this.data), 365);
+    },
+    init: function () {
+      if (this.data) {
+        return;
+      }
+      this.data = decodeCookieData(readCookie(DOKU_PREFS_COOKIE));
+    }
+  };
+
+  window.DokuCookie = DokuCookie;
+  window.DOKU_BASE = window.DOKU_BASE || "/";
+
+  function readCookie(name) {
+    var prefix = name + "=";
+    var cookie = document.cookie
+      .split(";")
+      .map(function (part) {
+        return part.trim();
+      })
+      .find(function (part) {
+        return part.indexOf(prefix) === 0;
+      });
+
+    return cookie ? cookie.slice(prefix.length) : "";
+  }
+
+  function writeCookie(name, value, days) {
+    var expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+    var secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie =
+      name + "=" + value + "; expires=" + expires + "; path=/; SameSite=Lax" + secure;
+  }
+
+  function decodeCookieData(value) {
+    var data = {};
+    var parts = value ? value.split("#") : [];
+
+    for (var index = 0; index + 1 < parts.length; index += 2) {
+      data[decodeURIComponent(parts[index])] = decodeURIComponent(parts[index + 1]);
+    }
+
+    return data;
+  }
+
+  function encodeCookieData(data) {
+    return Object.keys(data)
+      .map(function (key) {
+        return encodeURIComponent(key) + "#" + encodeURIComponent(data[key]);
+      })
+      .join("#");
+  }
+
   function bindMobileTools() {
     document.querySelectorAll(".mobileTools select").forEach(function (select) {
       select.addEventListener("change", function () {
@@ -22,6 +90,47 @@
           window.location.href = select.value;
         }
       });
+    });
+  }
+
+  function bindHotkeys() {
+    var shortcuts = [];
+
+    document.querySelectorAll("a[accesskey], button[accesskey]").forEach(function (element) {
+      var key = element.getAttribute("accesskey");
+
+      if (!key) {
+        return;
+      }
+
+      shortcuts.push({ key: key.toLowerCase(), element: element });
+    });
+
+    if (!shortcuts.length) {
+      return;
+    }
+
+    document.addEventListener("keydown", function (event) {
+      var modifier = isMac ? event.ctrlKey && event.altKey : event.altKey;
+
+      if (!modifier || event.shiftKey || event.metaKey || event.key.length !== 1) {
+        return;
+      }
+
+      var shortcut = shortcuts.find(function (entry) {
+        return entry.key === event.key.toLowerCase();
+      });
+
+      if (!shortcut) {
+        return;
+      }
+
+      event.preventDefault();
+      if (shortcut.element.tagName.toLowerCase() === "a") {
+        window.location.href = shortcut.element.href;
+      } else {
+        shortcut.element.click();
+      }
     });
   }
 
@@ -100,6 +209,16 @@
   function bindToolbar(form, textarea) {
     form.querySelectorAll("#tool__bar button").forEach(function (button) {
       button.addEventListener("click", function () {
+        if (button.dataset.linkWizard != null) {
+          openLinkWizard(textarea);
+          return;
+        }
+
+        if (button.dataset.mediaPopup != null) {
+          openMediaPopup(form);
+          return;
+        }
+
         if (button.dataset.insert != null) {
           insertText(textarea, button);
           return;
@@ -118,6 +237,297 @@
         wrapSelection(textarea, button);
       });
     });
+  }
+
+  function currentNamespace(form) {
+    var id = form.querySelector('input[name="id"]');
+    var value = id ? id.value : "";
+    var separator = value.lastIndexOf(":");
+
+    return separator > 0 ? value.slice(0, separator) : "";
+  }
+
+  function openMediaPopup(form) {
+    var namespace = currentNamespace(form);
+    var url = "/media-manager";
+
+    if (namespace) {
+      url += "?ns=" + encodeURIComponent(namespace);
+    }
+
+    window.open(url, "dokuwiki__media", "width=980,height=700,resizable=yes,scrollbars=yes");
+  }
+
+  function bindMediaInsertion(textarea) {
+    window.addEventListener("message", function (event) {
+      var data = event.data || {};
+
+      if (event.origin !== window.location.origin || data.type !== "dokuwiki-media-select") {
+        return;
+      }
+
+      replaceSelection(textarea, "{{" + data.id + "|" + (data.title || data.id) + "}}");
+    });
+  }
+
+  function bindEditorSizeControls(textarea) {
+    var controls = document.querySelector("#size__ctl");
+
+    if (!controls) {
+      return;
+    }
+
+    var savedHeight = DokuCookie.getValue("sizeCtl");
+    var savedWrap = DokuCookie.getValue("wrapCtl");
+
+    if (savedHeight) {
+      textarea.style.height = savedHeight;
+    }
+
+    if (savedWrap) {
+      textarea.setAttribute("wrap", savedWrap);
+    }
+
+    [
+      ["Larger", 100],
+      ["Smaller", -100],
+      ["Wrap", 0]
+    ].forEach(function (control) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = control[0];
+      button.addEventListener("click", function () {
+        if (control[1] === 0) {
+          var nextWrap =
+            (textarea.getAttribute("wrap") || "soft").toLowerCase() === "off" ? "soft" : "off";
+          textarea.setAttribute("wrap", nextWrap);
+          DokuCookie.setValue("wrapCtl", nextWrap);
+          return;
+        }
+
+        textarea.style.height = Math.max(120, textarea.offsetHeight + control[1]) + "px";
+        DokuCookie.setValue("sizeCtl", textarea.style.height);
+      });
+      controls.appendChild(button);
+    });
+  }
+
+  function bindEditorKeyHelpers(form, textarea) {
+    textarea.addEventListener("keydown", function (event) {
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var before = textarea.value.slice(0, start);
+      var lineStart = before.lastIndexOf("\n") + 1;
+      var line = before.slice(lineStart);
+      var listMatch = line.match(/^(\s{2,}(?:[*-]\s?)?)/);
+
+      if ((event.key === "Enter" || event.key === "NumpadEnter") && event.ctrlKey) {
+        var save =
+          form.querySelector("#edbtn__save") || form.querySelector('button[type="submit"]');
+        if (save) {
+          event.preventDefault();
+          save.click();
+        }
+        return;
+      }
+
+      if (start !== end || !listMatch) {
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (/^\s{2,}[*-]\s*$/.test(line)) {
+          textarea.value = textarea.value.slice(0, lineStart) + textarea.value.slice(start);
+          textarea.setSelectionRange(lineStart, lineStart);
+        } else {
+          replaceSelection(textarea, "\n" + listMatch[1]);
+        }
+        return;
+      }
+
+      if (event.key === "Backspace" && /\s{2,}[*-]\s?$/.test(line)) {
+        event.preventDefault();
+        var deleteStart = Math.max(lineStart, start - 2);
+        textarea.value = textarea.value.slice(0, deleteStart) + textarea.value.slice(start);
+        textarea.setSelectionRange(deleteStart, deleteStart);
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+
+      if (event.key === " " && /\s{2,}[*-]\s$/.test(line)) {
+        event.preventDefault();
+        replaceSelection(textarea, "  ");
+      }
+    });
+  }
+
+  function bindUnsavedWarning(form, textarea) {
+    var original = textarea.value;
+    var dirty = false;
+
+    textarea.addEventListener("input", function () {
+      dirty = textarea.value !== original;
+    });
+
+    form.addEventListener("submit", function () {
+      dirty = false;
+    });
+
+    window.addEventListener("beforeunload", function (event) {
+      if (!dirty) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "Unsaved changes will be lost.";
+    });
+  }
+
+  var linkWizardState = {
+    textarea: null,
+    selected: -1,
+    timer: 0
+  };
+
+  function linkWizardElement() {
+    var wizard = document.querySelector("#link__wiz");
+
+    if (wizard) {
+      return wizard;
+    }
+
+    wizard = document.createElement("div");
+    wizard.id = "link__wiz";
+    wizard.className = "JSpopup";
+    wizard.setAttribute("role", "dialog");
+    wizard.setAttribute("aria-label", "Link wizard");
+    wizard.hidden = true;
+    wizard.innerHTML =
+      '<button type="button" id="link__wiz_close">Close</button>' +
+      '<label for="link__wiz_entry">Link to</label> ' +
+      '<input type="text" class="edit" id="link__wiz_entry" autocomplete="off">' +
+      '<div id="link__wiz_result" role="listbox"></div>';
+    document.body.appendChild(wizard);
+    wizard.querySelector("#link__wiz_close").addEventListener("click", closeLinkWizard);
+    wizard.querySelector("#link__wiz_entry").addEventListener("keydown", linkWizardKeydown);
+    wizard.querySelector("#link__wiz_entry").addEventListener("input", scheduleLinkWizardSearch);
+    wizard.querySelector("#link__wiz_result").addEventListener("click", linkWizardClick);
+
+    return wizard;
+  }
+
+  function openLinkWizard(textarea) {
+    var wizard = linkWizardElement();
+    var entry = wizard.querySelector("#link__wiz_entry");
+    var form = textarea.form;
+    var namespace = form ? currentNamespace(form) : "";
+    var selected = selectedText(textarea, "");
+
+    linkWizardState.textarea = textarea;
+    linkWizardState.selected = -1;
+    linkWizardState.selectionText = selected;
+    entry.value = selected || (namespace ? namespace + ":" : "");
+    wizard.hidden = false;
+    entry.focus();
+    runLinkWizardSearch();
+  }
+
+  function closeLinkWizard() {
+    var wizard = document.querySelector("#link__wiz");
+    if (wizard) {
+      wizard.hidden = true;
+    }
+  }
+
+  function scheduleLinkWizardSearch() {
+    window.clearTimeout(linkWizardState.timer);
+    linkWizardState.timer = window.setTimeout(runLinkWizardSearch, 250);
+  }
+
+  async function runLinkWizardSearch() {
+    var wizard = linkWizardElement();
+    var entry = wizard.querySelector("#link__wiz_entry");
+    var result = wizard.querySelector("#link__wiz_result");
+    var response = await fetch(
+      "/lib/exe/ajax.php?call=linkwiz&q=" + encodeURIComponent(entry.value),
+      { headers: { "x-requested-with": "XMLHttpRequest" } }
+    );
+
+    if (!response.ok) {
+      result.textContent = "Search failed.";
+      return;
+    }
+
+    result.innerHTML = await response.text();
+    linkWizardState.selected = -1;
+  }
+
+  function linkWizardKeydown(event) {
+    var result = document.querySelector("#link__wiz_result");
+    var items = result ? Array.from(result.querySelectorAll("div")) : [];
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeLinkWizard();
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      linkWizardState.selected += event.key === "ArrowDown" ? 1 : -1;
+      if (linkWizardState.selected < 0) linkWizardState.selected = items.length - 1;
+      if (linkWizardState.selected >= items.length) linkWizardState.selected = 0;
+      items.forEach(function (item, index) {
+        item.classList.toggle("selected", index === linkWizardState.selected);
+      });
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (items[linkWizardState.selected]) {
+        insertLinkFromAnchor(items[linkWizardState.selected].querySelector("a"));
+      } else {
+        insertLink(document.querySelector("#link__wiz_entry").value, "");
+      }
+    }
+  }
+
+  function linkWizardClick(event) {
+    var anchor = event.target.closest("a");
+
+    if (!anchor) {
+      return;
+    }
+
+    event.preventDefault();
+    insertLinkFromAnchor(anchor);
+  }
+
+  function insertLinkFromAnchor(anchor) {
+    var id = anchor.getAttribute("title") || anchor.textContent.trim();
+    var title = anchor.parentElement.querySelector("span");
+
+    if (id.endsWith(":")) {
+      document.querySelector("#link__wiz_entry").value = id;
+      runLinkWizardSearch();
+      return;
+    }
+
+    insertLink(id, title ? title.textContent.trim() : "");
+  }
+
+  function insertLink(id, title) {
+    var textarea = linkWizardState.textarea;
+    var label = linkWizardState.selectionText || title;
+    var syntax = label && label !== id ? "[[" + id + "|" + label + "]]" : "[[" + id + "]]";
+
+    if (textarea && id) {
+      replaceSelection(textarea, syntax);
+    }
+
+    closeLinkWizard();
   }
 
   function setStatus(status, text) {
@@ -301,6 +711,19 @@
     }
 
     var submitting = false;
+    var warningTimer = 0;
+    var warningDelay = Number(form.dataset.lockWarningDelay || 0);
+
+    function resetWarningTimer() {
+      if (!warningDelay) {
+        return;
+      }
+
+      window.clearTimeout(warningTimer);
+      warningTimer = window.setTimeout(function () {
+        setStatus(status, "This page lock is close to expiring.");
+      }, warningDelay);
+    }
 
     form.addEventListener("submit", function () {
       submitting = true;
@@ -310,11 +733,15 @@
 
     if (refreshDelay > 0) {
       window.setInterval(function () {
-        refreshPageLock(form, status).catch(function () {
-          setStatus(status, "Page lock refresh failed.");
-        });
+        refreshPageLock(form, status)
+          .then(resetWarningTimer)
+          .catch(function () {
+            setStatus(status, "Page lock refresh failed.");
+          });
       }, refreshDelay);
     }
+
+    resetWarningTimer();
 
     window.addEventListener("pagehide", function () {
       if (submitting || !form.dataset.lockReleaseUrl || !navigator.sendBeacon) {
@@ -340,9 +767,139 @@
     }
 
     bindToolbar(form, textarea);
+    bindMediaInsertion(textarea);
+    bindEditorSizeControls(textarea);
+    bindEditorKeyHelpers(form, textarea);
+    bindUnsavedWarning(form, textarea);
     bindPreview(form, textarea, status);
     bindDraftAutosave(form, textarea, status);
     bindPageLock(form, status);
+  }
+
+  function bindQuickSearch() {
+    var input = document.querySelector("#qsearch__in");
+    var output = document.querySelector("#qsearch__out");
+    var timer = 0;
+    var controller = null;
+
+    if (!input || !output) {
+      return;
+    }
+
+    function clear() {
+      output.hidden = true;
+      output.innerHTML = "";
+      input.closest("form").classList.remove("searching");
+    }
+
+    input.addEventListener("input", function () {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async function () {
+        var value = input.value.trim();
+
+        if (controller) {
+          controller.abort();
+        }
+
+        if (!value) {
+          clear();
+          return;
+        }
+
+        controller = new AbortController();
+        input.closest("form").classList.add("searching");
+
+        try {
+          var response = await fetch(
+            "/lib/exe/ajax.php?call=qsearch&q=" + encodeURIComponent(value),
+            {
+              headers: { "x-requested-with": "XMLHttpRequest" },
+              signal: controller.signal
+            }
+          );
+          var html = response.ok ? await response.text() : "";
+
+          if (!html) {
+            clear();
+            return;
+          }
+
+          output.innerHTML = html;
+          output.hidden = false;
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            clear();
+          }
+        } finally {
+          input.closest("form").classList.remove("searching");
+        }
+      }, 500);
+    });
+
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        clear();
+      }
+    });
+
+    output.addEventListener("click", function (event) {
+      if (!event.target.closest("a")) {
+        clear();
+      }
+    });
+  }
+
+  function bindSearchAssistant() {
+    var form = document.querySelector(".search-results-form");
+    var options = form ? form.querySelector(".advancedOptions") : null;
+
+    if (!form || !options) {
+      return;
+    }
+
+    var button = form.querySelector(".toggleAssistant") || document.createElement("button");
+    if (!button.classList.contains("toggleAssistant")) {
+      button.type = "button";
+      button.className = "toggleAssistant";
+      button.textContent = "Search tools";
+      form.querySelector("fieldset").prepend(button);
+    }
+
+    function setOpen(open) {
+      options.hidden = !open;
+      options.setAttribute("aria-hidden", open ? "false" : "true");
+      button.setAttribute("aria-expanded", open ? "true" : "false");
+      DokuCookie.setValue("sa", open ? "on" : "off");
+    }
+
+    button.addEventListener("click", function () {
+      setOpen(options.hidden);
+    });
+
+    options.querySelectorAll(".toggle div.current").forEach(function (toggle) {
+      toggle.addEventListener("click", function () {
+        var parent = toggle.parentElement;
+        options.querySelectorAll(".toggle").forEach(function (other) {
+          if (other !== parent) other.classList.remove("open");
+        });
+        parent.classList.toggle("open");
+      });
+    });
+
+    options.addEventListener("click", function (event) {
+      var insert = event.target.closest("[data-search-insert]");
+      var query = form.querySelector('input[name="q"]');
+
+      if (!insert || !query) {
+        return;
+      }
+
+      event.preventDefault();
+      query.value = (query.value + " " + insert.dataset.searchInsert).trim();
+      query.focus();
+    });
+
+    setOpen(DokuCookie.getValue("sa") === "on");
   }
 
   function mediaDetailUrl(id) {
@@ -541,7 +1098,10 @@
   }
 
   ready(function () {
+    bindHotkeys();
     bindMobileTools();
+    bindQuickSearch();
+    bindSearchAssistant();
     bindEditor();
     bindMediaManager();
   });
