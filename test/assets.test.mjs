@@ -2,6 +2,10 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 describe("public assets", () => {
+  it("does not ship a stale static index fallback page", async () => {
+    await expect(readFile("public/index.html", "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("keeps the create-page action out of missing wiki-link styling", async () => {
     const css = await readFile("public/dokuwiki.css", "utf8");
     const missingLinkRule = css.indexOf(".dokuwiki a.wikilink2");

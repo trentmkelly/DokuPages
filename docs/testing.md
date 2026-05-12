@@ -59,10 +59,12 @@ Asset tests cover converted upstream CSS module selectors for forms, tabs,
 media popup and fullscreen manager views, search assistant UI, modal/link
 wizard surfaces, uploader hooks, and admin task pages. They also verify that
 the upstream image assets referenced by those converted rules are shipped.
-They pin native browser hooks for upstream-style cookies, hotkeys, quick
-search, search assistant toggles, link wizard insertion, media popups, editor
-helpers, toolbar insertion, picker toggles, lock warnings, and media manager
-uploads. Asset tests also verify the upstream editor toolbar icons are present.
+They also keep stale static fallback pages such as `public/index.html` out of
+the deployed asset set. They pin native browser hooks for upstream-style
+cookies, hotkeys, quick search, search assistant toggles, link wizard insertion,
+media popups, editor helpers, toolbar insertion, picker toggles, lock warnings,
+and media manager uploads. Asset tests also verify the upstream editor toolbar
+icons are present.
 Renderer and app-route tests cover upstream-style section edit forms, section
 marker classes, page-tool actions, disabled-action hiding, footer license text,
 validation badges, external footer targets, disabled-license behavior, and edit
