@@ -148,14 +148,19 @@ export function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-export function sessionCookieHeader(name: string, session: LoginSession, request: Request): string {
+export function sessionCookieHeader(
+  name: string,
+  session: LoginSession,
+  request: Request,
+  path = "/"
+): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=${session.id}.${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
+  return `${name}=${session.id}.${session.token}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
 }
 
-export function clearSessionCookieHeader(name: string, request: Request): string {
+export function clearSessionCookieHeader(name: string, request: Request, path = "/"): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+  return `${name}=; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
 }
 
 async function getUserByUsername(db: D1Database, username: string): Promise<UserRecord | null> {

@@ -36,6 +36,7 @@ describe("runtime config", () => {
       canonicalUrls: false,
       baseUrl: null,
       baseDir: "",
+      cookiePath: "/",
       recentEntries: 20,
       recentDays: 7,
       dontLog: ["debug"],
@@ -109,6 +110,15 @@ describe("runtime config", () => {
       ok: true,
       issues: []
     });
+    expect(getRuntimeConfigEntries({} as Env)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "COOKIE_DIR",
+          effectiveValue: "/",
+          source: "default"
+        })
+      ])
+    );
   });
 
   it("normalizes configured page ids and reports warnings", () => {
@@ -132,6 +142,7 @@ describe("runtime config", () => {
       CANONICAL_URLS: "true",
       BASE_URL: "https://wiki.example.test/",
       BASE_DIR: "/docs/",
+      COOKIE_DIR: "/cookie-root/",
       RECENT: "25",
       RECENT_DAYS: "30",
       DONTLOG: "error, deprecated, debug, error",
@@ -208,6 +219,8 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).canonicalUrls).toBe(true);
     expect(getRuntimeConfig(env).baseUrl).toBe("https://wiki.example.test");
     expect(getRuntimeConfig(env).baseDir).toBe("/docs");
+    expect(getRuntimeConfig({ BASE_DIR: "/docs/" } as Env).cookiePath).toBe("/docs/");
+    expect(getRuntimeConfig(env).cookiePath).toBe("/cookie-root/");
     expect(getRuntimeConfig(env).recentEntries).toBe(25);
     expect(getRuntimeConfig(env).recentDays).toBe(30);
     expect(getRuntimeConfig(env).dontLog).toEqual(["error", "deprecated", "debug"]);
@@ -290,6 +303,7 @@ describe("runtime config", () => {
       EMAIL_PROVIDER: "resend",
       EMAIL_FROM: "Wiki <wiki@example.test>",
       EMAIL_REGISTRATION_NOTIFY: "admin@example.test",
+      COOKIE_DIR: "/cookie-root/",
       NOTIFY: "ops@example.test",
       MAILFROM: "DokuWiki <@MAIL@>",
       MAILRETURNPATH: "bounces@example.test",
@@ -350,6 +364,11 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "DISABLE_ACTIONS",
           effectiveValue: ""
+        }),
+        expect.objectContaining({
+          key: "COOKIE_DIR",
+          effectiveValue: "/cookie-root/",
+          dokuwikiKey: "cookiedir"
         }),
         expect.objectContaining({
           key: "TAGLINE",
@@ -706,6 +725,7 @@ describe("runtime config", () => {
       DISABLE_ACTIONS: "edit,bad action,$",
       BASE_URL: "ftp://example.test",
       BASE_DIR: "../wiki",
+      COOKIE_DIR: "relative",
       RECENT: "0",
       RECENT_DAYS: "-1",
       DONTLOG: "error,trace",
@@ -757,6 +777,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "DISABLE_ACTIONS", severity: "error" }),
         expect.objectContaining({ key: "BASE_URL", severity: "error" }),
         expect.objectContaining({ key: "BASE_DIR", severity: "error" }),
+        expect.objectContaining({ key: "COOKIE_DIR", severity: "error" }),
         expect.objectContaining({ key: "RECENT", severity: "error" }),
         expect.objectContaining({ key: "RECENT_DAYS", severity: "error" }),
         expect.objectContaining({ key: "DONTLOG", severity: "error" }),

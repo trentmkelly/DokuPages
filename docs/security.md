@@ -12,7 +12,8 @@ that value as `sectok`.
 The previous `DW_CSRF_TOKEN` cookie plus `x-csrf-token` header remains accepted
 as a compatibility fallback for native AJAX callers, external auth principals,
 and deployments without `DOKUWIKI_COOKIE_SALT`. That fallback cookie is
-HTTP-only, `SameSite=Lax`, and marked `Secure` on HTTPS.
+HTTP-only, `SameSite=Lax`, marked `Secure` on HTTPS, and scoped to the
+DokuWiki-compatible `cookiedir` path.
 
 Preview rendering is exempt because it does not write storage.
 

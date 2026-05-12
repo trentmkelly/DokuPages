@@ -24,6 +24,8 @@ export interface Env {
   CANONICAL_URLS?: string;
   BASE_URL?: string;
   BASE_DIR?: string;
+  COOKIE_DIR?: string;
+  COOKIEDIR?: string;
   RECENT?: string;
   RECENT_DAYS?: string;
   DONTLOG?: string;

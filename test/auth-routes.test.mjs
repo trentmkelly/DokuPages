@@ -1112,7 +1112,7 @@ describe("auth routes", () => {
   });
 
   it("logs in native users, resolves the session principal, and logs out", async () => {
-    env = createEnv();
+    env = createEnv({ COOKIE_DIR: "/wiki/" });
     await seedUser(env.DB);
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const login = new FormData();
@@ -1134,6 +1134,7 @@ describe("auth routes", () => {
       expect(loginResponse.status).toBe(303);
       expect(loginResponse.headers.get("location")).toBe("/wiki/wiki/welcome");
       expect(cookie).toContain("DW_PAGES_SESSION=");
+      expect(cookie).toContain("Path=/wiki/");
       expect(cookie).toContain("HttpOnly");
       expect(cookie).toContain("SameSite=Lax");
       expect(cookie).toContain("Secure");
@@ -1169,6 +1170,7 @@ describe("auth routes", () => {
 
       expect(logoutResponse.status).toBe(303);
       expect(logoutResponse.headers.get("set-cookie")).toContain("Max-Age=0");
+      expect(logoutResponse.headers.get("set-cookie")).toContain("Path=/wiki/");
 
       const anonymousResponse = await handleRequest(
         new Request("https://example.com/api/auth/session", {

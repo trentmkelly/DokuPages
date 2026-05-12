@@ -94,6 +94,9 @@ Optional Pages environment variables:
 - `USEDRAFT`: enables DokuWiki-style edit draft autosave and recovery screens.
   Default: enabled.
 - `SESSION_COOKIE_NAME`: session cookie name. Default: `DW_PAGES_SESSION`.
+- `COOKIE_DIR`: DokuWiki-compatible `cookiedir` cookie path. Default: the
+  normalized `BASE_DIR` with a trailing slash when `BASE_DIR` is configured, or
+  `/` for root deployments. `COOKIEDIR` remains accepted as an alias.
 - `SUPERUSER`: DokuWiki-style comma-separated user/group member list for full
   admin access. Default: `@admin`.
 - `MANAGER`: DokuWiki-style comma-separated user/group member list for

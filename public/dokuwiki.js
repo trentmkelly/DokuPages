@@ -60,8 +60,17 @@
   function writeCookie(name, value, days) {
     var expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
     var secure = window.location.protocol === "https:" ? "; Secure" : "";
+    var cookiePath = (window.DOKU_COOKIE_PARAM && window.DOKU_COOKIE_PARAM.path) || "/";
     document.cookie =
-      name + "=" + value + "; expires=" + expires + "; path=/; SameSite=Lax" + secure;
+      name +
+      "=" +
+      value +
+      "; expires=" +
+      expires +
+      "; path=" +
+      cookiePath +
+      "; SameSite=Lax" +
+      secure;
   }
 
   function decodeCookieData(value) {

@@ -3102,7 +3102,13 @@ async function handleAjaxLock(
   if (lockToken && config.lockTime > 0 && response.lock === "1") {
     ajaxResponse.headers.append(
       "set-cookie",
-      pageLockCookieHeader(pageLockCookieName(id), lockToken, request, config.lockTime)
+      pageLockCookieHeader(
+        pageLockCookieName(id),
+        lockToken,
+        request,
+        config.lockTime,
+        config.cookiePath
+      )
     );
   }
   return ajaxResponse;
@@ -5691,7 +5697,7 @@ function breadcrumbStateForPage(
 
   return {
     entries,
-    cookie: breadcrumbCookieHeader(request, entries)
+    cookie: breadcrumbCookieHeader(request, entries, config.cookiePath)
   };
 }
 
@@ -5722,10 +5728,14 @@ function readBreadcrumbCookie(
   }
 }
 
-function breadcrumbCookieHeader(request: Request, entries: readonly BreadcrumbEntry[]): string {
+function breadcrumbCookieHeader(
+  request: Request,
+  entries: readonly BreadcrumbEntry[],
+  path: string
+): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   const value = encodeURIComponent(JSON.stringify(entries));
-  return `${BREADCRUMB_COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${BREADCRUMB_COOKIE_MAX_AGE_SECONDS}${secure}`;
+  return `${BREADCRUMB_COOKIE_NAME}=${value}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${BREADCRUMB_COOKIE_MAX_AGE_SECONDS}${secure}`;
 }
 
 function versionedAssetPath(assetPath: string, env: Env): string {
@@ -9973,7 +9983,12 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     status: 303,
     headers: securityHeaders({
       location: returnTo,
-      "set-cookie": sessionCookieHeader(getRuntimeConfig(env).sessionCookieName, session, request)
+      "set-cookie": sessionCookieHeader(
+        getRuntimeConfig(env).sessionCookieName,
+        session,
+        request,
+        getRuntimeConfig(env).cookiePath
+      )
     })
   });
 }
@@ -10048,7 +10063,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
           { ok: true, user: publicRegisteredUser(user), passwordEmailSent: true },
           { status: 201 }
         )
-      : flashRedirectResponse(request, "/login", [
+      : flashRedirectResponse(request, env, "/login", [
           flashMessage("success", localizedAuthText(env, "regsuccess"))
         ]);
   }
@@ -10059,7 +10074,12 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     : redirectResponse(safeReturnPath(String(form.get("returnTo") ?? ""), env));
   response.headers.append(
     "set-cookie",
-    sessionCookieHeader(getRuntimeConfig(env).sessionCookieName, session, request)
+    sessionCookieHeader(
+      getRuntimeConfig(env).sessionCookieName,
+      session,
+      request,
+      getRuntimeConfig(env).cookiePath
+    )
   );
   return response;
 }
@@ -10448,7 +10468,7 @@ async function handleLogout(
     status: 303,
     headers: securityHeaders({
       location: returnTo,
-      "set-cookie": clearSessionCookieHeader(cookieName, request)
+      "set-cookie": clearSessionCookieHeader(cookieName, request, getRuntimeConfig(env).cookiePath)
     })
   });
 }
@@ -10565,7 +10585,7 @@ async function handleProfileUpdate(
     });
   }
 
-  return flashRedirectResponse(request, "/profile", [
+  return flashRedirectResponse(request, env, "/profile", [
     flashMessage("success", localizedAuthText(env, "profchanged") || "Profile updated.")
   ]);
 }
@@ -10606,7 +10626,7 @@ async function handleAuthTokenAction(
       : htmlResponseWithCsrf(request, page, csrf, { status: 503 });
   }
 
-  return flashRedirectResponse(request, "/profile", [
+  return flashRedirectResponse(request, env, "/profile", [
     flashMessage("success", "Authentication token regenerated.")
   ]);
 }
@@ -10867,7 +10887,7 @@ async function handleProfileDelete(
 
   const cookieName = getRuntimeConfig(env).sessionCookieName;
   const headers = {
-    "set-cookie": clearSessionCookieHeader(cookieName, request)
+    "set-cookie": clearSessionCookieHeader(cookieName, request, getRuntimeConfig(env).cookiePath)
   };
 
   if (acceptsJson(request)) {
@@ -12376,6 +12396,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const stylesheetPath = versionedAssetPath("/dokuwiki.css", env);
   const themeStylesheetPath = "/theme.css";
   const scriptPath = versionedAssetPath("/dokuwiki.js", env);
+  const cookieParamScript = JSON.stringify({ path: config.cookiePath }).replace(/</g, "\\u003c");
   const faviconPath = versionedAssetPath("/images/favicon.ico", env);
   const appleTouchIconPath = versionedAssetPath("/images/apple-touch-icon.png", env);
   const logoPath = versionedAssetPath("/dokuwiki-logo.png", env);
@@ -12411,6 +12432,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   ${canonicalLink}
   <link rel="stylesheet" href="${stylesheetPath}">
   <link rel="stylesheet" href="${themeStylesheetPath}">
+  <script>window.DOKU_COOKIE_PARAM = ${cookieParamScript};</script>
   <script src="${scriptPath}" defer></script>
 </head>
 <body class="dokuwiki">
@@ -12711,6 +12733,7 @@ function manifestResponse(body: Record<string, unknown>): Response {
 interface CsrfContext {
   token: string;
   cookieToken: string | null;
+  cookiePath: string;
 }
 
 type FlashMessageType = "error" | "info" | "success" | "notify";
@@ -12721,13 +12744,14 @@ interface FlashMessage {
 }
 
 function csrfContext(request: Request, env?: Env, principal?: AuthPrincipal): CsrfContext {
+  const cookiePath = runtimeCookiePath(env);
   const dokuwikiToken = dokuWikiSecurityToken(request, env, principal);
   if (dokuwikiToken !== null) {
-    return { token: dokuwikiToken, cookieToken: null };
+    return { token: dokuwikiToken, cookieToken: null, cookiePath };
   }
 
   const token = readCookie(request, CSRF_COOKIE_NAME) || randomCsrfToken();
-  return { token, cookieToken: token };
+  return { token, cookieToken: token, cookiePath };
 }
 
 function htmlResponseWithCsrf(
@@ -12739,20 +12763,24 @@ function htmlResponseWithCsrf(
   const response = htmlResponse(body, init);
   appendCsrfCookie(response, request, csrf);
   if (readFlashMessages(request).length > 0) {
-    response.headers.append("set-cookie", clearFlashCookieHeader(request));
+    response.headers.append("set-cookie", clearFlashCookieHeader(request, csrf.cookiePath));
   }
   return response;
 }
 
 function flashRedirectResponse(
   request: Request,
+  env: Env,
   location: string,
   messages: FlashMessage[],
   status = 303
 ): Response {
   const response = redirectResponse(location, status);
   const stackedMessages = [...readFlashMessages(request), ...messages];
-  response.headers.append("set-cookie", flashCookieHeader(stackedMessages, request));
+  response.headers.append(
+    "set-cookie",
+    flashCookieHeader(stackedMessages, request, runtimeCookiePath(env))
+  );
   return response;
 }
 
@@ -12809,7 +12837,10 @@ function validateCsrf(
 
 function appendCsrfCookie(response: Response, request: Request, csrf: CsrfContext): void {
   if (csrf.cookieToken) {
-    response.headers.append("set-cookie", csrfCookieHeader(csrf.cookieToken, request));
+    response.headers.append(
+      "set-cookie",
+      csrfCookieHeader(csrf.cookieToken, request, csrf.cookiePath)
+    );
   }
 }
 
@@ -12868,22 +12899,30 @@ function dokuWikiSecurityToken(
   return hmacMd5Hex(`${sessionId}${principal.username}`, salt);
 }
 
-function csrfCookieHeader(token: string, request: Request): string {
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${CSRF_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${CSRF_TTL_SECONDS}${secure}`;
+function runtimeCookiePath(env?: Env): string {
+  return env ? getRuntimeConfig(env).cookiePath : "/";
 }
 
-function flashCookieHeader(messages: readonly FlashMessage[], request: Request): string {
+function csrfCookieHeader(token: string, request: Request, path: string): string {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${CSRF_COOKIE_NAME}=${token}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${CSRF_TTL_SECONDS}${secure}`;
+}
+
+function flashCookieHeader(
+  messages: readonly FlashMessage[],
+  request: Request,
+  path: string
+): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   const value = encodeURIComponent(
     base64UrlEncode(JSON.stringify(normalizeFlashMessages(messages)))
   );
-  return `${FLASH_COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${FLASH_TTL_SECONDS}${secure}`;
+  return `${FLASH_COOKIE_NAME}=${value}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${FLASH_TTL_SECONDS}${secure}`;
 }
 
-function clearFlashCookieHeader(request: Request): string {
+function clearFlashCookieHeader(request: Request, path: string): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${FLASH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+  return `${FLASH_COOKIE_NAME}=; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
 }
 
 function readFlashMessages(request: Request): FlashMessage[] {
@@ -13002,7 +13041,7 @@ async function handleEditPage(
   if (config.lockTime > 0) {
     response.headers.append(
       "set-cookie",
-      pageLockCookieHeader(cookieName, lockToken, request, config.lockTime)
+      pageLockCookieHeader(cookieName, lockToken, request, config.lockTime, config.cookiePath)
     );
   }
   appendCsrfCookie(response, request, csrf);
@@ -13042,7 +13081,7 @@ async function handleSave(
     const response = redirectResponse(pagePath(id), 303);
     response.headers.append(
       "set-cookie",
-      clearPageLockCookieHeader(pageLockCookieName(id), request)
+      clearPageLockCookieHeader(pageLockCookieName(id), request, runtimeCookiePath(env))
     );
     return response;
   }
@@ -13142,7 +13181,10 @@ async function handleSave(
   );
 
   const response = redirectResponse(redirectTargetForAction(id, redirectFragment));
-  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  response.headers.append(
+    "set-cookie",
+    clearPageLockCookieHeader(pageLockCookieName(id), request, runtimeCookiePath(env))
+  );
   return response;
 }
 
@@ -13557,7 +13599,10 @@ async function handleRevert(
   );
 
   const response = redirectResponse(pagePath(id));
-  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  response.headers.append(
+    "set-cookie",
+    clearPageLockCookieHeader(pageLockCookieName(id), request, runtimeCookiePath(env))
+  );
   return response;
 }
 
@@ -13596,7 +13641,13 @@ async function handleRefreshPageLock(
   const response = jsonResponse({ ok: true, lock: lock.lock });
   response.headers.append(
     "set-cookie",
-    pageLockCookieHeader(pageLockCookieName(id), lockToken, request, getRuntimeConfig(env).lockTime)
+    pageLockCookieHeader(
+      pageLockCookieName(id),
+      lockToken,
+      request,
+      getRuntimeConfig(env).lockTime,
+      runtimeCookiePath(env)
+    )
   );
   return response;
 }
@@ -13629,7 +13680,10 @@ async function handleReleasePageLock(
 
   await releaseHeldPageLock(env, principal, id, lockToken);
   const response = jsonResponse({ ok: true });
-  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  response.headers.append(
+    "set-cookie",
+    clearPageLockCookieHeader(pageLockCookieName(id), request, runtimeCookiePath(env))
+  );
   return response;
 }
 
@@ -13869,7 +13923,8 @@ async function handleSaveDraft(
           pageLockCookieName(id),
           lockToken,
           request,
-          getRuntimeConfig(env).lockTime
+          getRuntimeConfig(env).lockTime,
+          runtimeCookiePath(env)
         )
       );
     }
@@ -13886,7 +13941,8 @@ async function handleSaveDraft(
         pageLockCookieName(id),
         lockToken,
         request,
-        getRuntimeConfig(env).lockTime
+        getRuntimeConfig(env).lockTime,
+        runtimeCookiePath(env)
       )
     );
   }
@@ -14548,7 +14604,10 @@ async function handleDeleteDraft(
       ? safeReturnPath(requestedRedirect, env)
       : (redirectTarget ?? `${pagePath(id)}?do=edit`)
   );
-  response.headers.append("set-cookie", clearPageLockCookieHeader(pageLockCookieName(id), request));
+  response.headers.append(
+    "set-cookie",
+    clearPageLockCookieHeader(pageLockCookieName(id), request, runtimeCookiePath(env))
+  );
   return response;
 }
 
@@ -14609,15 +14668,16 @@ function pageLockCookieHeader(
   name: string,
   token: string,
   request: Request,
-  maxAgeSeconds: number
+  maxAgeSeconds: number,
+  path: string
 ): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+  return `${name}=${token}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
 }
 
-function clearPageLockCookieHeader(name: string, request: Request): string {
+function clearPageLockCookieHeader(name: string, request: Request, path: string): string {
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+  return `${name}=; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
 }
 
 function randomPageLockToken(): string {

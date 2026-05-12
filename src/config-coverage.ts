@@ -133,6 +133,7 @@ const IMPLEMENTED = new Set<string>([
   "lang",
   "basedir",
   "baseurl",
+  "cookiedir",
   "tagline",
   "sidebar",
   "license",
@@ -217,7 +218,6 @@ const IMPORTED_METADATA_ONLY = new Set<string>([
 
 const INTENTIONALLY_UNSUPPORTED = new Set<string>([
   "savedir",
-  "cookiedir",
   "dmode",
   "fmode",
   "allowdebug",

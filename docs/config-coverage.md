@@ -19,9 +19,9 @@ Current counts:
 
 | Status                      | Count |
 | --------------------------- | ----: |
-| `implemented`               |    76 |
+| `implemented`               |    77 |
 | `imported_metadata_only`    |     6 |
-| `intentionally_unsupported` |    31 |
+| `intentionally_unsupported` |    30 |
 | `not_yet_evaluated`         |     2 |
 
 Remaining not-yet-evaluated settings are `securecookie` and `samesitecookie`.

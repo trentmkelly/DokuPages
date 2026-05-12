@@ -264,6 +264,8 @@ export const RUNTIME_ENV_DOKUWIKI_KEYS: Readonly<Record<string, string>> = {
   WIKI_LANG: "lang",
   BASE_DIR: "basedir",
   BASE_URL: "baseurl",
+  COOKIE_DIR: "cookiedir",
+  COOKIEDIR: "cookiedir",
   RECENT: "recent",
   RECENT_DAYS: "recent_days",
   DONTLOG: "dontlog",

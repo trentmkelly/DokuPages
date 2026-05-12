@@ -75,6 +75,7 @@ export interface RuntimeConfig {
   canonicalUrls: boolean;
   baseUrl: string | null;
   baseDir: string;
+  cookiePath: string;
   recentEntries: number;
   recentDays: number;
   dontLog: DokuWikiLogFacility[];
@@ -179,6 +180,7 @@ export interface ConfigValidationIssue {
 
 export function getRuntimeConfig(env: Env): RuntimeConfig {
   const pageIdCleanOptions = runtimePageIdCleanOptions(env);
+  const baseDir = normalizedBaseDir(env.BASE_DIR);
 
   return {
     siteName: nonEmpty(env.TITLE) ?? nonEmpty(env.SITE_NAME) ?? DEFAULT_SITE_NAME,
@@ -200,7 +202,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     send404: booleanConfig(env.SEND404, true),
     canonicalUrls: truthy(env.CANONICAL_URLS),
     baseUrl: normalizedBaseUrl(env.BASE_URL),
-    baseDir: normalizedBaseDir(env.BASE_DIR),
+    baseDir,
+    cookiePath: normalizedCookiePath(env.COOKIE_DIR ?? env.COOKIEDIR, baseDir),
     recentEntries: integerConfig(env.RECENT, 20, 1, 100),
     recentDays: integerConfig(env.RECENT_DAYS, 7, 0, 3660),
     dontLog: parseLogFacilityList(env.DONTLOG),
@@ -277,6 +280,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateActionList(env.DISABLE_ACTIONS, issues);
   validateBaseUrl(env.BASE_URL, issues);
   validateBaseDir(env.BASE_DIR, issues);
+  validateCookieDir(env.COOKIE_DIR ?? env.COOKIEDIR, issues);
   validateIntegerRange("RECENT", env.RECENT, 1, 100, issues);
   validateIntegerRange("RECENT_DAYS", env.RECENT_DAYS, 0, 3660, issues);
   validateLogFacilityList(env.DONTLOG, issues);
@@ -331,6 +335,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
 
 export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
   const config = getRuntimeConfig(env);
+  const defaultCookiePath = config.baseDir ? `${config.baseDir}/` : "/";
 
   return [
     configEntry(
@@ -364,6 +369,13 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("CANONICAL_URLS", env.CANONICAL_URLS, String(config.canonicalUrls), "false"),
     configEntry("BASE_URL", env.BASE_URL, config.baseUrl, null),
     configEntry("BASE_DIR", env.BASE_DIR, config.baseDir, ""),
+    configEntry(
+      "COOKIE_DIR",
+      env.COOKIE_DIR ?? env.COOKIEDIR,
+      config.cookiePath,
+      defaultCookiePath,
+      "cookiedir"
+    ),
     configEntry("RECENT", env.RECENT, String(config.recentEntries), "20"),
     configEntry("RECENT_DAYS", env.RECENT_DAYS, String(config.recentDays), "7"),
     configEntry("DONTLOG", env.DONTLOG, config.dontLog.join(","), DEFAULT_DONTLOG),
@@ -779,6 +791,19 @@ function validateBaseDir(value: string | undefined, issues: ConfigValidationIssu
       key: "BASE_DIR",
       severity: "error",
       message: "BASE_DIR must be an absolute path prefix without '..'."
+    });
+  }
+}
+
+function validateCookieDir(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  const cookieDir = nonEmpty(value);
+  if (!cookieDir) return;
+
+  if (!cookieDir.startsWith("/") || cookieDir.includes("..")) {
+    issues.push({
+      key: "COOKIE_DIR",
+      severity: "error",
+      message: "COOKIE_DIR must be an absolute cookie path without '..'."
     });
   }
 }
@@ -1221,6 +1246,16 @@ function normalizedBaseDir(value: string | undefined): string {
   const baseDir = nonEmpty(value);
   if (!baseDir || !baseDir.startsWith("/") || baseDir.includes("..")) return "";
   return `/${baseDir.split("/").filter(Boolean).join("/")}`;
+}
+
+function normalizedCookiePath(value: string | undefined, baseDir: string): string {
+  const cookieDir = nonEmpty(value);
+  if (!cookieDir) return baseDir ? `${baseDir}/` : "/";
+  if (!cookieDir.startsWith("/") || cookieDir.includes("..")) return baseDir ? `${baseDir}/` : "/";
+
+  const trailingSlash = cookieDir.endsWith("/") ? "/" : "";
+  const normalized = `/${cookieDir.split("/").filter(Boolean).join("/")}${trailingSlash}`;
+  return normalized === "//" ? "/" : normalized;
 }
 
 function normalizedLinkTarget(value: string | undefined): string | null {
