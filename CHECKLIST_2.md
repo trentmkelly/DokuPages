@@ -213,7 +213,7 @@ are not fixed by this checklist.
 - [x] Match feed summaries from `rss_show_summary`.
 - [x] Match feed cache timing from `rss_update`.
 - [x] Match sitemap frequency behavior from `sitemap`, including disabled sitemap mode.
-- [ ] Match OpenSearch and manifest output from upstream `inc/Manifest.php` and `lib/exe/opensearch.php`.
+- [x] Match OpenSearch and manifest output from upstream `inc/Manifest.php` and `lib/exe/opensearch.php`.
 - [ ] Match robots behavior to upstream and site configuration instead of always allowing all.
 
 ## Remote API And AJAX

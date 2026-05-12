@@ -152,6 +152,7 @@ describe("handleRequest", () => {
     env.SIDEBAR = undefined;
     env.LICENSE = undefined;
     env.WIKI_LANG = undefined;
+    env.BASE_DIR = undefined;
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
     env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
@@ -1225,8 +1226,8 @@ describe("handleRequest", () => {
       ["/sitemap.xml", 200, "application/xml"],
       ["/sitemap", 200, "application/xml"],
       ["/robots.txt", 200, "text/plain"],
-      ["/lib/exe/opensearch.php", 200, "application/xml"],
-      ["/opensearch.xml", 200, "application/xml"],
+      ["/lib/exe/opensearch.php", 200, "application/opensearchdescription+xml"],
+      ["/opensearch.xml", 200, "application/opensearchdescription+xml"],
       ["/lib/exe/manifest.php", 200, "application/manifest+json"],
       ["/manifest.webmanifest", 200, "application/manifest+json"],
       ["/install.php", 410, "text/html"],
@@ -3603,6 +3604,73 @@ describe("handleRequest", () => {
     await expect(opensearch.text()).resolves.toContain("OpenSearchDescription");
     await expect(manifest.json()).resolves.toMatchObject({ name: "Test Wiki" });
     await expect(robots.text()).resolves.toContain("Sitemap: https://example.com/sitemap.xml");
+  });
+
+  it("matches upstream OpenSearch and manifest document shapes", async () => {
+    env.TAGLINE = "Notes from the edge";
+    env.BASE_DIR = "/docs";
+    state.media.push({
+      id: "wiki:favicon.ico",
+      namespace: "wiki",
+      object_key: "media/current/wiki/favicon.ico",
+      mime_type: "image/x-icon",
+      byte_length: 128,
+      content_hash: "favicon-media-hash",
+      current_revision_id: "favicon-media-rev",
+      is_deleted: 0,
+      created_at: "2026-05-07T00:00:00.000Z",
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
+
+    const opensearch = await handleRequest(
+      new Request("https://example.com/lib/exe/opensearch.php"),
+      env
+    );
+    const manifest = await handleRequest(
+      new Request("https://example.com/lib/exe/manifest.php"),
+      env
+    );
+
+    expect(opensearch.headers.get("content-type")).toContain(
+      "application/opensearchdescription+xml"
+    );
+    const opensearchXml = await opensearch.text();
+    expect(opensearchXml).toContain('<?xml version="1.0"?>');
+    expect(opensearchXml).toContain("<ShortName>Test Wiki</ShortName>");
+    expect(opensearchXml).toContain(
+      '<Image width="16" height="16" type="image/x-icon">https://example.com/images/favicon.ico</Image>'
+    );
+    expect(opensearchXml).toContain(
+      'template="https://example.com/docs/doku.php?do=search&amp;id={searchTerms}"'
+    );
+    expect(opensearchXml).toContain(
+      'template="https://example.com/docs/lib/exe/ajax.php?call=suggestions&amp;q={searchTerms}"'
+    );
+    expect(opensearchXml).not.toContain("<Description>");
+    expect(opensearchXml).not.toContain("<InputEncoding>");
+
+    expect(manifest.headers.get("content-type")).toContain("application/manifest+json");
+    await expect(manifest.json()).resolves.toMatchObject({
+      display: "standalone",
+      scope: "/docs/",
+      name: "Test Wiki",
+      short_name: "Test Wiki",
+      description: "Notes from the edge",
+      start_url: "/docs/",
+      background_color: "#fff",
+      theme_color: "#008800",
+      icons: [
+        {
+          src: "https://example.com/docs/lib/exe/fetch.php?media=wiki%3Afavicon.ico",
+          sizes: "16x16"
+        },
+        {
+          src: "https://example.com/docs/lib/exe/fetch.php?media=wiki%3Alogo.svg",
+          sizes: "17x17 512x512",
+          type: "image/svg+xml"
+        }
+      ]
+    });
   });
 
   it("honors DokuWiki feed type, link, content, summary, deleted, and cache settings", async () => {

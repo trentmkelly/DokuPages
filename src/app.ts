@@ -675,11 +675,14 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/lib/exe/opensearch.php" || url.pathname === "/opensearch.xml") {
-    return xmlResponse(renderOpenSearch(env, url));
+    return xmlResponse(
+      renderOpenSearch(env, url),
+      "application/opensearchdescription+xml; charset=utf-8"
+    );
   }
 
   if (url.pathname === "/lib/exe/manifest.php" || url.pathname === "/manifest.webmanifest") {
-    return manifestResponse(renderWebManifest(env));
+    return manifestResponse(await renderWebManifest(env, url));
   }
 
   if (url.pathname === "/robots.txt") {
@@ -7947,29 +7950,75 @@ function feedContentType(type: FeedType): string {
 }
 
 function renderOpenSearch(env: Env, url: URL): string {
-  const title = getRuntimeConfig(env).siteName;
-  const searchTemplate = `${new URL("/search", url).href}?q={searchTerms}`;
+  const config = getRuntimeConfig(env);
+  const title = config.siteName;
+  const relativeBase = dokuwikiRelativeBase(config);
+  const faviconUrl = new URL("/images/favicon.ico", url).href;
+  const searchTemplate = `${new URL(`${relativeBase}doku.php`, url).href}?do=search&id={searchTerms}`;
+  const suggestionsTemplate = `${new URL(`${relativeBase}lib/exe/ajax.php`, url).href}?call=suggestions&q={searchTerms}`;
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
   <ShortName>${escapeXml(title)}</ShortName>
-  <Description>${escapeXml(`Search ${title}`)}</Description>
-  <InputEncoding>UTF-8</InputEncoding>
-  <Url type="text/html" template="${escapeXml(searchTemplate)}"/>
+  <Image width="16" height="16" type="image/x-icon">${escapeXml(faviconUrl)}</Image>
+  <Url type="text/html" template="${escapeXml(searchTemplate)}" />
+  <Url type="application/x-suggestions+json" template="${escapeXml(suggestionsTemplate)}" />
 </OpenSearchDescription>`;
 }
 
-function renderWebManifest(env: Env): Record<string, unknown> {
-  const name = getRuntimeConfig(env).siteName;
+async function renderWebManifest(env: Env, url: URL): Promise<Record<string, unknown>> {
+  const config = getRuntimeConfig(env);
+  const relativeBase = dokuwikiRelativeBase(config);
 
   return {
-    name,
-    short_name: name.slice(0, 24),
-    start_url: "/",
-    display: "minimal-ui",
-    background_color: "#ffffff",
-    theme_color: "#0f172a"
+    display: "standalone",
+    scope: relativeBase,
+    name: config.siteName,
+    short_name: config.siteName,
+    description: config.tagline,
+    start_url: relativeBase,
+    background_color: "#fff",
+    theme_color: "#008800",
+    icons: await manifestIcons(env, url, config)
   };
+}
+
+function dokuwikiRelativeBase(config: RuntimeConfig): string {
+  return config.baseDir ? `${config.baseDir}/` : "/";
+}
+
+async function manifestIcons(
+  env: Env,
+  url: URL,
+  config: RuntimeConfig
+): Promise<Record<string, string>[]> {
+  const icons: Record<string, string>[] = [];
+
+  if (await getCurrentMedia(env.DB, "wiki:favicon.ico")) {
+    icons.push({
+      src: dokuwikiMediaUrl("wiki:favicon.ico", url, config),
+      sizes: "16x16"
+    });
+  }
+
+  for (const mediaId of ["wiki:logo.svg", "logo.svg", "wiki:dokuwiki.svg"]) {
+    if (await getCurrentMedia(env.DB, mediaId)) {
+      icons.push({
+        src: dokuwikiMediaUrl(mediaId, url, config),
+        sizes: "17x17 512x512",
+        type: "image/svg+xml"
+      });
+      break;
+    }
+  }
+
+  return icons;
+}
+
+function dokuwikiMediaUrl(id: string, url: URL, config: RuntimeConfig): string {
+  const mediaUrl = new URL(`${dokuwikiRelativeBase(config)}lib/exe/fetch.php`, url);
+  mediaUrl.searchParams.set("media", id);
+  return mediaUrl.href;
 }
 
 async function handleAclRuleUpsert(
