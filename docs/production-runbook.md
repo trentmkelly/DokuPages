@@ -119,6 +119,7 @@ Verify imported content hashes:
 
 ```sh
 npm run import:verify-hashes
+npm run import:review
 ```
 
 Run the deployed checks:
@@ -130,9 +131,10 @@ npm run test:visual -- --base-url https://dokutest.pages.dev
 curl https://dokutest.pages.dev/api/diagnostics
 ```
 
-Spot-check representative pages, representative media, login, registration,
-password reset, subscriptions, edit-save, media upload/download, search, feeds,
-sitemap, admin diagnostics, admin audit, and ACL-protected content.
+Complete `.wrangler/post-import-content-review.md` before cutover. It is the
+explicit review for production-only gaps that starter pages cannot expose; add
+confirmed gaps back to `CHECKLIST_2.md` or the issue tracker with source IDs,
+routes, expected upstream behavior, actual Pages behavior, and severity.
 
 ## Deploy And Cutover
 

@@ -91,6 +91,7 @@ export function buildProductionRehearsalPlan(args) {
   const mediaManifest = path.join(args.workDir, "dokuwiki-media-manifest.json");
   const hashManifest = path.join(args.workDir, "dokuwiki-hash-manifest.json");
   const backupReport = path.join(args.workDir, "backup-verification.json");
+  const contentReview = path.join(args.workDir, "post-import-content-review.md");
 
   const steps = [
     commandStep(
@@ -178,6 +179,21 @@ export function buildProductionRehearsalPlan(args) {
       ],
       { resources: ["D1", "R2"], validates: ["import-fidelity"] }
     ),
+    commandStep(
+      "post-import-content-review",
+      "Generate the manual production content review checklist so non-starter content gaps are captured.",
+      "node",
+      [
+        "scripts/post-import-content-review.mjs",
+        "--manifest",
+        hashManifest,
+        "--output",
+        contentReview,
+        "--base-url",
+        args.baseUrl
+      ],
+      { validates: ["production-content-review"] }
+    ),
     {
       id: "remote-diagnostics",
       description: "Fetch /api/diagnostics and require D1, R2, KV, and Durable Object health.",
@@ -246,7 +262,8 @@ export function buildProductionRehearsalPlan(args) {
       importSql,
       mediaManifest,
       hashManifest,
-      backupReport
+      backupReport,
+      contentReview
     },
     steps
   };
@@ -463,6 +480,7 @@ Runs the final production rehearsal:
 - backs up remote D1/R2
 - imports final-source D1/R2 data into remote Cloudflare resources
 - verifies remote D1/R2 hashes and D1/R2/KV/Durable Object diagnostics
+- generates the post-import production content review checklist
 - restores the pre-import backup into local rollback targets
 
 Use --dry-run to print the command plan without changing remote or local data.`;

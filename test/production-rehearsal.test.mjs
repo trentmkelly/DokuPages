@@ -29,6 +29,7 @@ describe("production rehearsal", () => {
       "remote-d1-final-import",
       "remote-r2-final-import",
       "remote-import-hash-verification",
+      "post-import-content-review",
       "remote-diagnostics",
       "remote-smoke-tests",
       "remote-alert-checks",
@@ -49,6 +50,13 @@ describe("production rehearsal", () => {
       mutatesLocal: true,
       validates: ["rollback"]
     });
+    expect(plan.steps.find((step) => step.id === "post-import-content-review")).toMatchObject({
+      command: "node",
+      validates: ["production-content-review"]
+    });
+    expect(plan.artifacts.contentReview).toBe(
+      ".wrangler/rehearsal-prod/post-import-content-review.md"
+    );
   });
 
   it("supports dry-run parsing without requiring --yes", () => {

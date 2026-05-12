@@ -133,6 +133,7 @@ Verify a completed import:
 
 ```sh
 npm run import:verify-hashes
+npm run import:review
 ```
 
 Use `-- --skip-r2` when only D1 hashes need to be checked.
@@ -146,6 +147,13 @@ npm run smoke -- --base-url https://dokutest.pages.dev
 ```
 
 For media-specific checks, fetch representative media paths from rendered pages and compare status, content type, byte length, and body hash against the manifest.
+
+The post-import review command writes `.wrangler/post-import-content-review.md`
+from the final hash manifest. Treat it as the human review checklist for
+production-only content gaps that starter pages cannot expose: representative
+non-starter pages, old revisions, deleted pages, media namespaces, ACL/user
+flows, imported custom config, plugin compatibility, search, feeds, sitemap,
+and any gaps that must be added back to `CHECKLIST_2.md` or the issue tracker.
 
 The automated importer suite also includes a non-starter wiki fixture that
 executes generated SQL against the real migrations and verifies pages, old page
