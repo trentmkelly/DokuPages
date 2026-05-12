@@ -539,6 +539,10 @@ describe("DokuWiki import planner", () => {
       ].join("\n")
     );
     await writeFile(
+      path.join(root, "data/meta/_media.changes"),
+      "1767225600\t203.0.113.8\tE\twiki:logo.svg\tbob\tEdited old logo\t\t3\n"
+    );
+    await writeFile(
       path.join(root, "data/meta/wiki/welcome.meta"),
       'a:1:{s:7:"current";a:1:{s:5:"title";s:7:"Welcome";}}'
     );
@@ -590,6 +594,7 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert or replace into media_revisions");
     expect(sql).toContain("'media/current/wiki/logo.svg'");
     expect(sql).toContain("'wiki:logo.svg@2026-01-01T00:00:00.000Z'");
+    expect(sql).toContain("'user:bob', 'Edited old logo', 'edit'");
     expect(sql).toContain("insert or replace into metadata");
     expect(sql).toContain("dokuwiki_language_file");
     expect(sql).toContain("dokuwiki_template_file");

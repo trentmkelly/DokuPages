@@ -36,6 +36,9 @@ Page revisions imported from `data/pages` and `data/attic` are correlated with
 `data/meta/_dokuwiki.changes` by page ID and revision timestamp. When a matching
 changelog row exists, the importer preserves the DokuWiki username, edit
 summary, change type, and size delta on the D1 `page_revisions` row.
+Media revisions imported from `data/media` and `data/media_attic` use the same
+timestamp correlation against `data/meta/_media.changes` to preserve the
+DokuWiki username, upload summary, and media change type on `media_revisions`.
 
 Imported DokuWiki config metadata preserves whether a value came from
 `conf/dokuwiki.php`, `conf/local.php`, or `conf/local.protected.php`. The
