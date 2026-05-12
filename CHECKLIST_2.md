@@ -244,7 +244,7 @@ are not fixed by this checklist.
 ## Cache, Tasks, And Operations
 
 - [x] Match DokuWiki parser instruction cache invalidation semantics more closely, or document rendered-HTML KV cache as intentionally different.
-- [ ] Implement metadata cache parity where DokuWiki stores and reuses parser metadata.
+- [x] Implement metadata cache parity where DokuWiki stores and reuses parser metadata.
 - [ ] Implement stale cache fallback only if it can match DokuWiki's cache behavior safely.
 - [ ] Implement the upstream task runner queue behavior from `inc/TaskRunner.php` and `lib/exe/taskrunner.php`, or document all replaced scheduled jobs.
 - [ ] Implement indexer locking and background indexing semantics from upstream `inc/indexer.php`.

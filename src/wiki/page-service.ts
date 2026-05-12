@@ -103,6 +103,12 @@ export interface PageSearchIndexTaskResult {
   postingCount: number;
 }
 
+export interface PageMetadataCacheResult {
+  status: "hit" | "refreshed";
+  revisionId: string;
+  contentHash: string;
+}
+
 export interface RecentChangeListOptions {
   namespace?: string;
   groupBySubject?: boolean;
@@ -181,6 +187,14 @@ interface RecentChangeRow {
   summary: string;
   size_change: number;
   created_at: string;
+}
+
+interface PageChangeMetadataRow {
+  change_type: SavePageInput["changeType"];
+  summary: string | null;
+  user_id: string | null;
+  user_name: string | null;
+  ip: string | null;
 }
 
 interface SearchTermRow {
@@ -1389,6 +1403,75 @@ export async function rebuildPageSearchIndex(
   };
 }
 
+export async function ensurePageMetadataCache(
+  db: D1Database,
+  page: CurrentPage,
+  renderedMetadata: ReturnType<typeof renderWikiText>
+): Promise<PageMetadataCacheResult> {
+  const contentHash = await sha256(page.content);
+  const cached = await readPageMetadataCacheState(db, page.id);
+
+  if (cached.revisionId === page.revisionId && cached.contentHash === contentHash) {
+    return {
+      status: "hit",
+      revisionId: page.revisionId,
+      contentHash
+    };
+  }
+
+  const namespace = page.id.includes(":") ? page.id.slice(0, page.id.lastIndexOf(":")) : "";
+  const fallbackTitle = pageTitleFromId(page.id);
+  const title = page.title ?? extractTitle(page.content) ?? fallbackTitle;
+  const outgoingLinks = pageDependencies(renderedMetadata.dependencies);
+  const mediaLinks = mediaDependencies(renderedMetadata.dependencies);
+  const existingLinkIds = await listExistingPageIds(db, outgoingLinks);
+  existingLinkIds.add(page.id);
+  const existingMediaIds = await listExistingMediaIds(db, mediaLinks);
+  const previousMetadata = await readDokuWikiPageMetadata(db, page.id);
+  const pageCreatedAt = (await getPageCreatedAt(db, page.id)) ?? page.updatedAt;
+  const change = await getPageChangeMetadata(db, page.id, page.revisionId);
+  const previousOutgoingLinks = pageRelationReferenceIds(previousMetadata);
+  const backlinkTargets = [...new Set([...previousOutgoingLinks, ...outgoingLinks, page.id])];
+  const backlinkMetadata = await buildBacklinkMetadata(db, page.id, page.content, backlinkTargets);
+  const pageMetadata = buildPageMetadata({
+    title,
+    revisionId: page.revisionId,
+    namespace,
+    contentHash,
+    content: page.content,
+    isDelete: false,
+    renderedMetadata,
+    outgoingLinks,
+    existingLinkIds,
+    mediaLinks,
+    existingMediaIds,
+    previousMetadata,
+    pageCreatedAt,
+    modifiedAt: page.updatedAt,
+    changeType: change?.changeType ?? "edit",
+    summary: change?.summary ?? "",
+    authorId: change?.authorId ?? page.author?.userId ?? null,
+    authorName:
+      change?.authorName ??
+      page.author?.fallbackName ??
+      page.author?.username ??
+      page.author?.displayName ??
+      null,
+    ip: change?.ip ?? null
+  });
+
+  await db.batch([
+    ...buildPageMetadataStatements(db, page.id, page.updatedAt, pageMetadata),
+    ...buildBacklinkMetadataStatements(db, backlinkMetadata, page.updatedAt)
+  ]);
+
+  return {
+    status: "refreshed",
+    revisionId: page.revisionId,
+    contentHash
+  };
+}
+
 interface DokuWikiPageMetadata {
   current?: Record<string, unknown>;
   persistent?: Record<string, unknown>;
@@ -1611,6 +1694,77 @@ async function readDokuWikiPageMetadata(
   }
 }
 
+async function readPageMetadataCacheState(
+  db: D1Database,
+  pageId: string
+): Promise<{ revisionId: string | null; contentHash: string | null }> {
+  const result = await db
+    .prepare(
+      `select key, value_json
+       from metadata
+       where subject_type = ?
+         and subject_id = ?
+         and key in ('revisionId', 'contentHash')`
+    )
+    .bind("page", pageId)
+    .all<{ key: string; value_json: string }>();
+  const rows = new Map(result.results.map((row) => [row.key, parseJsonValue(row.value_json)]));
+
+  return {
+    revisionId: stringValue(rows.get("revisionId")),
+    contentHash: stringValue(rows.get("contentHash"))
+  };
+}
+
+async function getPageChangeMetadata(
+  db: D1Database,
+  pageId: string,
+  revisionId: string
+): Promise<{
+  changeType: SavePageInput["changeType"];
+  summary: string;
+  authorId: string | null;
+  authorName: string | null;
+  ip: string | null;
+} | null> {
+  const row = await db
+    .prepare(
+      `select change_type, summary, user_id, user_name, ip
+       from changelog
+       where subject_type = 'page'
+         and subject_id = ?
+         and revision_id = ?
+       order by created_at desc, id desc
+       limit 1`
+    )
+    .bind(pageId, revisionId)
+    .first<PageChangeMetadataRow>();
+
+  if (!row) return null;
+
+  return {
+    changeType: row.change_type ?? "edit",
+    summary: row.summary ?? "",
+    authorId: row.user_id ?? null,
+    authorName: row.user_name ?? null,
+    ip: row.ip ?? null
+  };
+}
+
+function pageRelationReferenceIds(metadata: DokuWikiPageMetadata | null): string[] {
+  const current = objectValue(metadata?.current);
+  const relation = objectValue(current.relation);
+  return Object.keys(recordValue(relation.references));
+}
+
+function parseJsonValue(valueJson: string): unknown {
+  try {
+    return JSON.parse(valueJson);
+  } catch {
+    return null;
+  }
+}
+
 async function listExistingMediaIds(
   db: D1Database,
   mediaIds: readonly string[]
@@ -1710,8 +1864,13 @@ function tableOfContentsMetadata(
 }
 
 function pageAbstract(html: string): string {
-  const withImageText = html.replace(/<img\b[^>]*\balt="([^"]*)"[^>]*>/gi, (_match, alt) =>
-    alt ? `[${decodeHtmlEntities(String(alt))}]` : ""
+  const withoutSectionEditButtons = html.replace(
+    /<div class="secedit\b[\s\S]*?<\/form><\/div>/gi,
+    ""
+  );
+  const withImageText = withoutSectionEditButtons.replace(
+    /<img\b[^>]*\balt="([^"]*)"[^>]*>/gi,
+    (_match, alt) => (alt ? `[${decodeHtmlEntities(String(alt))}]` : "")
   );
   const withoutFootnotes = withImageText.replace(/<div class="footnotes">[\s\S]*?<\/div>\s*$/i, "");
   const text = decodeHtmlEntities(

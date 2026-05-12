@@ -114,6 +114,7 @@ import {
   getCurrentPage,
   getPageDraft,
   getPageRevision,
+  ensurePageMetadataCache,
   listAllPages,
   listBacklinks,
   listExistingPageIds,
@@ -5005,6 +5006,17 @@ async function renderPageHtml(
     rssDateFormatter: (date) => formatRuntimeDate(config, date)
   });
   const title = displayPageTitle(renderConfig, rendered.title, page?.title, id);
+
+  if (page && !revisionDate) {
+    const metadataCache = await ensurePageMetadataCache(env.DB, page, rendered);
+    logMetric("cache_metric", {
+      cache: "page_metadata",
+      action: metadataCache.status,
+      pageId: id,
+      revisionId,
+      durationMs: elapsedSince(startedAt)
+    });
+  }
 
   if (!rendered.noCache && !privateCache && cacheableRenderControls) {
     await writeRenderCache(env, cacheKey, {

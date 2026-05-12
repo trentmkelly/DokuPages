@@ -2914,6 +2914,77 @@ describe("handleRequest", () => {
     ]);
   });
 
+  it("refreshes and reuses DokuWiki parser metadata cache rows on current page renders", async () => {
+    state.row = {
+      ...currentPageRow(),
+      content: "====== Welcome ======\n\n[[wiki:syntax|Syntax]] {{wiki:logo.svg|Logo}}\n\nText."
+    };
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const pageMetadata = state.metadata.filter(
+      (record) => record.subject_type === "page" && record.subject_id === "wiki:welcome"
+    );
+    const byKey = new Map(pageMetadata.map((record) => [record.key, record.value_json]));
+    expect(JSON.parse(String(byKey.get("revisionId")))).toBe(
+      "wiki:welcome@2026-05-07T00:00:00.000Z"
+    );
+    expect(JSON.parse(String(byKey.get("contentHash")))).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.parse(String(byKey.get("relation")))).toMatchObject({
+      references: { "wiki:syntax": false },
+      media: { "wiki:logo.svg": true },
+      firstimage: "wiki:logo.svg"
+    });
+    expect(JSON.parse(String(byKey.get("description"))).abstract).toBe(
+      "Welcome\n\nSyntax [Logo]\n\nText."
+    );
+    expect(JSON.parse(String(byKey.get("dokuwiki")))).toMatchObject({
+      current: {
+        title: "Welcome",
+        internal: {
+          cache: true,
+          toc: true
+        }
+      },
+      persistent: {
+        last_change: {
+          type: "create",
+          sum: "Initial import"
+        }
+      }
+    });
+    expect(state.metadata).toContainEqual(
+      expect.objectContaining({
+        subject_type: "page",
+        subject_id: "wiki:syntax",
+        key: "backlinks",
+        value_json: JSON.stringify(["wiki:welcome"])
+      })
+    );
+    const batchesAfterRefresh = state.batches.length;
+    const metadataCountAfterRefresh = state.metadata.length;
+    renderCache.clear();
+    state.cacheDependencies = [];
+
+    const rerenderedResponse = await handleRequest(
+      new Request("https://example.com/wiki/wiki/welcome"),
+      env
+    );
+
+    expect(rerenderedResponse.status).toBe(200);
+    expect(state.metadata).toHaveLength(metadataCountAfterRefresh);
+    expect(
+      state.batches
+        .slice(batchesAfterRefresh)
+        .some((batch) =>
+          batch.some((statement) =>
+            String((statement as { sql?: unknown }).sql).includes("insert into metadata")
+          )
+        )
+    ).toBe(false);
+  });
+
   it("emits cache, search, and media metric events", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
@@ -4942,6 +5013,18 @@ function createD1Stub(state: D1StubState): D1Database {
             return state.revisions.find((revision) => revision.id === id) ?? null;
           }
 
+          if (sql.includes("from changelog")) {
+            const [subjectId, revisionId] = values;
+            return (
+              state.changelog.find(
+                (change) =>
+                  change.subject_type === "page" &&
+                  change.subject_id === subjectId &&
+                  change.revision_id === revisionId
+              ) ?? null
+            );
+          }
+
           if (sql.includes("from drafts")) {
             return state.drafts.find((draft) => draft.id === id) ?? null;
           }
@@ -5513,7 +5596,14 @@ function createD1Stub(state: D1StubState): D1Database {
         }
 
         if (statement.sql.includes("insert into metadata")) {
-          const [subjectId, key, valueJson, updatedAt] = statement.values;
+          const [subjectId, rawKeyOrValue, rawValueOrUpdatedAt, rawUpdatedAt] = statement.values;
+          const key = statement.sql.includes("'backlinks'") ? "backlinks" : rawKeyOrValue;
+          const valueJson = statement.sql.includes("'backlinks'")
+            ? rawKeyOrValue
+            : rawValueOrUpdatedAt;
+          const updatedAt = statement.sql.includes("'backlinks'")
+            ? rawValueOrUpdatedAt
+            : rawUpdatedAt;
           const subjectType = statement.sql.includes("'media'") ? "media" : "page";
           const existing = state.metadata.find(
             (record) =>

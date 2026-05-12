@@ -166,8 +166,17 @@ storage error mapped by the route.
 
 ## Metadata Cache Decision
 
-No separate metadata cache is used for launch. Page and media saves write
-metadata rows in the same D1 batches as their canonical records, but hot routes
-read current page/media rows directly instead of issuing repeated metadata
-lookups. The `metadata(subject_type, subject_id, key)` primary key remains the
-bounded access path for admin, import, backup, and diagnostic uses.
+Page and media saves write metadata rows in the same D1 batches as their
+canonical records. Current page renders that miss the rendered-HTML cache also
+check the `revisionId` and `contentHash` metadata rows that stand in for
+DokuWiki's parser metadata cache; if they are missing or stale, the render
+result is used to refresh the `description`, `relation`, backlink, and
+`dokuwiki` metadata rows before the response is returned. Matching rows are
+reused without a metadata write, and warm rendered-HTML cache hits do not add a
+metadata lookup to the read path.
+
+The port still does not import or execute PHP parser instruction arrays from
+`data/cache`; rendered HTML uses the revision-aware KV/D1 cache described
+above. The `metadata(subject_type, subject_id, key)` primary key remains the
+bounded access path for admin, import, backup, diagnostics, backlink, wanted
+page, and orphan-page uses.
