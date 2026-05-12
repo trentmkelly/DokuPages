@@ -1535,6 +1535,36 @@ describe("handleRequest", () => {
     }
   });
 
+  it("covers every upstream DokuWiki action class with an explicit route parity case", async () => {
+    const expectedActionClasses = upstreamActionClasses();
+    const actionRouteCases = upstreamActionRouteCases();
+
+    expect([...actionRouteCases.keys()].sort()).toEqual(expectedActionClasses);
+
+    for (const [actionClass, routeCase] of actionRouteCases) {
+      pageLocks.reset();
+      const response = await handleRequest(
+        new Request(`https://example.com${routeCase.path}`, {
+          method: routeCase.method ?? "GET",
+          body: routeCase.body?.(),
+          headers: routeCase.headers
+        }),
+        env
+      );
+
+      expect(response.status, actionClass).toBe(routeCase.status);
+      if (routeCase.location) {
+        expect(response.headers.get("location"), actionClass).toBe(routeCase.location);
+      }
+      if (routeCase.contentType) {
+        expect(response.headers.get("content-type"), actionClass).toContain(routeCase.contentType);
+      }
+      if (routeCase.bodyIncludes) {
+        await expect(response.text(), actionClass).resolves.toContain(routeCase.bodyIncludes);
+      }
+    }
+  });
+
   it("serves authenticated native API read methods with configured CORS", async () => {
     if (state.row) {
       state.row.content = "====== Welcome ======\n\nSee [[wiki:guide]].";
@@ -5056,6 +5086,305 @@ function csrfHeaders(headers: Record<string, string> = {}): Record<string, strin
       : `DW_CSRF_TOKEN=${TEST_CSRF_TOKEN}`,
     "x-csrf-token": TEST_CSRF_TOKEN
   };
+}
+
+interface UpstreamActionRouteCase {
+  path: string;
+  status: number;
+  method?: "GET" | "POST";
+  body?: () => FormData;
+  headers?: Record<string, string>;
+  location?: string;
+  contentType?: string;
+  bodyIncludes?: string;
+}
+
+function upstreamActionClasses(): string[] {
+  return [
+    "Admin",
+    "Authtoken",
+    "Backlink",
+    "Cancel",
+    "Check",
+    "Conflict",
+    "Denied",
+    "Diff",
+    "Draft",
+    "Draftdel",
+    "Edit",
+    "Export",
+    "Index",
+    "Locked",
+    "Login",
+    "Logout",
+    "Media",
+    "Plugin",
+    "Preview",
+    "Profile",
+    "ProfileDelete",
+    "Recent",
+    "Recover",
+    "Redirect",
+    "Register",
+    "Resendpwd",
+    "Revert",
+    "Revisions",
+    "Save",
+    "Search",
+    "Show",
+    "Sitemap",
+    "Source",
+    "Subscribe"
+  ];
+}
+
+function upstreamActionRouteCases(): Map<string, UpstreamActionRouteCase> {
+  return new Map([
+    ["Admin", { path: "/doku.php?do=admin", status: 301, location: "/admin" }],
+    [
+      "Authtoken",
+      {
+        path: "/wiki/wiki/welcome?do=authtoken",
+        status: 303,
+        location: "/login?returnTo=%2Fprofile"
+      }
+    ],
+    ["Backlink", { path: "/wiki/wiki/welcome?do=backlink", status: 200, contentType: "text/html" }],
+    [
+      "Cancel",
+      { path: "/wiki/wiki/welcome?do=cancel", status: 303, location: "/wiki/wiki/welcome" }
+    ],
+    [
+      "Check",
+      {
+        path: "/wiki/wiki/welcome?do=check",
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: "<h1>Diagnostics</h1>"
+      }
+    ],
+    [
+      "Conflict",
+      {
+        path: "/wiki/wiki/welcome?do=conflict",
+        status: 409,
+        contentType: "text/html",
+        bodyIncludes: "<h1>A newer version exists</h1>"
+      }
+    ],
+    [
+      "Denied",
+      {
+        path: "/wiki/wiki/welcome?do=denied",
+        status: 403,
+        contentType: "text/html",
+        bodyIncludes: "Permission Denied"
+      }
+    ],
+    [
+      "Diff",
+      {
+        path: "/wiki/wiki/welcome?do=diff&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z",
+        status: 200,
+        contentType: "text/html"
+      }
+    ],
+    [
+      "Draft",
+      {
+        path: "/doku.php?id=wiki:welcome&do=draft",
+        method: "POST",
+        body: draftActionForm,
+        headers: csrfHeaders(),
+        status: 303,
+        location: "/wiki/wiki/welcome?do=edit"
+      }
+    ],
+    [
+      "Draftdel",
+      {
+        path: "/wiki/wiki/welcome?do=draftdel",
+        method: "POST",
+        body: emptyActionForm,
+        headers: csrfHeaders(),
+        status: 303,
+        location: "/wiki/wiki/welcome?do=edit"
+      }
+    ],
+    [
+      "Edit",
+      {
+        path: "/wiki/wiki/welcome?do=edit",
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: 'id="dw__editform"'
+      }
+    ],
+    [
+      "Export",
+      {
+        path: "/wiki/wiki/welcome?do=export_raw",
+        status: 200,
+        contentType: "text/plain",
+        bodyIncludes: "Imported page."
+      }
+    ],
+    ["Index", { path: "/wiki/wiki/welcome?do=index", status: 200, contentType: "text/html" }],
+    [
+      "Locked",
+      {
+        path: "/wiki/wiki/welcome?do=locked",
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: "Page locked"
+      }
+    ],
+    [
+      "Login",
+      {
+        path: "/wiki/wiki/welcome?do=login",
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: 'id="dw__login"'
+      }
+    ],
+    ["Logout", { path: "/wiki/wiki/welcome?do=logout", status: 200, contentType: "text/html" }],
+    [
+      "Media",
+      {
+        path: "/wiki/wiki/welcome?do=media",
+        status: 303,
+        location: "/media-manager?ns=wiki"
+      }
+    ],
+    [
+      "Plugin",
+      {
+        path: "/wiki/wiki/welcome?do=plugin",
+        status: 501,
+        contentType: "text/html",
+        bodyIncludes: "DokuWiki action plugin dispatch"
+      }
+    ],
+    [
+      "Preview",
+      {
+        path: "/doku.php?id=wiki:welcome&do=preview",
+        method: "POST",
+        body: previewActionForm,
+        headers: csrfHeaders(),
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: "<h1>Preview</h1>"
+      }
+    ],
+    ["Profile", { path: "/doku.php?do=profile", status: 301, location: "/profile" }],
+    ["ProfileDelete", { path: "/doku.php?do=profile_delete", status: 301, location: "/profile" }],
+    ["Recent", { path: "/wiki/wiki/welcome?do=recent", status: 200, contentType: "text/html" }],
+    [
+      "Recover",
+      {
+        path: "/wiki/wiki/welcome?do=recover",
+        status: 303,
+        location: "/wiki/wiki/welcome?do=edit"
+      }
+    ],
+    [
+      "Redirect",
+      {
+        path: "/wiki/wiki/welcome?do=redirect&hid=welcome",
+        status: 303,
+        location: "/wiki/wiki/welcome#welcome"
+      }
+    ],
+    [
+      "Register",
+      {
+        path: "/wiki/wiki/welcome?do=register",
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: 'id="dw__register"'
+      }
+    ],
+    [
+      "Resendpwd",
+      {
+        path: "/wiki/wiki/welcome?do=resendpwd",
+        status: 200,
+        contentType: "text/html",
+        bodyIncludes: 'id="dw__resendpwd"'
+      }
+    ],
+    [
+      "Revert",
+      {
+        path: "/wiki/wiki/welcome?do=revert&rev=wiki%3Awelcome%402026-05-06T00%3A00%3A00.000Z",
+        status: 200,
+        contentType: "text/html"
+      }
+    ],
+    [
+      "Revisions",
+      { path: "/wiki/wiki/welcome?do=revisions", status: 200, contentType: "text/html" }
+    ],
+    [
+      "Save",
+      {
+        path: "/doku.php?id=wiki:welcome&do=save",
+        method: "POST",
+        body: saveActionForm,
+        headers: csrfHeaders(),
+        status: 303,
+        location: "/wiki/wiki/welcome"
+      }
+    ],
+    [
+      "Search",
+      { path: "/wiki/wiki/welcome?do=search&q=welcome", status: 200, contentType: "text/html" }
+    ],
+    [
+      "Show",
+      { path: "/doku.php?id=Wiki:Welcome&do=show", status: 301, location: "/wiki/wiki/welcome" }
+    ],
+    ["Sitemap", { path: "/sitemap.xml", status: 200, contentType: "application/xml" }],
+    ["Source", { path: "/wiki/wiki/welcome?do=source", status: 200, contentType: "text/plain" }],
+    [
+      "Subscribe",
+      {
+        path: "/wiki/wiki/welcome?do=subscribe",
+        status: 303,
+        location: "/login?returnTo=%2Fwiki%2Fwiki%2Fwelcome%3Fdo%3Dsubscribe"
+      }
+    ]
+  ]);
+}
+
+function draftActionForm(): FormData {
+  const form = new FormData();
+  form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+  form.set("content", "====== Draft route parity ======\n\nUnsaved route coverage.");
+  return form;
+}
+
+function previewActionForm(): FormData {
+  const form = new FormData();
+  form.set("content", "====== Preview route parity ======\n\nRendered preview coverage.");
+  return form;
+}
+
+function saveActionForm(): FormData {
+  const form = new FormData();
+  form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+  form.set(
+    "content",
+    "====== Saved route parity ======\n\nSaved through an upstream action route."
+  );
+  form.set("summary", "Route parity save");
+  return form;
+}
+
+function emptyActionForm(): FormData {
+  return new FormData();
 }
 
 function createDurableObjectStateStub(): DurableObjectState {
