@@ -1,6 +1,6 @@
 # Data Import
 
-The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media manifest. It preserves current page bodies, search postings, current media rows, media revision rows, parsed page/media `.meta` data, custom language files, custom template files, ACL rules, authplain users/groups, and page/media changelog rows. Imported custom `conf/lang/<lang>/lang.php` strings and auth page `.txt` files are used at runtime for supported auth/UI text. It intentionally does not import `data/log` PHP runtime log files; Cloudflare Logs are the Pages runtime source for request and error events, and D1 `audit_log` rows cover native admin actions.
+The importer reads a flat-file DokuWiki tree and emits D1 SQL plus an R2 media manifest. It preserves current page bodies, search postings, current media rows, media revision rows, parsed page/media `.meta` data, custom language files, custom template files, ACL rules, authplain users/groups, page/media subscriptions, and page/media changelog rows. Imported custom `conf/lang/<lang>/lang.php` strings and auth page `.txt` files are used at runtime for supported auth/UI text. It intentionally does not import `data/log` PHP runtime log files; Cloudflare Logs are the Pages runtime source for request and error events, and D1 `audit_log` rows cover native admin actions.
 
 ## Dry Run
 
@@ -10,8 +10,8 @@ npm run import:dry-run
 
 The dry run prints the import plan and counts discovered pages, page revisions,
 media, media revisions, metadata, custom language files, custom template files,
-ACL rules, users, config values, plugin settings, interwiki templates, MIME
-mappings, scheme protocols, and wordblock patterns.
+subscriptions, ACL rules, users, config values, plugin settings, interwiki
+templates, MIME mappings, scheme protocols, and wordblock patterns.
 
 The importer reads `fnencode` from the source wiki's DokuWiki configuration
 before walking `data/pages`, `data/attic`, `data/media`, `data/media_attic`, and
@@ -30,7 +30,7 @@ npm run import:sql
 npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-import.sql
 ```
 
-The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships. Plugin enablement records preserve the effective source and layer from `conf/plugins.php`, `conf/plugins.local.php`, and `conf/plugins.required.php` so diagnostics and the Extension Manager replacement can show which file won. Interrupted D1 imports can be rerun with the same generated SQL after fixing the underlying failure.
+The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, subscriptions, ACL rules, users, groups, and group memberships. Plugin enablement records preserve the effective source and layer from `conf/plugins.php`, `conf/plugins.local.php`, and `conf/plugins.required.php` so diagnostics and the Extension Manager replacement can show which file won. Interrupted D1 imports can be rerun with the same generated SQL after fixing the underlying failure.
 
 Page revisions imported from `data/pages` and `data/attic` are correlated with
 `data/meta/_dokuwiki.changes` by page ID and revision timestamp. When a matching
@@ -42,6 +42,12 @@ DokuWiki username, upload summary, and media change type on `media_revisions`.
 Delete changelog rows for subjects that no longer have a current file are
 imported as deleted D1 page/media tombstones with delete revisions, so old
 history and recent-change views can still reference those IDs after migration.
+
+DokuWiki `.mlist` subscription files in `data/meta` are imported for users
+present in imported authplain records. Page `.mlist` files become page
+subscriptions; namespace `.mlist` files become namespace subscriptions.
+DokuWiki `every` delivery maps to immediate delivery, while digest/list styles
+map to daily digest delivery.
 
 Imported DokuWiki config metadata preserves whether a value came from
 `conf/dokuwiki.php`, `conf/local.php`, or `conf/local.protected.php`. The

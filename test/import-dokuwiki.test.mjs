@@ -59,6 +59,11 @@ describe("DokuWiki import planner", () => {
       'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
     );
     await writeFile(
+      path.join(root, "data/meta/wiki/welcome.mlist"),
+      "alice every 1767225603\nbob digest 1767225604\n"
+    );
+    await writeFile(path.join(root, "data/meta/wiki/.mlist"), "carol list 1767225605\n");
+    await writeFile(
       path.join(root, "conf/acl.auth.php"),
       "* @ALL 1\nwiki:* @user 8\nusers:%USER%:* %USER% 16\nteams:%GROUP%:* %GROUP% 8 # group home\n"
     );
@@ -132,6 +137,7 @@ describe("DokuWiki import planner", () => {
       mediaRevisions: 1,
       mediaChangelogEntries: 1,
       mediaMetadata: 1,
+      subscriptions: 3,
       aclRules: 4,
       users: 3,
       configSettings: 3,
@@ -204,6 +210,25 @@ describe("DokuWiki import planner", () => {
       subjectId: "wiki:logo.svg",
       value: { Exif: { Title: "Logo" } }
     });
+    expect(plan.subscriptions).toContainEqual(
+      expect.objectContaining({
+        subjectType: "page",
+        subjectId: "wiki:welcome",
+        username: "alice",
+        userId: "user:alice",
+        digestInterval: "immediate",
+        createdAt: "2026-01-01T00:00:03.000Z"
+      })
+    );
+    expect(plan.subscriptions).toContainEqual(
+      expect.objectContaining({
+        subjectType: "namespace",
+        subjectId: "wiki",
+        username: "carol",
+        digestInterval: "daily",
+        createdAt: "2026-01-01T00:00:05.000Z"
+      })
+    );
     expect(plan.aclRules[0]).toMatchObject({
       scope: "*",
       principalType: "all",
@@ -554,6 +579,10 @@ describe("DokuWiki import planner", () => {
       path.join(root, "data/media_meta/wiki/logo.svg.meta"),
       'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
     );
+    await writeFile(
+      path.join(root, "data/meta/wiki/welcome.mlist"),
+      "alice every 1767225606\nbob digest 1767225607\n"
+    );
     await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 8\n");
     await writeFile(
       path.join(root, "conf/users.auth.php"),
@@ -632,6 +661,10 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert into users");
     expect(sql).toContain("insert into groups");
     expect(sql).toContain("insert into user_groups");
+    expect(sql).toContain("insert into subscriptions");
+    expect(sql).toContain("'subscription:user%3Aalice:page:wiki%3Awelcome'");
+    expect(sql).toContain("'immediate', '2026-01-01T00:00:06.000Z'");
+    expect(sql).not.toContain("subscription:user%3Abob");
     expect(sql).toContain("'user:alice'");
     expect(sql).toContain("'group:admin'");
     expect(sql).toContain("'all'");

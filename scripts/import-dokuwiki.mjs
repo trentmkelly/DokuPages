@@ -63,6 +63,9 @@ export async function buildImportPlan(sourceRoot) {
       fnencode: fileNameEncoding
     }
   );
+  const subscriptions = await discoverSubscriptions(path.join(dataRoot, "meta"), {
+    fnencode: fileNameEncoding
+  });
   const aclRules = await discoverAclRules(path.join(confRoot, "acl.auth.php"));
   const users = await discoverUsers(path.join(confRoot, "users.auth.php"));
   const pluginSettings = await discoverPluginSettings([
@@ -111,6 +114,7 @@ export async function buildImportPlan(sourceRoot) {
       mediaRevisions: mediaRevisions.length,
       mediaChangelogEntries: mediaChangelogEntries.length,
       mediaMetadata: mediaMetadata.length,
+      subscriptions: subscriptions.length,
       aclRules: aclRules.length,
       users: users.length,
       configSettings: configSettings.length,
@@ -134,6 +138,7 @@ export async function buildImportPlan(sourceRoot) {
     mediaRevisions,
     mediaChangelogEntries,
     mediaMetadata,
+    subscriptions,
     aclRules,
     users,
     configSettings,
@@ -561,6 +566,23 @@ on conflict(user_id, group_id) do nothing;`
     }
   }
 
+  const importedUserIds = new Set(plan.users.map((user) => user.id));
+  for (const subscription of plan.subscriptions.filter((entry) =>
+    importedUserIds.has(entry.userId)
+  )) {
+    statements.push(
+      `insert into subscriptions (id, subject_type, subject_id, user_id, digest_interval, created_at)
+values (
+  ${sql(subscription.id)}, ${sql(subscription.subjectType)}, ${sql(subscription.subjectId)}, ${sql(
+    subscription.userId
+  )}, ${sql(subscription.digestInterval)}, ${sql(subscription.createdAt)}
+)
+on conflict(id) do update set
+  digest_interval = excluded.digest_interval,
+  created_at = excluded.created_at;`
+    );
+  }
+
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
   await fs.writeFile(outputFile, `${statements.join("\n\n")}\n`);
 }
@@ -940,6 +962,89 @@ export async function discoverSerializedMetadata(root, subjectType, options = {}
   }
 
   return entries.sort((a, b) => a.subjectId.localeCompare(b.subjectId));
+}
+
+export async function discoverSubscriptions(metaRoot, options = {}) {
+  const files = await walkFiles(metaRoot);
+  const subscriptions = [];
+
+  for (const file of files) {
+    const relative = normalizeRelativePath(path.relative(metaRoot, file));
+    if (!relative.endsWith(".mlist")) continue;
+
+    const subject = subscriptionSubjectFromMlistPath(relative, options);
+    if (!subject) continue;
+
+    const stat = await fs.stat(file);
+    const fallbackCreatedAt = stat.mtime.toISOString();
+    const text = await fs.readFile(file, "utf8");
+
+    for (const line of text.split(/\r?\n/)) {
+      const subscription = parseSubscriptionLine(line, subject, fallbackCreatedAt);
+      if (subscription) subscriptions.push(subscription);
+    }
+  }
+
+  return subscriptions.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function subscriptionSubjectFromMlistPath(relative, options = {}) {
+  if (path.posix.basename(relative) === ".mlist") {
+    const namespacePath = path.posix.dirname(relative);
+    const subjectId = namespacePath === "." ? "" : pathWithoutExtensionToId(namespacePath, options);
+    return { subjectType: "namespace", subjectId };
+  }
+
+  if (!relative.endsWith(".mlist")) return null;
+  return {
+    subjectType: "page",
+    subjectId: pathWithoutExtensionToId(relative.slice(0, -".mlist".length), options)
+  };
+}
+
+function parseSubscriptionLine(line, subject, fallbackCreatedAt) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) parts.push("every");
+  const [encodedUsername, rawStyle, rawTimestamp] = parts;
+  const username = decodeSubscriptionUsername(encodedUsername);
+  if (!username) return null;
+
+  const userIdValue = userId(username);
+  return {
+    id: subscriptionId(userIdValue, subject.subjectType, subject.subjectId),
+    subjectType: subject.subjectType,
+    subjectId: subject.subjectId,
+    username,
+    userId: userIdValue,
+    digestInterval: subscriptionDigestInterval(rawStyle),
+    createdAt: subscriptionCreatedAt(rawTimestamp, fallbackCreatedAt)
+  };
+}
+
+function decodeSubscriptionUsername(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function subscriptionDigestInterval(style) {
+  return style === "every" ? "immediate" : "daily";
+}
+
+function subscriptionCreatedAt(value, fallback) {
+  if (/^\d{10,}$/.test(value ?? "")) {
+    return new Date(Number.parseInt(value, 10) * 1000).toISOString();
+  }
+  return fallback;
+}
+
+function subscriptionId(userIdValue, subjectType, subjectId) {
+  return `subscription:${encodeURIComponent(userIdValue)}:${subjectType}:${encodeURIComponent(subjectId)}`;
 }
 
 export async function discoverCustomLanguageFiles(root) {
