@@ -35,6 +35,40 @@ describe("wiki search helpers", () => {
     expect(query.simpleTerms).toEqual([]);
   });
 
+  it("covers DokuWiki query parsing parity cases", () => {
+    const cases = [
+      {
+        query: "alpha beta",
+        highlight: ["alpha", "beta"],
+        simpleTerms: ["alpha", "beta"],
+        namespaces: [],
+        excludedNamespaces: []
+      },
+      {
+        query: "alpha | beta",
+        highlight: ["alpha", "beta"],
+        simpleTerms: [],
+        namespaces: [],
+        excludedNamespaces: []
+      },
+      {
+        query: '"exact phrase" -excluded @wiki ^secret prefix* *suffix',
+        highlight: ["exact phrase", "excluded", "prefix", "suffix"],
+        simpleTerms: [],
+        namespaces: ["wiki"],
+        excludedNamespaces: ["secret"]
+      }
+    ];
+
+    for (const testCase of cases) {
+      const parsed = parseFulltextSearchQuery(testCase.query, "en");
+      expect(parsed.highlight, testCase.query).toEqual(testCase.highlight);
+      expect(parsed.simpleTerms, testCase.query).toEqual(testCase.simpleTerms);
+      expect(parsed.namespaces, testCase.query).toEqual(testCase.namespaces);
+      expect(parsed.excludedNamespaces, testCase.query).toEqual(testCase.excludedNamespaces);
+    }
+  });
+
   it("applies DokuWiki search namespace and fragment defaults", () => {
     expect(
       adjustSearchQuery("alpha beta", {

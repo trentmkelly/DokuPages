@@ -3890,6 +3890,47 @@ describe("handleRequest", () => {
     expect(scopedHtml).not.toContain('<li>\n        <a href="/wiki/wiki/welcome"');
   });
 
+  it("covers search ranking, snippets, namespace filters, and ACL filtering", async () => {
+    seedSearchParityIndex();
+
+    const ranked = await handleRequest(
+      new Request("https://example.com/search?q=alpha&ns=wiki"),
+      env
+    );
+    const rankedHtml = await ranked.text();
+    expect(ranked.status).toBe(200);
+    expect(rankedHtml.indexOf("wiki:guide - score 9")).toBeLessThan(
+      rankedHtml.indexOf("wiki:welcome - score 5")
+    );
+    expect(rankedHtml).toContain("score 9");
+    expect(rankedHtml).toContain("score 5");
+    expect(rankedHtml).not.toContain("/wiki/playground/playground");
+
+    const namespace = await handleRequest(
+      new Request("https://example.com/search?q=alpha&ns=playground"),
+      env
+    );
+    const namespaceHtml = await namespace.text();
+    expect(namespaceHtml).toContain("Search scope: playground");
+    expect(namespaceHtml).toContain("/wiki/playground/playground");
+    expect(namespaceHtml).not.toContain("/wiki/wiki/guide");
+    expect(namespaceHtml).not.toContain("wiki:welcome - score");
+
+    const snippet = await handleRequest(new Request("https://example.com/search?q=needle"), env);
+    const snippetHtml = await snippet.text();
+    expect(snippetHtml).toContain("needle alpha target paragraph");
+    expect(snippetHtml).toContain("<p>...");
+
+    state.aclRules = [aclRule("*", "all", "@ALL", 16), aclRule("wiki:guide", "all", "@ALL", 0)];
+    const aclFiltered = await handleRequest(
+      new Request("https://example.com/search?q=alpha&ns=wiki"),
+      env
+    );
+    const aclFilteredHtml = await aclFiltered.text();
+    expect(aclFilteredHtml).not.toContain("/wiki/wiki/guide");
+    expect(aclFilteredHtml).toContain("/wiki/wiki/welcome");
+  });
+
   it("handles DokuWiki-style page search actions", async () => {
     const response = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=search&q=welcome"),
@@ -5566,6 +5607,42 @@ function seedFeedParityChanges(): void {
   });
 }
 
+function seedSearchParityIndex(): void {
+  if (!state.row) return;
+
+  state.row.content = `${"Prelude text. ".repeat(
+    40
+  )}needle alpha target paragraph with enough surrounding text for a DokuWiki-style snippet. ${"Tail text. ".repeat(
+    20
+  )}`;
+  state.searchPostings = [
+    {
+      term: "alpha",
+      page_id: "wiki:guide",
+      frequency: 9,
+      updated_at: "2026-05-07T00:00:00.000Z"
+    },
+    {
+      term: "alpha",
+      page_id: "wiki:welcome",
+      frequency: 5,
+      updated_at: "2026-05-07T00:00:00.000Z"
+    },
+    {
+      term: "alpha",
+      page_id: "playground:playground",
+      frequency: 7,
+      updated_at: "2026-05-07T00:00:00.000Z"
+    },
+    {
+      term: "needle",
+      page_id: "wiki:welcome",
+      frequency: 4,
+      updated_at: "2026-05-07T00:00:00.000Z"
+    }
+  ];
+}
+
 function decodeXmlEntities(value: string): string {
   return value
     .replace(/&lt;/g, "<")
@@ -5820,28 +5897,43 @@ function createD1Stub(state: D1StubState): D1Database {
             const terms = values.slice(0, hasNamespaceFilter ? -2 : -1);
             const namespace = hasNamespaceFilter ? values.at(-2) : null;
             const searchLimit = Number(values.at(-1));
+            const pages = currentPageSourceRows(state);
+            const pageById = new Map(pages.map((page) => [String(page.id), page]));
             const scored = new Map<string, number>();
+            const matchedTermsByPage = new Map<string, Set<unknown>>();
 
             for (const posting of state.searchPostings) {
               if (terms.includes(posting.term)) {
                 const pageId = String(posting.page_id);
                 scored.set(pageId, (scored.get(pageId) ?? 0) + Number(posting.frequency));
+                const matchedTerms = matchedTermsByPage.get(pageId) ?? new Set<unknown>();
+                matchedTerms.add(posting.term);
+                matchedTermsByPage.set(pageId, matchedTerms);
               }
             }
 
             return {
               results: [...scored.entries()]
-                .filter(([pageId]) => {
-                  if (state.deleted || state.row?.id !== pageId) return false;
-                  return !namespace || state.row.namespace === namespace;
+                .map(([pageId, score]) => ({ page: pageById.get(pageId), score }))
+                .filter((entry): entry is { page: Record<string, unknown>; score: number } => {
+                  if (!entry.page) return false;
+                  if ((matchedTermsByPage.get(String(entry.page.id))?.size ?? 0) < terms.length) {
+                    return false;
+                  }
+                  return !namespace || entry.page.namespace === namespace;
                 })
-                .sort((a, b) => b[1] - a[1])
+                .sort(
+                  (left, right) =>
+                    right.score - left.score ||
+                    namespaceDepth(String(left.page.id)) - namespaceDepth(String(right.page.id)) ||
+                    String(left.page.id).localeCompare(String(right.page.id))
+                )
                 .slice(0, Number.isFinite(searchLimit) ? searchLimit : 25)
-                .map(([, score]) => ({
-                  id: state.row?.id,
-                  title: state.row?.title,
-                  content: state.row?.content,
-                  updated_at: state.row?.updated_at,
+                .map(({ page, score }) => ({
+                  id: page.id,
+                  title: page.title,
+                  content: page.content,
+                  updated_at: page.updated_at,
                   score
                 }))
             };
@@ -6452,6 +6544,10 @@ function seedPageSourceRows(): Record<string, unknown>[] {
 
 function namespaceFromId(id: string): string {
   return id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
+}
+
+function namespaceDepth(id: string): number {
+  return (id.match(/:/g) ?? []).length;
 }
 
 function seedRevisions(): Record<string, unknown>[] {
