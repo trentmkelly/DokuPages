@@ -12,6 +12,6 @@ Icons for:  acl/ns.png, acl/page.png, acl/user.png, acl/group.png
 Source:     DokuWiki bundled ACL plugin pix
 License:    GNU GPL v2, matching the upstream DokuWiki distribution
 
-Icons for:  icon-list.png, icon-sort.png, ns.png, page.png, resizecol.png, throbber.gif, up.png
+Icons for:  bullet.png, closed-rtl.png, closed.png, email.svg, external-link.svg, icon-list.png, icon-sort.png, ns.png, open.png, page.png, resizecol.png, throbber.gif, unc.svg, up.png
 Source:     DokuWiki lib/images
 License:    GNU GPL v2, matching the upstream DokuWiki distribution
