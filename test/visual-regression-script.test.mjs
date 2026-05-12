@@ -19,7 +19,9 @@ describe("visual regression script", () => {
     expect(source).toContain("--upstream-url");
     expect(source).toContain(".pages.png");
     expect(source).toContain(".upstream.png");
-    expect(source).toContain("version: 2");
+    expect(source).toContain("BASELINE_VERSION = 3");
+    expect(source).toContain("version: BASELINE_VERSION");
+    expect(source).toContain('upstreamSource: args.upstreamUrl ? "running-upstream-dokuwiki"');
     expect(source).toContain("requireUpstream: Boolean(args.upstreamUrl)");
     expect(source).toContain("compareSourcePresence");
     expect(source).toContain("hashGate: true");

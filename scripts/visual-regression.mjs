@@ -8,6 +8,7 @@ import path from "node:path";
 const DEFAULT_BASE_URL = "https://dokutest.pages.dev";
 const DEFAULT_BASELINE = "test/visual-baselines.json";
 const DEFAULT_OUTPUT_DIR = ".wrangler/visual-regression";
+const BASELINE_VERSION = 3;
 const CASES = [
   {
     name: "page-view-desktop",
@@ -150,7 +151,7 @@ async function main() {
   }
 
   if (args.update) {
-    await writeFile(args.baseline, `${JSON.stringify({ version: 2, cases: results }, null, 2)}\n`);
+    await writeFile(args.baseline, `${JSON.stringify(baselinePayload(args, results), null, 2)}\n`);
     console.log(`updated ${args.baseline}`);
     return;
   }
@@ -167,6 +168,20 @@ async function main() {
       gatedCount === 1 ? "" : "s"
     } and ${parityCount} parity capture${parityCount === 1 ? "" : "s"}${upstreamNote}`
   );
+}
+
+function baselinePayload(args, results) {
+  return {
+    version: BASELINE_VERSION,
+    capture: {
+      generatedAt: new Date().toISOString(),
+      generatedBy: "scripts/visual-regression.mjs",
+      pagesBaseUrl: args.baseUrl,
+      upstreamBaseUrl: args.upstreamUrl || null,
+      upstreamSource: args.upstreamUrl ? "running-upstream-dokuwiki" : "not-captured"
+    },
+    cases: results
+  };
 }
 
 function parseArgs(argv) {

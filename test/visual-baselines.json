@@ -1,5 +1,12 @@
 {
-  "version": 2,
+  "version": 3,
+  "capture": {
+    "generatedAt": "2026-05-12T10:15:32.931Z",
+    "generatedBy": "scripts/visual-regression.mjs",
+    "pagesBaseUrl": "https://250f6b8d.dokutest.pages.dev",
+    "upstreamBaseUrl": "http://127.0.0.1:8797",
+    "upstreamSource": "running-upstream-dokuwiki"
+  },
   "cases": [
     {
       "name": "page-view-desktop",
@@ -15,8 +22,8 @@
       "hashGate": true,
       "sources": {
         "pages": {
-          "byteLength": 130903,
-          "sha256": "f12aae27f71e86bf691b177bcc07cb369690282a2102d650357daa93005b3731"
+          "byteLength": 130530,
+          "sha256": "db5a9b9da66949db5a7f1c70acbb1896911f6f1e7da0397ba8e463146e7961f9"
         },
         "upstream": {
           "byteLength": 136469,
@@ -38,12 +45,12 @@
       "hashGate": true,
       "sources": {
         "pages": {
-          "byteLength": 76117,
-          "sha256": "73aeae5e8e9a9e5f662e53a9c440d15b0757a65a9f5b4dc1023b3d1fd173d698"
+          "byteLength": 76101,
+          "sha256": "2e77c9fd230364e1f4081a71f378c831e998f83cf27b77f7cbf5d9f9ea823c1f"
         },
         "upstream": {
-          "byteLength": 72153,
-          "sha256": "38e653301cdb87fba881aead5353c84b6948b1692d1ba5896819f8b53ad503a9"
+          "byteLength": 72017,
+          "sha256": "9382fd06c0ef5ca2793656dd5ece247c589dff8e7bbee358ae72df509a122e27"
         }
       }
     },
@@ -61,12 +68,12 @@
       "hashGate": false,
       "sources": {
         "pages": {
-          "byteLength": 66291,
-          "sha256": "6d5ba4e0985b86584907a00972d850d5d6ebd4f4b6131cdd0b4079fc6d25e9b8"
+          "byteLength": 65775,
+          "sha256": "697ffa5da439ccd48fb337df9a075a89ffac47d94b897641ff159a15d371646d"
         },
         "upstream": {
-          "byteLength": 117965,
-          "sha256": "3de5a9765b3590c500fb539ee9d0dc5119437fc2f39776f529529af5ed784bc2"
+          "byteLength": 117290,
+          "sha256": "0b7dcad1c69f8f03747c82c63203bd876e8e4b900f4a30829e73f8b9889c58f8"
         }
       }
     },
@@ -199,8 +206,8 @@
       "hashGate": false,
       "sources": {
         "pages": {
-          "byteLength": 53753,
-          "sha256": "7f304caef81de78b3888b39ed0c461715ecbe9956ebba0eff8a27796e04c6d7c"
+          "byteLength": 47848,
+          "sha256": "b0bfbc3f66d45ce64c568aa24c5d2fc73d4087fe8cc1f6d4e860a85595ac6c67"
         },
         "upstream": {
           "byteLength": 136469,
