@@ -32,6 +32,11 @@ npx wrangler d1 execute dokuwiki_pages_dev --remote --file .wrangler/dokuwiki-im
 
 The generated SQL is idempotent for imported pages, search postings, current media metadata, media revisions, metadata rows, custom language/template file rows, DokuWiki config metadata, plugin settings, changelog rows, ACL rules, users, groups, and group memberships. Plugin enablement records preserve the effective source and layer from `conf/plugins.php`, `conf/plugins.local.php`, and `conf/plugins.required.php` so diagnostics and the Extension Manager replacement can show which file won. Interrupted D1 imports can be rerun with the same generated SQL after fixing the underlying failure.
 
+Page revisions imported from `data/pages` and `data/attic` are correlated with
+`data/meta/_dokuwiki.changes` by page ID and revision timestamp. When a matching
+changelog row exists, the importer preserves the DokuWiki username, edit
+summary, change type, and size delta on the D1 `page_revisions` row.
+
 Imported DokuWiki config metadata preserves whether a value came from
 `conf/dokuwiki.php`, `conf/local.php`, or `conf/local.protected.php`. The
 runtime only applies local/protected values for settings that are safe to use

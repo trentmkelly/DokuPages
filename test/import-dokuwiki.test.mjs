@@ -533,7 +533,10 @@ describe("DokuWiki import planner", () => {
     );
     await writeFile(
       path.join(root, "data/meta/_dokuwiki.changes"),
-      "1767225602\t203.0.113.9\tD\twiki:welcome\talice\tDeleted page\t\t-24\n"
+      [
+        "1767225600\t203.0.113.7\tE\twiki:welcome\talice\tEdited old page\t\t5",
+        "1767225602\t203.0.113.9\tD\twiki:welcome\talice\tDeleted page\t\t-24"
+      ].join("\n")
     );
     await writeFile(
       path.join(root, "data/meta/wiki/welcome.meta"),
@@ -577,7 +580,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("on conflict(id) do update");
     expect(sql).toContain("insert or replace into page_revisions");
     expect(sql).toContain("'wiki:welcome@2026-01-01T00:00:00.000Z'");
-    expect(sql).toContain("Imported from DokuWiki attic");
+    expect(sql).toContain("Imported from DokuWiki flat files");
+    expect(sql).toContain("'user:alice', 'alice',\n  'Edited old page', 'edit', 5");
     expect(sql).toContain("insert into search_terms");
     expect(sql).toContain("term_length");
     expect(sql).not.toContain("values ('aber'");

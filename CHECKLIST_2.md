@@ -228,7 +228,7 @@ are not fixed by this checklist.
 
 ## Data Import And Persistence
 
-- [ ] Preserve page revision authors and summaries from changelog correlation instead of using generic attic import metadata where unavailable.
+- [x] Preserve page revision authors and summaries from changelog correlation instead of using generic attic import metadata where unavailable.
 - [ ] Preserve media revision authors and summaries from media changelog correlation.
 - [ ] Preserve deleted pages and deleted media as first-class historical records even when current files no longer exist.
 - [ ] Import and use subscription data from DokuWiki's metadata files if present.
