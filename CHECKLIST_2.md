@@ -214,7 +214,7 @@ are not fixed by this checklist.
 - [x] Match feed cache timing from `rss_update`.
 - [x] Match sitemap frequency behavior from `sitemap`, including disabled sitemap mode.
 - [x] Match OpenSearch and manifest output from upstream `inc/Manifest.php` and `lib/exe/opensearch.php`.
-- [ ] Match robots behavior to upstream and site configuration instead of always allowing all.
+- [x] Match robots behavior to upstream and site configuration instead of always allowing all.
 
 ## Remote API And AJAX
 

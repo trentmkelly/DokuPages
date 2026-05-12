@@ -152,7 +152,9 @@ describe("handleRequest", () => {
     env.SIDEBAR = undefined;
     env.LICENSE = undefined;
     env.WIKI_LANG = undefined;
+    env.BASE_URL = undefined;
     env.BASE_DIR = undefined;
+    env.CANONICAL_URLS = undefined;
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
     env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
@@ -3603,7 +3605,11 @@ describe("handleRequest", () => {
     await expect(atom.text()).resolves.toContain("http://www.w3.org/2005/Atom");
     await expect(opensearch.text()).resolves.toContain("OpenSearchDescription");
     await expect(manifest.json()).resolves.toMatchObject({ name: "Test Wiki" });
-    await expect(robots.text()).resolves.toContain("Sitemap: https://example.com/sitemap.xml");
+    const robotsText = await robots.text();
+    expect(robotsText).toContain("Sitemap: https://example.com/sitemap.xml");
+    expect(robotsText).toContain("Disallow: /admin");
+    expect(robotsText).toContain("Disallow: /wiki/*?do=");
+    expect(robotsText).not.toContain("Allow: /");
   });
 
   it("matches upstream OpenSearch and manifest document shapes", async () => {
@@ -3671,6 +3677,26 @@ describe("handleRequest", () => {
         }
       ]
     });
+  });
+
+  it("matches configured robots policy for sitemap, base URL, and maintenance mode", async () => {
+    env.BASE_DIR = "/docs";
+    env.BASE_URL = "https://wiki.example.test";
+    env.CANONICAL_URLS = "1";
+
+    const robots = await handleRequest(new Request("https://example.com/robots.txt"), env);
+    const robotsText = await robots.text();
+
+    expect(robotsText).toContain("Disallow: /docs/admin");
+    expect(robotsText).toContain("Disallow: /docs/wiki/*?do=");
+    expect(robotsText).toContain("Sitemap: https://wiki.example.test/docs/sitemap.xml");
+    expect(robotsText).not.toContain("Allow: /");
+
+    env.MAINTENANCE_MODE = "1";
+    const maintenance = await handleRequest(new Request("https://example.com/robots.txt"), env);
+    await expect(maintenance.text()).resolves.toBe(
+      "User-agent: *\nDisallow: /docs/\nSitemap: https://wiki.example.test/docs/sitemap.xml\n"
+    );
   });
 
   it("honors DokuWiki feed type, link, content, summary, deleted, and cache settings", async () => {

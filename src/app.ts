@@ -686,10 +686,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/robots.txt") {
-    const config = getRuntimeConfig(env);
-    const sitemap =
-      config.sitemapDays >= 1 ? `Sitemap: ${new URL("/sitemap.xml", url).href}\n` : "";
-    return new Response(`User-agent: *\nAllow: /\n${sitemap}`, {
+    return new Response(renderRobotsTxt(env, url), {
       headers: securityHeaders({
         "content-type": "text/plain; charset=utf-8",
         "x-content-type-options": "nosniff"
@@ -8019,6 +8016,69 @@ function dokuwikiMediaUrl(id: string, url: URL, config: RuntimeConfig): string {
   const mediaUrl = new URL(`${dokuwikiRelativeBase(config)}lib/exe/fetch.php`, url);
   mediaUrl.searchParams.set("media", id);
   return mediaUrl.href;
+}
+
+function renderRobotsTxt(env: Env, url: URL): string {
+  const config = getRuntimeConfig(env);
+  const lines = ["User-agent: *"];
+
+  for (const path of robotsDisallowPaths(config)) {
+    lines.push(`Disallow: ${path}`);
+  }
+
+  if (config.sitemapDays >= 1) {
+    lines.push(`Sitemap: ${absoluteDiscoveryUrl(config, env, url, "sitemap.xml")}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function robotsDisallowPaths(config: RuntimeConfig): string[] {
+  if (config.maintenanceMode) return [dokuwikiRelativeBase(config)];
+
+  return [
+    "/admin",
+    "/admin/",
+    "/api/",
+    "/diagnostics",
+    "/login",
+    "/logout",
+    "/profile",
+    "/register",
+    "/resendpwd",
+    "/search",
+    "/wanted",
+    "/orphans",
+    "/backlinks",
+    "/index",
+    "/media-manager",
+    "/media-detail/",
+    "/doku.php?do=",
+    "/wiki/*?do=",
+    "/lib/exe/ajax.php",
+    "/lib/exe/indexer.php",
+    "/lib/exe/taskrunner.php",
+    "/lib/exe/xmlrpc.php",
+    "/lib/exe/jsonrpc.php",
+    "/lib/exe/openapi.php"
+  ].map((path) => publicDiscoveryPath(config, path));
+}
+
+function publicDiscoveryPath(config: RuntimeConfig, path: string): string {
+  const relativeBase = dokuwikiRelativeBase(config);
+  if (relativeBase === "/") return path;
+  return `${relativeBase.replace(/\/$/, "")}${path}`;
+}
+
+function absoluteDiscoveryUrl(
+  config: RuntimeConfig,
+  env: Env,
+  requestUrl: URL,
+  path: string
+): string {
+  const origin =
+    config.baseUrl ?? (config.canonicalUrls ? canonicalOrigin(config, env) : requestUrl.origin);
+  return new URL(`${dokuwikiRelativeBase(config)}${path}`, origin).href;
 }
 
 async function handleAclRuleUpsert(
