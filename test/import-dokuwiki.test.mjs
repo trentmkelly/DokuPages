@@ -41,6 +41,19 @@ const WELCOME_PAGE_META = [
   "}",
   "}"
 ].join("");
+const DOKU_MEDIA_JPEG_META = [
+  "a:2:{",
+  's:4:"Exif";a:3:{',
+  's:5:"Title";s:12:"Legacy title";',
+  's:15:"PixelXDimension";s:4:"1024";',
+  's:15:"PixelYDimension";s:3:"768";',
+  "}",
+  's:4:"Iptc";a:2:{',
+  's:7:"Caption";s:14:"Legacy caption";',
+  's:8:"Keywords";a:2:{i:0;s:3:"one";i:1;s:3:"two";}',
+  "}",
+  "}"
+].join("");
 
 describe("DokuWiki import planner", () => {
   it("discovers pages, media, ACLs, and users from a flat-file DokuWiki tree", async () => {
@@ -586,6 +599,7 @@ describe("DokuWiki import planner", () => {
       await gzipAsync("====== Old Welcome ======\n")
     );
     await writeFile(path.join(root, "data/media/wiki/logo.svg"), "<svg />\n");
+    await writeFile(path.join(root, "data/media/wiki/photo.jpg"), "jpeg data\n");
     await writeFile(
       path.join(root, "data/media_attic/wiki/logo.1767225600.svg"),
       "<svg>old</svg>\n"
@@ -610,6 +624,7 @@ describe("DokuWiki import planner", () => {
       path.join(root, "data/media_meta/wiki/logo.svg.meta"),
       'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
     );
+    await writeFile(path.join(root, "data/media_meta/wiki/photo.jpg.meta"), DOKU_MEDIA_JPEG_META);
     await writeFile(
       path.join(root, "data/meta/wiki/welcome.mlist"),
       "alice every 1767225606\nbob digest 1767225607\n"
@@ -660,6 +675,7 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("insert into media (");
     expect(sql).toContain("insert or replace into media_revisions");
     expect(sql).toContain("'media/current/wiki/logo.svg'");
+    expect(sql).toContain("'media/current/wiki/photo.jpg'");
     expect(sql).toContain("'wiki:logo.svg@2026-01-01T00:00:00.000Z'");
     expect(sql).toContain("'user:bob', 'Edited old logo', 'edit'");
     expect(sql).toContain("'wiki:gone.png', 'wiki', 'media/deleted/wiki/gone.png/");
@@ -694,6 +710,11 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'contributor', '{\"user:alice\":\"Alice Example\"}'");
     expect(sql).toContain("values ('page', 'wiki:guide', 'backlinks', '[\"wiki:welcome\"]'");
     expect(sql).toContain("values ('page', 'wiki:missing', 'backlinks', '[\"wiki:welcome\"]'");
+    expect(sql).toContain("values ('media', 'wiki:photo.jpg', 'jpeg', '{\"format\":\"JPEG\"");
+    expect(sql).toContain('"Iptc.Headline":"Legacy title"');
+    expect(sql).toContain('"Iptc.Caption":"Legacy caption"');
+    expect(sql).toContain('"File.Width":"1024"');
+    expect(sql).toContain('"File.Height":"768"');
     expect(sql).toContain("'delete'");
     expect(sql).toContain("'Deleted page'");
     expect(sql).toContain("insert into acl_rules");

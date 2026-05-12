@@ -20,6 +20,46 @@ const DEFAULT_MIME_TYPES = new Map([
   ["txt", "text/plain"],
   ["webp", "image/webp"]
 ]);
+const IMPORTED_JPEG_METADATA_FIELDS = [
+  { key: "img_title", label: "Title", type: "text", tags: ["Iptc.Headline", "Xmp.dc.title"] },
+  { key: "img_date", label: "Date", type: "date", tags: ["Date.EarliestTime"] },
+  { key: "img_fname", label: "Filename", type: "text", tags: ["File.Name"] },
+  {
+    key: "img_caption",
+    label: "Caption",
+    type: "textarea",
+    tags: [
+      "Iptc.Caption",
+      "Xmp.dc.description",
+      "Exif.UserComment",
+      "Exif.TIFFImageDescription",
+      "Exif.TIFFUserComment"
+    ]
+  },
+  {
+    key: "img_artist",
+    label: "Photographer",
+    type: "text",
+    tags: ["Iptc.Byline", "Xmp.dc.creator", "Exif.TIFFArtist", "Exif.Artist", "Iptc.Credit"]
+  },
+  {
+    key: "img_copyr",
+    label: "Copyright",
+    type: "text",
+    tags: ["Iptc.CopyrightNotice", "Xmp.dc.rights", "Exif.TIFFCopyright", "Exif.Copyright"]
+  },
+  { key: "img_format", label: "Format", type: "text", tags: ["File.Format"] },
+  { key: "img_fsize", label: "File size", type: "text", tags: ["File.NiceSize"] },
+  { key: "img_width", label: "Width", type: "text", tags: ["File.Width"] },
+  { key: "img_height", label: "Height", type: "text", tags: ["File.Height"] },
+  { key: "img_camera", label: "Camera", type: "text", tags: ["Simple.Camera"] },
+  {
+    key: "img_keywords",
+    label: "Keywords",
+    type: "text",
+    tags: ["Iptc.Keywords", "Xmp.dc.subject", "Exif.Category"]
+  }
+];
 
 export async function buildImportPlan(sourceRoot) {
   const root = path.resolve(sourceRoot);
@@ -163,6 +203,7 @@ export async function writePageImportSql(plan, outputFile) {
   const mediaChangesByRevision = changelogEntriesByRevision(plan.mediaChangelogEntries);
   const currentPageIds = new Set(plan.pages.map((page) => page.id));
   const currentMediaIds = new Set(plan.media.map((media) => media.id));
+  const currentMediaById = new Map(plan.media.map((media) => [media.id, media]));
 
   for (const page of plan.pages) {
     const content = await fs.readFile(page.sourcePath, "utf8");
@@ -452,6 +493,22 @@ on conflict(id) do update set
         entry.modifiedAt
       )
     );
+
+    for (const importedMetadata of importedMediaMetadataStatements(
+      entry,
+      currentMediaById,
+      plan.mimeTypes
+    )) {
+      statements.push(
+        metadataStatement(
+          entry.subjectType,
+          entry.subjectId,
+          importedMetadata.key,
+          importedMetadata.value,
+          entry.modifiedAt
+        )
+      );
+    }
   }
 
   for (const entry of plan.customLanguageFiles) {
@@ -684,6 +741,199 @@ function importedBacklinkMetadataStatements(pageMetadata) {
       value: [...referrers].sort((a, b) => a.localeCompare(b))
     }))
     .sort((a, b) => a.subjectId.localeCompare(b.subjectId));
+}
+
+function importedMediaMetadataStatements(entry, currentMediaById, mimeTypes) {
+  const media = currentMediaById.get(entry.subjectId);
+  if (!media) return [];
+
+  const mimeType = mediaMimeType(entry.subjectId, mimeTypes);
+  if (!isJpegImportMedia(entry.subjectId, mimeType)) return [];
+
+  const jpeg = importedDokuMediaJpegMetadata(entry.subjectId, media.byteLength, entry.value);
+  return jpeg ? [{ key: "jpeg", value: jpeg }] : [];
+}
+
+function importedDokuMediaJpegMetadata(id, byteLength, metadata) {
+  const root = metadataObject(metadata);
+  if (Object.keys(root).length === 0) return null;
+
+  const tags = {};
+  const exif = metadataObject(importedCaseInsensitiveValue(root, "Exif"));
+  const iptc = metadataObject(importedCaseInsensitiveValue(root, "Iptc"));
+  const xmp = metadataObject(importedCaseInsensitiveValue(root, "Xmp"));
+
+  copyImportedMediaLegacyFields(exif, "Exif", tags);
+  copyImportedMediaLegacyFields(iptc, "Iptc", tags);
+  copyImportedMediaLegacyFields(xmp, "Xmp", tags);
+
+  setImportedMediaTag(tags, "File.Name", importedMediaName(id));
+  setImportedMediaTag(tags, "File.Format", "JPEG");
+  setImportedMediaTag(tags, "File.NiceSize", formatImportedMediaByteLength(byteLength));
+  setImportedMediaLegacyAlias(tags, exif, "ImageDescription", "Exif.TIFFImageDescription");
+  setImportedMediaLegacyAlias(tags, exif, "Artist", "Exif.Artist");
+  setImportedMediaLegacyAlias(tags, exif, "TIFFArtist", "Exif.TIFFArtist");
+  setImportedMediaLegacyAlias(tags, exif, "Copyright", "Exif.Copyright");
+  setImportedMediaLegacyAlias(tags, exif, "TIFFCopyright", "Exif.TIFFCopyright");
+  setImportedMediaLegacyAlias(tags, exif, "UserComment", "Exif.UserComment");
+  setImportedMediaLegacyAlias(tags, exif, "TIFFUserComment", "Exif.TIFFUserComment");
+  setImportedMediaLegacyAlias(tags, exif, "PixelXDimension", "Exif.PixelXDimension");
+  setImportedMediaLegacyAlias(tags, exif, "PixelYDimension", "Exif.PixelYDimension");
+  setImportedMediaLegacyAlias(tags, exif, "Title", "Iptc.Headline");
+  setImportedMediaLegacyAlias(tags, iptc, "Headline", "Iptc.Headline");
+  setImportedMediaLegacyAlias(tags, iptc, "Caption", "Iptc.Caption");
+  setImportedMediaLegacyAlias(tags, iptc, "Byline", "Iptc.Byline");
+  setImportedMediaLegacyAlias(tags, iptc, "Credit", "Iptc.Credit");
+  setImportedMediaLegacyAlias(tags, iptc, "CopyrightNotice", "Iptc.CopyrightNotice");
+  setImportedMediaLegacyAlias(tags, iptc, "Keywords", "Iptc.Keywords");
+
+  const width = importedNumericTag(tags["Exif.PixelXDimension"]);
+  const height = importedNumericTag(tags["Exif.PixelYDimension"]);
+  if (width) setImportedMediaTag(tags, "File.Width", String(width));
+  if (height) setImportedMediaTag(tags, "File.Height", String(height));
+  setImportedCombinedIptcDate(tags);
+  setImportedSimpleCamera(tags);
+
+  const display = buildImportedJpegDisplayFields(tags);
+  if (display.length === 0) return null;
+
+  return {
+    format: "JPEG",
+    width,
+    height,
+    tags,
+    display
+  };
+}
+
+function isJpegImportMedia(id, mimeType) {
+  return mimeType === "image/jpeg" || /\.jpe?g$/i.test(id);
+}
+
+function copyImportedMediaLegacyFields(source, prefix, tags) {
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value === "string" || typeof value === "number") {
+      setImportedMediaTag(tags, `${prefix}.${key}`, String(value));
+    } else if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === "string" || typeof entry === "number") {
+          setImportedMediaTag(tags, `${prefix}.${key}`, String(entry), true);
+        }
+      }
+    }
+  }
+}
+
+function setImportedMediaLegacyAlias(tags, source, sourceKey, targetKey) {
+  if (tags[targetKey]) return;
+
+  const value = importedCaseInsensitiveValue(source, sourceKey);
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === "string" || typeof entry === "number") {
+        setImportedMediaTag(tags, targetKey, String(entry), true);
+      }
+    }
+  } else if (typeof value === "string" || typeof value === "number") {
+    setImportedMediaTag(tags, targetKey, String(value));
+  }
+}
+
+function importedCaseInsensitiveValue(source, key) {
+  const lowerKey = key.toLowerCase();
+  const match = Object.entries(source).find(([candidate]) => candidate.toLowerCase() === lowerKey);
+  return match?.[1];
+}
+
+function buildImportedJpegDisplayFields(tags) {
+  return IMPORTED_JPEG_METADATA_FIELDS.flatMap((field) => {
+    const value = firstImportedTagValue(tags, field.tags);
+    return value ? [{ ...field, value }] : [];
+  });
+}
+
+function firstImportedTagValue(tags, names) {
+  for (const name of names) {
+    const value = importedStringTag(tags[name]);
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function importedStringTag(value) {
+  if (Array.isArray(value)) return value.map(cleanImportedMetadataText).filter(Boolean).join(", ");
+  return cleanImportedMetadataText(value ?? "");
+}
+
+function importedNumericTag(value) {
+  const parsed = Number.parseInt(importedStringTag(value), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function setImportedMediaTag(tags, key, value, append = false) {
+  const text = cleanImportedMetadataText(String(value ?? ""));
+  if (!text) return;
+
+  if (append) {
+    const existing = tags[key];
+    tags[key] = Array.isArray(existing)
+      ? [...existing, text]
+      : existing
+        ? [existing, text]
+        : [text];
+    return;
+  }
+
+  tags[key] = text;
+}
+
+function setImportedCombinedIptcDate(tags) {
+  const date = importedStringTag(tags["Iptc.DateCreated"]);
+  if (!/^\d{8}$/.test(date)) return;
+
+  const time = importedStringTag(tags["Iptc.TimeCreated"]).replace(/[+-]\d{4}$/, "");
+  const formattedDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+  const formattedTime = /^(\d{2})(\d{2})(\d{2})$/.test(time)
+    ? ` ${time.slice(0, 2)}:${time.slice(2, 4)}:${time.slice(4, 6)}`
+    : "";
+
+  setImportedMediaTag(tags, "Date.EarliestTime", `${formattedDate}${formattedTime}`);
+}
+
+function setImportedSimpleCamera(tags) {
+  const make = importedStringTag(tags["Exif.Make"]);
+  const model = importedStringTag(tags["Exif.Model"]);
+  const camera = [make, model].filter(Boolean).join(" ");
+  if (camera) setImportedMediaTag(tags, "Simple.Camera", camera);
+}
+
+function cleanImportedMetadataText(value) {
+  return [...String(value)]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code === 10 || code === 13 || code === 9 || code >= 32;
+    })
+    .join("")
+    .trim();
+}
+
+function formatImportedMediaByteLength(bytes) {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = Number.isFinite(bytes) ? Math.max(0, bytes) : 0;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded % 1 === 0 ? Math.trunc(rounded) : rounded}\u00A0${units[unitIndex]}`;
+}
+
+function importedMediaName(id) {
+  return id.includes(":") ? id.slice(id.lastIndexOf(":") + 1) : id;
 }
 
 function metadataObject(value) {

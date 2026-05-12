@@ -56,6 +56,12 @@ importer derives `backlinks` metadata from imported relation references so
 backlink, wanted-page, and orphan-page reports can use upstream parser metadata
 immediately after migration.
 
+For current JPEG media, DokuWiki `data/media_meta/*.meta` payloads are converted
+into the same `jpeg` metadata row shape written by native media uploads. Media
+detail pages and media searches can then use imported titles, captions,
+dimensions, author/copyright fields, dates, and keywords directly while the raw
+DokuWiki payload remains preserved under the `dokuwiki` metadata key.
+
 Imported DokuWiki config metadata preserves whether a value came from
 `conf/dokuwiki.php`, `conf/local.php`, or `conf/local.protected.php`. The
 runtime only applies local/protected values for settings that are safe to use
