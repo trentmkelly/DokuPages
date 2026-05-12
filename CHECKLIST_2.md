@@ -274,7 +274,7 @@ are not fixed by this checklist.
 - [x] Add feed parity tests for all upstream feed types and feed configuration combinations.
 - [x] Add search parity tests comparing query parsing, ranking, snippets, namespace filters, and ACL filtering.
 - [x] Add admin parity tests for every bundled plugin replacement page.
-- [ ] Add auth parity tests for imported legacy users, unsupported hash types, remember-me, profile deletion, and superuser/manager config expressions.
+- [x] Add auth parity tests for imported legacy users, unsupported hash types, remember-me, profile deletion, and superuser/manager config expressions.
 - [ ] Add localization parity tests for at least one non-English DokuWiki language pack.
 - [ ] Add visual regression baselines captured from a running upstream DokuWiki instance, not only the Pages port.
 - [ ] Add a checklist review after importing production content so gaps not visible in starter pages are captured.

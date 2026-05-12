@@ -1532,6 +1532,182 @@ describe("auth routes", () => {
     expect(row.password_hash).toMatch(/^pbkdf2-sha256\$100000\$/);
   });
 
+  it("covers upstream auth parity for imported users, unsupported hashes, remember-me, profile deletion, and configured roles", async () => {
+    env = createEnv({
+      SUPERUSER: "legacyroot,@ops",
+      MANAGER: "@staff,mona"
+    });
+    await seedUser(env.DB, {
+      userId: "user-legacyroot",
+      username: "legacyroot",
+      password: "placeholder",
+      displayName: "Legacy Root",
+      email: "legacyroot@example.test",
+      groups: ["user"]
+    });
+    await env.DB.prepare("update users set password_hash = ? where username = ?")
+      .bind("$1$salt1234$U4DE1tCkda9p2NZpiBnLR0", "legacyroot")
+      .run();
+    await seedUser(env.DB, {
+      userId: "user-ops",
+      username: "oliver",
+      password: "ops password",
+      displayName: "Oliver Ops",
+      email: "oliver@example.test",
+      groups: ["ops", "user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-staff",
+      username: "stella",
+      password: "staff password",
+      displayName: "Stella Staff",
+      email: "stella@example.test",
+      groups: ["staff", "user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-mona",
+      username: "mona",
+      password: "mona password",
+      displayName: "Mona Named",
+      email: "mona@example.test",
+      groups: ["user"]
+    });
+    await seedUser(env.DB, {
+      userId: "user-delete",
+      username: "deleteme",
+      password: "delete password",
+      displayName: "Delete Me",
+      email: "deleteme@example.test",
+      groups: ["user"]
+    });
+
+    const unsupportedUsers = [
+      [
+        "user-unsupported-native",
+        "workerhash",
+        "pbkdf2-sha256$100001$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      ],
+      ["user-unsupported-argon", "argonuser", "$argon2id$v=19$m=65536,t=4,p=1$bad$hash"]
+    ];
+    for (const [userId, username, passwordHash] of unsupportedUsers) {
+      await seedUser(env.DB, {
+        userId,
+        username,
+        password: "placeholder",
+        displayName: username,
+        email: `${username}@example.test`,
+        groups: ["user"]
+      });
+      await env.DB.prepare("update users set password_hash = ? where username = ?")
+        .bind(passwordHash, username)
+        .run();
+    }
+
+    const rememberLogin = new FormData();
+    rememberLogin.set("username", "legacyroot");
+    rememberLogin.set("password", "legacy password");
+    rememberLogin.set("r", "1");
+    rememberLogin.set("remember", "1");
+    rememberLogin.set("rememberme", "1");
+    const legacyResponse = await handleRequest(
+      new Request("https://example.com/api/auth/login", {
+        method: "POST",
+        body: rememberLogin,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+    const legacyCookie = legacyResponse.headers.get("set-cookie") ?? "";
+    const legacyHash = await env.DB.prepare("select password_hash from users where username = ?")
+      .bind("legacyroot")
+      .first();
+
+    expect(legacyResponse.status).toBe(303);
+    expect(legacyCookie).toContain("DW_PAGES_SESSION=");
+    expect(legacyCookie).toContain("Max-Age=86400");
+    expect(legacyCookie).not.toContain("Max-Age=31536000");
+    expect(legacyHash.password_hash).toMatch(/^pbkdf2-sha256\$100000\$/);
+
+    const unsupportedNative = await postLogin(env, "workerhash", "legacy password");
+    const unsupportedArgon = await postLogin(env, "argonuser", "legacy password");
+    expect(unsupportedNative.status).toBe(401);
+    expect(unsupportedArgon.status).toBe(401);
+    expect(unsupportedNative.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+    expect(unsupportedArgon.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
+    for (const [, username, passwordHash] of unsupportedUsers) {
+      await expect(
+        env.DB.prepare("select password_hash from users where username = ?").bind(username).first()
+      ).resolves.toMatchObject({ password_hash: passwordHash });
+    }
+
+    const oliverCookie = await loginAs(env, "oliver", "ops password");
+    const stellaCookie = await loginAs(env, "stella", "staff password");
+    const monaCookie = await loginAs(env, "mona", "mona password");
+
+    const legacyAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: legacyCookie }
+      }),
+      env
+    );
+    const opsAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: oliverCookie }
+      }),
+      env
+    );
+    const staffDashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie: stellaCookie }
+      }),
+      env
+    );
+    const staffAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: stellaCookie }
+      }),
+      env
+    );
+    const monaDashboard = await handleRequest(
+      new Request("https://example.com/admin", {
+        headers: { cookie: monaCookie }
+      }),
+      env
+    );
+    const monaAcl = await handleRequest(
+      new Request("https://example.com/admin/acl", {
+        headers: { cookie: monaCookie }
+      }),
+      env
+    );
+
+    expect(legacyAcl.status).toBe(200);
+    expect(opsAcl.status).toBe(200);
+    expect(staffDashboard.status).toBe(200);
+    expect(staffAcl.status).toBe(403);
+    expect(monaDashboard.status).toBe(200);
+    expect(monaAcl.status).toBe(403);
+
+    const deleteCookie = await loginAs(env, "deleteme", "delete password");
+    const deleteForm = new FormData();
+    deleteForm.set("delete", "1");
+    deleteForm.set("confirm_delete", "1");
+    deleteForm.set("oldpass", "delete password");
+    const deleted = await handleRequest(
+      new Request("https://example.com/api/auth/profile/delete", {
+        method: "POST",
+        body: deleteForm,
+        headers: csrfHeaders({ cookie: deleteCookie })
+      }),
+      env
+    );
+    expect(deleted.status).toBe(200);
+    expect(deleted.headers.get("set-cookie") ?? "").toContain("Max-Age=0");
+    await expect(
+      env.DB.prepare("select id from users where username = ?").bind("deleteme").first()
+    ).resolves.toBeNull();
+  });
+
   it("allows admin users to manage ACL rules", async () => {
     env = createEnv();
     await seedUser(env.DB);
