@@ -1,11 +1,17 @@
 import { jsonResponse } from "./responses";
+import { isDokuWikiLogFacilityEnabled, type DokuWikiLogFacility } from "../config";
 import { mapStorageError, type MappedStorageError } from "../storage/errors";
 
 type RequestHandler = () => Promise<Response>;
 
+export interface RequestObservabilityOptions {
+  dontLog?: readonly DokuWikiLogFacility[];
+}
+
 export async function withRequestObservability(
   request: Request,
-  handler: RequestHandler
+  handler: RequestHandler,
+  options: RequestObservabilityOptions = {}
 ): Promise<Response> {
   const requestId = getRequestId(request);
   const startedAt = Date.now();
@@ -13,10 +19,12 @@ export async function withRequestObservability(
   try {
     const response = await handler();
     response.headers.set("x-request-id", requestId);
-    logRequest(request, requestId, response.status, Date.now() - startedAt);
+    if (shouldLog(options, "debug")) {
+      logRequest(request, requestId, response.status, Date.now() - startedAt);
+    }
     return response;
   } catch (error) {
-    const storageError = logError(request, requestId, Date.now() - startedAt, error);
+    const storageError = logError(request, requestId, Date.now() - startedAt, error, options);
     if (storageError) {
       const response = jsonResponse(
         {
@@ -53,6 +61,10 @@ function getRequestId(request: Request): string {
   );
 }
 
+function shouldLog(options: RequestObservabilityOptions, facility: DokuWikiLogFacility): boolean {
+  return isDokuWikiLogFacilityEnabled({ dontLog: options.dontLog ?? [] }, facility);
+}
+
 function logRequest(request: Request, requestId: string, status: number, durationMs: number): void {
   const url = new URL(request.url);
   console.log(
@@ -72,36 +84,39 @@ function logError(
   request: Request,
   requestId: string,
   durationMs: number,
-  error: unknown
+  error: unknown,
+  options: RequestObservabilityOptions
 ): MappedStorageError | null {
   const url = new URL(request.url);
   const exception = error instanceof Error ? error : new Error(String(error));
   const storageError = mapStorageError(exception);
 
-  console.error(
-    JSON.stringify({
-      level: "error",
-      event: "request_error",
-      requestId,
-      method: request.method,
-      path: url.pathname,
-      durationMs,
-      error: {
-        name: exception.name,
-        message: exception.message,
-        stack: exception.stack
-      },
-      storage: storageError
-        ? {
-            code: storageError.code,
-            service: storageError.service,
-            retryable: storageError.retryable
-          }
-        : undefined
-    })
-  );
+  if (shouldLog(options, "error")) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "request_error",
+        requestId,
+        method: request.method,
+        path: url.pathname,
+        durationMs,
+        error: {
+          name: exception.name,
+          message: exception.message,
+          stack: exception.stack
+        },
+        storage: storageError
+          ? {
+              code: storageError.code,
+              service: storageError.service,
+              retryable: storageError.retryable
+            }
+          : undefined
+      })
+    );
+  }
 
-  if (storageError) {
+  if (storageError && shouldLog(options, "error")) {
     logStorageError(request, requestId, durationMs, storageError);
   }
 

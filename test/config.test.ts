@@ -38,6 +38,8 @@ describe("runtime config", () => {
       baseDir: "",
       recentEntries: 20,
       recentDays: 7,
+      dontLog: ["debug"],
+      logRetainDays: 3,
       topTocLevel: 1,
       tocMinHeads: 3,
       maxTocLevel: 3,
@@ -130,6 +132,8 @@ describe("runtime config", () => {
       BASE_DIR: "/docs/",
       RECENT: "25",
       RECENT_DAYS: "30",
+      DONTLOG: "error, deprecated, debug, error",
+      LOGRETAIN: "14",
       TOP_TOC_LEVEL: "2",
       TOC_MIN_HEADS: "4",
       MAX_TOC_LEVEL: "4",
@@ -202,6 +206,8 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).baseDir).toBe("/docs");
     expect(getRuntimeConfig(env).recentEntries).toBe(25);
     expect(getRuntimeConfig(env).recentDays).toBe(30);
+    expect(getRuntimeConfig(env).dontLog).toEqual(["error", "deprecated", "debug"]);
+    expect(getRuntimeConfig(env).logRetainDays).toBe(14);
     expect(getRuntimeConfig(env).topTocLevel).toBe(2);
     expect(getRuntimeConfig(env).tocMinHeads).toBe(4);
     expect(getRuntimeConfig(env).maxTocLevel).toBe(4);
@@ -358,6 +364,16 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "RECENT_DAYS",
           effectiveValue: "7"
+        }),
+        expect.objectContaining({
+          key: "DONTLOG",
+          effectiveValue: "debug",
+          dokuwikiKey: "dontlog"
+        }),
+        expect.objectContaining({
+          key: "LOGRETAIN",
+          effectiveValue: "3",
+          dokuwikiKey: "logretain"
         }),
         expect.objectContaining({
           key: "SIGNATURE",
@@ -635,6 +651,8 @@ describe("runtime config", () => {
         licenseId: "cc-by-nc-sa",
         recentEntries: 20,
         recentDays: 7,
+        dontLog: ["debug"],
+        logRetainDays: 3,
         signature: " --- //[[@MAIL@|@NAME@]] @DATE@//",
         updateCheck: false,
         trustedProxies: [
@@ -674,6 +692,8 @@ describe("runtime config", () => {
       BASE_DIR: "../wiki",
       RECENT: "0",
       RECENT_DAYS: "-1",
+      DONTLOG: "error,trace",
+      LOGRETAIN: "-1",
       TOP_TOC_LEVEL: "0",
       TOC_MIN_HEADS: "many",
       MAX_TOC_LEVEL: "9",
@@ -722,6 +742,8 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "BASE_DIR", severity: "error" }),
         expect.objectContaining({ key: "RECENT", severity: "error" }),
         expect.objectContaining({ key: "RECENT_DAYS", severity: "error" }),
+        expect.objectContaining({ key: "DONTLOG", severity: "error" }),
+        expect.objectContaining({ key: "LOGRETAIN", severity: "error" }),
         expect.objectContaining({ key: "TOP_TOC_LEVEL", severity: "error" }),
         expect.objectContaining({ key: "TOC_MIN_HEADS", severity: "error" }),
         expect.objectContaining({ key: "MAX_TOC_LEVEL", severity: "error" }),

@@ -67,6 +67,51 @@ describe("withRequestObservability", () => {
     }
   });
 
+  it("honors DokuWiki dontlog for request debug logs", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      const response = await withRequestObservability(
+        new Request("https://example.com/wiki/start", {
+          headers: {
+            "cf-ray": "request-quiet"
+          }
+        }),
+        async () => new Response("ok"),
+        { dontLog: ["debug"] }
+      );
+
+      expect(response.headers.get("x-request-id")).toBe("request-quiet");
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("honors DokuWiki dontlog for request error logs", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const response = await withRequestObservability(
+        new Request("https://example.com/broken", {
+          headers: {
+            "x-request-id": "request-muted-error"
+          }
+        }),
+        async () => {
+          throw new Error("boom");
+        },
+        { dontLog: ["error"] }
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.headers.get("x-request-id")).toBe("request-muted-error");
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("maps known storage errors to stable service responses", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 

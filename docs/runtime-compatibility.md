@@ -164,22 +164,22 @@ is a future architecture extension, not a hidden filesystem compatibility mode.
 
 ## Filesystem Semantics Map
 
-| Upstream filesystem area | Pages-native storage                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| `data/pages`             | D1 `pages` plus `page_revisions`.                                                        |
-| `data/attic`             | D1 `page_revisions`, including imported compressed revisions after decompression.        |
-| `data/media`             | R2 media objects plus D1 current media metadata.                                         |
-| `data/media_attic`       | R2 old media objects plus D1 `media_revisions`.                                          |
-| `data/meta`              | D1 metadata rows with DokuWiki-shaped page metadata plus compatibility helper keys.      |
-| `data/media_meta`        | D1 metadata rows plus native JPEG EXIF/IPTC/XMP display metadata for uploaded media.     |
-| `data/cache`             | KV rendered payloads, Cache API candidates, and D1 cache dependency rows.                |
-| `data/index`             | D1 search postings and term tables, including DokuWiki-style term lengths and stopwords. |
-| `data/locks`             | Durable Object edit/media locks.                                                         |
-| `data/tmp`               | Request-local memory or short-lived Cloudflare storage only when explicitly required.    |
-| `data/log`               | D1 audit rows plus Cloudflare structured logs.                                           |
-| `conf/*.php`             | Imported metadata plus validated env/config surfaces.                                    |
-| `conf/*.conf`            | Imported metadata and native parsers where implemented.                                  |
-| `lib/plugins/*`          | Native replacement modules or unsupported compatibility reports.                         |
+| Upstream filesystem area | Pages-native storage                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `data/pages`             | D1 `pages` plus `page_revisions`.                                                                         |
+| `data/attic`             | D1 `page_revisions`, including imported compressed revisions after decompression.                         |
+| `data/media`             | R2 media objects plus D1 current media metadata.                                                          |
+| `data/media_attic`       | R2 old media objects plus D1 `media_revisions`.                                                           |
+| `data/meta`              | D1 metadata rows with DokuWiki-shaped page metadata plus compatibility helper keys.                       |
+| `data/media_meta`        | D1 metadata rows plus native JPEG EXIF/IPTC/XMP display metadata for uploaded media.                      |
+| `data/cache`             | KV rendered payloads, Cache API candidates, and D1 cache dependency rows.                                 |
+| `data/index`             | D1 search postings and term tables, including DokuWiki-style term lengths and stopwords.                  |
+| `data/locks`             | Durable Object edit/media locks.                                                                          |
+| `data/tmp`               | Request-local memory or short-lived Cloudflare storage only when explicitly required.                     |
+| `data/log`               | D1 audit rows plus Cloudflare structured logs, with `DONTLOG` filtering and `LOGRETAIN` D1 audit pruning. |
+| `conf/*.php`             | Imported metadata plus validated env/config surfaces.                                                     |
+| `conf/*.conf`            | Imported metadata and native parsers where implemented.                                                   |
+| `lib/plugins/*`          | Native replacement modules or unsupported compatibility reports.                                          |
 
 The compatibility layer does not expose POSIX timestamps, chmod, path traversal,
 rename, or direct file handles. Code that depends on those APIs must be mapped to

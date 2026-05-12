@@ -531,6 +531,10 @@ export class D1AuditLogStore implements AuditLogStore {
       )
       .run();
   }
+
+  async deleteEntriesBefore(createdBefore: string): Promise<void> {
+    await this.db.prepare("delete from audit_log where created_at < ?").bind(createdBefore).run();
+  }
 }
 
 export class D1UserStore implements UserStore {

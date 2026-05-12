@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { getRuntimeConfig, isDokuWikiLogFacilityEnabled } from "./config";
 
 const DEFAULT_RESEND_ENDPOINT = "https://api.resend.com/emails";
 const DEFAULT_SITE_NAME = "DokuWiki";
@@ -200,7 +201,7 @@ export async function sendWikiEmail(
         error: providerErrorMessage(response.status, payload)
       };
       await recordEmailDelivery(env.DB, preparedEmail, result);
-      logEmailDelivery(preparedEmail, result);
+      logEmailDelivery(env, preparedEmail, result);
       return result;
     }
 
@@ -212,7 +213,7 @@ export async function sendWikiEmail(
       error: null
     };
     await recordEmailDelivery(env.DB, preparedEmail, result);
-    logEmailDelivery(preparedEmail, result);
+    logEmailDelivery(env, preparedEmail, result);
     return result;
   } catch (error) {
     const result: EmailSendResult = {
@@ -223,7 +224,7 @@ export async function sendWikiEmail(
       error: error instanceof Error ? error.message : String(error)
     };
     await recordEmailDelivery(env.DB, preparedEmail, result);
-    logEmailDelivery(preparedEmail, result);
+    logEmailDelivery(env, preparedEmail, result);
     return result;
   }
 }
@@ -456,7 +457,10 @@ async function recordEmailDelivery(
     .run();
 }
 
-function logEmailDelivery(email: WikiEmail, result: EmailSendResult): void {
+function logEmailDelivery(env: Env, email: WikiEmail, result: EmailSendResult): void {
+  const facility = result.ok ? "debug" : "error";
+  if (!isDokuWikiLogFacilityEnabled(getRuntimeConfig(env), facility)) return;
+
   console.log(
     JSON.stringify({
       level: result.ok ? "info" : "error",

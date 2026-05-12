@@ -2463,6 +2463,48 @@ describe("auth routes", () => {
     });
   });
 
+  it("prunes D1 audit log rows with DokuWiki logretain", async () => {
+    env = createEnv({ LOGRETAIN: "1" });
+    await seedUser(env.DB);
+    await env.DB.prepare(
+      `insert into audit_log (
+         id, actor_id, action, target_type, target_id, details_json, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        "audit:old",
+        "user-1",
+        "legacy_logviewer_row",
+        "test",
+        null,
+        "{}",
+        "1970-01-01T00:00:00.000Z"
+      )
+      .run();
+    const cookie = await loginAsAlice(env);
+
+    const purged = await handleRequest(
+      new Request("https://example.com/api/admin/cache/purge", {
+        method: "POST",
+        body: new FormData(),
+        headers: csrfHeaders({ cookie })
+      }),
+      env
+    );
+
+    expect(purged.status).toBe(303);
+    await expect(
+      env.DB.prepare("select id from audit_log where id = ?").bind("audit:old").first()
+    ).resolves.toBeNull();
+    await expect(
+      env.DB.prepare("select action, target_type from audit_log where action = ?")
+        .bind("cache_purge")
+        .all()
+    ).resolves.toMatchObject({
+      results: [{ action: "cache_purge", target_type: "cache" }]
+    });
+  });
+
   it("allows admin users to clean up unreferenced media objects", async () => {
     env = createEnv();
     env.MEDIA_BUCKET = createMediaCleanupR2Stub([

@@ -27,6 +27,19 @@ search index rebuilds also write D1 audit log rows that are visible in
 `/admin/audit`. Legacy `data/log` files from a source DokuWiki install are not
 part of the import surface.
 
+DokuWiki's `dontlog` setting is available as the `DONTLOG` Pages variable. The
+default is `debug`, so the production Pages wrapper suppresses request and
+metric debug events unless `DONTLOG` is set to an empty value. Adding `error`
+suppresses request, storage, Turnstile, custom language, and failed email
+delivery error events. `deprecated` is accepted for config parity; no native
+deprecation log source exists yet.
+
+DokuWiki's `logretain` setting is available as `LOGRETAIN`, defaulting to `3`.
+The port applies it to D1 `audit_log` rows when native admin actions append a
+new row, with `0` retaining all rows. Cloudflare Logs and Logpush retention are
+platform/operator settings, so the Worker documents but cannot enforce their
+retention window.
+
 ## Metrics
 
 The runtime emits structured metric events to Cloudflare logs:

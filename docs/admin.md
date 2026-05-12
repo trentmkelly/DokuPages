@@ -64,6 +64,11 @@ purges, media cleanups, and search index rebuilds append rows to the D1
 action-specific JSON details. Legacy `data/log` files from a source DokuWiki
 install are intentionally not imported or displayed by this page.
 
+The `LOGRETAIN` Pages variable mirrors DokuWiki's `logretain` setting for the
+D1 `audit_log` table. It defaults to `3`, prunes rows older than that many days
+when a new admin audit entry is written, and keeps all rows when set to `0`.
+Cloudflare Logs retention remains an account or Logpush destination setting.
+
 Operators can promote an existing native user to the configured DokuWiki
 `SUPERUSER` role without hand-editing D1 rows:
 

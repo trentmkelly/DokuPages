@@ -26,6 +26,7 @@ const DEFAULT_SESSION_COOKIE_NAME = "DW_PAGES_SESSION";
 const DEFAULT_SUPERUSER = "@admin";
 const DEFAULT_MANAGER = "@manager";
 const DEFAULT_CACHE_TIME = 60 * 60 * 24;
+const DEFAULT_DONTLOG = "debug";
 const DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER = "cf-access-authenticated-user-email";
 const DEFAULT_REMOTEUSER = "!!not set!!";
 const DEFAULT_TRUSTED_PROXIES = [
@@ -47,6 +48,9 @@ const SHOW_USER_AS_VALUES = new Set([
   "email",
   "email_link"
 ]);
+const LOG_FACILITY_VALUES = new Set(["error", "debug", "deprecated"] as const);
+
+export type DokuWikiLogFacility = "error" | "debug" | "deprecated";
 
 export interface RuntimeConfig {
   siteName: string;
@@ -71,6 +75,8 @@ export interface RuntimeConfig {
   baseDir: string;
   recentEntries: number;
   recentDays: number;
+  dontLog: DokuWikiLogFacility[];
+  logRetainDays: number;
   topTocLevel: number;
   tocMinHeads: number;
   maxTocLevel: number;
@@ -193,6 +199,8 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     baseDir: normalizedBaseDir(env.BASE_DIR),
     recentEntries: integerConfig(env.RECENT, 20, 1, 100),
     recentDays: integerConfig(env.RECENT_DAYS, 7, 0, 3660),
+    dontLog: parseLogFacilityList(env.DONTLOG),
+    logRetainDays: integerConfig(env.LOGRETAIN, 3, 0, 3660),
     topTocLevel: integerConfig(env.TOP_TOC_LEVEL, 1, 1, 5),
     tocMinHeads: integerConfig(env.TOC_MIN_HEADS, 3, 0, 99),
     maxTocLevel: integerConfig(env.MAX_TOC_LEVEL, 3, 1, 5),
@@ -265,6 +273,8 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateBaseDir(env.BASE_DIR, issues);
   validateIntegerRange("RECENT", env.RECENT, 1, 100, issues);
   validateIntegerRange("RECENT_DAYS", env.RECENT_DAYS, 0, 3660, issues);
+  validateLogFacilityList(env.DONTLOG, issues);
+  validateIntegerRange("LOGRETAIN", env.LOGRETAIN, 0, 3660, issues);
   validateIntegerRange("TOP_TOC_LEVEL", env.TOP_TOC_LEVEL, 1, 5, issues);
   validateIntegerRange("TOC_MIN_HEADS", env.TOC_MIN_HEADS, 0, 99, issues);
   validateIntegerRange("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, 1, 5, issues);
@@ -349,6 +359,8 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("BASE_DIR", env.BASE_DIR, config.baseDir, ""),
     configEntry("RECENT", env.RECENT, String(config.recentEntries), "20"),
     configEntry("RECENT_DAYS", env.RECENT_DAYS, String(config.recentDays), "7"),
+    configEntry("DONTLOG", env.DONTLOG, config.dontLog.join(","), DEFAULT_DONTLOG),
+    configEntry("LOGRETAIN", env.LOGRETAIN, String(config.logRetainDays), "3"),
     configEntry("TOP_TOC_LEVEL", env.TOP_TOC_LEVEL, String(config.topTocLevel), "1"),
     configEntry("TOC_MIN_HEADS", env.TOC_MIN_HEADS, String(config.tocMinHeads), "3"),
     configEntry("MAX_TOC_LEVEL", env.MAX_TOC_LEVEL, String(config.maxTocLevel), "3"),
@@ -523,6 +535,13 @@ export function createConfigExport(env: Env, now = new Date()): ConfigExport {
     secrets: getSecretConfigStatus(env),
     validation: validateRuntimeConfig(env)
   };
+}
+
+export function isDokuWikiLogFacilityEnabled(
+  config: { dontLog: readonly DokuWikiLogFacility[] },
+  facility: DokuWikiLogFacility
+): boolean {
+  return !config.dontLog.includes(facility);
 }
 
 function validateSiteName(
@@ -702,6 +721,24 @@ function validateActionList(value: string | undefined, issues: ConfigValidationI
       key: "DISABLE_ACTIONS",
       severity: "error",
       message: `DISABLE_ACTIONS contains invalid action names: ${invalid.join(", ")}.`
+    });
+  }
+}
+
+function validateLogFacilityList(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  if (value === undefined || value.trim() === "") return;
+
+  const invalid = value
+    .split(",")
+    .map((facility) => facility.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((facility) => !isDokuWikiLogFacility(facility));
+
+  if (invalid.length > 0) {
+    issues.push({
+      key: "DONTLOG",
+      severity: "error",
+      message: `DONTLOG must contain only 'error', 'debug', or 'deprecated'.`
     });
   }
 }
@@ -1133,6 +1170,21 @@ function parseActionList(value: string | undefined): string[] {
         .filter((action) => /^[a-z][a-z0-9_]*$/i.test(action))
     )
   ].sort();
+}
+
+function parseLogFacilityList(value: string | undefined): DokuWikiLogFacility[] {
+  return [
+    ...new Set(
+      (value === undefined ? DEFAULT_DONTLOG : value)
+        .split(",")
+        .map((facility) => facility.trim().toLowerCase())
+        .filter(isDokuWikiLogFacility)
+    )
+  ];
+}
+
+function isDokuWikiLogFacility(value: string): value is DokuWikiLogFacility {
+  return LOG_FACILITY_VALUES.has(value as DokuWikiLogFacility);
 }
 
 function normalizedBaseUrl(value: string | undefined): string | null {

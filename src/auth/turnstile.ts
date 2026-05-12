@@ -1,5 +1,5 @@
 import type { Env } from "../env";
-import { getRuntimeConfig } from "../config";
+import { getRuntimeConfig, isDokuWikiLogFacilityEnabled } from "../config";
 import { getClientIp } from "../http/client-ip";
 
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -85,13 +85,15 @@ export async function verifyTurnstileForm(
 
     return failedVerification(payload["error-codes"] ?? [`http-${response.status}`]);
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        level: "error",
-        event: "turnstile_verification_error",
-        error: error instanceof Error ? error.message : String(error)
-      })
-    );
+    if (isDokuWikiLogFacilityEnabled(runtimeConfig, "error")) {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "turnstile_verification_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
     return failedVerification(["internal-error"]);
   }
 }

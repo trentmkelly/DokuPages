@@ -52,6 +52,17 @@ Optional Pages environment variables:
 - `RECENT_DAYS`: DokuWiki-compatible recent-change retention window, in days,
   used to omit older changelog rows from recent-change views and feeds. Default:
   `7`; set to `0` to show all retained D1 changelog rows.
+- `DONTLOG`: DokuWiki-compatible comma-separated log facilities to suppress:
+  `debug`, `error`, and `deprecated`. Default: `debug`, matching upstream. In
+  the Pages runtime, `debug` suppresses request, cache, search, media, and
+  successful email delivery events in Cloudflare Logs; `error` suppresses
+  request, storage, Turnstile, custom language, and failed email delivery error
+  events. `deprecated` is parsed for config parity and currently has no native
+  log source.
+- `LOGRETAIN`: DokuWiki-compatible log retention count in days. Default: `3`;
+  set to `0` to retain all D1 audit rows. This controls the port's D1
+  `audit_log` pruning. Cloudflare Logs retention is configured in Cloudflare or
+  the chosen Logpush destination, not inside Worker code.
 - `BREADCRUMBS`: number of recent visited pages to keep in the DokuWiki-style
   trace. Default: `10`; set to `0` to disable the trace.
 - `YOUAREHERE`: truthy value enables the DokuWiki-style hierarchical "You are

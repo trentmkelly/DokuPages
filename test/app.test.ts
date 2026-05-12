@@ -174,6 +174,8 @@ describe("handleRequest", () => {
     env.AUTOPLURAL = undefined;
     env.RECENT = undefined;
     env.RECENT_DAYS = undefined;
+    env.DONTLOG = undefined;
+    env.LOGRETAIN = undefined;
     env.RSS_TYPE = undefined;
     env.RSS_LINKTO = undefined;
     env.RSS_CONTENT = undefined;
@@ -3007,6 +3009,7 @@ describe("handleRequest", () => {
   });
 
   it("emits cache, search, and media metric events", async () => {
+    env.DONTLOG = "";
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     try {

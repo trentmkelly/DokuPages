@@ -26,6 +26,8 @@ export interface Env {
   BASE_DIR?: string;
   RECENT?: string;
   RECENT_DAYS?: string;
+  DONTLOG?: string;
+  LOGRETAIN?: string;
   TOP_TOC_LEVEL?: string;
   TOC_MIN_HEADS?: string;
   MAX_TOC_LEVEL?: string;

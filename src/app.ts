@@ -34,6 +34,7 @@ import {
   getRuntimeConfig,
   getRuntimeConfigEntries,
   getSecretConfigStatus,
+  isDokuWikiLogFacilityEnabled,
   validateRuntimeConfig,
   type ConfigValidation,
   type RuntimeConfig,
@@ -2302,7 +2303,7 @@ async function handleNativeApiMediaUpload(
   await purgeDependentRenderCache(env, "media", id);
   await sendMediaChangeNotifications(request, env, result.revision, author);
 
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: "upload",
     namespace: mediaNamespace(id) || null,
     changeType: result.changeType,
@@ -2885,7 +2886,7 @@ async function handleAjax(
       .join("");
     const overflow = results.length > 50 ? "<li>...</li>" : "";
 
-    logMetric("search_metric", {
+    logMetric(env, "search_metric", {
       surface: "ajax_qsearch",
       queryLength: query.length,
       resultCount: results.length,
@@ -2919,7 +2920,7 @@ async function handleAjax(
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b));
 
-    logMetric("search_metric", {
+    logMetric(env, "search_metric", {
       surface: "ajax_suggestions",
       queryLength: query.length,
       resultCount: names.length,
@@ -2938,7 +2939,7 @@ async function handleAjax(
       query,
       getRuntimeConfig(env).pageIdCleanOptions
     ).namespace;
-    logMetric("search_metric", {
+    logMetric(env, "search_metric", {
       surface: "ajax_linkwiz",
       namespace: namespace || null,
       queryLength: query.length,
@@ -3291,7 +3292,7 @@ async function handleAjaxMediaUpload(
   await purgeDependentRenderCache(env, "media", id);
   await sendMediaChangeNotifications(request, env, result.revision, author);
 
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: "ajax_upload",
     namespace: mediaNamespace(id) || null,
     changeType: result.changeType,
@@ -3635,7 +3636,7 @@ async function handleMediaFetch(
 
   if (!bypassesMediaClientCache(url) && isMediaNotModified(request, media, expectedEtag)) {
     headers.delete("content-length");
-    logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+    logMediaFetchMetric(env, startedAt, id, media, Boolean(revisionId), {
       delivery: "not_modified",
       r2Operations: 0
     });
@@ -3652,7 +3653,7 @@ async function handleMediaFetch(
       return notFoundResponse(`Media object '${media.objectKey}' was not found.`);
     }
 
-    logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+    logMediaFetchMetric(env, startedAt, id, media, Boolean(revisionId), {
       delivery: "headers",
       r2Operations: 1
     });
@@ -3684,7 +3685,7 @@ async function handleMediaFetch(
     copyDownloadHeader(headers, derivativeHeaders);
     derivativeHeaders.set("accept-ranges", "bytes");
 
-    logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+    logMediaFetchMetric(env, startedAt, id, media, Boolean(revisionId), {
       delivery: request.method === "HEAD" ? "headers" : "body",
       r2Operations: 1
     });
@@ -3701,7 +3702,7 @@ async function handleMediaFetch(
     const body = await new Response(object.body).arrayBuffer();
     const rangeResponse = mediaRangeResponse(request, body, headers);
     if (rangeResponse) {
-      logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+      logMediaFetchMetric(env, startedAt, id, media, Boolean(revisionId), {
         delivery: request.method === "HEAD" ? "headers" : "body",
         r2Operations: 1
       });
@@ -3709,7 +3710,7 @@ async function handleMediaFetch(
     }
   }
 
-  logMediaFetchMetric(startedAt, id, media, Boolean(revisionId), {
+  logMediaFetchMetric(env, startedAt, id, media, Boolean(revisionId), {
     delivery: "body",
     r2Operations: 1
   });
@@ -4017,13 +4018,14 @@ function mediaLastModified(media: CurrentMedia | MediaRevision): string {
 }
 
 function logMediaFetchMetric(
+  env: Env,
   startedAt: number,
   id: string,
   media: CurrentMedia | MediaRevision,
   revision: boolean,
   details: { delivery: "body" | "headers" | "not_modified"; r2Operations: number }
 ): void {
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: "fetch",
     namespace: mediaNamespace(id) || null,
     revision,
@@ -4468,7 +4470,7 @@ async function renderMediaManagerPage(
     resolveConfiguredAclPermission(env, aclRules, namespace ? `${namespace}:*` : "*", principal),
     ACL_UPLOAD
   );
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: query ? "manager_search" : "manager_list",
     namespace: namespace || null,
     queryLength: query.length,
@@ -4918,7 +4920,7 @@ async function renderPageHtml(
       : await readRenderCache(env, cacheKey, revisionId);
 
   if (directives.noCache) {
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "rendered_page",
       action: "bypass",
       reason: "directive",
@@ -4928,7 +4930,7 @@ async function renderPageHtml(
   }
 
   if (privateCache) {
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "rendered_page",
       action: "bypass",
       reason: "private_acl",
@@ -4938,7 +4940,7 @@ async function renderPageHtml(
   }
 
   if (cached) {
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "rendered_page",
       action: "hit",
       cacheKey,
@@ -4961,7 +4963,7 @@ async function renderPageHtml(
   }
 
   if (!directives.noCache && !privateCache) {
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "rendered_page",
       action: "miss",
       cacheKey,
@@ -5011,7 +5013,7 @@ async function renderPageHtml(
 
   if (page && !revisionDate) {
     const metadataCache = await ensurePageMetadataCache(env.DB, page, rendered);
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "page_metadata",
       action: metadataCache.status,
       pageId: id,
@@ -5029,7 +5031,7 @@ async function renderPageHtml(
       toc: rendered.toc,
       dependencies: rendered.dependencies
     });
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "rendered_page",
       action: "write",
       cacheKey,
@@ -8015,7 +8017,7 @@ async function renderSearchPage(
         await searchPages(env.DB, query, namespace, 25, getRuntimeConfig(env).language)
       )
     : [];
-  logMetric("search_metric", {
+  logMetric(env, "search_metric", {
     surface: "search_page",
     namespace: namespace || null,
     queryLength: query.length,
@@ -9464,7 +9466,8 @@ async function appendAdminAuditLog(
     ip: requestClientIp(request, env)
   };
 
-  await new D1AuditLogStore(env.DB).appendEntry({
+  const auditLog = new D1AuditLogStore(env.DB);
+  await auditLog.appendEntry({
     id: `audit:${createdAt}:${crypto.randomUUID()}`,
     actorId: principal.id,
     action: entry.action,
@@ -9473,6 +9476,13 @@ async function appendAdminAuditLog(
     details,
     createdAt
   });
+
+  const retentionDays = getRuntimeConfig(env).logRetainDays;
+  if (retentionDays > 0) {
+    await auditLog.deleteEntriesBefore(
+      new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
+    );
+  }
 }
 
 async function listManagedUsers(
@@ -10894,13 +10904,15 @@ async function prepareCustomAuthLanguage(env: Env, request: Request): Promise<vo
       await ensureCustomAuthLanguageOverrides(env.DB, language);
     }
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        level: "error",
-        event: "custom_language_load_error",
-        error: error instanceof Error ? error.message : String(error)
-      })
-    );
+    if (shouldLogFacility(env, "error")) {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "custom_language_load_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
   }
 }
 
@@ -10944,9 +10956,12 @@ function logAuthEvent(
 }
 
 function logMetric(
+  env: Env,
   event: "cache_metric" | "search_metric" | "media_metric",
   details: Record<string, unknown>
 ): void {
+  if (!shouldLogFacility(env, "debug")) return;
+
   console.log(
     JSON.stringify({
       level: "info",
@@ -10954,6 +10969,10 @@ function logMetric(
       ...details
     })
   );
+}
+
+function shouldLogFacility(env: Env, facility: "error" | "debug" | "deprecated"): boolean {
+  return isDokuWikiLogFacilityEnabled(getRuntimeConfig(env), facility);
 }
 
 function elapsedSince(startedAt: number): number {
@@ -13085,7 +13104,7 @@ async function handleMediaUpload(
   await purgeDependentRenderCache(env, "media", id);
   await sendMediaChangeNotifications(request, env, result.revision, author);
 
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: "upload",
     namespace: mediaNamespace(id) || null,
     changeType: result.changeType,
@@ -13150,7 +13169,7 @@ async function handleMediaDelete(
 
   await purgeDependentRenderCache(env, "media", id);
 
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: "delete",
     namespace: mediaNamespace(id) || null,
     revisionId: result.revision.id,
@@ -13275,7 +13294,7 @@ async function handleMediaRevert(
 
   await purgeDependentRenderCache(env, "media", id);
 
-  logMetric("media_metric", {
+  logMetric(env, "media_metric", {
     operation: "revert",
     namespace: mediaNamespace(id) || null,
     sourceRevisionId: revisionId,
@@ -15020,7 +15039,7 @@ async function purgePageCache(
   const cacheKeys = [...keys];
   await Promise.all(cacheKeys.map((key) => env.RENDER_CACHE.delete(key)));
   await deleteRenderCacheDependencyRows(env, cacheKeys);
-  logMetric("cache_metric", {
+  logMetric(env, "cache_metric", {
     cache: "rendered_page",
     action: "purge",
     keyCount: cacheKeys.length,
@@ -15039,7 +15058,7 @@ async function purgeDependentRenderCache(
 
   await Promise.all(keys.map((key) => env.RENDER_CACHE.delete(key)));
   await deleteRenderCacheDependencyRows(env, keys);
-  logMetric("cache_metric", {
+  logMetric(env, "cache_metric", {
     cache: "rendered_page",
     action: "dependency_purge",
     dependencyType,
@@ -15063,7 +15082,7 @@ async function purgeGlobalCache(env: Env): Promise<GlobalCachePurgeResult> {
     .run()
     .catch(() => undefined);
 
-  logMetric("cache_metric", {
+  logMetric(env, "cache_metric", {
     cache: "global",
     action: "purge",
     kvKeysPurged,
@@ -15111,7 +15130,7 @@ async function cachedXmlResponse(
   };
 
   if (cached) {
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "discovery",
       kind,
       action: "hit",
@@ -15121,7 +15140,7 @@ async function cachedXmlResponse(
     return xmlResponse(cached, contentType, cacheHeaders);
   }
 
-  logMetric("cache_metric", {
+  logMetric(env, "cache_metric", {
     cache: "discovery",
     kind,
     action: "miss",
@@ -15131,7 +15150,7 @@ async function cachedXmlResponse(
   const body = await render();
   if (safeTtl > 0) {
     await writeTextCache(env, cacheKey, body, safeTtl);
-    logMetric("cache_metric", {
+    logMetric(env, "cache_metric", {
       cache: "discovery",
       kind,
       action: "write",

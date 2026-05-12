@@ -185,6 +185,7 @@ export interface ChangelogStore {
 export interface AuditLogStore {
   listEntries(limit: number, offset?: number): Promise<AuditLogRecord[]>;
   appendEntry(entry: AuditLogRecord): Promise<void>;
+  deleteEntriesBefore(createdBefore: WikiTimestamp): Promise<void>;
 }
 
 export interface UserStore {
