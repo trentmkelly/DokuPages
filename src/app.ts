@@ -3461,7 +3461,7 @@ async function renderMediaDetailPage(
         </form>
       </div>
     </div>`,
-    { principal }
+    { principal, mode: "detail" }
   );
 }
 
@@ -3624,7 +3624,7 @@ async function renderMediaDiffPage(
         </tbody>
       </table>
     </div>`,
-    { principal }
+    { principal, mode: "media" }
   );
 }
 
@@ -3909,7 +3909,7 @@ async function renderMediaManagerPage(
         </section>
       </div>
     </div>`,
-    { principal }
+    { principal, mode: "media" }
   );
 }
 
@@ -5047,7 +5047,7 @@ function renderRouteNotFoundPage(env: Env, url: URL, principal: AuthPrincipal): 
       <span class="sep"> · </span>
       <a href="/search?q=${encodeURIComponent(requestedPath)}">Search the wiki</a>
     </p>`,
-    { principal }
+    { principal, mode: "show" }
   );
 }
 
@@ -5106,12 +5106,13 @@ function renderHeaderBreadcrumbs(
   pageId: string | undefined,
   startId: string,
   breadcrumbTrace: readonly BreadcrumbEntry[] | undefined,
-  showYouAreHere: boolean
+  showYouAreHere: boolean,
+  showBreadcrumbShell = false
 ): string {
   const trace = renderBreadcrumbTrace(breadcrumbTrace);
   const youAreHere = showYouAreHere ? renderYouAreHereTrail(env, pageId, startId) : "";
 
-  if (!youAreHere && !trace) {
+  if (!youAreHere && !trace && !showBreadcrumbShell) {
     return "";
   }
 
@@ -5201,7 +5202,7 @@ async function renderRevisionsPage(env: Env, id: string, url: URL): Promise<stri
       <ul>${items}</ul>
     </form>
     ${renderPaginationControls(url, pagination, revisions.length)}`,
-    { pageId: id }
+    { pageId: id, mode: "revisions" }
   );
 }
 
@@ -5242,7 +5243,7 @@ async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
       </thead>
       <tbody>${rows}</tbody>
     </table>`,
-    { pageId: id }
+    { pageId: id, mode: "diff" }
   );
 }
 
@@ -5453,7 +5454,7 @@ async function renderRecentPage(
       </div>
       ${renderRecentNavigation(pagination, hasNext)}
     </form>`,
-    { principal }
+    { principal, mode: "recent" }
   );
 }
 
@@ -5926,7 +5927,7 @@ function renderAdminDashboardPage(
         <li><a href="/media-manager">Media manager</a></li>
       </ul>
       ${adminActions}`,
-    { principal }
+    { principal, mode: "admin" }
   );
 }
 
@@ -5964,7 +5965,7 @@ async function renderBundledPluginCompatibilityPage(
       <thead><tr><th>Plugin</th><th>Types</th><th>Imported state</th><th>Source</th><th>Pages status</th><th>Native replacement</th><th>Notes</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`,
-    { principal }
+    { principal, mode: "admin" }
   );
 }
 
@@ -6042,7 +6043,7 @@ async function renderExtensionManagerUnsupportedPage(
         </tbody>
       </table>
     </div>`,
-    { principal }
+    { principal, mode: "admin" }
   );
 }
 
@@ -6089,7 +6090,7 @@ async function renderStylingAdminPage(
         </p>
       </form>
     </div>`,
-    { principal }
+    { principal, mode: "admin" }
   );
 }
 
@@ -7254,7 +7255,7 @@ async function renderSearchPage(
     ${namespace ? `<p>Search scope: ${escapeHtml(namespace)}</p>` : ""}
     ${emptyState}
     <ol>${resultItems}</ol>`,
-    { principal }
+    { principal, mode: "search" }
   );
 }
 
@@ -7304,7 +7305,7 @@ async function renderNamespaceIndexPage(
     env,
     title,
     `<h1>${escapeHtml(title)}</h1>${emptyState}<ul>${items}</ul>${renderPaginationControls(url, pagination, pages.length)}`,
-    { principal }
+    { principal, mode: "index" }
   );
 }
 
@@ -7321,7 +7322,7 @@ async function renderBacklinksPage(
     env,
     `Backlinks for ${id}`,
     `<h1>Backlinks for ${escapeHtml(id)}</h1>${emptyState}<ul>${items}</ul>`,
-    { principal }
+    { principal, mode: "backlink" }
   );
 }
 
@@ -10917,7 +10918,8 @@ function renderRegisterPage(
           <button type="submit">${escapeHtml(localizedAuthText(env, "btn_register"))}</button>
         </div>
       </fieldset>
-    </form>`
+    </form>`,
+    { mode: "register" }
   );
 }
 
@@ -11021,7 +11023,7 @@ async function renderSubscriptionPage(
     `<h1>Subscriptions</h1>
     ${renderSubscriptionForm(pageId, "page", pageId, pageSubscription, csrfToken)}
     ${renderSubscriptionForm(pageId, "namespace", namespace, namespaceSubscription, csrfToken)}`,
-    { pageId, principal }
+    { pageId, principal, mode: "subscribe" }
   );
 }
 
@@ -11108,7 +11110,8 @@ function renderLoginPage(
       </fieldset>
     </form>
     <p>${escapeHtml(localizedAuthText(env, "reghere"))}: <a href="/register">${escapeHtml(localizedAuthText(env, "btn_register"))}</a></p>
-    <p>${escapeHtml(localizedAuthText(env, "pwdforget"))}: <a href="/resendpwd">${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</a></p>`
+    <p>${escapeHtml(localizedAuthText(env, "pwdforget"))}: <a href="/resendpwd">${escapeHtml(localizedAuthText(env, "btn_resendpwd"))}</a></p>`,
+    { mode: "login" }
   );
 }
 
@@ -11126,7 +11129,8 @@ function renderLogoutPage(
       ${csrfInput(csrfToken)}
       <input type="hidden" name="returnTo" value="${escapeAttribute(returnTo)}">
       <button type="submit">${escapeHtml(localizedAuthText(env, "btn_logout"))}</button>
-    </form>`
+    </form>`,
+    { mode: "login" }
   );
 }
 
@@ -11216,6 +11220,7 @@ function getComparablePageId(page: CurrentPage | PageRevision): string {
 
 interface HtmlShellOptions {
   breadcrumbs?: BreadcrumbEntry[];
+  mode?: string;
   pageId?: string;
   principal?: AuthPrincipal;
   sidebarHtml?: string;
@@ -11299,7 +11304,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <div class="content"><div class="group">${options.sidebarHtml}</div></div>
         </div></nav>`
       : "";
-  const siteClasses = `site dokuwiki mode_show tpl_dokuwiki${sidebar ? " showSidebar hasSidebar" : ""}`;
+  const siteClasses = `site dokuwiki mode_${shellModeClass(options.mode)} tpl_dokuwiki${sidebar ? " showSidebar hasSidebar" : ""}`;
   const searchLabel = localizedAuthText(env, "btn_search");
   const recentLabel = localizedAuthText(env, "btn_recent");
   const mediaLabel = localizedAuthText(env, "btn_media");
@@ -11350,7 +11355,14 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             </ul>
           </nav>
         </div>
-        ${renderHeaderBreadcrumbs(env, pageId, startId, options.breadcrumbs, config.youAreHere)}
+        ${renderHeaderBreadcrumbs(
+          env,
+          pageId,
+          startId,
+          options.breadcrumbs,
+          config.youAreHere,
+          config.breadcrumbs > 0 || config.youAreHere
+        )}
         <hr class="a11y">
         </div>
       </header>
@@ -11381,6 +11393,15 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   </div>
 </body>
 </html>`;
+}
+
+function shellModeClass(mode = "show"): string {
+  const normalized = mode
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || "show";
 }
 
 function renderUserTools(
@@ -12478,7 +12499,7 @@ function renderWordblockPage(
         <a href="${pagePath(id)}?do=edit">Back to editor</a>
       </div>
     </form>`,
-    { pageId: id }
+    { pageId: id, mode: "edit" }
   );
 }
 
@@ -13253,7 +13274,7 @@ function renderLockedPage(env: Env, id: string, lock: PageLockInfo | null): stri
     `${renderLocalizedAuthPageIntro(env, "locked")}
     ${lockDetails}
     <p><a href="${pagePath(id)}">${escapeHtml(localizedAuthText(env, "btn_back"))}</a></p>`,
-    { pageId: id }
+    { pageId: id, mode: "locked" }
   );
 }
 
@@ -13480,7 +13501,7 @@ function renderEditPage(
     </form>
     </div>
   `,
-    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author }
+    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author, mode: "edit" }
   );
 }
 
@@ -13547,7 +13568,12 @@ function renderConflictPage(env: Env, id: string, options: ConflictPageOptions):
       </thead>
       <tbody>${diffRows}</tbody>
     </table>`,
-    { pageId: id, updatedAt: currentUpdatedAt, updatedBy: options.current?.author }
+    {
+      pageId: id,
+      updatedAt: currentUpdatedAt,
+      updatedBy: options.current?.author,
+      mode: "conflict"
+    }
   );
 }
 
@@ -13589,7 +13615,7 @@ function renderDraftPage(
         <button type="submit" name="do[show]" value="1" tabindex="3" formaction="${pagePath(id)}?do=show">Cancel</button>
       </div>
     </form>`,
-    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author }
+    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author, mode: "draft" }
   );
 }
 

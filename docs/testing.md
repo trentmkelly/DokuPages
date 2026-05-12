@@ -42,6 +42,10 @@ Accessibility tests cover rendered wiki shell landmarks, the keyboard skip link,
 the header search label, the mobile tools label, and accessible names for
 icon-only page tools.
 
+Template shell parity tests compare the Pages shell landmarks and `mode_$ACT`
+classes with upstream `lib/tpl/dokuwiki/main.php`, `tpl_header.php`, and
+`tpl_footer.php` across representative page modes.
+
 Responsive CSS tests cover the mobile navigation breakpoints, narrow-viewport
 header controls, long-word wrapping, diagnostic/media detail overflow behavior,
 and fixed-size font rules.

@@ -190,7 +190,7 @@ are not fixed by this checklist.
 
 ## Template, Frontend, And Static Assets
 
-- [ ] Compare generated HTML from the Pages shell against `lib/tpl/dokuwiki/main.php` for every page mode.
+- [x] Compare generated HTML from the Pages shell against `lib/tpl/dokuwiki/main.php` for every page mode.
 - [ ] Port sidebar behavior from the default template, including `sidebar` page lookup and ACL filtering.
 - [ ] Match upstream page tools, site tools, user tools, mobile menus, access keys, and rel/title attributes from `inc/Menu`.
 - [ ] Match upstream CSS modules more completely, including forms, tabs, media popups, media fullscreen views, search assistant, modals, and admin plugin pages.
