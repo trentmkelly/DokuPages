@@ -1088,7 +1088,7 @@ export async function discoverPages(pagesRoot, options = {}) {
       sourcePath: file,
       byteLength: content.byteLength,
       contentHash: sha256(content),
-      modifiedAt: stat.mtime.toISOString()
+      modifiedAt: dokuwikiFileMtime(stat)
     });
   }
 
@@ -1118,7 +1118,7 @@ export async function discoverPageRevisions(atticRoot, options = {}) {
       compression,
       byteLength: raw.byteLength,
       contentHash: sha256(raw),
-      modifiedAt: stat.mtime.toISOString()
+      modifiedAt: dokuwikiFileMtime(stat)
     });
   }
 
@@ -1144,7 +1144,7 @@ export async function discoverMedia(mediaRoot, options = {}) {
       objectKey: `media/current/${id.replaceAll(":", "/")}`,
       byteLength: content.byteLength,
       contentHash: sha256(content),
-      modifiedAt: stat.mtime.toISOString()
+      modifiedAt: dokuwikiFileMtime(stat)
     });
   }
 
@@ -1170,7 +1170,7 @@ export async function discoverMediaRevisions(mediaAtticRoot, options = {}) {
       objectKey: `media/revisions/${parsed.mediaId.replaceAll(":", "/")}/${parsed.revision}`,
       byteLength: content.byteLength,
       contentHash: sha256(content),
-      modifiedAt: stat.mtime.toISOString()
+      modifiedAt: dokuwikiFileMtime(stat)
     });
   }
 
@@ -1238,6 +1238,10 @@ function pageRevisionCreatedAt(revision) {
 
 function mediaRevisionId(id, createdAt) {
   return `${id}@${createdAt}`;
+}
+
+function dokuwikiFileMtime(stat) {
+  return new Date(Math.floor(stat.mtimeMs / 1000) * 1000).toISOString();
 }
 
 export async function discoverChangelogEntries(file, subjectType) {
@@ -1310,7 +1314,7 @@ export async function discoverSerializedMetadata(root, subjectType, options = {}
       byteLength: content.byteLength,
       contentHash: sha256(content),
       value: parsePhpSerialized(content),
-      modifiedAt: stat.mtime.toISOString()
+      modifiedAt: dokuwikiFileMtime(stat)
     });
   }
 
@@ -1329,7 +1333,7 @@ export async function discoverSubscriptions(metaRoot, options = {}) {
     if (!subject) continue;
 
     const stat = await fs.stat(file);
-    const fallbackCreatedAt = stat.mtime.toISOString();
+    const fallbackCreatedAt = dokuwikiFileMtime(stat);
     const text = await fs.readFile(file, "utf8");
 
     for (const line of text.split(/\r?\n/)) {
@@ -1446,7 +1450,7 @@ async function discoverImportFiles(root, mapRelativePath) {
       sourcePath: file,
       byteLength: content.byteLength,
       contentHash: sha256(content),
-      modifiedAt: stat.mtime.toISOString(),
+      modifiedAt: dokuwikiFileMtime(stat),
       ...contentPayload(content)
     });
   }
@@ -1499,7 +1503,7 @@ export async function discoverAclRules(file) {
   const text = await readTextIfExists(file);
   if (!text) return [];
   const stat = await fs.stat(file);
-  const createdAt = stat.mtime.toISOString();
+  const createdAt = dokuwikiFileMtime(stat);
 
   return text
     .split(/\r?\n/)
@@ -1534,7 +1538,7 @@ export async function discoverUsers(file) {
   const text = await readTextIfExists(file);
   if (!text) return [];
   const stat = await fs.stat(file);
-  const createdAt = stat.mtime.toISOString();
+  const createdAt = dokuwikiFileMtime(stat);
 
   return text
     .split(/\r?\n/)

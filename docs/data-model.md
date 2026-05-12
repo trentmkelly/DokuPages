@@ -90,7 +90,12 @@ Media search does not use a separate full-text index. The media manager searches
 
 ## Timestamp Replacement
 
-All former `filemtime` and `touch` semantics are modeled as ISO 8601 timestamp columns. Revision identity should use original DokuWiki timestamps during import when available.
+All former `filemtime` and `touch` semantics are modeled as ISO 8601 timestamp
+columns. Imported filesystem mtimes are truncated to whole seconds to match
+DokuWiki `filemtime()` behavior before they become revision IDs, current page
+and media `updated_at` values, metadata timestamps, ACL/user import timestamps,
+or changelog correlation keys. Revision identity should use original DokuWiki
+timestamps during import when available.
 
 ## Content Hashes
 

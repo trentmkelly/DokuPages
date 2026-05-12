@@ -58,6 +58,10 @@ Page revisions imported from `data/pages` and `data/attic` are correlated with
 `data/meta/_dokuwiki.changes` by page ID and revision timestamp. When a matching
 changelog row exists, the importer preserves the DokuWiki username, edit
 summary, change type, and size delta on the D1 `page_revisions` row.
+Filesystem mtimes are normalized to DokuWiki `filemtime()` precision, so current
+page and media revision IDs, `updated_at` route timestamps, and changelog
+correlation use whole Unix seconds even when the operator filesystem exposes
+subsecond mtimes.
 Media revisions imported from `data/media` and `data/media_attic` use the same
 timestamp correlation against `data/meta/_media.changes` to preserve the
 DokuWiki username, upload summary, and media change type on `media_revisions`.

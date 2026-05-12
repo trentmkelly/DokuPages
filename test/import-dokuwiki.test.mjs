@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -524,6 +524,72 @@ describe("DokuWiki import planner", () => {
         ).contentHash
       })
     );
+  });
+
+  it("normalizes filesystem mtimes to DokuWiki filemtime precision", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-mtime-"));
+    const pagePath = path.join(root, "data/pages/wiki/mtime.txt");
+    const pageRevisionPath = path.join(root, "data/attic/wiki/mtime.1767225600.txt");
+    const mediaPath = path.join(root, "data/media/wiki/logo.png");
+    const mediaRevisionPath = path.join(root, "data/media_attic/wiki/logo.1767225600.png");
+
+    await mkdir(path.dirname(pagePath), { recursive: true });
+    await mkdir(path.dirname(pageRevisionPath), { recursive: true });
+    await mkdir(path.dirname(mediaPath), { recursive: true });
+    await mkdir(path.dirname(mediaRevisionPath), { recursive: true });
+    await mkdir(path.join(root, "data/meta"), { recursive: true });
+    await mkdir(path.join(root, "conf"), { recursive: true });
+
+    await writeFile(pagePath, "====== Mtime ======\n");
+    await writeFile(pageRevisionPath, "====== Old Mtime ======\n");
+    await writeFile(mediaPath, "png");
+    await writeFile(mediaRevisionPath, "old");
+    await writeFile(
+      path.join(root, "data/meta/_dokuwiki.changes"),
+      "1767225601\t203.0.113.7\tE\twiki:mtime\talice\tCurrent edit\t\t18\n"
+    );
+
+    await utimes(
+      pagePath,
+      new Date("2026-01-01T00:00:01.789Z"),
+      new Date("2026-01-01T00:00:01.789Z")
+    );
+    await utimes(
+      mediaPath,
+      new Date("2026-01-01T00:00:02.999Z"),
+      new Date("2026-01-01T00:00:02.999Z")
+    );
+
+    const plan = await buildImportPlan(root);
+
+    expect(plan.pages[0]).toMatchObject({
+      id: "wiki:mtime",
+      modifiedAt: "2026-01-01T00:00:01.000Z"
+    });
+    expect(plan.pageRevisions[0]).toMatchObject({
+      pageId: "wiki:mtime",
+      modifiedAt: expect.stringMatching(/\.000Z$/)
+    });
+    expect(plan.media[0]).toMatchObject({
+      id: "wiki:logo.png",
+      modifiedAt: "2026-01-01T00:00:02.000Z"
+    });
+    expect(plan.mediaRevisions[0]).toMatchObject({
+      mediaId: "wiki:logo.png",
+      modifiedAt: expect.stringMatching(/\.000Z$/)
+    });
+
+    const sqlOutput = path.join(root, "import.sql");
+    await writePageImportSql(plan, sqlOutput);
+    const sql = await readFile(sqlOutput, "utf8");
+    const currentRevisionStatement = sql.slice(
+      sql.indexOf("insert or replace into page_revisions"),
+      sql.indexOf("delete from search_postings")
+    );
+
+    expect(sql).toContain("wiki:mtime@2026-01-01T00:00:01.000Z");
+    expect(currentRevisionStatement).toContain("'user:alice'");
+    expect(currentRevisionStatement).toContain("'Current edit'");
   });
 
   it("decodes DokuWiki URL and SafeFN filename modes during import", async () => {
