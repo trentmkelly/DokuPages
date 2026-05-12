@@ -2886,6 +2886,27 @@ describe("handleRequest", () => {
     expect(cachePuts).toContain("page:wiki:welcome");
   });
 
+  it("does not serve stale rendered page cache entries from older current revisions", async () => {
+    renderCache.set(
+      "page:wiki:welcome",
+      JSON.stringify({
+        rendererVersion: 31,
+        revisionId: "wiki:welcome@2026-05-06T00:00:00.000Z",
+        title: "Stale Welcome",
+        html: "<p>Stale cached body.</p>",
+        toc: []
+      })
+    );
+
+    const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Imported page.");
+    expect(html).not.toContain("Stale cached body.");
+    expect(cachePuts).toContain("page:wiki:welcome");
+  });
+
   it("stores rendered page cache dependencies for invalidation", async () => {
     state.row = {
       ...currentPageRow(),

@@ -159,10 +159,17 @@ for release-specific pages.
 
 The Pages port does not serve stale rendered page HTML after cache validation
 fails. Rendered cache entries include revision ID and renderer version checks,
-and private pages bypass shared cache entirely. Falling back to stale HTML after
-edits, ACL changes, or renderer updates could expose outdated content or the
-wrong visibility state, so the safer behavior is to re-render or return the
-storage error mapped by the route.
+and private pages bypass shared cache entirely. Upstream DokuWiki can validate
+local parser cache files against local page mtimes and config state
+synchronously; the Pages port cannot make the same guarantee across KV, D1, R2,
+ACLs, and Worker code updates. Falling back to stale HTML after edits, ACL
+changes, or renderer updates could expose outdated content or the wrong
+visibility state, so the safer behavior is to re-render or return the storage
+error mapped by the route.
+
+Regression coverage verifies that older renderer-version entries and older
+current-revision entries are ignored and replaced rather than served as stale
+fallbacks.
 
 ## Metadata Cache Decision
 
