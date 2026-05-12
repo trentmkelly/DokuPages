@@ -13574,6 +13574,292 @@ function fnv1a(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
+type EditorToolbarControl = {
+  id?: string;
+  title: string;
+  icon: string;
+  key?: string;
+  className?: string;
+  attributes?: Record<string, string>;
+};
+
+const EDITOR_TOOLBAR_SPECIAL_CHARS = `
+À à Á á Â â Ã ã Ä ä Ǎ ǎ Ă ă Å å Ā ā Ą ą Æ æ Ć ć Ç ç Č č Ĉ ĉ Ċ ċ
+Ð đ ð Ď ď È è É é Ê ê Ë ë Ě ě Ē ē Ė ė Ę ę Ģ ģ Ĝ ĝ Ğ ğ Ġ ġ Ĥ ĥ
+Ì ì Í í Î î Ï ï Ǐ ǐ Ī ī İ ı Į į Ĵ ĵ Ķ ķ Ĺ ĺ Ļ ļ Ľ ľ Ł ł Ŀ ŀ Ń ń
+Ñ ñ Ņ ņ Ň ň Ò ò Ó ó Ô ô Õ õ Ö ö Ǒ ǒ Ō ō Ő ő Œ œ Ø ø Ŕ ŕ Ŗ ŗ Ř ř
+Ś ś Ş ş Š š Ŝ ŝ Ţ ţ Ť ť Ù ù Ú ú Û û Ü ü Ǔ ǔ Ŭ ŭ Ū ū Ů ů ǖ ǘ ǚ ǜ
+Ų ų Ű ű Ŵ ŵ Ý ý Ÿ ÿ Ŷ ŷ Ź ź Ž ž Ż ż Þ þ ß Ħ ħ ¿ ¡ ¢ £ ¤ ¥ € ¦ § ª
+¬ ¯ ° ± ÷ ‰ ¼ ½ ¾ ¹ ² ³ µ ¶ † ‡ · • º ∀ ∂ ∃ Ə ə ∅ ∇ ∈ ∉ ∋ ∏ ∑ ‾ − ∗
+× ⁄ √ ∝ ∞ ∠ ∧ ∨ ∩ ∪ ∫ ∴ ∼ ≅ ≈ ≠ ≡ ≤ ≥ ⊂ ⊃ ⊄ ⊆ ⊇ ⊕ ⊗ ⊥ ⋅ ◊ ℘ ℑ ℜ ℵ
+♠ ♣ ♥ ♦ α β Γ γ Δ δ ε ζ η Θ θ ι κ Λ λ μ Ξ ξ Π π ρ Σ σ Τ τ υ Φ φ χ Ψ ψ Ω ω
+★ ☆ ☎ ☚ ☛ ☜ ☝ ☞ ☟ ☹ ☺ ✔ ✘ „ “ ” ‚ ‘ ’ « » ‹ › — – … ← ↑ → ↓ ↔ ⇐ ⇑ ⇒ ⇓ ⇔
+© ™ ® ′ ″ [ ] { } ~ ( ) % § $ # | @
+`
+  .trim()
+  .split(/\s+/);
+
+const EDITOR_TOOLBAR_SMILEYS = [
+  ["8-)", "cool.svg"],
+  ["8-O", "eek.svg"],
+  ["8-o", "eek.svg"],
+  [":-(", "sad.svg"],
+  [":-)", "smile.svg"],
+  ["=)", "smile2.svg"],
+  [":-/", "doubt.svg"],
+  [":-\\", "doubt2.svg"],
+  [":-?", "confused.svg"],
+  [":-D", "biggrin.svg"],
+  [":-P", "razz.svg"],
+  [":-o", "surprised.svg"],
+  [":-O", "surprised.svg"],
+  [":-x", "silenced.svg"],
+  [":-X", "silenced.svg"],
+  [":-|", "neutral.svg"],
+  [";-)", "wink.svg"],
+  ["m(", "facepalm.svg"],
+  ["^_^", "fun.svg"],
+  [":?:", "question.svg"],
+  [":!:", "exclaim.svg"],
+  ["LOL", "lol.svg"],
+  ["FIXME", "fixme.svg"],
+  ["DELETEME", "deleteme.svg"]
+] as const;
+
+function renderEditorToolbar(config: RuntimeConfig, principal: AuthPrincipal): string {
+  const controls: EditorToolbarControl[] = [
+    toolbarFormatControl("edbtn__bold", "Bold Text", "bold.png", "b", "**", "**"),
+    toolbarFormatControl("edbtn__italic", "Italic Text", "italic.png", "i", "//", "//"),
+    toolbarFormatControl("edbtn__underline", "Underlined Text", "underline.png", "u", "__", "__"),
+    toolbarFormatControl("edbtn__mono", "Monospaced Text", "mono.png", "m", "''", "''"),
+    toolbarFormatControl(
+      "edbtn__strike",
+      "Strike-through Text",
+      "strike.png",
+      "d",
+      "<del>",
+      "</del>"
+    ),
+    toolbarAutoheadControl("edbtn__hequal", "Same Level Headline", "hequal.png", "8", 0),
+    toolbarAutoheadControl("edbtn__hminus", "Lower Headline", "hminus.png", "9", 1),
+    toolbarAutoheadControl("edbtn__hplus", "Higher Headline", "hplus.png", "0", -1),
+    {
+      id: "edbtn__headlines",
+      title: "Select Headline",
+      icon: "h.png",
+      attributes: {
+        "aria-controls": "picker__headlines",
+        "aria-haspopup": "true",
+        "data-picker-target": "picker__headlines"
+      }
+    },
+    {
+      id: "edbtn__link",
+      title: "Internal Link",
+      icon: "link.png",
+      key: "l",
+      attributes: {
+        "data-link-wizard": "1",
+        "data-open": "[[",
+        "data-close": "]]",
+        "data-sample": "Internal Link"
+      }
+    },
+    toolbarFormatControl(
+      "edbtn__extlink",
+      "External Link",
+      "linkextern.png",
+      "",
+      "[[",
+      "]]",
+      "http://example.com|External Link"
+    ),
+    toolbarLineFormatControl("edbtn__ol", "Ordered List Item", "ol.png", "-", "  - ", ""),
+    toolbarLineFormatControl("edbtn__ul", "Unordered List Item", "ul.png", ".", "  * ", ""),
+    {
+      id: "edbtn__hr",
+      title: "Horizontal Rule",
+      icon: "hr.png",
+      attributes: {
+        "data-toolbar-action": "insert",
+        "data-insert": "\\n----\\n"
+      }
+    },
+    {
+      id: "edbtn__media",
+      title: "Add Images and other files (opens in a new window)",
+      icon: "image.png",
+      attributes: {
+        "data-media-popup": "1"
+      }
+    },
+    {
+      id: "edbtn__smileys",
+      title: "Smileys",
+      icon: "smiley.png",
+      attributes: {
+        "aria-controls": "picker__smileys",
+        "aria-haspopup": "true",
+        "data-picker-target": "picker__smileys"
+      }
+    },
+    {
+      id: "edbtn__chars",
+      title: "Special Chars",
+      icon: "chars.png",
+      attributes: {
+        "aria-controls": "picker__chars",
+        "aria-haspopup": "true",
+        "data-picker-target": "picker__chars"
+      }
+    }
+  ];
+
+  if (config.signature) {
+    controls.push({
+      id: "edbtn__sig",
+      title: "Insert Signature",
+      icon: "sig.png",
+      key: "y",
+      attributes: {
+        "data-toolbar-action": "insert",
+        "data-insert": renderEditSignature(config, principal)
+      }
+    });
+  }
+
+  return `${controls.map(renderEditorToolbarControl).join("")}
+    ${renderHeadingPicker()}
+    ${renderSmileyPicker()}
+    ${renderSpecialCharsPicker()}`;
+}
+
+function toolbarFormatControl(
+  id: string,
+  title: string,
+  icon: string,
+  key: string,
+  open: string,
+  close: string,
+  sample = title
+): EditorToolbarControl {
+  return {
+    id,
+    title,
+    icon,
+    key: key || undefined,
+    attributes: {
+      "data-toolbar-action": "format",
+      "data-open": open,
+      "data-close": close,
+      "data-sample": sample
+    }
+  };
+}
+
+function toolbarLineFormatControl(
+  id: string,
+  title: string,
+  icon: string,
+  key: string,
+  open: string,
+  close: string
+): EditorToolbarControl {
+  return {
+    id,
+    title,
+    icon,
+    key,
+    attributes: {
+      "data-toolbar-action": "formatln",
+      "data-open": open,
+      "data-close": close,
+      "data-sample": title
+    }
+  };
+}
+
+function toolbarAutoheadControl(
+  id: string,
+  title: string,
+  icon: string,
+  key: string,
+  mod: number
+): EditorToolbarControl {
+  return {
+    id,
+    title,
+    icon,
+    key,
+    attributes: {
+      "data-toolbar-action": "autohead",
+      "data-mod": String(mod),
+      "data-sample": "Headline"
+    }
+  };
+}
+
+function renderEditorToolbarControl(control: EditorToolbarControl): string {
+  const title = control.key ? `${control.title} [${control.key.toUpperCase()}]` : control.title;
+  const attributes = {
+    ...(control.attributes?.["aria-controls"] ? {} : { "aria-controls": "wiki__text" }),
+    ...control.attributes
+  };
+  const renderedAttributes = Object.entries(attributes)
+    .map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`)
+    .join("");
+  const id = control.id ? ` id="${escapeAttribute(control.id)}"` : "";
+  const accessKey = control.key ? ` accesskey="${escapeAttribute(control.key)}"` : "";
+  const className = `toolbutton${control.className ? ` ${control.className}` : ""}`;
+
+  return `<button${id} class="${escapeAttribute(className)}" type="button" title="${escapeAttribute(title)}"${accessKey}${renderedAttributes}>${renderToolbarIcon(control.icon)}</button>`;
+}
+
+function renderToolbarIcon(icon: string): string {
+  return `<img src="/images/toolbar/${escapeAttribute(icon)}" alt="" width="16" height="16">`;
+}
+
+function renderHeadingPicker(): string {
+  const controls = [
+    toolbarFormatControl("edbtn__h1", "Level 1 Headline", "h1.png", "1", "====== ", " ======\n"),
+    toolbarFormatControl("edbtn__h2", "Level 2 Headline", "h2.png", "2", "===== ", " =====\n"),
+    toolbarFormatControl("edbtn__h3", "Level 3 Headline", "h3.png", "3", "==== ", " ====\n"),
+    toolbarFormatControl("edbtn__h4", "Level 4 Headline", "h4.png", "4", "=== ", " ===\n"),
+    toolbarFormatControl("edbtn__h5", "Level 5 Headline", "h5.png", "5", "== ", " ==\n")
+  ];
+
+  return renderToolbarPicker(
+    "picker__headlines",
+    "pk_hl",
+    controls.map(renderEditorToolbarControl).join("")
+  );
+}
+
+function renderSmileyPicker(): string {
+  return renderToolbarPicker(
+    "picker__smileys",
+    "",
+    EDITOR_TOOLBAR_SMILEYS.map(([text, icon]) => {
+      return `<button class="pickerbutton" type="button" title="${escapeAttribute(text)}" aria-controls="wiki__text" data-picker-insert="${escapeAttribute(text)}"><img src="/images/smileys/${escapeAttribute(icon)}" alt="" height="16"></button>`;
+    }).join("")
+  );
+}
+
+function renderSpecialCharsPicker(): string {
+  return renderToolbarPicker(
+    "picker__chars",
+    "",
+    EDITOR_TOOLBAR_SPECIAL_CHARS.map((char) => {
+      return `<button class="pickerbutton" type="button" title="${escapeAttribute(char)}" aria-controls="wiki__text" data-picker-insert="${escapeAttribute(char)}">${escapeHtml(char)}</button>`;
+    }).join("")
+  );
+}
+
+function renderToolbarPicker(id: string, className: string, content: string): string {
+  const classes = `picker a11y${className ? ` ${className}` : ""}`;
+  return `<div id="${escapeAttribute(id)}" class="${escapeAttribute(classes)}" style="position: absolute" aria-hidden="true">${content}</div>`;
+}
+
 function renderEditPage(
   id: string,
   page: Awaited<ReturnType<typeof getCurrentPage>>,
@@ -13615,9 +13901,7 @@ function renderEditPage(
     lockToken && config.lockTime > 0
       ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}" data-lock-warning-delay="${config.lockTime * 1000}"`
       : "";
-  const signatureButton = config.signature
-    ? `<button class="toolbutton" type="button" data-insert="${escapeAttribute(renderEditSignature(config, principal))}" title="Signature">Sig</button>`
-    : "";
+  const editorToolbar = renderEditorToolbar(config, principal);
 
   return htmlShell(
     env,
@@ -13633,18 +13917,7 @@ function renderEditPage(
       <input type="hidden" name="lockToken" value="${escapeHtml(lockToken)}">
       ${sectionFields}
       <div class="toolbar group">
-        <div id="tool__bar" role="toolbar" aria-label="Editor toolbar">
-          <button class="toolbutton" type="button" data-wrap-before="**" data-wrap-after="**" data-placeholder="strong text" title="Bold"><strong>B</strong></button>
-          <button class="toolbutton" type="button" data-wrap-before="//" data-wrap-after="//" data-placeholder="emphasized text" title="Italic"><em>I</em></button>
-          <button class="toolbutton" type="button" data-line-before="====== " data-line-after=" ======" data-placeholder="Headline" title="Level 1 headline">H1</button>
-          <button class="toolbutton" type="button" data-line-before="===== " data-line-after=" =====" data-placeholder="Headline" title="Level 2 headline">H2</button>
-          <button id="edbtn__link" class="toolbutton" type="button" data-link-wizard="1" data-wrap-before="[[" data-wrap-after="]]" data-placeholder="page:id|Link text" title="Internal link">Link</button>
-          <button id="edbtn__media" class="toolbutton" type="button" data-media-popup="1" title="Media">Media</button>
-          <button class="toolbutton" type="button" data-prefix="  * " data-placeholder="List item" title="Unordered list">UL</button>
-          <button class="toolbutton" type="button" data-prefix="  - " data-placeholder="List item" title="Ordered list">OL</button>
-          <button class="toolbutton" type="button" data-wrap-before="<code>" data-wrap-after="</code>" data-placeholder="code" title="Code">Code</button>
-          ${signatureButton}
-        </div>
+        <div id="tool__bar" role="toolbar" aria-label="Editor toolbar">${editorToolbar}</div>
         ${draftStatus}
       </div>
       <textarea id="wiki__text" class="edit" name="content" rows="24" cols="100" data-preview-url="/api/pages/preview"${draftAttributes}>${escapeHtml(content)}</textarea>

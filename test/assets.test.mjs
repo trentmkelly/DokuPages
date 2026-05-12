@@ -25,6 +25,10 @@ describe("public assets", () => {
     expect(js).toContain("bindSearchAssistant");
     expect(js).toContain("openLinkWizard");
     expect(js).toContain("openMediaPopup");
+    expect(js).toContain("insertTags");
+    expect(js).toContain("formatLines");
+    expect(js).toContain("autoHeadline");
+    expect(js).toContain("pickerToggle");
     expect(js).toContain("bindEditorKeyHelpers");
     expect(js).toContain("lockWarningDelay");
     expect(js).toContain("data-media-tree-toggle");
@@ -84,6 +88,38 @@ describe("public assets", () => {
 
     for (const asset of assets) {
       await expect(readFile(asset)).resolves.toBeInstanceOf(Buffer);
+    }
+  });
+
+  it("ships upstream editor toolbar icons", async () => {
+    const toolbarIcons = [
+      "bold.png",
+      "chars.png",
+      "h.png",
+      "h1.png",
+      "h2.png",
+      "h3.png",
+      "h4.png",
+      "h5.png",
+      "hequal.png",
+      "hminus.png",
+      "hplus.png",
+      "hr.png",
+      "image.png",
+      "italic.png",
+      "link.png",
+      "linkextern.png",
+      "mono.png",
+      "ol.png",
+      "sig.png",
+      "smiley.png",
+      "strike.png",
+      "ul.png",
+      "underline.png"
+    ];
+
+    for (const icon of toolbarIcons) {
+      await expect(readFile(`public/images/toolbar/${icon}`)).resolves.toBeInstanceOf(Buffer);
     }
   });
 });

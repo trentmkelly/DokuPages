@@ -15,3 +15,7 @@ License:    GNU GPL v2, matching the upstream DokuWiki distribution
 Icons for:  bullet.png, closed-rtl.png, closed.png, email.svg, external-link.svg, icon-list.png, icon-sort.png, ns.png, open.png, page.png, resizecol.png, throbber.gif, unc.svg, up.png
 Source:     DokuWiki lib/images
 License:    GNU GPL v2, matching the upstream DokuWiki distribution
+
+Icons for:  toolbar/*.png
+Source:     DokuWiki lib/images/toolbar
+License:    GNU GPL v2, matching the upstream DokuWiki distribution

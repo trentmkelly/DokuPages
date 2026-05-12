@@ -13,7 +13,7 @@ missing, and appends `src/styles/dokuwiki-pages-overrides.css`. Use
 sources and Pages override layer.
 
 The current port checks in the generated CSS, JavaScript, DokuWiki logo, icons,
-and image assets that Pages serves.
+editor toolbar icons, smileys, and image assets that Pages serves.
 
 Top-level HTML references use `?v=<APP_VERSION>-<CF_PAGES_COMMIT_SHA prefix>`
 fingerprints for cache busting on Cloudflare Pages, falling back to

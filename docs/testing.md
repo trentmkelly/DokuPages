@@ -60,7 +60,8 @@ wizard surfaces, uploader hooks, and admin task pages. They also verify that
 the upstream image assets referenced by those converted rules are shipped.
 They pin native browser hooks for upstream-style cookies, hotkeys, quick
 search, search assistant toggles, link wizard insertion, media popups, editor
-helpers, lock warnings, and media manager uploads.
+helpers, toolbar insertion, picker toggles, lock warnings, and media manager
+uploads. Asset tests also verify the upstream editor toolbar icons are present.
 `npm run format:check` runs `npm run style:check` before Prettier so generated
 `public/dokuwiki.css` cannot drift from upstream `style.ini`, upstream template
 CSS modules, or `src/styles/dokuwiki-pages-overrides.css`.

@@ -138,104 +138,241 @@
     return textarea.value.slice(textarea.selectionStart, textarea.selectionEnd) || fallback;
   }
 
-  function replaceSelection(textarea, replacement, cursorOffset) {
-    var start = textarea.selectionStart;
-    var end = textarea.selectionEnd;
-    var before = textarea.value.slice(0, start);
-    var after = textarea.value.slice(end);
-
-    textarea.value = before + replacement + after;
+  function currentSelection(textarea) {
     textarea.focus();
+    return {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+      scroll: textarea.scrollTop
+    };
+  }
 
-    var cursor = start + (cursorOffset == null ? replacement.length : cursorOffset);
-    textarea.setSelectionRange(cursor, cursor);
+  function pasteText(textarea, selection, replacement, options) {
+    var opts = options || {};
+
+    textarea.value =
+      textarea.value.slice(0, selection.start) + replacement + textarea.value.slice(selection.end);
+
+    selection.end = selection.start + replacement.length;
+    if (opts.startofs) selection.start += opts.startofs;
+    if (opts.endofs) selection.end -= opts.endofs;
+    if (opts.nosel) selection.start = selection.end;
+
+    textarea.focus();
+    textarea.setSelectionRange(selection.start, selection.end);
+    textarea.scrollTop = selection.scroll;
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
-  function wrapSelection(textarea, button) {
-    var before = button.dataset.wrapBefore || "";
-    var after = button.dataset.wrapAfter || "";
-    var placeholder = button.dataset.placeholder || "";
-    var text = selectedText(textarea, placeholder);
-    var replacement = before + text + after;
-
-    replaceSelection(textarea, replacement, before.length + text.length);
+  function replaceSelection(textarea, replacement, cursorOffset) {
+    var selection = currentSelection(textarea);
+    var cursor = cursorOffset == null ? replacement.length : cursorOffset;
+    pasteText(textarea, selection, replacement, {
+      startofs: cursor,
+      endofs: replacement.length - cursor
+    });
   }
 
-  function wrapLine(textarea, button) {
-    var lineBefore = button.dataset.lineBefore || "";
-    var lineAfter = button.dataset.lineAfter || "";
-    var placeholder = button.dataset.placeholder || "";
-    var start = textarea.selectionStart;
-    var end = textarea.selectionEnd;
-    var value = textarea.value;
-    var lineStart = value.lastIndexOf("\n", start - 1) + 1;
-    var lineEnd = value.indexOf("\n", end);
+  function fixToolbarText(value) {
+    return String(value || "").replace(/\\n/g, "\n");
+  }
 
-    if (lineEnd === -1) {
-      lineEnd = value.length;
+  function insertTags(textarea, open, close, sample) {
+    var selection = currentSelection(textarea);
+    var text = textarea.value.slice(selection.start, selection.end);
+    var options;
+
+    if (text.charAt(text.length - 1) === " ") {
+      selection.end -= 1;
+      text = textarea.value.slice(selection.start, selection.end);
     }
 
-    var text = value.slice(lineStart, lineEnd) || placeholder;
-    var replacement = lineBefore + text.replace(/^=+\s*|\s*=+$/g, "") + lineAfter;
+    if (!text) {
+      text = sample;
+      options = {
+        startofs: open.length,
+        endofs: close.length
+      };
+    } else {
+      options = { nosel: true };
+    }
 
-    textarea.value = value.slice(0, lineStart) + replacement + value.slice(lineEnd);
-    textarea.focus();
-    textarea.setSelectionRange(
-      lineStart + lineBefore.length,
-      lineStart + replacement.length - lineAfter.length
-    );
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    pasteText(textarea, selection, open + text + close, options);
+    pickerClose();
   }
 
-  function prefixSelection(textarea, button) {
-    var prefix = button.dataset.prefix || "";
-    var placeholder = button.dataset.placeholder || "";
-    var text = selectedText(textarea, placeholder);
-    var replacement = text
-      .split("\n")
-      .map(function (line) {
-        return line ? prefix + line : prefix.trimEnd();
-      })
-      .join("\n");
+  function formatSelection(textarea, button) {
+    insertTags(
+      textarea,
+      fixToolbarText(button.dataset.open || button.dataset.wrapBefore || ""),
+      fixToolbarText(button.dataset.close || button.dataset.wrapAfter || ""),
+      fixToolbarText(button.dataset.sample || button.dataset.placeholder || button.title)
+    );
+  }
 
-    replaceSelection(textarea, replacement);
+  function formatLines(textarea, button) {
+    var selection = currentSelection(textarea);
+    var open = fixToolbarText(button.dataset.open || button.dataset.prefix || "");
+    var close = fixToolbarText(button.dataset.close || "");
+    var sample = fixToolbarText(
+      button.dataset.sample || button.dataset.placeholder || button.title
+    );
+    var text = textarea.value.slice(selection.start, selection.end);
+    var options;
+
+    if (text) {
+      sample = text;
+      options = { nosel: true };
+    } else {
+      options = {
+        startofs: open.length,
+        endofs: close.length
+      };
+    }
+
+    pasteText(
+      textarea,
+      selection,
+      open + sample.split("\n").join(close + "\n" + open) + close,
+      options
+    );
+    pickerClose();
+  }
+
+  function currentHeadlineLevel(textarea) {
+    var form = textarea.form;
+    var prefix = form ? form.querySelector('input[name="prefix"]') : null;
+    var candidates = [textarea.value.slice(0, textarea.selectionStart)];
+
+    if (prefix) {
+      candidates.push(prefix.value);
+    }
+
+    for (var index = 0; index < candidates.length; index += 1) {
+      var before = "\n" + candidates[index];
+      var offset = before.lastIndexOf("\n==");
+      if (offset === -1) {
+        continue;
+      }
+
+      var match = before.slice(offset + 1, offset + 7).match(/^={2,6}/);
+      if (match) {
+        return 7 - match[0].length;
+      }
+    }
+
+    return 0;
+  }
+
+  function autoHeadline(textarea, button) {
+    var level = currentHeadlineLevel(textarea) + Number(button.dataset.mod || 0);
+    if (level < 1) level = 1;
+    if (level > 5) level = 5;
+
+    var tags = "=".repeat(7 - level);
+    insertTags(textarea, tags + " ", " " + tags + "\n", button.dataset.sample || "Headline");
+  }
+
+  function pickerClose(except) {
+    document.querySelectorAll(".picker").forEach(function (picker) {
+      if (except && picker === except) {
+        return;
+      }
+
+      picker.classList.add("a11y");
+      picker.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function pickerToggle(pickerId, button) {
+    var picker = document.querySelector("#" + pickerId);
+
+    if (!picker) {
+      return;
+    }
+
+    var open = picker.classList.contains("a11y") || picker.getAttribute("aria-hidden") !== "false";
+    pickerClose(picker);
+
+    if (!open) {
+      picker.classList.add("a11y");
+      picker.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    var position = button.getBoundingClientRect();
+    var pickerWidth = Math.min(picker.offsetWidth || 300, 300);
+    var left = position.left + window.scrollX + 3;
+    var maxLeft = window.scrollX + window.innerWidth - pickerWidth - 40;
+
+    if (left > maxLeft) left = maxLeft;
+    if (left < window.scrollX) left = window.scrollX;
+
+    picker.classList.remove("a11y");
+    picker.setAttribute("aria-hidden", "false");
+    picker.style.left = left + "px";
+    picker.style.top = position.top + window.scrollY + button.offsetHeight + 3 + "px";
+    picker.style.maxWidth = "300px";
   }
 
   function insertText(textarea, button) {
-    replaceSelection(textarea, button.dataset.insert || "");
+    replaceSelection(textarea, fixToolbarText(button.dataset.insert || ""));
+    pickerClose();
   }
 
   function bindToolbar(form, textarea) {
-    form.querySelectorAll("#tool__bar button").forEach(function (button) {
-      button.addEventListener("click", function () {
-        if (button.dataset.linkWizard != null) {
-          openLinkWizard(textarea);
-          return;
-        }
+    form.addEventListener("click", function (event) {
+      var button = event.target.closest ? event.target.closest("button") : null;
 
-        if (button.dataset.mediaPopup != null) {
-          openMediaPopup(form);
-          return;
-        }
+      if (!button || !form.contains(button)) {
+        return;
+      }
 
-        if (button.dataset.insert != null) {
+      if (button.dataset.pickerTarget) {
+        event.preventDefault();
+        pickerToggle(button.dataset.pickerTarget, button);
+        return;
+      }
+
+      if (button.dataset.pickerInsert != null) {
+        event.preventDefault();
+        replaceSelection(textarea, fixToolbarText(button.dataset.pickerInsert));
+        pickerClose();
+        return;
+      }
+
+      if (button.dataset.linkWizard != null) {
+        event.preventDefault();
+        openLinkWizard(textarea);
+        return;
+      }
+
+      if (button.dataset.mediaPopup != null) {
+        event.preventDefault();
+        openMediaPopup(form);
+        return;
+      }
+
+      if (!button.dataset.toolbarAction && !button.dataset.wrapBefore && !button.dataset.prefix) {
+        return;
+      }
+
+      event.preventDefault();
+      switch (button.dataset.toolbarAction) {
+        case "insert":
           insertText(textarea, button);
-          return;
-        }
-
-        if (button.dataset.lineBefore || button.dataset.lineAfter) {
-          wrapLine(textarea, button);
-          return;
-        }
-
-        if (button.dataset.prefix) {
-          prefixSelection(textarea, button);
-          return;
-        }
-
-        wrapSelection(textarea, button);
-      });
+          break;
+        case "formatln":
+          formatLines(textarea, button);
+          break;
+        case "autohead":
+          autoHeadline(textarea, button);
+          break;
+        case "format":
+        default:
+          formatSelection(textarea, button);
+          break;
+      }
     });
   }
 

@@ -196,7 +196,7 @@ are not fixed by this checklist.
 - [x] Match upstream CSS modules more completely, including forms, tabs, media popups, media fullscreen views, search assistant, modals, and admin plugin pages.
 - [x] Replace the hand-maintained CSS bundle with a traceable build or copy strategy from upstream `lib/tpl/dokuwiki/css`.
 - [x] Port upstream JavaScript behaviors from `lib/scripts`, including toolbar, hotkeys, lock timer, qsearch, link wizard, media popup, tree expansion, search assistant, cookies, and editor helpers.
-- [ ] Match upstream editor toolbar buttons, picker dialogs, shortcut keys, and insertion behavior.
+- [x] Match upstream editor toolbar buttons, picker dialogs, shortcut keys, and insertion behavior.
 - [ ] Match upstream section edit buttons, action icons, and disabled-action hiding.
 - [ ] Match upstream accessibility text, skip links, access keys, and ARIA behavior.
 - [ ] Match upstream validation badges, license footer behavior, and template messages.
