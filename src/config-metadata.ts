@@ -293,6 +293,7 @@ export const RUNTIME_ENV_DOKUWIKI_KEYS: Readonly<Record<string, string>> = {
   USEWORDBLOCK: "usewordblock",
   REL_NOFOLLOW: "relnofollow",
   IEXSSPROTECT: "iexssprotect",
+  MAILGUARD: "mailguard",
   USEDRAFT: "usedraft",
   LOCKTIME: "locktime",
   CACHETIME: "cachetime",

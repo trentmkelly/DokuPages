@@ -1,5 +1,6 @@
 import type { RuntimeConfig } from "../config";
 import { resolveInterwikiLink } from "./interwiki";
+import { mailtoHrefAddress, obfuscateEmail, type MailguardMode } from "./mailguard";
 
 export interface UserDisplaySource {
   userId?: string | null;
@@ -12,7 +13,8 @@ export interface UserDisplaySource {
 
 export function renderUserDisplay(
   source: UserDisplaySource,
-  showUserAs: RuntimeConfig["showUserAs"]
+  showUserAs: RuntimeConfig["showUserAs"],
+  mailguard: MailguardMode = "hex"
 ): string {
   const username = displayUsername(source);
   const displayName = source.displayName?.trim() || username;
@@ -33,11 +35,11 @@ export function renderUserDisplay(
   }
 
   if (showUserAs === "email") {
-    return email ? obfuscateEmail(email) : escapeHtml(username);
+    return email ? obfuscateEmail(email, mailguard) : escapeHtml(username);
   }
 
   if (showUserAs === "email_link") {
-    return email ? renderEmailLink(email) : escapeHtml(username);
+    return email ? renderEmailLink(email, mailguard) : escapeHtml(username);
   }
 
   return escapeHtml(username);
@@ -63,15 +65,10 @@ function displayUsername(source: UserDisplaySource): string {
   );
 }
 
-function renderEmailLink(email: string): string {
-  const obfuscated = obfuscateEmail(email);
-  return `<a href="mailto:${obfuscated}" class="mail" title="${obfuscated}">${obfuscated}</a>`;
-}
-
-function obfuscateEmail(email: string): string {
-  return Array.from(email)
-    .map((char) => `&#x${char.codePointAt(0)?.toString(16)};`)
-    .join("");
+function renderEmailLink(email: string, mailguard: MailguardMode): string {
+  const obfuscated = obfuscateEmail(email, mailguard);
+  const hrefAddress = mailtoHrefAddress(email, mailguard);
+  return `<a href="mailto:${hrefAddress}" class="mail" title="${obfuscated}">${obfuscated}</a>`;
 }
 
 function escapeHtml(value: string): string {

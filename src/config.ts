@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { isValidIpOrCidr } from "./http/client-ip";
 import { APP_VERSION } from "./version";
+import { normalizeMailguardMode, type MailguardMode } from "./wiki/mailguard";
 import {
   isSupportedLanguage,
   normalizeLanguage,
@@ -49,6 +50,7 @@ const SHOW_USER_AS_VALUES = new Set([
   "email_link"
 ]);
 const LOG_FACILITY_VALUES = new Set(["error", "debug", "deprecated"] as const);
+const MAILGUARD_VALUES = ["visible", "hex", "none"] as const;
 
 export type DokuWikiLogFacility = "error" | "debug" | "deprecated";
 
@@ -99,6 +101,7 @@ export interface RuntimeConfig {
   refcheck: boolean;
   mediaRevisions: boolean;
   ieXssProtect: boolean;
+  mailguard: MailguardMode;
   fetchSize: number;
   rssType: "rss" | "rss1" | "rss2" | "atom" | "atom1";
   rssLinkTo: "diff" | "page" | "rev" | "current";
@@ -224,6 +227,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     refcheck: booleanConfig(env.REFCHECK, true),
     mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
     ieXssProtect: booleanConfig(env.IEXSSPROTECT, true),
+    mailguard: normalizeMailguardMode(env.MAILGUARD),
     fetchSize: integerConfig(env.FETCHSIZE, 0, 0, 100 * 1024 * 1024),
     rssType: rssTypeConfig(env.RSS_TYPE),
     rssLinkTo: rssLinkToConfig(env.RSS_LINKTO),
@@ -287,6 +291,7 @@ export function validateRuntimeConfig(env: Env): ConfigValidation {
   validateIntegerRange("LOCKTIME", env.LOCKTIME, 0, 604800, issues);
   validateIntegerRange("TYPOGRAPHY", env.TYPOGRAPHY, 0, 2, issues);
   validateIntegerRange("FETCHSIZE", env.FETCHSIZE, 0, 100 * 1024 * 1024, issues);
+  validateMailguard(env.MAILGUARD, issues);
   validateRssType(env.RSS_TYPE, issues);
   validateRssLinkTo(env.RSS_LINKTO, issues);
   validateRssContent(env.RSS_CONTENT, issues);
@@ -390,6 +395,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("REFCHECK", env.REFCHECK, String(config.refcheck), "true"),
     configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
     configEntry("IEXSSPROTECT", env.IEXSSPROTECT, String(config.ieXssProtect), "true"),
+    configEntry("MAILGUARD", env.MAILGUARD, config.mailguard, "hex"),
     configEntry("FETCHSIZE", env.FETCHSIZE, String(config.fetchSize), "0"),
     configEntry("RSS_TYPE", env.RSS_TYPE, config.rssType, "rss1"),
     configEntry("RSS_LINKTO", env.RSS_LINKTO, config.rssLinkTo, "diff"),
@@ -831,6 +837,10 @@ function validateRssType(value: string | undefined, issues: ConfigValidationIssu
   validateChoice("RSS_TYPE", value, ["rss", "rss1", "rss2", "atom", "atom1"], issues);
 }
 
+function validateMailguard(value: string | undefined, issues: ConfigValidationIssue[]): void {
+  validateChoice("MAILGUARD", value, [...MAILGUARD_VALUES], issues);
+}
+
 function validateRssLinkTo(value: string | undefined, issues: ConfigValidationIssue[]): void {
   validateChoice("RSS_LINKTO", value, ["diff", "page", "rev", "current"], issues);
 }
@@ -998,6 +1008,7 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "USEWORDBLOCK",
   "REL_NOFOLLOW",
   "IEXSSPROTECT",
+  "MAILGUARD",
   "USEDRAFT",
   "MEDIAREVISIONS",
   "REFCHECK",

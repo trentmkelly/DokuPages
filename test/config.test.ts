@@ -62,6 +62,7 @@ describe("runtime config", () => {
       refcheck: true,
       mediaRevisions: true,
       ieXssProtect: true,
+      mailguard: "hex",
       fetchSize: 0,
       rssType: "rss1",
       rssLinkTo: "diff",
@@ -157,6 +158,7 @@ describe("runtime config", () => {
       REFCHECK: "0",
       MEDIAREVISIONS: "0",
       IEXSSPROTECT: "0",
+      MAILGUARD: "visible",
       FETCHSIZE: "65536",
       RSS_TYPE: "atom1",
       RSS_LINKTO: "current",
@@ -232,6 +234,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).refcheck).toBe(false);
     expect(getRuntimeConfig(env).mediaRevisions).toBe(false);
     expect(getRuntimeConfig(env).ieXssProtect).toBe(false);
+    expect(getRuntimeConfig(env).mailguard).toBe("visible");
     expect(getRuntimeConfig(env).fetchSize).toBe(65536);
     expect(getRuntimeConfig(env).rssType).toBe("atom1");
     expect(getRuntimeConfig(env).rssLinkTo).toBe("current");
@@ -484,6 +487,11 @@ describe("runtime config", () => {
           effectiveValue: "true"
         }),
         expect.objectContaining({
+          key: "MAILGUARD",
+          effectiveValue: "hex",
+          dokuwikiKey: "mailguard"
+        }),
+        expect.objectContaining({
           key: "FETCHSIZE",
           effectiveValue: "0"
         }),
@@ -710,6 +718,7 @@ describe("runtime config", () => {
       CACHETIME: "-1",
       LOCKTIME: "-1",
       TYPOGRAPHY: "3",
+      MAILGUARD: "rot13",
       RSS_TYPE: "json",
       RSS_LINKTO: "bad",
       RSS_CONTENT: "bad",
@@ -760,6 +769,7 @@ describe("runtime config", () => {
         expect.objectContaining({ key: "CACHETIME", severity: "error" }),
         expect.objectContaining({ key: "LOCKTIME", severity: "error" }),
         expect.objectContaining({ key: "TYPOGRAPHY", severity: "error" }),
+        expect.objectContaining({ key: "MAILGUARD", severity: "error" }),
         expect.objectContaining({ key: "RSS_TYPE", severity: "error" }),
         expect.objectContaining({ key: "RSS_LINKTO", severity: "error" }),
         expect.objectContaining({ key: "RSS_CONTENT", severity: "error" }),

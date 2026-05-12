@@ -18,10 +18,14 @@ describe("DokuWiki user display modes", () => {
       '<a href="/wiki/user/alice" class="interwiki iw_user">Alice Example</a>'
     );
     expect(renderUserDisplay(user, "email")).toBe(
-      "&#x61;&#x6c;&#x69;&#x63;&#x65;&#x40;&#x65;&#x78;&#x61;&#x6d;&#x70;&#x6c;&#x65;&#x2e;&#x74;&#x65;&#x73;&#x74;"
+      "&#97;&#108;&#105;&#99;&#101;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#116;&#101;&#115;&#116;"
     );
     expect(renderUserDisplay(user, "email_link")).toBe(
-      '<a href="mailto:&#x61;&#x6c;&#x69;&#x63;&#x65;&#x40;&#x65;&#x78;&#x61;&#x6d;&#x70;&#x6c;&#x65;&#x2e;&#x74;&#x65;&#x73;&#x74;" class="mail" title="&#x61;&#x6c;&#x69;&#x63;&#x65;&#x40;&#x65;&#x78;&#x61;&#x6d;&#x70;&#x6c;&#x65;&#x2e;&#x74;&#x65;&#x73;&#x74;">&#x61;&#x6c;&#x69;&#x63;&#x65;&#x40;&#x65;&#x78;&#x61;&#x6d;&#x70;&#x6c;&#x65;&#x2e;&#x74;&#x65;&#x73;&#x74;</a>'
+      '<a href="mailto:&#97;&#108;&#105;&#99;&#101;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#116;&#101;&#115;&#116;" class="mail" title="&#97;&#108;&#105;&#99;&#101;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#116;&#101;&#115;&#116;">&#97;&#108;&#105;&#99;&#101;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#116;&#101;&#115;&#116;</a>'
+    );
+    expect(renderUserDisplay(user, "email", "visible")).toBe("alice [at] example [dot] test");
+    expect(renderUserDisplay(user, "email_link", "none")).toBe(
+      '<a href="mailto:alice@example.test" class="mail" title="alice@example.test">alice@example.test</a>'
     );
   });
 });

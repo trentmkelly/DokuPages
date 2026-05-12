@@ -1804,6 +1804,7 @@ async function handlePagePreview(
     maxSectionEditLevel: renderConfig.maxSectionEditLevel,
     camelCaseLinks: renderConfig.camelCaseLinks,
     typographyMode: renderConfig.typographyMode,
+    mailguard: renderConfig.mailguard,
     pageIdCleanOptions: config.pageIdCleanOptions,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
@@ -4893,6 +4894,7 @@ type RenderRuntimeConfig = Pick<
   | "typographyMode"
   | "autoPluralLinks"
   | "relNofollow"
+  | "mailguard"
   | "linkTargets"
 >;
 
@@ -4905,7 +4907,8 @@ function usesDefaultRenderControls(config: RenderRuntimeConfig): boolean {
     config.maxSectionEditLevel === 3 &&
     !config.camelCaseLinks &&
     !config.autoPluralLinks &&
-    config.typographyMode === 1
+    config.typographyMode === 1 &&
+    config.mailguard === "hex"
   );
 }
 
@@ -5032,6 +5035,7 @@ async function renderPageHtml(
     maxSectionEditLevel: renderConfig.maxSectionEditLevel,
     camelCaseLinks: renderConfig.camelCaseLinks,
     typographyMode: renderConfig.typographyMode,
+    mailguard: renderConfig.mailguard,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
     rssDateFormatter: (date) => formatRuntimeDate(config, date)
@@ -5152,6 +5156,7 @@ async function renderPageExport(
     maxSectionEditLevel: renderConfig.maxSectionEditLevel,
     camelCaseLinks: renderConfig.camelCaseLinks,
     typographyMode: renderConfig.typographyMode,
+    mailguard: renderConfig.mailguard,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
     rssDateFormatter: (date) => formatRuntimeDate(config, date)
@@ -5358,6 +5363,7 @@ async function renderSidebarForPage(
     maxSectionEditLevel: renderConfig.maxSectionEditLevel,
     camelCaseLinks: renderConfig.camelCaseLinks,
     typographyMode: renderConfig.typographyMode,
+    mailguard: renderConfig.mailguard,
     mediaTokenSecret: mediaTokenSecret(env),
     rssFeeds,
     rssDateFormatter: (date) => formatRuntimeDate(config, date)
@@ -5457,6 +5463,7 @@ async function runtimeSafeRenderConfig(
     autoPluralLinks:
       importedDokuWikiBooleanConfig(imported, "autoplural") ?? fallback.autoPluralLinks,
     relNofollow: importedDokuWikiBooleanConfig(imported, "relnofollow") ?? fallback.relNofollow,
+    mailguard: importedDokuWikiMailguardConfig(imported) ?? fallback.mailguard,
     linkTargets: {
       wiki: wikiTarget !== undefined ? wikiTarget : fallback.linkTargets.wiki,
       interwiki: interwikiTarget !== undefined ? interwikiTarget : fallback.linkTargets.interwiki,
@@ -5514,6 +5521,13 @@ function importedDokuWikiStringConfig(
   if (value === undefined) return undefined;
 
   return parseDokuWikiStringConfigMetadata(value);
+}
+
+function importedDokuWikiMailguardConfig(
+  imported: Map<string, string>
+): RuntimeConfig["mailguard"] | null {
+  const value = importedDokuWikiStringConfig(imported, "mailguard");
+  return value === "visible" || value === "hex" || value === "none" ? value : null;
 }
 
 function isRuntimeSafeImportedDokuWikiConfig(value: string): boolean {
@@ -5945,7 +5959,7 @@ async function renderRevisionsPage(
   const items = revisions
     .map((revision) => {
       const editor = revision.author
-        ? `<span class="user"><bdi>${renderUserDisplay(revision.author, config.showUserAs)}</bdi></span>`
+        ? `<span class="user"><bdi>${renderUserDisplay(revision.author, config.showUserAs, config.mailguard)}</bdi></span>`
         : "";
 
       return `<li class="${revision.changeType === "minor" ? "minor" : ""}">
@@ -6411,7 +6425,7 @@ function renderRecentChangeItem(env: Env, change: RecentChange): string {
 function renderRecentChangeEditor(env: Env, change: RecentChange): string {
   const config = getRuntimeConfig(env);
   const editor = change.user
-    ? renderUserDisplay(change.user, config.showUserAs)
+    ? renderUserDisplay(change.user, config.showUserAs, config.mailguard)
     : change.ip
       ? escapeHtml(change.ip)
       : "";
@@ -8594,6 +8608,7 @@ async function pageFeedHtml(
   const rendered = renderWikiText(revision.content, {
     pageId: revision.pageId,
     typographyMode: config.typographyMode,
+    mailguard: config.mailguard,
     pageIdCleanOptions: config.pageIdCleanOptions,
     linkTargets: config.linkTargets,
     relNofollow: config.relNofollow
@@ -12256,7 +12271,9 @@ function renderPageInfo(
   updatedBy?: UserDisplaySource | null
 ): string {
   const path = pageInfoPath(config, pageId);
-  const by = updatedBy ? ` by <bdi>${renderUserDisplay(updatedBy, config.showUserAs)}</bdi>` : "";
+  const by = updatedBy
+    ? ` by <bdi>${renderUserDisplay(updatedBy, config.showUserAs, config.mailguard)}</bdi>`
+    : "";
   return `<bdi>${escapeHtml(path)}</bdi> · Last modified: <time datetime="${escapeAttribute(updatedAt)}">${escapeHtml(updatedAt)}</time>${by}`;
 }
 

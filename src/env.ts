@@ -52,6 +52,7 @@ export interface Env {
   REFCHECK?: string;
   MEDIAREVISIONS?: string;
   IEXSSPROTECT?: string;
+  MAILGUARD?: string;
   FETCHSIZE?: string;
   RSS_TYPE?: string;
   RSS_LINKTO?: string;

@@ -150,6 +150,9 @@ Optional Pages environment variables:
   Default: enabled.
 - `USEWORDBLOCK`: set to `0` to disable DokuWiki's wordblock spam list for page
   edits, page reverts, and text media uploads. Default: enabled.
+- `MAILGUARD`: email address obfuscation mode for wiki email links and
+  `SHOWUSERAS=email*` user displays. Supported values are `visible`, `hex`, and
+  `none`. Default: `hex`.
 - `FETCHSIZE`: maximum bytes `lib/exe/fetch.php` may download for external
   image media. Default: `0`, which disables proxy downloads and redirects to the
   original URL like upstream DokuWiki.

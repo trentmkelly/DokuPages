@@ -1284,7 +1284,7 @@ describe("auth routes", () => {
     const emailHtml = await emailPage.text();
 
     expect(emailHtml).toContain(
-      '<a href="mailto:&#x61;&#x6c;&#x69;&#x63;&#x65;&#x40;&#x65;&#x78;&#x61;&#x6d;&#x70;&#x6c;&#x65;&#x2e;&#x74;&#x65;&#x73;&#x74;" class="mail"'
+      '<a href="mailto:&#97;&#108;&#105;&#99;&#101;&#64;&#101;&#120;&#97;&#109;&#112;&#108;&#101;&#46;&#116;&#101;&#115;&#116;" class="mail"'
     );
   });
 

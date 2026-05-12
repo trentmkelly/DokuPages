@@ -484,6 +484,23 @@ describe("renderWikiText", () => {
     expect(rendered.html).not.toContain("team@example.org");
   });
 
+  it("renders visible and none mailguard email modes", () => {
+    const visible = renderWikiText("<team-mail@example.org> [[team-mail@example.org|Team]]", {
+      mailguard: "visible"
+    });
+    const none = renderWikiText("<team-mail@example.org>", { mailguard: "none" });
+
+    expect(visible.html).toContain(
+      '<a href="mailto:team%20%5Bdash%5D%20mail%20%5Bat%5D%20example%20%5Bdot%5D%20org" class="mail" title="team [dash] mail [at] example [dot] org">team [dash] mail [at] example [dot] org</a>'
+    );
+    expect(visible.html).toContain(
+      '<a href="mailto:team%20%5Bdash%5D%20mail%20%5Bat%5D%20example%20%5Bdot%5D%20org" class="mail" title="team [dash] mail [at] example [dot] org">Team</a>'
+    );
+    expect(none.html).toContain(
+      '<a href="mailto:team-mail@example.org" class="mail" title="team-mail@example.org">team-mail@example.org</a>'
+    );
+  });
+
   it("renders lists, code blocks, and nowiki spans", () => {
     const rendered = renderWikiText(
       "  * first\n  * **second**\n    * nested\n  - ordered\n\n  <unsafe>\n\n%%**literal**%%"

@@ -568,12 +568,13 @@ describe("handleRequest", () => {
       updated_at: "2026-05-07T00:00:00.000Z"
     });
     state.metadata.push(importedDokuWikiConfigMetadata("relnofollow", 0));
+    state.metadata.push(importedDokuWikiConfigMetadata("mailguard", "visible"));
     state.metadata.push(importedDokuWikiConfigMetadata("target.extern", "_blank"));
     state.metadata.push(importedDokuWikiConfigMetadata("target.interwiki", "_blank"));
     state.row = {
       ...currentPageRow(),
       content:
-        "====== Welcome ======\n\n'quoted' don't and 640x480?? :-) API [[docs>Guide|Docs]] [[foo://service/path|Foo]]"
+        "====== Welcome ======\n\n'quoted' don't and 640x480?? :-) API <team-mail@example.org> [[docs>Guide|Docs]] [[foo://service/path|Foo]]"
     };
 
     const response = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), env);
@@ -583,6 +584,9 @@ describe("handleRequest", () => {
     expect(html).toContain("‘quoted’ don’t and 640&times;480‽");
     expect(html).toContain('<img src="/images/smileys/custom.svg"');
     expect(html).toContain('<abbr title="Custom API">API</abbr>');
+    expect(html).toContain(
+      '<a href="mailto:team%20%5Bdash%5D%20mail%20%5Bat%5D%20example%20%5Bdot%5D%20org" class="mail" title="team [dash] mail [at] example [dot] org">team [dash] mail [at] example [dot] org</a>'
+    );
     expect(html).toContain(
       '<a href="https://docs.example/Guide" class="interwiki iw_docs" target="_blank" rel="noopener">Docs</a>'
     );

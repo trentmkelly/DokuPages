@@ -27,6 +27,7 @@ import {
   phpCompatibilityInfoRows
 } from "./info-equivalents";
 import { highlightSyntax } from "./syntax-highlight";
+import { mailtoHrefAddress, obfuscateEmail, type MailguardMode } from "./mailguard";
 
 export interface TocItem {
   id: string;
@@ -77,6 +78,7 @@ export interface RenderWikiTextOptions {
   maxSectionEditLevel?: number;
   camelCaseLinks?: boolean;
   typographyMode?: number;
+  mailguard?: MailguardMode;
   pageIdCleanOptions?: PageIdCleanOptions;
   mediaTokenSecret?: string | null;
   rssFeeds?: ReadonlyMap<string, RssFeedResult>;
@@ -238,6 +240,7 @@ export function renderWikiText(
     maxSectionEditLevel: clampHeadingLevel(options.maxSectionEditLevel, 5, 0),
     camelCaseLinks: options.camelCaseLinks ?? false,
     typographyMode: clampTypographyMode(options.typographyMode),
+    mailguard: options.mailguard ?? "hex",
     pageIdCleanOptions: options.pageIdCleanOptions,
     mediaTokenSecret: options.mediaTokenSecret,
     rssFeeds: options.rssFeeds ?? new Map(),
@@ -490,6 +493,7 @@ interface RenderContext {
   maxSectionEditLevel: number;
   camelCaseLinks: boolean;
   typographyMode: number;
+  mailguard: MailguardMode;
   pageIdCleanOptions?: PageIdCleanOptions;
   mediaTokenSecret?: string | null;
   rssFeeds: ReadonlyMap<string, RssFeedResult>;
@@ -866,6 +870,7 @@ function flushFootnotes(blocks: string[], context: RenderContext): void {
             maxSectionEditLevel: context.maxSectionEditLevel,
             camelCaseLinks: context.camelCaseLinks,
             typographyMode: context.typographyMode,
+            mailguard: context.mailguard,
             pageIdCleanOptions: context.pageIdCleanOptions,
             mediaTokenSecret: context.mediaTokenSecret,
             rssFeeds: context.rssFeeds,
@@ -918,7 +923,7 @@ function renderInline(source: string, context: RenderContext): string {
     context.linkTargets,
     protectHtml
   );
-  rendered = renderEmailAutolinks(rendered, protectHtml);
+  rendered = renderEmailAutolinks(rendered, context, protectHtml);
   rendered = renderTypography(rendered, context.entityReplacements, context.typographyMode);
   rendered = renderCamelCaseLinks(rendered, context, protectHtml);
   rendered = renderSmileys(rendered, context.smileys, protectHtml);
@@ -1134,10 +1139,7 @@ function renderPluginInfoItem(
     plugin.url,
     plugin.name,
     context
-  )} <em>${escapeHtml(plugin.date)}</em> by ${renderEmailLink(
-    plugin.email,
-    plugin.author
-  )}<br>${escapeHtml(plugin.desc)}</div></li>`;
+  )} <em>${escapeHtml(plugin.date)}</em> by ${renderEmailLink(plugin.email, context, plugin.author)}<br>${escapeHtml(plugin.desc)}</div></li>`;
 }
 
 function renderInfoTable(rows: Array<readonly [string, string]>): string {
@@ -1461,7 +1463,7 @@ function renderLinks(
     const label = decodeHtmlEntities(explicitLabel || target);
 
     if (isEmailAddress(target)) {
-      return protectHtml(renderEmailLink(target, explicitLabel ? label : undefined));
+      return protectHtml(renderEmailLink(target, context, explicitLabel ? label : undefined));
     }
 
     const external = isExternalLinkTarget(target, context.linkSchemes);
@@ -1604,10 +1606,14 @@ function targetAttribute(targetName: string | null): string {
   return targetName ? ` target="${escapeAttribute(targetName)}"` : "";
 }
 
-function renderEmailAutolinks(source: string, protectHtml: (html: string) => string): string {
+function renderEmailAutolinks(
+  source: string,
+  context: RenderContext,
+  protectHtml: (html: string) => string
+): string {
   return source.replace(
     /&lt;([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})&gt;/gi,
-    (_match, email: string) => protectHtml(renderEmailLink(email))
+    (_match, email: string) => protectHtml(renderEmailLink(email, context))
   );
 }
 
@@ -1719,17 +1725,12 @@ function splitTrailingLinkPunctuation(value: string): { linkText: string; suffix
   };
 }
 
-function renderEmailLink(email: string, label?: string): string {
-  const obfuscated = obfuscateEmail(email);
+function renderEmailLink(email: string, context: RenderContext, label?: string): string {
+  const obfuscated = obfuscateEmail(email, context.mailguard);
+  const hrefAddress = mailtoHrefAddress(email, context.mailguard);
   const name = label ? escapeHtml(label) : obfuscated;
 
-  return `<a href="mailto:${obfuscated}" class="mail" title="${obfuscated}">${name}</a>`;
-}
-
-function obfuscateEmail(email: string): string {
-  return Array.from(email)
-    .map((char) => `&#${char.codePointAt(0) ?? 0};`)
-    .join("");
+  return `<a href="mailto:${hrefAddress}" class="mail" title="${obfuscated}">${name}</a>`;
 }
 
 function isEmailAddress(value: string): boolean {

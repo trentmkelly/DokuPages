@@ -19,13 +19,12 @@ Current counts:
 
 | Status                      | Count |
 | --------------------------- | ----: |
-| `implemented`               |    75 |
+| `implemented`               |    76 |
 | `imported_metadata_only`    |     6 |
 | `intentionally_unsupported` |    31 |
-| `not_yet_evaluated`         |     3 |
+| `not_yet_evaluated`         |     2 |
 
-Remaining not-yet-evaluated settings are `securecookie`, `samesitecookie`, and
-`mailguard`.
+Remaining not-yet-evaluated settings are `securecookie` and `samesitecookie`.
 
 `updatecheck` is implemented as a fixed Pages policy: upstream DokuWiki update
 notices are not fetched or rendered, because code updates are deployed through

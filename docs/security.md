@@ -80,6 +80,11 @@ Page saves, page reverts, and text media uploads honor DokuWiki's
 semantics, inline `#` comments are stripped during matching, and
 `USEWORDBLOCK=0` disables these checks.
 
+Wiki email links and `SHOWUSERAS=email` / `email_link` user displays honor
+DokuWiki's `mailguard` modes. `MAILGUARD=hex` emits numeric entities,
+`MAILGUARD=visible` rewrites addresses with `[at]`, `[dot]`, and `[dash]`, and
+`MAILGUARD=none` leaves addresses unobfuscated.
+
 External media proxying follows DokuWiki's token gate. Requests for external
 `lib/exe/fetch.php?media=<url>` media require the HMAC token generated from the
 remote URL, and `FETCHSIZE=0` keeps proxy downloads disabled by default. When a
