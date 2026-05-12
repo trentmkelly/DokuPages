@@ -3,6 +3,8 @@
 
 export const AUTH_LANGUAGE_KEYS = [
   "btn_edit",
+  "btn_create",
+  "btn_show",
   "btn_source",
   "btn_search",
   "btn_top",
@@ -126,6 +128,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ar: {
     strings: {
       btn_edit: "حرر هذه الصفحة",
+      btn_create: "أنشئ هذه الصفحة",
+      btn_show: "اعرض الصفحة",
       btn_source: "اعرض مصدر الصفحة",
       btn_search: "ابحث",
       btn_top: "ارجع للأعلى",
@@ -208,6 +212,8 @@ export const AUTH_LANGUAGE_PACKS = {
   az: {
     strings: {
       btn_edit: "Səhifəyə düzəliş et",
+      btn_create: "Səhifəni yarat",
+      btn_show: "Səhifəni göstər",
       btn_source: "Səhifənin ilkin mətnini göstər",
       btn_search: "Axtarış",
       btn_top: "Yuxarı",
@@ -279,6 +285,8 @@ export const AUTH_LANGUAGE_PACKS = {
   be: {
     strings: {
       btn_edit: "Рэдагаваць старонку",
+      btn_create: "Стварыць старонку",
+      btn_show: "Паказаць старонку",
       btn_source: "Паказаць зыходны тэкст",
       btn_search: "Знайсці",
       btn_top: "Наверх",
@@ -366,6 +374,8 @@ export const AUTH_LANGUAGE_PACKS = {
   bg: {
     strings: {
       btn_edit: "Редактиране",
+      btn_create: "Създаване на страница",
+      btn_show: "Преглед на страницата",
       btn_source: "Преглед на кода",
       btn_search: "Търсене",
       btn_top: "Към началото",
@@ -452,6 +462,8 @@ export const AUTH_LANGUAGE_PACKS = {
   bn: {
     strings: {
       btn_edit: "এই পৃষ্ঠা সম্পাদনা করুন",
+      btn_create: "এই পৃষ্ঠা তৈরি করুন",
+      btn_show: "দেখান পৃষ্ঠা",
       btn_source: "দেখান পাতা উৎস",
       btn_search: "অনুসন্ধান",
       btn_top: "উপরে ফিরে যান ",
@@ -520,6 +532,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ca: {
     strings: {
       btn_edit: "Edita aquesta pàgina",
+      btn_create: "Crea aquesta pàgina",
+      btn_show: "Mostra la pàgina",
       btn_source: "Mostra el codi font",
       btn_search: "Cerca",
       btn_top: "Torna dalt",
@@ -605,6 +619,8 @@ export const AUTH_LANGUAGE_PACKS = {
   "ca-valencia": {
     strings: {
       btn_edit: "Editar esta pàgina",
+      btn_create: "Crear esta pàgina",
+      btn_show: "Mostrar pàgina",
       btn_source: "Mostrar font",
       btn_search: "Buscar",
       btn_top: "Tornar dalt",
@@ -678,6 +694,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ckb: {
     strings: {
       btn_edit: "دەستکاری ئەم پەڕە",
+      btn_create: "دروستکردنی ئەم پەڕە",
+      btn_show: "نیشاندانی پەڕە",
       btn_source: "پیشاندانی کۆدی پەڕە",
       btn_search: "گەڕان",
       btn_top: "گەڕانەوە بۆ سەرەوە",
@@ -764,6 +782,8 @@ export const AUTH_LANGUAGE_PACKS = {
   cs: {
     strings: {
       btn_edit: "Upravit stránku",
+      btn_create: "Vytvořit stránku",
+      btn_show: "Zobrazit stránku",
       btn_source: "Zdrojový kód stránky",
       btn_search: "Hledat",
       btn_top: "Nahoru",
@@ -849,6 +869,8 @@ export const AUTH_LANGUAGE_PACKS = {
   cy: {
     strings: {
       btn_edit: "Golygu'r dudaen hon",
+      btn_create: "Creu'r dudalen",
+      btn_show: "Dangos y dudalen",
       btn_source: "Dangos y ffynhonnell",
       btn_search: "Chwilio",
       btn_top: "Nôl i'r brig",
@@ -935,6 +957,8 @@ export const AUTH_LANGUAGE_PACKS = {
   da: {
     strings: {
       btn_edit: "Rediger denne side",
+      btn_create: "Opret denne side",
+      btn_show: "Vis side",
       btn_source: "Vis kildekode",
       btn_search: "Søg",
       btn_top: "Tilbage til toppen",
@@ -1018,6 +1042,8 @@ export const AUTH_LANGUAGE_PACKS = {
   de: {
     strings: {
       btn_edit: "Diese Seite bearbeiten",
+      btn_create: "Seite anlegen",
+      btn_show: "Seite anzeigen",
       btn_source: "Quelltext anzeigen",
       btn_search: "Suche",
       btn_top: "Nach oben",
@@ -1104,6 +1130,8 @@ export const AUTH_LANGUAGE_PACKS = {
   "de-informal": {
     strings: {
       btn_edit: "Diese Seite bearbeiten",
+      btn_create: "Seite anlegen",
+      btn_show: "Seite anzeigen",
       btn_source: "Quelltext anzeigen",
       btn_search: "Suchen",
       btn_top: "Nach oben",
@@ -1190,6 +1218,8 @@ export const AUTH_LANGUAGE_PACKS = {
   el: {
     strings: {
       btn_edit: "Επεξεργασία σελίδας",
+      btn_create: "Δημιουργία σελίδας",
+      btn_show: "Προβολή σελίδας",
       btn_source: "Προβολή κώδικα σελίδας",
       btn_search: "Αναζήτηση",
       btn_top: "Επιστροφή στην κορυφή της σελίδας",
@@ -1276,6 +1306,8 @@ export const AUTH_LANGUAGE_PACKS = {
   en: {
     strings: {
       btn_edit: "Edit this page",
+      btn_create: "Create this page",
+      btn_show: "Show page",
       btn_source: "Show pagesource",
       btn_search: "Search",
       btn_top: "Back to top",
@@ -1362,6 +1394,8 @@ export const AUTH_LANGUAGE_PACKS = {
   eo: {
     strings: {
       btn_edit: "Redakti la paĝon",
+      btn_create: "Krei paĝon",
+      btn_show: "Montri paĝon",
       btn_source: "Montri fontan tekston",
       btn_search: "Serĉi",
       btn_top: "Supren",
@@ -1448,6 +1482,8 @@ export const AUTH_LANGUAGE_PACKS = {
   es: {
     strings: {
       btn_edit: "Editar esta página",
+      btn_create: "Crear esta página",
+      btn_show: "Ver página",
       btn_source: "Ver la fuente de esta página",
       btn_search: "Buscar",
       btn_top: "Volver arriba",
@@ -1534,6 +1570,8 @@ export const AUTH_LANGUAGE_PACKS = {
   et: {
     strings: {
       btn_edit: "Toimeta seda lehte",
+      btn_create: "Tekita selle lingi alla leht",
+      btn_show: "Näita lehte",
       btn_source: "Näita lehepõhja",
       btn_search: "Otsi",
       btn_top: "Tagasi lehe algusesse",
@@ -1618,6 +1656,8 @@ export const AUTH_LANGUAGE_PACKS = {
   eu: {
     strings: {
       btn_edit: "Aldatu orri hau",
+      btn_create: "Sortu orri hau",
+      btn_show: "Orria ikusi",
       btn_source: "Kodea ikusi",
       btn_search: "Bilatu",
       btn_top: "Itzuli gora",
@@ -1703,6 +1743,8 @@ export const AUTH_LANGUAGE_PACKS = {
   fa: {
     strings: {
       btn_edit: "ویرایش این صفحه",
+      btn_create: "ایجاد این صفحه",
+      btn_show: "نمایش صفحه",
       btn_source: "نمایش کد صفحه",
       btn_search: "جستجو",
       btn_top: "برگشت به بالا",
@@ -1787,6 +1829,8 @@ export const AUTH_LANGUAGE_PACKS = {
   fi: {
     strings: {
       btn_edit: "Muokkaa tätä sivua",
+      btn_create: "Luo tämä sivu",
+      btn_show: "Näytä sivu",
       btn_source: "Näytä sivun lähdekoodi",
       btn_search: "Etsi",
       btn_top: "Takaisin ylös",
@@ -1872,6 +1916,8 @@ export const AUTH_LANGUAGE_PACKS = {
   fo: {
     strings: {
       btn_edit: "Rætta hetta skjal",
+      btn_create: "Býrja uppá hetta skjal",
+      btn_show: "Vís skjal",
       btn_source: "Vís keldu",
       btn_search: "Leita",
       btn_top: "Aftur til toppin",
@@ -1936,6 +1982,8 @@ export const AUTH_LANGUAGE_PACKS = {
   fr: {
     strings: {
       btn_edit: "Modifier cette page",
+      btn_create: "Créer cette page",
+      btn_show: "Afficher la page",
       btn_source: "Afficher le texte source",
       btn_search: "Rechercher",
       btn_top: "Haut de page",
@@ -2023,6 +2071,8 @@ export const AUTH_LANGUAGE_PACKS = {
   gl: {
     strings: {
       btn_edit: "Editar esta páxina",
+      btn_create: "Crear esta páxina",
+      btn_show: "Amosar páxina",
       btn_source: "Amosar a fonte da páxina",
       btn_search: "Procurar",
       btn_top: "Comezo da páxina",
@@ -2107,6 +2157,8 @@ export const AUTH_LANGUAGE_PACKS = {
   he: {
     strings: {
       btn_edit: "עריכת דף זה",
+      btn_create: "יצירת דף",
+      btn_show: "הצגת דף",
       btn_source: "הצגת מקור הדף",
       btn_search: "חיפוש",
       btn_top: "חזרה למעלה",
@@ -2190,6 +2242,8 @@ export const AUTH_LANGUAGE_PACKS = {
   hi: {
     strings: {
       btn_edit: "यह पृष्ठ संपादित करें",
+      btn_create: "इस पृष्ठ को बनायें",
+      btn_show: "पृष्ठ दिखाएँ",
       btn_source: "पृष्ठ का श्रोत दिखाएँ",
       btn_search: "खोजें",
       btn_top: "वापस शीर्ष पर",
@@ -2228,6 +2282,8 @@ export const AUTH_LANGUAGE_PACKS = {
   hr: {
     strings: {
       btn_edit: "Izmijeni stranicu",
+      btn_create: "Stvori ovu stranicu",
+      btn_show: "Prikaži dokument",
       btn_source: "Prikaži kod stranice",
       btn_search: "Pretraži",
       btn_top: "Na vrh",
@@ -2313,6 +2369,8 @@ export const AUTH_LANGUAGE_PACKS = {
   hu: {
     strings: {
       btn_edit: "Oldal szerkesztése",
+      btn_create: "Oldal létrehozása",
+      btn_show: "Oldal megtekintése",
       btn_source: "Oldalforrás megtekintése",
       btn_search: "Keresés",
       btn_top: "Vissza a tetejére",
@@ -2397,6 +2455,8 @@ export const AUTH_LANGUAGE_PACKS = {
   "hu-formal": {
     strings: {
       btn_edit: "Oldal módosítása",
+      btn_create: "Oldal létrehozása",
+      btn_show: "Oldal megtekintése",
       btn_source: "Forrás megtekintése",
       btn_search: "Keresés",
       btn_top: "Oldal tetejére",
@@ -2410,6 +2470,8 @@ export const AUTH_LANGUAGE_PACKS = {
   hy: {
     strings: {
       btn_edit: "Խմբագրել էջը",
+      btn_create: "Ստեղծել էջը",
+      btn_show: "Ցուցադրել էջը",
       btn_source: "Ցուցադրել սկզբնաղբյուրը",
       btn_search: "Որոնել",
       btn_top: "Վերադառնալ վեր",
@@ -2459,6 +2521,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ia: {
     strings: {
       btn_edit: "Modificar iste pagina",
+      btn_create: "Crear iste pagina",
+      btn_show: "Monstrar pagina",
       btn_source: "Monstrar codice-fonte",
       btn_search: "Cercar",
       btn_top: "Retornar al initio",
@@ -2531,6 +2595,8 @@ export const AUTH_LANGUAGE_PACKS = {
   id: {
     strings: {
       btn_edit: "Edit halaman ini",
+      btn_create: "Buat halaman baru",
+      btn_show: "Tampilkan halaman",
       btn_source: "Lihat sumber halaman",
       btn_search: "Cari",
       btn_top: "kembali ke atas",
@@ -2613,6 +2679,8 @@ export const AUTH_LANGUAGE_PACKS = {
   "id-ni": {
     strings: {
       btn_edit: "Haogö nga'örö da'a",
+      btn_create: "Fazökhi nga'öro",
+      btn_show: "Foroma'ö nga'örö",
       btn_source: "Oroma'ö nga'örö sindruhu",
       btn_search: "Alui",
       btn_top: "Angawuli ba mböröta",
@@ -2659,6 +2727,8 @@ export const AUTH_LANGUAGE_PACKS = {
   is: {
     strings: {
       btn_edit: "Breyta þessari síðu",
+      btn_create: "Búa til þessa síðu",
+      btn_show: "Sýna síðu",
       btn_source: "Skoða wikikóða",
       btn_search: "Leit",
       btn_top: "Efst á síðu",
@@ -2719,6 +2789,8 @@ export const AUTH_LANGUAGE_PACKS = {
   it: {
     strings: {
       btn_edit: "Modifica questa pagina",
+      btn_create: "Crea questa pagina",
+      btn_show: "Mostra pagina",
       btn_source: "Mostra sorgente",
       btn_search: "Cerca",
       btn_top: "Torna su",
@@ -2804,6 +2876,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ja: {
     strings: {
       btn_edit: "文書の編集",
+      btn_create: "文書の作成",
+      btn_show: "文書の表示",
       btn_source: "ソースの表示",
       btn_search: "検索",
       btn_top: "文書の先頭へ",
@@ -2892,6 +2966,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ka: {
     strings: {
       btn_edit: "დაარედაქტირეთ ეს გვერდი",
+      btn_create: "გვერდის შექმნა",
+      btn_show: "გვერდის ჩვენება",
       btn_source: "მაჩვენე გვერდის კოდი",
       btn_search: "ძიება",
       btn_top: "მაღლა",
@@ -2966,6 +3042,8 @@ export const AUTH_LANGUAGE_PACKS = {
   kk: {
     strings: {
       btn_edit: "Бұл мақаланы өңдеү",
+      btn_create: "Бұл бетті жасау",
+      btn_show: "Бетті көрсету",
       btn_source: "Бастапқы мәтінді көрсету",
       btn_search: "Іздеу",
       btn_top: "Жоғары",
@@ -3020,6 +3098,8 @@ export const AUTH_LANGUAGE_PACKS = {
   km: {
     strings: {
       btn_edit: "កែទំព័រនេះ",
+      btn_create: "បង្កើតទំព័រនេះ",
+      btn_show: "បង្ហាងទំព័រ",
       btn_source: "បង្ហាងប្រភពទំព័រ",
       btn_search: "ស្វែងរក",
       btn_top: "ទៅលើ",
@@ -3078,6 +3158,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ko: {
     strings: {
       btn_edit: "문서 편집",
+      btn_create: "문서 만들기",
+      btn_show: "문서 보기",
       btn_source: "원본 보기",
       btn_search: "검색",
       btn_top: "맨 위로",
@@ -3161,6 +3243,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ku: {
     strings: {
       btn_edit: "Vê rûpelê biguherîne",
+      btn_create: "Vê rûpelê biafirîne",
+      btn_show: "Rûpelê nîşan bide",
       btn_source: "Çavkaniya rûpelê nîşan bide",
       btn_search: "Lêbigere",
       btn_top: "Biçe ser",
@@ -3190,6 +3274,8 @@ export const AUTH_LANGUAGE_PACKS = {
   la: {
     strings: {
       btn_edit: "Recensere hanc paginam",
+      btn_create: "Creare paginam",
+      btn_show: "Ostendere paginam",
       btn_source: "Fontem uidere",
       btn_search: "Quaerere",
       btn_top: "I ad summa",
@@ -3261,6 +3347,8 @@ export const AUTH_LANGUAGE_PACKS = {
   lb: {
     strings: {
       btn_edit: "Dës Säit änneren",
+      btn_create: "Dës Säit uleeën",
+      btn_show: "Säit weisen",
       btn_source: "Säitequell weisen",
       btn_search: "Sichen",
       btn_top: "Zréck no uewen",
@@ -3331,6 +3419,8 @@ export const AUTH_LANGUAGE_PACKS = {
   lt: {
     strings: {
       btn_edit: "Redaguoti šį puslapį",
+      btn_create: "Sukurti šį puslapį",
+      btn_show: "Rodyti puslapį",
       btn_source: "Rodyti puslapio šaltinį",
       btn_search: "Ieškoti",
       btn_top: "Į viršų",
@@ -3415,6 +3505,8 @@ export const AUTH_LANGUAGE_PACKS = {
   lv: {
     strings: {
       btn_edit: "Labot lapu",
+      btn_create: "Izveidot lapu",
+      btn_show: "Parādīt lapu",
       btn_source: "Parādīt lapas kodu",
       btn_search: "Meklēt",
       btn_top: "Atpakaļ uz sākumu",
@@ -3499,6 +3591,8 @@ export const AUTH_LANGUAGE_PACKS = {
   mg: {
     strings: {
       btn_edit: "Hanova ny pejy",
+      btn_create: "Amboary ity pejy",
+      btn_show: "Asehoy ny pejy",
       btn_source: "Asehoy ny source",
       btn_search: "Hikaroka",
       btn_top: "Ho ery ambony",
@@ -3544,6 +3638,8 @@ export const AUTH_LANGUAGE_PACKS = {
   mk: {
     strings: {
       btn_edit: "Уреди ја страницата",
+      btn_create: "Креирај ја оваа страница",
+      btn_show: "Прикажи страница",
       btn_source: "Прикажи ја изворната страница",
       btn_search: "Барај",
       btn_top: "Назад до врв",
@@ -3606,6 +3702,8 @@ export const AUTH_LANGUAGE_PACKS = {
   mr: {
     strings: {
       btn_edit: "हे पृष्ठ संपादित करा",
+      btn_create: "हे पृष्ठ लीहा",
+      btn_show: "पान दाखवा",
       btn_source: "पानाचा स्त्रोत दाखवा ",
       btn_search: "शोधा",
       btn_top: "परत वर",
@@ -3679,6 +3777,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ms: {
     strings: {
       btn_edit: "Sunting halaman ini",
+      btn_create: "Cipta halaman",
+      btn_show: "Baca",
       btn_source: "Lihat sumber",
       btn_search: "Cari",
       btn_top: "Balik ke mula",
@@ -3730,6 +3830,8 @@ export const AUTH_LANGUAGE_PACKS = {
   nan: {
     strings: {
       btn_edit: "改即頁",
+      btn_create: "創即頁",
+      btn_show: "顯示網頁",
       btn_source: "顯示原始碼",
       btn_search: "搜揣",
       btn_top: "轉去面頂",
@@ -3757,6 +3859,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ne: {
     strings: {
       btn_edit: "यो पृष्ठ सम्पादन गर्नुहोस् ",
+      btn_create: "यो पृष्ठ निर्माण गर्नुहोस्",
+      btn_show: "पृष्ठ देखाउनुहोस् ",
       btn_source: "यो पृष्ठको स्रोत देखाउनुहोस् ",
       btn_search: "खोज्नुहोस् ",
       btn_top: "माथि फर्कनुहोस्",
@@ -3821,6 +3925,8 @@ export const AUTH_LANGUAGE_PACKS = {
   nl: {
     strings: {
       btn_edit: "Pagina aanpassen",
+      btn_create: "Maak deze pagina aan",
+      btn_show: "Toon pagina",
       btn_source: "Toon bronpagina",
       btn_search: "Zoeken",
       btn_top: "Terug naar boven",
@@ -3908,6 +4014,8 @@ export const AUTH_LANGUAGE_PACKS = {
   no: {
     strings: {
       btn_edit: "Rediger denne siden",
+      btn_create: "Lag denne siden",
+      btn_show: "Vis siden",
       btn_source: "Vis kildekode",
       btn_search: "Søk",
       btn_top: "Til toppen av siden",
@@ -3993,6 +4101,8 @@ export const AUTH_LANGUAGE_PACKS = {
   oc: {
     strings: {
       btn_edit: "Modificar aquesta pagina",
+      btn_create: "Crear aquesta pagina",
+      btn_show: "Mostrar la pagina",
       btn_source: "Mostrar lo còdi font",
       btn_search: "Cercar",
       btn_top: "Tornar amont",
@@ -4063,6 +4173,8 @@ export const AUTH_LANGUAGE_PACKS = {
   pl: {
     strings: {
       btn_edit: "Edytuj stronę",
+      btn_create: "Utwórz stronę",
+      btn_show: "Pokaż stronę",
       btn_source: "Pokaż źródło strony",
       btn_search: "Szukaj",
       btn_top: "Do góry",
@@ -4146,6 +4258,8 @@ export const AUTH_LANGUAGE_PACKS = {
   pt: {
     strings: {
       btn_edit: "Editar esta página",
+      btn_create: "Criar esta página",
+      btn_show: "Mostrar página",
       btn_source: "Mostrar página fonte ",
       btn_search: "Pesquisar",
       btn_top: "Voltar ao topo",
@@ -4233,6 +4347,8 @@ export const AUTH_LANGUAGE_PACKS = {
   "pt-br": {
     strings: {
       btn_edit: "Editar esta página",
+      btn_create: "Criar esta página",
+      btn_show: "Mostrar página",
       btn_source: "Mostrar código fonte",
       btn_search: "Pesquisar",
       btn_top: "Voltar ao topo",
@@ -4320,6 +4436,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ro: {
     strings: {
       btn_edit: "Editează această pagină",
+      btn_create: "Creează această pagină",
+      btn_show: "Arată pagina",
       btn_source: "Arată sursa paginii",
       btn_search: "Caută",
       btn_top: "La început",
@@ -4407,6 +4525,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ru: {
     strings: {
       btn_edit: "Править страницу",
+      btn_create: "Создать страницу",
+      btn_show: "Показать страницу",
       btn_source: "Показать исходный текст",
       btn_search: "Найти",
       btn_top: "Наверх",
@@ -4494,6 +4614,8 @@ export const AUTH_LANGUAGE_PACKS = {
   si: {
     strings: {
       btn_edit: "මෙම පිටුව සංස්කරණය කරන්න",
+      btn_create: "නව පිටුවක් නිර්මාණය කරන්න",
+      btn_show: "මෙම පිටුව පෙන්වන්න",
       btn_source: "පිටුවේ මූලාශ්‍රය පෙන්වන්න",
       btn_search: "සොයන්න",
       btn_top: "නැවත වරක් පිටුව මුලට ",
@@ -4507,6 +4629,8 @@ export const AUTH_LANGUAGE_PACKS = {
   sk: {
     strings: {
       btn_edit: "Upraviť stránku",
+      btn_create: "Vytvoriť stránku",
+      btn_show: "Zobraziť stránku",
       btn_source: "Zobraziť zdroj stránky",
       btn_search: "Hľadať",
       btn_top: "Hore",
@@ -4592,6 +4716,8 @@ export const AUTH_LANGUAGE_PACKS = {
   sl: {
     strings: {
       btn_edit: "Uredi stran",
+      btn_create: "Ustvari stran",
+      btn_show: "Pokaži stran",
       btn_source: "Pokaži izvorno kodo strani",
       btn_search: "Poišči",
       btn_top: "Nazaj na vrh",
@@ -4678,6 +4804,8 @@ export const AUTH_LANGUAGE_PACKS = {
   sq: {
     strings: {
       btn_edit: "Redaktoni këtë faqe",
+      btn_create: "Krijo këtë faqe",
+      btn_show: "Trego faqen",
       btn_source: "Trego kodin burim të faqes",
       btn_search: "Kërko",
       btn_top: "Kthehu ne krye",
@@ -4754,6 +4882,8 @@ export const AUTH_LANGUAGE_PACKS = {
   sr: {
     strings: {
       btn_edit: "Измени ову страницу",
+      btn_create: "Направи ову страницу",
+      btn_show: "Прикажи страницу",
       btn_source: "Прикажи изворни код",
       btn_search: "Тражи",
       btn_top: "Врати се на врх",
@@ -4840,6 +4970,8 @@ export const AUTH_LANGUAGE_PACKS = {
   sv: {
     strings: {
       btn_edit: "Redigera sidan",
+      btn_create: "Skapa sidan",
+      btn_show: "Visa sidan",
       btn_source: "Visa källkod",
       btn_search: "Sök",
       btn_top: "Till början av sidan",
@@ -4925,6 +5057,8 @@ export const AUTH_LANGUAGE_PACKS = {
   ta: {
     strings: {
       btn_edit: "இந்த பக்கத்தை திருத்து ",
+      btn_create: "இந்த பக்கத்தை உருவாக்கு ",
+      btn_show: "பக்கத்தை காண்பி ",
       btn_source: "பக்க மூலத்தைக் காட்டு",
       btn_search: "தேடு",
       btn_top: "மேலே செல்",
@@ -4957,6 +5091,8 @@ export const AUTH_LANGUAGE_PACKS = {
   th: {
     strings: {
       btn_edit: "แก้ไขหน้านี้",
+      btn_create: "สร้างเพจนี้",
+      btn_show: "แสดงเพจ",
       btn_source: "ดูโค้ด",
       btn_search: "ค้นหา",
       btn_top: "กลับสู่ด้านบน",
@@ -5040,6 +5176,8 @@ export const AUTH_LANGUAGE_PACKS = {
   tr: {
     strings: {
       btn_edit: "Sayfayı düzenle",
+      btn_create: "Bu sayfayı oluştur",
+      btn_show: "Sayfayı göster",
       btn_source: "Kaynağı göster",
       btn_search: "Ara",
       btn_top: "Başa dön",
@@ -5126,6 +5264,8 @@ export const AUTH_LANGUAGE_PACKS = {
   uk: {
     strings: {
       btn_edit: "Редагувати цю сторінку",
+      btn_create: "Створити сторінку",
+      btn_show: "Показати сторінку",
       btn_source: "Показати вихідний текст",
       btn_search: "Пошук",
       btn_top: "Повернутися наверх",
@@ -5211,6 +5351,8 @@ export const AUTH_LANGUAGE_PACKS = {
   uz: {
     strings: {
       btn_edit: "Ushbu sahifani tahrirlash",
+      btn_create: "Sahifa yaratish",
+      btn_show: "Sahifani ko'rsatish",
       btn_search: "Izlash",
       btn_top: "Yuqoriga",
       btn_revs: "Avvalgi versiyalari",
@@ -5228,6 +5370,8 @@ export const AUTH_LANGUAGE_PACKS = {
   vi: {
     strings: {
       btn_edit: "Sửa đổi trang này",
+      btn_create: "Tạo trang này",
+      btn_show: "Xem trang",
       btn_source: "Xem mã nguồn trang",
       btn_search: "Tìm kiếm",
       btn_top: "Quay lên trên",
@@ -5316,6 +5460,8 @@ export const AUTH_LANGUAGE_PACKS = {
   zh: {
     strings: {
       btn_edit: "编辑本页",
+      btn_create: "创建该页面",
+      btn_show: "显示页面",
       btn_source: "显示源文件",
       btn_search: "搜索",
       btn_top: "回到顶部",
@@ -5397,6 +5543,8 @@ export const AUTH_LANGUAGE_PACKS = {
   "zh-tw": {
     strings: {
       btn_edit: "編輯本頁",
+      btn_create: "建立此頁",
+      btn_show: "顯示頁面",
       btn_source: "顯示原始碼",
       btn_search: "搜尋",
       btn_top: "回到頁頂",

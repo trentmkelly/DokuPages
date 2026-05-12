@@ -47,6 +47,8 @@ classes with upstream `lib/tpl/dokuwiki/main.php`, `tpl_header.php`, and
 `tpl_footer.php` across representative page modes. They also cover default
 template sidebar propagation, `showSidebar`/`hasSidebar` class behavior, and
 ACL-filtered sidebar fallback for anonymous and authenticated principals.
+Menu parity assertions cover DokuWiki-style page, site, user, and mobile tool
+entries, including upstream access-key, `rel`, and `title` attributes.
 
 Responsive CSS tests cover the mobile navigation breakpoints, narrow-viewport
 header controls, long-word wrapping, diagnostic/media detail overflow behavior,

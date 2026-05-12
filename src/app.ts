@@ -5061,6 +5061,7 @@ async function renderMissingPage(
     </p>`;
 
   return htmlShell(env, id, `${renderBreadcrumbs(id)}${body}`, {
+    pageExists: false,
     pageId: id,
     principal,
     sidebarHtml: sidebar?.html,
@@ -11291,6 +11292,7 @@ function getComparablePageId(page: CurrentPage | PageRevision): string {
 interface HtmlShellOptions {
   breadcrumbs?: BreadcrumbEntry[];
   mode?: string;
+  pageExists?: boolean;
   pageId?: string;
   principal?: AuthPrincipal;
   sidebarHtml?: string;
@@ -11357,7 +11359,14 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       ? `<div class="docInfo">${renderPageInfo(config, pageId, options.updatedAt, options.updatedBy)}</div>`
       : "";
   const disabledActions = new Set(config.disabledActions);
-  const pageTools = pageId ? renderPageTools(env, pageId, disabledActions) : "";
+  const shellMode = shellModeClass(options.mode);
+  const pageTools = pageId
+    ? renderPageTools(env, pageId, disabledActions, {
+        mode: shellMode,
+        pageExists: options.pageExists ?? true,
+        principal: options.principal
+      })
+    : "";
   const siteToolNamespace = pageId ? namespaceForIndex(pageId) : namespaceForIndex(startId);
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
@@ -11376,7 +11385,7 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
           <div class="content"><div class="group">${options.sidebarHtml}</div></div>
         </div></nav>`
       : "";
-  const siteClasses = `site dokuwiki mode_${shellModeClass(options.mode)} tpl_dokuwiki${showSidebar ? " showSidebar" : ""}${hasSidebar ? " hasSidebar" : ""}`;
+  const siteClasses = `site dokuwiki mode_${shellMode} tpl_dokuwiki${showSidebar ? " showSidebar" : ""}${hasSidebar ? " hasSidebar" : ""}`;
   const searchLabel = localizedAuthText(env, "btn_search");
   const recentLabel = localizedAuthText(env, "btn_recent");
   const mediaLabel = localizedAuthText(env, "btn_media");
@@ -11420,9 +11429,9 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
             </form>
             ${renderMobileTools(env, pageId, options.principal, disabledActions)}
             <ul>
-              ${disabledActions.has("recent") ? "" : `<li><a href="/recent">${escapeHtml(recentLabel)}</a></li>`}
-              ${disabledActions.has("media") ? "" : `<li><a href="${mediaManagerPath}">${escapeHtml(mediaLabel)}</a></li>`}
-              ${disabledActions.has("index") ? "" : `<li><a href="${siteIndexPath}">${escapeHtml(sitemapLabel)}</a></li>`}
+              ${disabledActions.has("recent") ? "" : renderDesktopMenuItem("action recent", "/recent", recentLabel, { accesskey: "r" })}
+              ${disabledActions.has("media") ? "" : renderDesktopMenuItem("action media", mediaManagerPath, mediaLabel)}
+              ${disabledActions.has("index") ? "" : renderDesktopMenuItem("action index", siteIndexPath, sitemapLabel, { accesskey: "x" })}
               <li><a href="/diagnostics">Diagnostics</a></li>
             </ul>
           </nav>
@@ -11491,11 +11500,11 @@ function renderUserTools(
   const userToolsLabel = localizedAuthText(env, "user_tools");
   const accountItems =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? `<li class="action admin"><a href="/admin" rel="nofollow">${escapeHtml(adminLabel)}</a></li>` : ""}
-        ${disabledActions.has("profile") ? "" : `<li class="action profile"><a href="${escapeAttribute(actionLinks.profile)}" rel="nofollow">${escapeHtml(profileLabel)}</a></li>`}
-        ${disabledActions.has("logout") ? "" : `<li class="action logout"><a href="${escapeAttribute(actionLinks.logout)}" rel="nofollow">${escapeHtml(logoutLabel)}</a></li>`}`
-      : `${disabledActions.has("login") ? "" : `<li class="action login"><a href="${escapeAttribute(actionLinks.login)}" rel="nofollow">${escapeHtml(loginLabel)}</a></li>`}
-        ${disabledActions.has("register") ? "" : `<li class="action register"><a href="${escapeAttribute(actionLinks.register)}" rel="nofollow">${escapeHtml(registerLabel)}</a></li>`}`;
+      ? `${disabledActions.has("profile") ? "" : renderDesktopMenuItem("action profile", actionLinks.profile, profileLabel)}
+        ${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? renderDesktopMenuItem("action admin", "/admin", adminLabel) : ""}
+        ${disabledActions.has("logout") ? "" : renderDesktopMenuItem("action logout", actionLinks.logout, logoutLabel)}`
+      : `${disabledActions.has("register") ? "" : renderDesktopMenuItem("action register", actionLinks.register, registerLabel)}
+        ${disabledActions.has("login") ? "" : renderDesktopMenuItem("action login", actionLinks.login, loginLabel)}`;
 
   return `<nav id="dokuwiki__usertools" aria-label="${escapeAttribute(userToolsLabel)}">
             <h3 class="a11y">${escapeHtml(userToolsLabel)}</h3>
@@ -11516,7 +11525,6 @@ function renderMobileTools(
   const adminLabel = localizedAuthText(env, "btn_admin");
   const profileLabel = localizedAuthText(env, "btn_profile");
   const editLabel = localizedAuthText(env, "btn_edit");
-  const sourceLabel = localizedAuthText(env, "btn_source");
   const revisionsLabel = localizedAuthText(env, "btn_revs");
   const backlinksLabel = localizedAuthText(env, "btn_backlink");
   const subscribeLabel = localizedAuthText(env, "btn_subscribe");
@@ -11529,33 +11537,56 @@ function renderMobileTools(
   const mediaManagerPath = `/media-manager?ns=${encodeURIComponent(siteToolNamespace)}`;
   const siteIndexPath = `/index?ns=${encodeURIComponent(siteToolNamespace)}`;
   const pageOptions = pageId
-    ? `${disabledActions.has("edit") ? "" : `<option value="${pagePath(pageId)}?do=edit">${escapeHtml(editLabel)}</option>`}
-      ${disabledActions.has("source") ? "" : `<option value="${pagePath(pageId)}?do=source">${escapeHtml(sourceLabel)}</option>`}
-      ${disabledActions.has("revisions") ? "" : `<option value="${pagePath(pageId)}?do=revisions">${escapeHtml(revisionsLabel)}</option>`}
-      ${disabledActions.has("backlink") ? "" : `<option value="${pagePath(pageId)}?do=backlink">${escapeHtml(backlinksLabel)}</option>`}
-      ${disabledActions.has("subscribe") ? "" : `<option value="${pagePath(pageId)}?do=subscribe">${escapeHtml(subscribeLabel)}</option>`}`
+    ? `${disabledActions.has("edit") ? "" : renderMobileOption(`${pagePath(pageId)}?do=edit`, editLabel)}
+      ${disabledActions.has("revisions") ? "" : renderMobileOption(`${pagePath(pageId)}?do=revisions`, revisionsLabel)}
+      ${disabledActions.has("backlink") ? "" : renderMobileOption(`${pagePath(pageId)}?do=backlink`, backlinksLabel)}
+      ${principal?.type === "user" && !disabledActions.has("subscribe") ? renderMobileOption(`${pagePath(pageId)}?do=subscribe`, subscribeLabel) : ""}`
     : "";
   const accountOptions =
     principal?.type === "user"
-      ? `${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? `<option value="/admin">${escapeHtml(adminLabel)}</option>` : ""}
-        ${disabledActions.has("profile") ? "" : `<option value="${escapeAttribute(actionLinks.profile)}">${escapeHtml(profileLabel)}</option>`}
-        ${disabledActions.has("logout") ? "" : `<option value="${escapeAttribute(actionLinks.logout)}">${escapeHtml(logoutLabel)}</option>`}`
-      : `${disabledActions.has("login") ? "" : `<option value="${escapeAttribute(actionLinks.login)}">${escapeHtml(loginLabel)}</option>`}
-        ${disabledActions.has("register") ? "" : `<option value="${escapeAttribute(actionLinks.register)}">${escapeHtml(registerLabel)}</option>`}`;
+      ? `${disabledActions.has("profile") ? "" : renderMobileOption(actionLinks.profile, profileLabel)}
+        ${isManagerPrincipal(principal, env) && !disabledActions.has("admin") ? renderMobileOption("/admin", adminLabel) : ""}
+        ${disabledActions.has("logout") ? "" : renderMobileOption(actionLinks.logout, logoutLabel)}`
+      : `${disabledActions.has("register") ? "" : renderMobileOption(actionLinks.register, registerLabel)}
+        ${disabledActions.has("login") ? "" : renderMobileOption(actionLinks.login, loginLabel)}`;
 
   return `<div class="mobileTools">
       <label class="a11y" for="mobile__tools">${escapeHtml(toolsLabel)}</label>
-      <select id="mobile__tools">
+      <select id="mobile__tools" class="edit quickselect" title="${escapeAttribute(toolsLabel)}">
         <option value="">${escapeHtml(toolsLabel)}</option>
-        ${pageOptions}
-        ${disabledActions.has("recent") ? "" : `<option value="/recent">${escapeHtml(recentLabel)}</option>`}
-        ${disabledActions.has("media") ? "" : `<option value="${mediaManagerPath}">${escapeHtml(mediaLabel)}</option>`}
-        ${disabledActions.has("index") ? "" : `<option value="${siteIndexPath}">${escapeHtml(sitemapLabel)}</option>`}
-        ${disabledActions.has("search") ? "" : `<option value="/search">${escapeHtml(searchLabel)}</option>`}
-        <option value="/diagnostics">Diagnostics</option>
-        ${accountOptions}
+        ${pageOptions ? `<optgroup label="${escapeAttribute(localizedAuthText(env, "page_tools"))}">${pageOptions}</optgroup>` : ""}
+        <optgroup label="${escapeAttribute(localizedAuthText(env, "site_tools"))}">
+          ${disabledActions.has("recent") ? "" : renderMobileOption("/recent", recentLabel)}
+          ${disabledActions.has("media") ? "" : renderMobileOption(mediaManagerPath, mediaLabel)}
+          ${disabledActions.has("index") ? "" : renderMobileOption(siteIndexPath, sitemapLabel)}
+          ${disabledActions.has("search") ? "" : renderMobileOption("/search", searchLabel)}
+          ${renderMobileOption("/diagnostics", "Diagnostics")}
+        </optgroup>
+        ${accountOptions ? `<optgroup label="${escapeAttribute(localizedAuthText(env, "user_tools"))}">${accountOptions}</optgroup>` : ""}
       </select>
     </div>`;
+}
+
+function renderDesktopMenuItem(
+  className: string,
+  href: string,
+  label: string,
+  options: { accesskey?: string; rel?: string } = {}
+): string {
+  const rel = options.rel ?? "nofollow";
+  const title = menuTitle(label, options.accesskey);
+  const accesskey = options.accesskey ? ` accesskey="${escapeAttribute(options.accesskey)}"` : "";
+  const relAttribute = rel ? ` rel="${escapeAttribute(rel)}"` : "";
+
+  return `<li class="${escapeAttribute(className)}"><a href="${escapeAttribute(href)}" title="${escapeAttribute(title)}"${relAttribute}${accesskey}>${escapeHtml(label)}</a></li>`;
+}
+
+function renderMobileOption(value: string, label: string): string {
+  return `<option value="${escapeAttribute(value)}">${escapeHtml(label)}</option>`;
+}
+
+function menuTitle(label: string, accesskey?: string): string {
+  return accesskey ? `${label} [${accesskey}]` : label;
 }
 
 function accountActionLinks(pageId?: string): {
@@ -11582,29 +11613,61 @@ function accountActionLinks(pageId?: string): {
   };
 }
 
-function renderPageTools(env: Env, pageId: string, disabledActions = new Set<string>()): string {
+function renderPageTools(
+  env: Env,
+  pageId: string,
+  disabledActions = new Set<string>(),
+  options: { mode: string; pageExists: boolean; principal?: AuthPrincipal }
+): string {
   const pageToolsLabel = localizedAuthText(env, "page_tools");
   const editLabel = localizedAuthText(env, "btn_edit");
-  const sourceLabel = localizedAuthText(env, "btn_source");
+  const createLabel = localizedAuthText(env, "btn_create");
+  const showLabel = localizedAuthText(env, "btn_show");
   const revisionsLabel = localizedAuthText(env, "btn_revs");
   const backlinksLabel = localizedAuthText(env, "btn_backlink");
   const subscribeLabel = localizedAuthText(env, "btn_subscribe");
   const topLabel = localizedAuthText(env, "btn_top");
+  const primaryTool =
+    options.mode === "show"
+      ? options.pageExists
+        ? {
+            className: "edit",
+            href: `${pagePath(pageId)}?do=edit`,
+            label: editLabel,
+            accesskey: "e"
+          }
+        : {
+            className: "create",
+            href: `${pagePath(pageId)}?do=edit`,
+            label: createLabel,
+            accesskey: "e"
+          }
+      : {
+          className: "show",
+          href: pagePath(pageId),
+          label: showLabel,
+          accesskey: "v"
+        };
 
   return `<nav id="dokuwiki__pagetools" aria-labelledby="dokuwiki__pagetools__heading">
     <h3 class="a11y" id="dokuwiki__pagetools__heading">${escapeHtml(pageToolsLabel)}</h3>
     <div class="tools">
       <ul>
-        ${disabledActions.has("edit") ? "" : `<li class="edit"><a href="${pagePath(pageId)}?do=edit" aria-label="${escapeAttribute(editLabel)}"><span class="label">${escapeHtml(editLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("source") ? "" : `<li class="source"><a href="${pagePath(pageId)}?do=source" aria-label="${escapeAttribute(sourceLabel)}"><span class="label">${escapeHtml(sourceLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("revisions") ? "" : `<li class="revisions"><a href="${pagePath(pageId)}?do=revisions" aria-label="${escapeAttribute(revisionsLabel)}"><span class="label">${escapeHtml(revisionsLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("backlink") ? "" : `<li class="backlink"><a href="${pagePath(pageId)}?do=backlink" aria-label="${escapeAttribute(backlinksLabel)}"><span class="label">${escapeHtml(backlinksLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("purge") ? "" : `<li class="purge"><a href="${pagePath(pageId)}?do=purge" aria-label="Purge cache"><span class="label">Purge cache</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        ${disabledActions.has("subscribe") ? "" : `<li class="subscribe"><a href="${pagePath(pageId)}?do=subscribe" aria-label="${escapeAttribute(subscribeLabel)}"><span class="label">${escapeHtml(subscribeLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>`}
-        <li class="top"><a href="#dokuwiki__top" aria-label="${escapeAttribute(topLabel)}"><span class="label">${escapeHtml(topLabel)}</span><span class="icon" aria-hidden="true"></span></a></li>
+        ${disabledActions.has(primaryTool.className) ? "" : renderPageToolItem(primaryTool.className, primaryTool.href, primaryTool.label, primaryTool.accesskey)}
+        ${disabledActions.has("revisions") ? "" : renderPageToolItem("revisions", `${pagePath(pageId)}?do=revisions`, revisionsLabel, "o")}
+        ${disabledActions.has("backlink") ? "" : renderPageToolItem("backlink", `${pagePath(pageId)}?do=backlink`, backlinksLabel)}
+        ${options.principal?.type === "user" && !disabledActions.has("subscribe") ? renderPageToolItem("subscribe", `${pagePath(pageId)}?do=subscribe`, subscribeLabel) : ""}
+        ${renderPageToolItem("top", "#dokuwiki__top", topLabel, "t")}
       </ul>
     </div>
   </nav>`;
+}
+
+function renderPageToolItem(type: string, href: string, label: string, accesskey?: string): string {
+  const title = menuTitle(label, accesskey);
+  const accesskeyAttribute = accesskey ? ` accesskey="${escapeAttribute(accesskey)}"` : "";
+
+  return `<li class="${escapeAttribute(type)}"><a href="${escapeAttribute(href)}" title="${escapeAttribute(title)}" rel="nofollow"${accesskeyAttribute} aria-label="${escapeAttribute(label)}"><span class="label">${escapeHtml(label)}</span><span class="icon" aria-hidden="true"></span></a></li>`;
 }
 
 function xmlResponse(

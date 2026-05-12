@@ -192,7 +192,7 @@ are not fixed by this checklist.
 
 - [x] Compare generated HTML from the Pages shell against `lib/tpl/dokuwiki/main.php` for every page mode.
 - [x] Port sidebar behavior from the default template, including `sidebar` page lookup and ACL filtering.
-- [ ] Match upstream page tools, site tools, user tools, mobile menus, access keys, and rel/title attributes from `inc/Menu`.
+- [x] Match upstream page tools, site tools, user tools, mobile menus, access keys, and rel/title attributes from `inc/Menu`.
 - [ ] Match upstream CSS modules more completely, including forms, tabs, media popups, media fullscreen views, search assistant, modals, and admin plugin pages.
 - [ ] Replace the hand-maintained CSS bundle with a traceable build or copy strategy from upstream `lib/tpl/dokuwiki/css`.
 - [ ] Port upstream JavaScript behaviors from `lib/scripts`, including toolbar, hotkeys, lock timer, qsearch, link wizard, media popup, tree expansion, search assistant, cookies, and editor helpers.

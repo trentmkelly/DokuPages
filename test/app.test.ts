@@ -309,10 +309,10 @@ describe("handleRequest", () => {
     expect(html).toContain("User Tools");
     expect(html).toContain('id="mobile__tools"');
     expect(html).toContain(
-      '<li class="action login"><a href="/wiki/wiki/welcome?do=login" rel="nofollow">Log In</a></li>'
+      '<li class="action login"><a href="/wiki/wiki/welcome?do=login" title="Log In" rel="nofollow">Log In</a></li>'
     );
     expect(html).toContain(
-      '<li class="action register"><a href="/wiki/wiki/welcome?do=register" rel="nofollow">Register</a></li>'
+      '<li class="action register"><a href="/wiki/wiki/welcome?do=register" title="Register" rel="nofollow">Register</a></li>'
     );
     expect(html).toContain('<option value="/wiki/wiki/welcome?do=login">Log In</option>');
     expect(html).toContain('<option value="/wiki/wiki/welcome?do=register">Register</option>');
@@ -359,9 +359,11 @@ describe("handleRequest", () => {
     expect(loginHtml).toContain("Custom user");
     expect(loginHtml).toContain("Sign in custom");
     expect(pageHtml).toContain(
-      '<li class="action login"><a href="/wiki/wiki/welcome?do=login" rel="nofollow">Sign in custom</a></li>'
+      '<li class="action login"><a href="/wiki/wiki/welcome?do=login" title="Sign in custom" rel="nofollow">Sign in custom</a></li>'
     );
-    expect(pageHtml).toContain('<a href="/media-manager?ns=wiki">Custom media</a>');
+    expect(pageHtml).toContain(
+      '<a href="/media-manager?ns=wiki" title="Custom media" rel="nofollow">Custom media</a>'
+    );
   });
 
   it("uses upstream language packs for non-English shell labels", async () => {
@@ -377,21 +379,22 @@ describe("handleRequest", () => {
     expect(html).toContain('<nav id="dokuwiki__usertools" aria-label="Benutzer-Werkzeuge">');
     expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Webseiten-Werkzeuge">');
     expect(html).toContain('<label class="a11y" for="qsearch__in">Suche</label>');
-    expect(html).toContain('<a href="/recent">Letzte Änderungen</a>');
-    expect(html).toContain('<a href="/media-manager?ns=wiki">Medien-Manager</a>');
-    expect(html).toContain('<a href="/index?ns=wiki">Übersicht</a>');
+    expect(html).toContain(
+      '<a href="/recent" title="Letzte Änderungen [r]" rel="nofollow" accesskey="r">Letzte Änderungen</a>'
+    );
+    expect(html).toContain(
+      '<a href="/media-manager?ns=wiki" title="Medien-Manager" rel="nofollow">Medien-Manager</a>'
+    );
+    expect(html).toContain(
+      '<a href="/index?ns=wiki" title="Übersicht [x]" rel="nofollow" accesskey="x">Übersicht</a>'
+    );
     expect(html).toContain(
       '<option value="/wiki/wiki/welcome?do=edit">Diese Seite bearbeiten</option>'
     );
-    expect(html).toContain(
-      '<option value="/wiki/wiki/welcome?do=source">Quelltext anzeigen</option>'
-    );
     expect(html).toContain('id="dokuwiki__pagetools__heading">Seiten-Werkzeuge</h3>');
     expect(html).toContain('aria-label="Diese Seite bearbeiten"');
-    expect(html).toContain('aria-label="Quelltext anzeigen"');
     expect(html).toContain('aria-label="Ältere Versionen"');
     expect(html).toContain('aria-label="Links hierher"');
-    expect(html).toContain('aria-label="Aboverwaltung"');
     expect(html).toContain('aria-label="Nach oben"');
     expect(html).toContain("Sie befinden sich hier:");
   });
@@ -678,7 +681,7 @@ describe("handleRequest", () => {
     expect(html).toContain('<link rel="canonical" href="/docs/wiki/wiki/welcome">');
     expect(html).toContain('<link rel="stylesheet" href="/docs/dokuwiki.css?v=0.1.0">');
     expect(html).toContain(
-      '<li class="action login"><a href="/docs/wiki/wiki/welcome?do=login" rel="nofollow">Log In</a></li>'
+      '<li class="action login"><a href="/docs/wiki/wiki/welcome?do=login" title="Log In" rel="nofollow">Log In</a></li>'
     );
     expect(html).toContain('<form class="search" method="get" action="/docs/search">');
     expect(html).toContain('<option value="/docs/media-manager?ns=wiki">Media Manager</option>');

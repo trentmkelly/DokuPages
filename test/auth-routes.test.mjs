@@ -859,10 +859,10 @@ describe("auth routes", () => {
     expect(html).toContain("Alice Example");
     expect(html).toContain('id="dokuwiki__usertools"');
     expect(html).toContain(
-      '<li class="action profile"><a href="/profile" rel="nofollow">Update Profile</a></li>'
+      '<li class="action profile"><a href="/profile" title="Update Profile" rel="nofollow">Update Profile</a></li>'
     );
     expect(html).toContain(
-      '<li class="action logout"><a href="/logout" rel="nofollow">Log Out</a></li>'
+      '<li class="action logout"><a href="/logout" title="Log Out" rel="nofollow">Log Out</a></li>'
     );
     expect(html).not.toContain('<a href="/login" rel="nofollow">Log In</a>');
 

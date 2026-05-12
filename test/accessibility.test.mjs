@@ -29,8 +29,12 @@ describe("accessibility surface", () => {
     expect(html).toContain('<nav id="dokuwiki__sitetools" aria-label="Site Tools">');
     expect(html).toContain('<label class="a11y" for="qsearch__in">Search</label>');
     expect(html).toContain('<input id="qsearch__in" name="q" type="search"');
-    expect(html).toContain('<a href="/media-manager?ns=wiki">Media Manager</a>');
-    expect(html).toContain('<a href="/index?ns=wiki">Sitemap</a>');
+    expect(html).toContain(
+      '<a href="/media-manager?ns=wiki" title="Media Manager" rel="nofollow">Media Manager</a>'
+    );
+    expect(html).toContain(
+      '<a href="/index?ns=wiki" title="Sitemap [x]" rel="nofollow" accesskey="x">Sitemap</a>'
+    );
     expect(html).toContain('<label class="a11y" for="mobile__tools">Tools</label>');
     expect(html).toContain('<option value="/media-manager?ns=wiki">Media Manager</option>');
     expect(html).toContain(
@@ -38,10 +42,8 @@ describe("accessibility surface", () => {
     );
     expect(html).toContain('id="dokuwiki__pagetools__heading">Page Tools</h3>');
     expect(html).toContain('aria-label="Edit this page"');
-    expect(html).toContain('aria-label="Show pagesource"');
     expect(html).toContain('aria-label="Old revisions"');
     expect(html).toContain('aria-label="Backlinks"');
-    expect(html).toContain('aria-label="Purge cache"');
     expect(html).toContain('aria-label="Back to top"');
   });
 

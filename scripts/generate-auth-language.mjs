@@ -11,6 +11,8 @@ const OUTPUT = path.join(REPO_ROOT, "src", "wiki", "auth-language.ts");
 
 const LANGUAGE_KEYS = [
   "btn_edit",
+  "btn_create",
+  "btn_show",
   "btn_source",
   "btn_search",
   "btn_top",
