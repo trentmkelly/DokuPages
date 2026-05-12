@@ -94,6 +94,7 @@ export interface RuntimeConfig {
   camelCaseLinks: boolean;
   typographyMode: number;
   autoPluralLinks: boolean;
+  useWordblock: boolean;
   relNofollow: boolean;
   refcheck: boolean;
   mediaRevisions: boolean;
@@ -218,6 +219,7 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     camelCaseLinks: truthy(env.CAMELCASE),
     typographyMode: integerConfig(env.TYPOGRAPHY, 1, 0, 2),
     autoPluralLinks: truthy(env.AUTOPLURAL),
+    useWordblock: booleanConfig(env.USEWORDBLOCK, true),
     relNofollow: booleanConfig(env.REL_NOFOLLOW, true),
     refcheck: booleanConfig(env.REFCHECK, true),
     mediaRevisions: booleanConfig(env.MEDIAREVISIONS, true),
@@ -383,6 +385,7 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
     configEntry("CAMELCASE", env.CAMELCASE, String(config.camelCaseLinks), "false"),
     configEntry("TYPOGRAPHY", env.TYPOGRAPHY, String(config.typographyMode), "1"),
     configEntry("AUTOPLURAL", env.AUTOPLURAL, String(config.autoPluralLinks), "false"),
+    configEntry("USEWORDBLOCK", env.USEWORDBLOCK, String(config.useWordblock), "true"),
     configEntry("REL_NOFOLLOW", env.REL_NOFOLLOW, String(config.relNofollow), "true"),
     configEntry("REFCHECK", env.REFCHECK, String(config.refcheck), "true"),
     configEntry("MEDIAREVISIONS", env.MEDIAREVISIONS, String(config.mediaRevisions), "true"),
@@ -992,6 +995,7 @@ const METADATA_VALIDATED_RUNTIME_KEYS = [
   "YOUAREHERE",
   "FULLPATH",
   "CAMELCASE",
+  "USEWORDBLOCK",
   "REL_NOFOLLOW",
   "IEXSSPROTECT",
   "USEDRAFT",

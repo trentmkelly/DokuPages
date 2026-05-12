@@ -290,6 +290,7 @@ export const RUNTIME_ENV_DOKUWIKI_KEYS: Readonly<Record<string, string>> = {
   MANAGER: "manager",
   PROFILECONFIRM: "profileconfirm",
   DISABLE_ACTIONS: "disableactions",
+  USEWORDBLOCK: "usewordblock",
   REL_NOFOLLOW: "relnofollow",
   IEXSSPROTECT: "iexssprotect",
   USEDRAFT: "usedraft",

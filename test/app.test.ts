@@ -5,7 +5,7 @@ import { clearCustomAuthLanguageOverrideCache } from "../src/wiki/custom-languag
 import { PageLockObject } from "../src/storage/page-lock-object";
 import { UPLOAD_XSS_MESSAGE } from "../src/wiki/media-validation";
 import { mediaToken, requestedMediaSize } from "../src/wiki/media-token";
-import { WORD_BLOCK_MESSAGE } from "../src/wiki/wordblock";
+import { UPLOAD_SPAM_MESSAGE, WORD_BLOCK_MESSAGE } from "../src/wiki/wordblock";
 
 interface D1StubState {
   row: Record<string, unknown> | null;
@@ -190,6 +190,7 @@ describe("handleRequest", () => {
     env.REFCHECK = undefined;
     env.MEDIAREVISIONS = undefined;
     env.IEXSSPROTECT = undefined;
+    env.USEWORDBLOCK = undefined;
     env.FETCHSIZE = undefined;
     env.BREADCRUMBS = undefined;
     env.YOUAREHERE = undefined;
@@ -2547,6 +2548,28 @@ describe("handleRequest", () => {
     });
   });
 
+  it("blocks text media uploads through the upstream wordblock list", async () => {
+    const form = new FormData();
+    form.set("ns", "wiki");
+    form.set("file", new File(["plain text with zoosex"], "blocked.txt", { type: "text/plain" }));
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/media/upload", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: UPLOAD_SPAM_MESSAGE,
+      blockedText: "zoosex"
+    });
+    expect(state.media.some((media) => media.id === "wiki:blocked.txt")).toBe(false);
+  });
+
   it("rate limits repeated media upload attempts before writing R2 objects", async () => {
     async function upload(name: string): Promise<Response> {
       const form = new FormData();
@@ -4567,6 +4590,27 @@ describe("handleRequest", () => {
     });
     expect(state.row?.content).toBe("====== Welcome ======\n\nImported page.");
     expect(state.batches).toHaveLength(0);
+  });
+
+  it("honors the upstream usewordblock toggle for page edits", async () => {
+    state.metadata.push(importedDokuWikiConfigMetadata("usewordblock", 0));
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Updated ======\n\nzoosex");
+    form.set("summary", "Updated page");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(state.row?.content).toContain("zoosex");
   });
 
   it("purges rendered page cache through the page action", async () => {

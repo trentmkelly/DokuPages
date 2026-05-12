@@ -57,6 +57,7 @@ describe("runtime config", () => {
       camelCaseLinks: false,
       typographyMode: 1,
       autoPluralLinks: false,
+      useWordblock: true,
       relNofollow: true,
       refcheck: true,
       mediaRevisions: true,
@@ -151,6 +152,7 @@ describe("runtime config", () => {
       CAMELCASE: "true",
       TYPOGRAPHY: "2",
       AUTOPLURAL: "1",
+      USEWORDBLOCK: "0",
       REL_NOFOLLOW: "0",
       REFCHECK: "0",
       MEDIAREVISIONS: "0",
@@ -225,6 +227,7 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).camelCaseLinks).toBe(true);
     expect(getRuntimeConfig(env).typographyMode).toBe(2);
     expect(getRuntimeConfig(env).autoPluralLinks).toBe(true);
+    expect(getRuntimeConfig(env).useWordblock).toBe(false);
     expect(getRuntimeConfig(env).relNofollow).toBe(false);
     expect(getRuntimeConfig(env).refcheck).toBe(false);
     expect(getRuntimeConfig(env).mediaRevisions).toBe(false);
@@ -458,6 +461,11 @@ describe("runtime config", () => {
         expect.objectContaining({
           key: "AUTOPLURAL",
           effectiveValue: "false"
+        }),
+        expect.objectContaining({
+          key: "USEWORDBLOCK",
+          effectiveValue: "true",
+          dokuwikiKey: "usewordblock"
         }),
         expect.objectContaining({
           key: "REL_NOFOLLOW",

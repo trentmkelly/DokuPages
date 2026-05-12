@@ -2040,15 +2040,15 @@ export async function discoverWordblockPatterns(files) {
     if (!text) continue;
 
     for (const rawLine of text.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#")) continue;
+      const trimmed = rawLine.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
 
-      if (line.startsWith("!")) {
-        const blocked = line.slice(1).trim();
+      if (rawLine.startsWith("!")) {
+        const blocked = rawLine.slice(1).trim();
         const existing = patterns.indexOf(blocked);
         if (existing !== -1) patterns.splice(existing, 1);
       } else {
-        patterns.push(line);
+        patterns.push(trimmed);
       }
     }
   }

@@ -255,7 +255,7 @@ are not fixed by this checklist.
 
 ## Security And Anti-Abuse
 
-- [ ] Match DokuWiki's wordblock behavior and config toggles exactly, including local wordblock overrides.
+- [x] Match DokuWiki's wordblock behavior and config toggles exactly, including local wordblock overrides.
 - [ ] Match upstream email obfuscation modes from `mailguard`: visible, hex, and none.
 - [x] Match upstream external link `rel` behavior from `relnofollow`.
 - [x] Match upstream upload XSS protection toggles from `iexssprotect`.

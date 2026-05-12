@@ -94,7 +94,7 @@ import {
   type MediaUsageReference
 } from "./wiki/media-service";
 import { dokuMediaMetadataToJpegMetadata, type ParsedJpegMetadata } from "./wiki/jpeg-metadata";
-import { validateMediaUpload } from "./wiki/media-validation";
+import { effectiveMediaUploadMimeType, validateMediaUpload } from "./wiki/media-validation";
 import { extensionFromMediaId, getMimeTypeConfig, shouldForceDownloadMedia } from "./wiki/mime";
 import {
   cleanPageId,
@@ -183,7 +183,12 @@ import {
   type RssFeedRequest
 } from "./wiki/rss";
 import { renderUserDisplay, type UserDisplaySource } from "./wiki/user-display";
-import { findWordblockMatch, WORD_BLOCK_MESSAGE, type WordblockMatch } from "./wiki/wordblock";
+import {
+  findWordblockMatch,
+  UPLOAD_SPAM_MESSAGE,
+  WORD_BLOCK_MESSAGE,
+  type WordblockMatch
+} from "./wiki/wordblock";
 import { resolveDefaultLicense } from "./wiki/license";
 import {
   expectedMediaDerivativeStatus,
@@ -2284,6 +2289,18 @@ async function handleNativeApiMediaUpload(
     return jsonResponse({ error: validation.error }, { status: 400 });
   }
 
+  const blocked = await findRuntimeMediaWordblockMatch(
+    env,
+    mediaBody,
+    effectiveMediaUploadMimeType(id, file.type || null, mimePolicy)
+  );
+  if (blocked) {
+    return jsonResponse(
+      { error: UPLOAD_SPAM_MESSAGE, blockedText: blocked.match },
+      { status: 400 }
+    );
+  }
+
   const author = principalAuthor(principal);
   const result = await saveMediaUpload(env.DB, env.MEDIA_BUCKET, {
     id,
@@ -3272,6 +3289,15 @@ async function handleAjaxMediaUpload(
   });
   if (!validation.ok) {
     return ajaxMediaUploadError(validation.error, namespace);
+  }
+
+  const blocked = await findRuntimeMediaWordblockMatch(
+    env,
+    upload.body,
+    effectiveMediaUploadMimeType(id, upload.mimeType, mimePolicy)
+  );
+  if (blocked) {
+    return ajaxMediaUploadError(UPLOAD_SPAM_MESSAGE, namespace);
   }
 
   const author = principalAuthor(principal);
@@ -13107,6 +13133,25 @@ async function handleMediaUpload(
     );
   }
 
+  const blocked = await findRuntimeMediaWordblockMatch(
+    env,
+    body,
+    effectiveMediaUploadMimeType(id, file.type || null, mimePolicy)
+  );
+  if (blocked) {
+    if (acceptsJson(request)) {
+      return jsonResponse(
+        { error: UPLOAD_SPAM_MESSAGE, blockedText: blocked.match },
+        { status: 400 }
+      );
+    }
+
+    return htmlResponse(
+      htmlShell(env, "Media upload rejected", `<p>${escapeHtml(UPLOAD_SPAM_MESSAGE)}</p>`),
+      { status: 400 }
+    );
+  }
+
   const author = principalAuthor(principal);
   const result = await saveMediaUpload(env.DB, env.MEDIA_BUCKET, {
     id,
@@ -13569,8 +13614,27 @@ function lockedResponse(
 }
 
 async function findRuntimeWordblockMatch(env: Env, text: string): Promise<WordblockMatch | null> {
+  if (!(await runtimeWordblockEnabled(env))) return null;
   const patterns = await wordblockPatternsForRuntime(env);
   return findWordblockMatch(text, patterns);
+}
+
+async function runtimeWordblockEnabled(env: Env): Promise<boolean> {
+  const fallback = getRuntimeConfig(env).useWordblock;
+  if (env.USEWORDBLOCK !== undefined) return fallback;
+
+  const imported = await importedDokuWikiRuntimeConfig(env);
+  return importedDokuWikiBooleanConfig(imported, "usewordblock") ?? fallback;
+}
+
+async function findRuntimeMediaWordblockMatch(
+  env: Env,
+  body: ArrayBuffer,
+  mimeType: string
+): Promise<WordblockMatch | null> {
+  if (!mimeType.startsWith("text/")) return null;
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(body);
+  return findRuntimeWordblockMatch(env, text);
 }
 
 async function wordblockPatternsForRuntime(env: Env): Promise<string[] | undefined> {

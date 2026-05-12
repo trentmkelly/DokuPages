@@ -148,6 +148,8 @@ Optional Pages environment variables:
   and old-revision fetches. Default: enabled.
 - `IEXSSPROTECT`: set to `0` to disable DokuWiki's upstream upload XSS scan.
   Default: enabled.
+- `USEWORDBLOCK`: set to `0` to disable DokuWiki's wordblock spam list for page
+  edits, page reverts, and text media uploads. Default: enabled.
 - `FETCHSIZE`: maximum bytes `lib/exe/fetch.php` may download for external
   image media. Default: `0`, which disables proxy downloads and redirects to the
   original URL like upstream DokuWiki.

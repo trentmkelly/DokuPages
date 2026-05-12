@@ -103,6 +103,20 @@ export function validateMediaUpload(input: ValidateMediaUploadInput): MediaUploa
   return { ok: true };
 }
 
+export function effectiveMediaUploadMimeType(
+  id: string,
+  mimeType: string | null | undefined,
+  mimePolicy?: Pick<MimeTypeConfig, "mimeType"> | null
+): string {
+  const extension = mediaExtension(id);
+  const declaredMimeType = normalizeMimeType(mimeType);
+  const configuredMimeType = normalizeMimeType(mimePolicy?.mimeType);
+
+  if (declaredMimeType && !isGenericMimeType(declaredMimeType)) return declaredMimeType;
+  if (configuredMimeType) return configuredMimeType;
+  return normalizeMimeType(EXPECTED_MIME_TYPES[extension]?.[0]);
+}
+
 function mediaExtension(id: string): string {
   const name = mediaName(id);
   const marker = name.lastIndexOf(".");

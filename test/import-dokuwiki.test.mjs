@@ -7,6 +7,7 @@ import { gzip } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   buildImportPlan,
+  discoverWordblockPatterns,
   writeHashManifest,
   writeMediaManifest,
   writePageImportSql
@@ -968,6 +969,18 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'group:admin'");
     expect(sql).toContain("'all'");
     expect(sql).toContain("'wiki:welcome'");
+  });
+
+  it("matches DokuWiki wordblock local removal semantics", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-wordblock-"));
+    const defaults = path.join(root, "wordblock.conf");
+    const local = path.join(root, "wordblock.local.conf");
+    await writeFile(defaults, "default blocked\ncommented blocked # local note\n");
+    await writeFile(local, "!default blocked\n !not removal\n!commented blocked # local note\n");
+
+    await expect(discoverWordblockPatterns([defaults, local])).resolves.toEqual([
+      { id: "wordblock:1", pattern: "!not removal" }
+    ]);
   });
 });
 

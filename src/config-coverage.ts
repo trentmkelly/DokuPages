@@ -164,6 +164,7 @@ const IMPLEMENTED = new Set<string>([
   "remote",
   "remoteuser",
   "remotecors",
+  "usewordblock",
   "relnofollow",
   "iexssprotect",
   "usedraft",

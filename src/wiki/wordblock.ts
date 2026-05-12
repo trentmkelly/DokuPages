@@ -1,10 +1,13 @@
 export const WORD_BLOCK_MESSAGE =
   "Your change was not saved because it contains blocked text (spam).";
+export const UPLOAD_SPAM_MESSAGE = "The upload was blocked by the spam blacklist.";
 
 export interface WordblockMatch {
   pattern: string;
   match: string;
 }
+
+const WORD_BLOCK_CHUNK_SIZE = 200;
 
 // Default mapping from DokuWiki's conf/wordblock.conf.
 const DEFAULT_WORD_BLOCKS = [
@@ -41,7 +44,34 @@ export function findWordblockMatch(
   patterns: readonly string[] = DEFAULT_WORD_BLOCKS
 ): WordblockMatch | null {
   const prepared = prepareWordblockText(text);
+  const normalizedPatterns = patterns
+    .map((pattern) => normalizeWordblockPattern(pattern))
+    .filter((pattern): pattern is string => Boolean(pattern));
 
+  for (let index = 0; index < normalizedPatterns.length; index += WORD_BLOCK_CHUNK_SIZE) {
+    const chunk = normalizedPatterns.slice(index, index + WORD_BLOCK_CHUNK_SIZE);
+    let expression: RegExp;
+    try {
+      expression = new RegExp(`(${chunk.join("|")})`, "is");
+    } catch {
+      continue;
+    }
+
+    const match = prepared.match(expression);
+    if (match) {
+      return { pattern: matchingPattern(prepared, chunk) ?? chunk.join("|"), match: match[0] };
+    }
+  }
+
+  return null;
+}
+
+export function normalizeWordblockPattern(pattern: string): string | null {
+  const stripped = pattern.replace(/#.*$/, "").trim();
+  return stripped ? stripped : null;
+}
+
+function matchingPattern(text: string, patterns: readonly string[]): string | null {
   for (const pattern of patterns) {
     let expression: RegExp;
     try {
@@ -49,10 +79,10 @@ export function findWordblockMatch(
     } catch {
       continue;
     }
-    const match = prepared.match(expression);
+    const match = text.match(expression);
 
     if (match) {
-      return { pattern, match: match[0] };
+      return pattern;
     }
   }
 
@@ -60,5 +90,8 @@ export function findWordblockMatch(
 }
 
 function prepareWordblockText(text: string): string {
-  return text.replace(/\b(www\.[^\s<>"']+)/gi, "http://$1 $1");
+  return text.replace(
+    /(\b)(www\.[\w.:?\-;,]+?\.[\w.:?\-;,]+?[\w/#~:.?+=&%@!\-.:?\-;,]+?)([.:?\-;,]*[^\w/#~:.?+=&%@!\-.:?\-;,])/gi,
+    "$1http://$2 $2$3"
+  );
 }

@@ -78,6 +78,7 @@ export interface Env {
   EXTERNAL_AUTH_MODE?: string;
   EXTERNAL_AUTH_EMAIL_HEADER?: string;
   EXTERNAL_AUTH_USERNAME_HEADER?: string;
+  USEWORDBLOCK?: string;
   REMOTE?: string;
   REMOTEUSER?: string;
   REMOTECORS?: string;
