@@ -244,6 +244,17 @@ const EDIT_DERIVED_ACTIONS = new Set([
   "recover",
   "conflict"
 ]);
+const KNOWN_LICENSE_IMAGE_IDS = new Set([
+  "cc-by",
+  "cc-by-nc",
+  "cc-by-nc-nd",
+  "cc-by-nc-sa",
+  "cc-by-nd",
+  "cc-by-sa",
+  "cc-zero",
+  "gnufdl",
+  "publicdomain"
+]);
 type DiscoveryCacheKind = (typeof DISCOVERY_CACHE_KINDS)[number];
 type FeedType = RuntimeConfig["rssType"];
 
@@ -11354,18 +11365,70 @@ function pageInfoPath(config: ReturnType<typeof getRuntimeConfig>, pageId: strin
   return config.fullPath ? `data/pages/${relativePath}` : relativePath;
 }
 
-function renderFooterLicense(config: RuntimeConfig, appVersion: string): string {
+function renderFooterLicense(env: Env, config: RuntimeConfig): string {
   const license = config.licenseId
     ? resolveDefaultLicense(config.licenseId, config.language)
     : null;
-  const target = config.linkTargets.extern
-    ? ` target="${escapeAttribute(config.linkTargets.extern)}" rel="license noopener"`
-    : ' rel="license"';
-  const contentLicense = license
-    ? `Except where otherwise noted, content on this wiki is licensed under the following license: <bdi><a href="${escapeAttribute(license.url)}" class="urlextern"${target}>${escapeHtml(license.name)}</a></bdi>. `
-    : "";
+  if (!license) return "";
 
-  return `<div class="license">${contentLicense}Template structure and styling are adapted from DokuWiki's GPL-2.0 default template. DokuWiki Pages.dev Port ${escapeHtml(appVersion)}.</div>`;
+  return `<div class="license">${escapeHtml(localizedAuthText(env, "license"))} <bdi>${renderLicenseLink(config, license)}</bdi></div>`;
+}
+
+function renderEditLicenseNote(env: Env, config: RuntimeConfig): string {
+  const license = config.licenseId
+    ? resolveDefaultLicense(config.licenseId, config.language)
+    : null;
+  if (!license) return "";
+
+  return `<div class="license">${escapeHtml(localizedAuthText(env, "licenseok"))} ${renderLicenseLink(config, license)}</div>`;
+}
+
+function renderLicenseLink(
+  config: RuntimeConfig,
+  license: NonNullable<ReturnType<typeof resolveDefaultLicense>>
+): string {
+  return `<a href="${escapeAttribute(license.url)}" rel="license" class="urlextern"${externalTargetAttribute(config)}>${escapeHtml(license.name)}</a>`;
+}
+
+function renderFooterTemplateMessage(appVersion: string): string {
+  return `<div class="templateMessage">Template structure and styling are adapted from DokuWiki's GPL-2.0 default template. DokuWiki Pages.dev Port ${escapeHtml(appVersion)}.</div>`;
+}
+
+function renderFooterButtons(config: RuntimeConfig): string {
+  const licenseButton = renderLicenseButton(config);
+  const target = externalTargetAttribute(config);
+
+  return `<div class="buttons">
+            ${licenseButton}
+            <a href="https://www.dokuwiki.org/donate" title="Donate"${target}><img src="/images/button-donate.gif" width="80" height="15" alt="Donate"></a>
+            <a href="https://php.net" title="Powered by PHP"${target}><img src="/images/button-php.gif" width="80" height="15" alt="Powered by PHP"></a>
+            <a href="//validator.w3.org/check/referer" title="Valid HTML5"${target}><img src="/images/button-html5.png" width="80" height="15" alt="Valid HTML5"></a>
+            <a href="//jigsaw.w3.org/css-validator/check/referer?profile=css3" title="Valid CSS"${target}><img src="/images/button-css.png" width="80" height="15" alt="Valid CSS"></a>
+            <a href="https://dokuwiki.org/" title="Driven by DokuWiki"${target}><img src="/images/button-dw.png" width="80" height="15" alt="Driven by DokuWiki"></a>
+          </div>`;
+}
+
+function renderLicenseButton(config: RuntimeConfig): string {
+  const license = config.licenseId
+    ? resolveDefaultLicense(config.licenseId, config.language)
+    : null;
+  if (!license) return "";
+
+  const imagePath = licenseImagePath(license.id, "button");
+  if (!imagePath) return "";
+
+  return `<a href="${escapeAttribute(license.url)}" rel="license"${externalTargetAttribute(config)}><img src="${escapeAttribute(imagePath)}" alt="${escapeAttribute(license.name)}"></a>`;
+}
+
+function licenseImagePath(licenseId: string, type: "badge" | "button"): string | null {
+  const preferred = `/images/license/${type}/${licenseId}.png`;
+  if (KNOWN_LICENSE_IMAGE_IDS.has(licenseId)) return preferred;
+  if (licenseId.startsWith("cc-")) return `/images/license/${type}/cc.png`;
+  return null;
+}
+
+function externalTargetAttribute(config: RuntimeConfig): string {
+  return config.linkTargets.extern ? ` target="${escapeAttribute(config.linkTargets.extern)}"` : "";
 }
 
 function htmlShell(env: Env, title: string, body: string, options: HtmlShellOptions = {}): string {
@@ -11498,12 +11561,9 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
       </div>
       <footer id="dokuwiki__footer">
         <div class="pad">
-          ${renderFooterLicense(config, appVersion)}
-          <div class="buttons">
-            <a href="https://validator.w3.org/check/referer" title="Valid HTML5"><img src="/images/button-html5.png" width="80" height="15" alt="Valid HTML5"></a>
-            <a href="https://jigsaw.w3.org/css-validator/check/referer?profile=css3" title="Valid CSS"><img src="/images/button-css.png" width="80" height="15" alt="Valid CSS"></a>
-            <a href="https://www.dokuwiki.org/" title="Driven by DokuWiki"><img src="/images/button-dw.png" width="80" height="15" alt="Driven by DokuWiki"></a>
-          </div>
+          ${renderFooterLicense(env, config)}
+          ${renderFooterTemplateMessage(appVersion)}
+          ${renderFooterButtons(config)}
         </div>
       </footer>
     </div>
@@ -13913,6 +13973,7 @@ function renderEditPage(
     ? `<button type="submit" formaction="/api/pages/draft">Save draft</button>
           <button type="submit" formaction="/api/pages/draft/delete">Delete draft</button>`
     : "";
+  const licenseNote = renderEditLicenseNote(env, config);
   const lockAttributes =
     lockToken && config.lockTime > 0
       ? ` data-lock-url="/api/pages/lock" data-lock-release-url="/api/pages/lock/release" data-lock-refresh-delay="${pageLockRefreshDelayMs(config.lockTime)}" data-lock-warning-delay="${config.lockTime * 1000}"`
@@ -13950,6 +14011,7 @@ function renderEditPage(
           <label class="minor"><input name="minor" type="checkbox" value="1"> Minor edit</label>
         </div>
       </div>
+      ${licenseNote}
       <div id="wiki__preview" class="preview group" hidden aria-live="polite"></div>
     </form>
     </div>

@@ -42,6 +42,8 @@ const LANGUAGE_KEYS = [
   "email",
   "badlogin",
   "badpassconfirm",
+  "license",
+  "licenseok",
   "regmissing",
   "reguexists",
   "regsuccess",

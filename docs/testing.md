@@ -64,7 +64,9 @@ search, search assistant toggles, link wizard insertion, media popups, editor
 helpers, toolbar insertion, picker toggles, lock warnings, and media manager
 uploads. Asset tests also verify the upstream editor toolbar icons are present.
 Renderer and app-route tests cover upstream-style section edit forms, section
-marker classes, page-tool actions, and disabled-action hiding.
+marker classes, page-tool actions, disabled-action hiding, footer license text,
+validation badges, external footer targets, disabled-license behavior, and edit
+license notices.
 `npm run format:check` runs `npm run style:check` before Prettier so generated
 `public/dokuwiki.css` cannot drift from upstream `style.ini`, upstream template
 CSS modules, or `src/styles/dokuwiki-pages-overrides.css`.

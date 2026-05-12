@@ -638,8 +638,49 @@ describe("handleRequest", () => {
     expect(html).toContain('<p class="claim">Notes from the edge</p>');
     expect(html).toContain('id="dokuwiki__aside"');
     expect(html).toContain('class="site dokuwiki mode_show tpl_dokuwiki showSidebar hasSidebar"');
-    expect(html).toContain("CC Attribution 4.0 International");
-    expect(html).toContain("https://creativecommons.org/licenses/by/4.0/deed.en");
+    expect(html).toContain(
+      '<div class="license">Except where otherwise noted, content on this wiki is licensed under the following license: <bdi><a href="https://creativecommons.org/licenses/by/4.0/deed.en" rel="license" class="urlextern">CC Attribution 4.0 International</a></bdi></div>'
+    );
+    expect(html).toContain(
+      '<a href="https://creativecommons.org/licenses/by/4.0/deed.en" rel="license"><img src="/images/license/button/cc-by.png" alt="CC Attribution 4.0 International"></a>'
+    );
+    expect(html).toContain(
+      '<a href="https://www.dokuwiki.org/donate" title="Donate"><img src="/images/button-donate.gif" width="80" height="15" alt="Donate"></a>'
+    );
+    expect(html).toContain(
+      '<a href="https://php.net" title="Powered by PHP"><img src="/images/button-php.gif" width="80" height="15" alt="Powered by PHP"></a>'
+    );
+    expect(html).toContain(
+      '<a href="//validator.w3.org/check/referer" title="Valid HTML5"><img src="/images/button-html5.png" width="80" height="15" alt="Valid HTML5"></a>'
+    );
+    expect(html).toContain("Template structure and styling are adapted from DokuWiki");
+  });
+
+  it("matches upstream footer target and disabled-license behavior", async () => {
+    const targeted = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), {
+      ...env,
+      LICENSE: "cc-by-sa",
+      TARGET_EXTERN: "_blank"
+    } satisfies Env);
+    const noLicense = await handleRequest(new Request("https://example.com/wiki/wiki/welcome"), {
+      ...env,
+      LICENSE: "none"
+    } satisfies Env);
+
+    expect(targeted.status).toBe(200);
+    const targetedHtml = await targeted.text();
+    expect(targetedHtml).toContain(
+      '<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.en" rel="license" class="urlextern" target="_blank">CC Attribution-Share Alike 4.0 International</a>'
+    );
+    expect(targetedHtml).toContain(
+      '<a href="https://www.dokuwiki.org/donate" title="Donate" target="_blank">'
+    );
+
+    expect(noLicense.status).toBe(200);
+    const noLicenseHtml = await noLicense.text();
+    expect(noLicenseHtml).not.toContain('rel="license"');
+    expect(noLicenseHtml).not.toContain("/images/license/button/");
+    expect(noLicenseHtml).toContain("Template structure and styling are adapted from DokuWiki");
   });
 
   it("fingerprints static assets with the Pages commit when available", async () => {
@@ -2765,6 +2806,9 @@ describe("handleRequest", () => {
     expect(html).toContain('data-lock-refresh-delay="840000"');
     expect(html).toContain('data-lock-warning-delay="900000"');
     expect(html).toContain('name="minor" type="checkbox"');
+    expect(html).toContain(
+      '<div class="license">Note: By editing this page you agree to license your content under the following license: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en" rel="license" class="urlextern">CC Attribution-Noncommercial-Share Alike 4.0 International</a></div>'
+    );
   });
 
   it("honors LOCKTIME for edit locks and client refresh timing", async () => {

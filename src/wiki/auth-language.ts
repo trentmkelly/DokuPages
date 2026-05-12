@@ -34,6 +34,8 @@ export const AUTH_LANGUAGE_KEYS = [
   "email",
   "badlogin",
   "badpassconfirm",
+  "license",
+  "licenseok",
   "regmissing",
   "reguexists",
   "regsuccess",
@@ -162,6 +164,8 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "البريد الإلكتروني",
       badlogin: "عذرا، اسم المشترك أو كلمة السر غير صحيحة",
       badpassconfirm: "عذراً,كلمة السر غير صحيحة",
+      license: "مالم يشر لخلاف ذلك، فإن المحتوى في هذه الويكي مرخص وفق الرخصة التالية:",
+      licenseok: "لاحظ: بتحرير هذه الصفحة أنت توافق على ترخيص محتواها تحت الرخصة التالية:",
       regmissing: "عذرا، عليك ملء جميع الحقول.",
       reguexists: "عذرا، يوجد مشترك بنفس الاسم.",
       regsuccess: "أنشئ المستخدم و ارسلت كلمة السر بالبريد.",
@@ -245,6 +249,10 @@ export const AUTH_LANGUAGE_PACKS = {
       remember: "Məni yadda saxla",
       fullname: "Tam ad",
       badlogin: "Təssüf ki istifadəçi adı və ya şifrə səhvdir.",
+      license:
+        "Fərqli şey göstərilmiş hallardan başqa, bu wiki-nin mətni aşağıda göstərilmiş lisenziyanın şərtlərinə uyğun təqdim olunur:",
+      licenseok:
+        "Qeyd: bu səhifəni düzəliş edərək, Siz elədiyiniz düzəlişi aşağıda göstərilmiş lisenziyanın şərtlərinə uyğun istifadəsinə razılıq verirsiniz:",
       regmissing: "Təssüf ki Siz bütün xanələri doldurmalısınız.",
       reguexists: "Təssüf ki bu ad ilə istifadəçi artıq mövcuddur.",
       regsuccess: "İstivadəci yaradıldı və şifrə sizin e-maila göndərildi.",
@@ -323,6 +331,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Эл. адрас",
       badlogin: "Прабачце, няправільнае імя карыстальніка або пароль.",
       badpassconfirm: "Прабачце, пароль няправільны",
+      license:
+        "Калі не пазначана іншае, змесціва гэтай вікі прадастаўляецца на ўмовах наступнай ліцэнзіі:",
+      licenseok:
+        "Заўвага: рэдагуючы гэтую старонку, вы згаджаецеся на выкарыстанне свайго ўкладу на ўмовах наступнай ліцэнзіі:",
       regmissing: "Прабачце, вам варта запоўніць усе палі.",
       reguexists: "Прабачце, карыстальнік з такім лагінам ужо існуе.",
       regsuccess: "Карыстальнік створаны; пароль высланы на адрас электроннай пошты.",
@@ -414,6 +426,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Електронна поща",
       badlogin: "Грешно потребителско име или парола.",
       badpassconfirm: "За съжаление паролата е грешна",
+      license: "Ако не е посочено друго, съдържанието на Wiki-то е лицензирано под следния лиценз:",
+      licenseok:
+        "Бележка: Редактирайки страницата, Вие се съгласявате да лицензирате промените (които сте направили) под следния лиценз:",
       regmissing: "Моля, попълнете всички полета.",
       reguexists: "Вече съществува потребител с избраното име.",
       regsuccess: "Потребителят е създаден, а паролата е пратена по електронната поща.",
@@ -504,6 +519,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "ই মেইল",
       badlogin: "দুঃখিত, ব্যবহারকারীর নাম বা পাসওয়ার্ড ভুল ছিল.",
       badpassconfirm: "দুঃখিত, পাসওয়ার্ড ভুল ছিল",
+      license:
+        "অন্যথায় নোট যেখানে ছাড়া, এই উইকি নেভিগেশন কন্টেন্ট নিম্নলিখিত লাইসেন্সের আওতায় লাইসেন্সকৃত:",
+      licenseok:
+        "দ্রষ্টব্য: আপনি নিম্নলিখিত লাইসেন্সের অধীনে আপনার বিষয়বস্তু লাইসেন্স সম্মত হন এই পৃষ্ঠার সম্পাদনার দ্বারা:",
       regmissing: "দুঃখিত, আপনি সমস্ত ক্ষেত্রগুলি পূরণ করা আবশ্যক.",
       reguexists: "দুঃখিত, এই লগইন সঙ্গে একটি ব্যবহারকারী ইতিমধ্যেই বিদ্যমান.",
       regsuccess: "ব্যবহারকারী তৈরি করা হয়েছে এবং পাসওয়ার্ড ইমেইল করে পাঠানো হয়েছিল.",
@@ -575,6 +594,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Adreça electrònica",
       badlogin: "Nom d'usuari o contrasenya incorrectes.",
       badpassconfirm: "Contrasenya incorrecta",
+      license:
+        "Excepte on es digui una altra cosa, el contingut d'aquest wiki està subjecte a la llicència següent:",
+      licenseok:
+        "Nota. En editar aquesta pàgina esteu acceptant que el vostre contingut estigui subjecte a la llicència següent:",
       regmissing: "Heu d'omplir tots els camps.",
       reguexists: "Ja existeix un altre usuari amb aquest nom.",
       regsuccess: "S'ha creat l'usuari. La contrasenya s'ha enviat per correu.",
@@ -662,6 +685,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nom complet",
       email: "Correu electrònic",
       badlogin: "Disculpe, pero el nom d'usuari o la contrasenya són incorrectes.",
+      license:
+        "Excepte quan s'indique una atra cosa, el contingut d'este wiki està llicenciat baix la següent llicència:",
+      licenseok:
+        "Nota: a l'editar esta pàgina accepta llicenciar el seu contingut baix la següent llicència:",
       regmissing: "Disculpe, pero deu omplir tots els camps.",
       reguexists: "Disculpe, pero ya existix un usuari en este nom.",
       regsuccess: "S'ha creat l'usuari i se li ha enviat la contrasenya per correu electrònic.",
@@ -741,6 +768,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "ئیمەیل",
       badlogin: "ببوورە، ناویبەکارهێنەر و تێپەڕوشە هەڵەیە",
       badpassconfirm: "ببورە، ئەم تێپەڕوشە هەڵەیە",
+      license:
+        "تەنها لەو شوێنەی تێبینی کراوە، ناوەڕۆکی ئەم ویکییە مۆڵەتدراوە لەژێر ئەم مۆڵەتەی خوارەوە:\t",
+      licenseok:
+        "تێبینی: بە بژارکردنی ئەم لاپەڕەیە ڕازیت بە مۆڵەتپێدانی ناوەڕۆکەکەت لەژێر ئەم مۆڵەتەی خوارەوە:\t",
       regmissing: "ببوورە، پێویستە هەموو خانەکان پڕ کەیت.",
       reguexists: "ببوورە، بەکارهێنەرێک کە ئەم چوونەژوورەوەی هەیە.",
       regsuccess: "بەکارهێنەرەکە پێکهێنراوە و تێپەڕوشە بە ئیمەیڵ نێردراوە.",
@@ -831,6 +862,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail",
       badlogin: "Zadané uživatelské jméno a heslo není správně.",
       badpassconfirm: "Bohužel špatné heslo",
+      license:
+        "Kromě míst, kde je explicitně uvedeno jinak, je obsah této wiki licencován pod následující licencí:",
+      licenseok:
+        "Poznámka: Tím, že editujete tuto stránku, souhlasíte, aby váš obsah byl licencován pod následující licencí:",
       regmissing: "Musíte vyplnit všechny údaje.",
       reguexists: "Uživatel se stejným jménem už je zaregistrován.",
       regsuccess: "Uživatelský účet byl vytvořen a heslo zasláno e-mailem.",
@@ -921,6 +956,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-Bost",
       badlogin: "Sori, roedd y defnyddair neu'r gyfriair yn anghywir.",
       badpassconfirm: "Sori, roedd y cyfrinair yn anghywir",
+      license:
+        "Heb law bod datganiad i'r gwrthwyneb, mae cynnwys y wici hwn o dan y drwydded ganlynol:",
+      licenseok:
+        "Sylwir: Gan olygu'r dudalen hon rydych chi'n cytuno i drwyddedu'ch cynnwys chi o dan y drwydded ganlynol:",
       regmissing: "Sori, llenwch bob maes.",
       reguexists: "Sori, mae defnyddiwr â'r enw hwn yn bodoli eisoes.",
       regsuccess: "Cafodd y defnyddiwr ei greu a chafodd y cyfrinair ei anfon gan ebost.",
@@ -1009,6 +1048,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail adresse",
       badlogin: "Brugernavn eller adgangskode var forkert.",
       badpassconfirm: "Adgangkode var desværre forkert",
+      license:
+        "Med mindre andet angivet, vil indhold på denne wiki blive udgivet under følgende licens:",
+      licenseok:
+        "Bemærk - ved at redigere denne side, accepterer du at dit indhold bliver frigivet under følgende licens:",
       regmissing: "Du skal udfylde alle felter.",
       reguexists: "Dette brugernavn er allerede i brug.",
       regsuccess: "Du er nu oprettet som bruger. Din adgangskode bliver sendt til dig i en e-mail.",
@@ -1096,6 +1139,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Voller Name",
       badlogin: "Benutzername oder Passwort sind falsch.",
       badpassconfirm: "Das Passwort war falsch.",
+      license:
+        "Falls nicht anders bezeichnet, ist der Inhalt dieses Wikis unter der folgenden Lizenz veröffentlicht:",
+      licenseok:
+        "Hinweis: Durch das Bearbeiten dieser Seite geben Sie Ihr Einverständnis, dass Ihr Inhalt unter der folgenden Lizenz veröffentlicht wird:",
       regmissing: "Bitte alle Felder ausfüllen!",
       reguexists: "Der Benutzername existiert leider schon.",
       regsuccess: "Der neue Benutzer wurde angelegt und das Passwort per E-Mail versandt.",
@@ -1186,6 +1233,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Voller Name",
       badlogin: "Benutzername oder Passwort sind falsch.",
       badpassconfirm: "Das Passwort war falsch.",
+      license:
+        "Falls nicht anders bezeichnet, ist der Inhalt dieses Wikis unter der folgenden Lizenz veröffentlicht:",
+      licenseok:
+        "Hinweis: Durch das Bearbeiten dieser Seite gibst du dein Einverständnis, dass dein Inhalt unter der folgenden Lizenz veröffentlicht wird:",
       regmissing: "Alle Felder müssen ausgefüllt werden",
       reguexists: "Der Benutzername existiert leider schon.",
       regsuccess: "Der neue Benutzer wurde angelegt und das Passwort per E-Mail versandt.",
@@ -1278,6 +1329,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "e-mail",
       badlogin: "Συγνώμη, το όνομα χρήστη ή ο κωδικός ήταν λανθασμένο.",
       badpassconfirm: "Ο κωδικός που εισάγατε είναι λανθασμένος",
+      license:
+        "Εκτός εάν αναφέρεται διαφορετικά, το περιεχόμενο σε αυτο το wiki διέπεται από την ακόλουθη άδεια:",
+      licenseok:
+        "Σημείωση: Τροποποιώντας αυτή την σελίδα αποδέχεστε την διάθεση του υλικού σας σύμφωνα με την ακόλουθη άδεια:",
       regmissing: "Πρέπει να συμπληρώσετε όλα τα πεδία.",
       reguexists: "Αυτός ο λογαριασμός υπάρχει ήδη.",
       regsuccess: "Ο λογαριασμός δημιουργήθηκε και ο κωδικός εστάλει με e-mail.",
@@ -1367,6 +1422,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-Mail",
       badlogin: "Sorry, username or password was wrong.",
       badpassconfirm: "Sorry, the password was wrong",
+      license:
+        "Except where otherwise noted, content on this wiki is licensed under the following license:",
+      licenseok:
+        "Note: By editing this page you agree to license your content under the following license:",
       regmissing: "Sorry, you must fill in all fields.",
       reguexists: "Sorry, a user with this login already exists.",
       regsuccess: "The user has been created and the password was sent by email.",
@@ -1458,6 +1517,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Retpoŝto",
       badlogin: "Pardonu, uzant-nomo aŭ pasvorto estis erara.",
       badpassconfirm: "Pardonu, la pasvorto malĝustis",
+      license:
+        "Krom kie rekte indikite, enhavo de tiu ĉi vikio estas publikigita laŭ la jena permesilo:",
+      licenseok:
+        "Rimarku: redaktante tiun ĉi paĝon vi konsentas publikigi vian enhavon laŭ la jena permesilo:",
       regmissing: "Pardonu, vi devas plenigi ĉiujn kampojn.",
       reguexists: "Pardonu, ĉi tiu uzanto-nomo jam ekzistas.",
       regsuccess: "La uzanto kreiĝis kaj la pasvorto sendiĝis per retpoŝto.",
@@ -1547,6 +1610,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nombre real",
       badlogin: "Lo siento, el usuario o la contraseña es incorrecto.",
       badpassconfirm: "Lo siento, la contraseña es errónea",
+      license:
+        "Excepto donde se indique lo contrario, el contenido de este wiki esta bajo la siguiente licencia:",
+      licenseok:
+        "Nota: Al editar esta página, estás de acuerdo en autorizar su contenido bajo la siguiente licencia:",
       regmissing: "Lo siento, tienes que completar todos los campos.",
       reguexists: "Lo siento, ya existe un usuario con este nombre.",
       regsuccess: "El usuario ha sido creado y la contraseña se ha enviado por correo.",
@@ -1638,6 +1705,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-post",
       badlogin: "Oops, Sinu kasutajanimi või parool oli vale.",
       badpassconfirm: "Väär salasõna",
+      license: "Kus pole öeldud teisiti, kehtib selle wiki sisule järgmine leping:",
+      licenseok:
+        "Teadmiseks: Toimetades seda lehte, nõustud avaldama oma sisu järgmise lepingu alusel:",
       regmissing: "Kõik väljad tuleb ära täita.",
       reguexists: "Tegelikult on sellise nimega kasutaja juba olemas.",
       regsuccess: "Kasutaja sai tehtud. Parool saadeti Sulle e-posti aadressil.",
@@ -1725,6 +1795,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-Maila",
       badlogin: "Barkatu, prozesuak huts egin du; saiatu berriz",
       badpassconfirm: "Pasahitz okerra",
+      license: "Besterik esan ezean, wiki hontako edukia ondorengo lizentziapean argitaratzen da:",
+      licenseok:
+        "Oharra: Orri hau editatzean, zure edukia ondorengo lizentziapean argitaratzea onartzen duzu: ",
       regmissing: "Barkatu, hutsune guztiak bete behar dituzu.",
       reguexists: "Barkatu, izen bereko erabiltzailea existitzen da.",
       regsuccess: "Erabiltzailea sortu da. Pasahitza mailez bidaliko zaizu.",
@@ -1815,6 +1888,8 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "رایانامه",
       badlogin: "متاسفم، نام کاربری یا رمز عبور اشتباه است.",
       badpassconfirm: "متاسفم، رمز عبور اشتباه است",
+      license: "به جز مواردی که ذکر می‌شود، مابقی محتویات ویکی تحت مجوز زیر می‌باشند:",
+      licenseok: "توجه: با ویرایش این صفحه، شما مجوز زیر را تایید می‌کنید:",
       regmissing: "متاسفم، شما باید همه قسمت‌ها را پر کنید.",
       reguexists: "نام کاربری‌ای که وارد کردید قبلن استفاده شده است.",
       regsuccess: "کاربر ساخته شد و گذرواژه به صورت ایمیل ارسال گردید.",
@@ -1904,6 +1979,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Sähköposti",
       badlogin: "Käyttäjänimi tai salasana oli väärä.",
       badpassconfirm: "Valitan. Salasana oli väärin",
+      license:
+        "Jollei muuta ole mainittu, niin sisältö tässä wikissä on lisensoitu seuraavalla lisenssillä:",
+      licenseok:
+        "Huom: Muokkaamalla tätä sivua suostut lisensoimaan sisällön seuraavan lisenssin mukaisesti:",
       regmissing: "Kaikki kentät tulee täyttää.",
       reguexists: "Käyttäjä tällä käyttäjänimellä on jo olemassa.",
       regsuccess: "Käyttäjä luotiin ja salasana lähetettiin sähköpostilla.",
@@ -1989,6 +2068,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Navn",
       email: "T-postur",
       badlogin: "Skeivt brúkaranavn ella loyniorð.",
+      license:
+        "Um ikki annað er tilskilað, so er tilfar á hesari wiki loyvt margfaldað undir fylgjandi treytum:",
+      licenseok:
+        "Legg til merkis: Við at dagføra hesa síðu samtykkir tú at loyva margfalding av tilfarinum undir fylgjandi treytum:",
       regmissing: "Tú skalt fylla út øll øki.",
       reguexists: "Hetta brúkaranavn er upptiki.",
       regsuccess:
@@ -2060,6 +2143,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Adresse de courriel",
       badlogin: "Le nom d'utilisateur ou le mot de passe est incorrect.",
       badpassconfirm: "Désolé, le mot de passe est erroné",
+      license:
+        "Sauf mention contraire, le contenu de ce wiki est placé sous les termes de la licence suivante :",
+      licenseok:
+        "Note : En modifiant cette page, vous acceptez que le contenu soit placé sous les termes de la licence suivante :",
       regmissing: "Désolé, vous devez remplir tous les champs.",
       reguexists: "Désolé, ce nom d'utilisateur est déjà pris.",
       regsuccess: "L'utilisateur a été créé. Le mot de passe a été expédié par courriel.",
@@ -2150,6 +2237,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nome Completo",
       email: "Correo-e",
       badlogin: "Sentímolo, mais o nome de usuario ou o contrasinal non son correctos.",
+      license:
+        "O contido deste wiki, agás onde se indique o contrario, ofrécese baixo da seguinte licenza:",
+      licenseok:
+        "Nota: Ao editares esta páxina estás a aceptar o licenciamento do contido baixo da seguinte licenza:",
       regmissing: "Sentímolo, mais tes que cubrir todos os campos.",
       reguexists: "Sentímolo, mais xa existe un usuario con ese nome.",
       regsuccess: "O usuario foi creado e o contrasinal enviado por correo-e.",
@@ -2239,6 +2330,8 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "דוא״ל",
       badlogin: "שם המשתמש או הססמה שגויים, עמך הסליחה",
       badpassconfirm: "מצטערים, הסיסמה שגויה",
+      license: "למעט מקרים בהם צוין אחרת, התוכן בוויקי זה זמין לפי הרישיון הבא:",
+      licenseok: "נא לשים לב: עריכת דף זה מהווה הסכמה מצדך להצגת התוכן שהוספת בהתאם הרישיון הבא:",
       regmissing: "עליך למלא את כל השדות, עמך הסליחה.",
       reguexists: "משתמש בשם זה כבר נרשם, עמך הסליחה.",
       regsuccess: "ההרשמה הצליחה, המשתמש נרשם והודעה נשלחה בדוא״ל.",
@@ -2367,6 +2460,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-pošta",
       badlogin: "Neispravno korisničko ime ili lozinka.",
       badpassconfirm: "Nažalost, lozinka nije ispravna",
+      license:
+        "Osim na mjestima gdje je naznačeno drugačije, sadržaj ovog wikija je licenciran sljedećom licencom:",
+      licenseok:
+        "Pažnja: promjenom ovog dokumenta pristajete licencirati sadržaj sljedećom licencom: ",
       regmissing: "Morate popuniti sva polja.",
       reguexists: "Korisnik s tim korisničkim imenom već postoji.",
       regsuccess: "Korisnik je uspješno stvoren i poslana je lozinka emailom.",
@@ -2454,6 +2551,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Teljes név",
       badlogin: "Sajnáljuk, az azonosító vagy a jelszó nem jó.",
       badpassconfirm: "Hibás jelszó",
+      license:
+        "Hacsak máshol nincs egyéb rendelkezés, ezen wiki tartalma a következő licenc alatt érhető el:",
+      licenseok:
+        "Megjegyzés: az oldal szerkesztésével elfogadja, hogy a tartalom a következő licenc alatt lesz elérhető:",
       regmissing: "Sajnáljuk, az összes mezőt ki kell töltened.",
       reguexists: "Sajnáljuk, ilyen azonosítójú felhasználónk már van.",
       regsuccess: "A felhasználói azonosítót létrehoztuk. A jelszót postáztuk.",
@@ -2606,6 +2707,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nomine real",
       email: "E-mail",
       badlogin: "Le nomine de usator o le contrasigno es incorrecte.",
+      license:
+        "Excepte ubi indicate alteremente, le contento in iste wiki es disponibile sub le licentia sequente:",
+      licenseok:
+        "Nota ben! Per modificar iste pagina tu accepta que tu contento essera publicate sub le conditiones del licentia sequente:",
       regmissing: "Es necessari completar tote le campos.",
       reguexists: "Regrettabilemente, un usator con iste nomine ja existe.",
       regsuccess: "Le conto ha essite create e le contrasigno ha essite inviate per e-mail.",
@@ -2680,6 +2785,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nama lengkap",
       badlogin: "Maaf, username atau password salah.",
       badpassconfirm: "Maaf, password salah",
+      license:
+        "Kecuali jika dinyatakan lain, konten pada wiki ini dilisensikan dibawah lisensi berikut:",
+      licenseok:
+        "Catatan: Dengan menyunting halaman ini, Anda setuju untuk melisensikan konten Anda dibawah lisensi berikut:",
       regmissing: "Maaf, Anda harus mengisi semua field.",
       reguexists: "Maaf, user dengan user login ini telah ada.",
       regsuccess: "User telah didaftarkan dan password telah dikirim ke email Anda.",
@@ -2816,6 +2925,9 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Fullt nafn þitt*",
       email: "Tölvupóstfangið þitt*",
       badlogin: "Því miður, notandanafn eða aðgangsorð var rangur.",
+      license: "Nema annað sé tekið fram, efni á þessari wiki er leyfð undir eftirfarandi leyfi:",
+      licenseok:
+        "Athugið: Með því að breyta þessari síðu samþykkir þú að leyfisveitandi efni undir eftirfarandi leyfi:",
       regmissing: "Afsakið, en þú verður að fylla út í allar eyður.",
       reguexists: "Afsakið, notandi með þessu nafni er þegar skráður inn.",
       regsuccess: "Notandi hefur verið búinn til og aðgangsorð sent í tölvupósti.",
@@ -2881,6 +2993,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Email",
       badlogin: "Il nome utente o la password non sono validi.",
       badpassconfirm: "La password è errata",
+      license:
+        "Ad eccezione da dove è diversamente indicato, il contenuto di questo wiki è soggetto alla seguente licenza:",
+      licenseok:
+        "Nota: modificando questa pagina accetti di rilasciare il contenuto sotto la seguente licenza:",
       regmissing: "Devi riempire tutti i campi.",
       reguexists: "Il nome utente inserito esiste già.",
       regsuccess: "L'utente è stato creato. La password è stata spedita via email.",
@@ -2971,6 +3087,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "メールアドレス",
       badlogin: "ユーザー名もしくはパスワードに誤りがあります。",
       badpassconfirm: "パスワードに誤りがあります。",
+      license: "特に明示されていない限り、本Wikiの内容は次のライセンスに従います：",
+      licenseok:
+        "注意： 本ページを編集した場合、あなたの編集した内容が次のライセンスに従うことに同意したものとみなします：",
       regmissing: "お手数ですが、全ての項目を入力してください。",
       reguexists: "恐れ入りますが、このユーザー名は既に存在しています。",
       regsuccess:
@@ -3063,6 +3182,8 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "ფოსტა",
       badlogin: "ლოგინი ან პაროლი არასწორია",
       badpassconfirm: "პაროლი არასწორია",
+      license: "ვიკი ლიცენზირებულია: ",
+      licenseok: "ამ გვერდის რედაქტირებით თვენ ეთანხმებით ლიცენზიას:",
       regmissing: "ყველა ველი შეავსეთ",
       reguexists: "მსგავსი ლოგინი უკვე არსებობს",
       regsuccess: "მომხმარებელი შექმნილია, პაროლი გამოგზავნილია",
@@ -3138,6 +3259,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Шын аты",
       email: "Е-пошта",
       badlogin: "Кешріңіз, түпнұсқа әлде құпиясөз дұрыс емес",
+      license:
+        "Басқаша көрсетілген болмаса, бұл wiki-дің мазмұны келесі лицензия бойынша беріледі:",
+      licenseok:
+        "Ескерту: бұл бетті өңдеуіңізбен мазмұныңыз келесі лицензия бойынша беруге келесесіз:",
       regmissing: "Кешіріңіз, барлық тармақтары толтыруыңыз керек.",
       reguexists: "Кешіріңіз, бұл түпнұскамен де пайдаланушы бар.",
       regsuccess: "Пайдаланушы қосылды әрі құпиясөзін электрондық поштаға жіберді.",
@@ -3257,6 +3382,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "이메일",
       badlogin: "죄송하지만 사용자 이름이나 비밀번호가 잘못되었습니다.",
       badpassconfirm: "죄송하지만 비밀번호가 잘못되었습니다",
+      license:
+        "별도로 명시하지 않을 경우, 이 위키의 내용은 다음 라이선스에 따라 사용할 수 있습니다:",
+      licenseok: "참고: 이 문서를 편집하면 내용은 다음 라이선스에 따라 배포하는 데 동의합니다:",
       regmissing: "죄송하지만 모든 필드를 채워야 합니다.",
       reguexists: "죄송하지만 같은 이름을 사용하는 사용자가 있습니다.",
       regsuccess: "사용자 계정을 만들었으며 비밀번호는 이메일로 보냈습니다.",
@@ -3373,6 +3501,8 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nomen tuom uerum:",
       email: "Cursus interretialis:",
       badlogin: "Error in ineundo est, rectum nomen uel tessera cedo.",
+      license: "Praeter ubi adnotatum, omnia scripta Corporis Gentis Latinae cum his facultatibus:",
+      licenseok: "Caue: si paginam recenseas, has facultates confirmas:",
       regmissing: "Omnes campi complendi sunt.",
       reguexists: "Nomen Sodalis ab aliquo iam elegitur.",
       regsuccess: "Adscriptio feliciter perficitur et tessera cursu interretiali mittitur",
@@ -3444,6 +3574,10 @@ export const AUTH_LANGUAGE_PACKS = {
       remember: "Verhal mech",
       fullname: "Richtegen Numm",
       badlogin: "Entschëllegt, de Benotzernumm oder d'Passwuert war falsch",
+      license:
+        "Wann näischt anescht do steet, ass den Inhalt vun dësem Wiki ënner folgender Lizenz:",
+      licenseok:
+        "Pass op: Wanns de dës Säit änners, bass de dermat averstan dass den Inhalt ënner folgender Lizenz lizenzéiert gëtt:",
       regmissing: "Du muss all d'Felder ausfëllen.",
       reguexists: "Et get schonn e Benotzer mat deem Numm.",
       regsuccess: "De Benotzer gouf erstallt an d'Passwuert via Email geschéckt.",
@@ -3523,6 +3657,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "El. pašto adresas",
       badlogin: "Nurodėte neteisingą vartotojo vardą arba slaptažodį.",
       badpassconfirm: "Deja slaptažodis buvo neteisingas",
+      license: "Jei nenurodyta kitaip, šio wiki turinys ginamas tokia licencija:",
+      licenseok:
+        "Pastaba: Redaguodami šį puslapį jūs sutinkate jog jūsų turinys atitinka licencijavima pagal šią licenciją",
       regmissing: "Turite užpildyti visus laukus.",
       reguexists: "Vartotojas su pasirinktu prisijungimo vardu jau egzistuoja.",
       regsuccess: "Vartotojas sukurtas, slaptažodis išsiųstas el. paštu.",
@@ -3611,6 +3748,8 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-pasts",
       badlogin: "Atvaino, lietotājvārds vai parole aplama.",
       badpassconfirm: "Atvaino, aplama parole",
+      license: "Ja nav norādīts citādi, viki saturs pieejams ar šādas licenzes  noteikumiem:",
+      licenseok: "Ievēro: Labojot lapu, tu piekrīti šādiem licenzes noteikumiem.",
       regmissing: "Atvaino, jāaizpilda visas ailes.",
       reguexists: "Atvaino, tāds lietotājs jau ir.",
       regsuccess: "Lietotājs izveidots. Parole nosūtīta pa pastu.",
@@ -3744,6 +3883,10 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Вистинско име",
       email: "Е-пошта",
       badlogin: "Жалам, корисничкото име или лозинката се погрешни.",
+      license:
+        "Освен каде што е наведено поинаку, содржината на ова вики е лиценцирано по следнава лиценца:",
+      licenseok:
+        "Забелешка: со уредување на оваа страница се согласувате да ја лиценцирате вашата содржина под следнава лиценца:",
       regmissing: "Жалам, мора да ги пополнеш сите полиња.",
       reguexists: "Жалам, корисник со ова корисничко име веќе постои.",
       regsuccess: "Корисникот е креиран и лозинката е испратена по е-пошта.",
@@ -3811,6 +3954,9 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "पूर्ण नावं",
       email: "इमेल",
       badlogin: "माफ़ करा, वापरकर्ता नावात किंवा परवलीच्या शब्दात चूक झाली आहे.",
+      license: "विशिष्ठ नोंद केलि नसल्यास ह्या विकी वरील सर्व मजकूर खालील लायसन्स मधे मोडतो : ",
+      licenseok:
+        "नोंद : हे पृष्ठ संपादित केल्यास तुम्ही तुमचे योगदान खालील लायसन्स अंतर्गत येइल : ",
       regmissing: "कृपया सर्व रकाने भरा.",
       reguexists: "या नावाने सदस्याची नोंदणी झालेली आहे, कृपया दुसरे सदस्य नाव निवडा.",
       regsuccess: "सदस्याची नोंदणी झाली आहे आणि परवलीचा शब्द इमेल केला आहे.",
@@ -3885,6 +4031,9 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Nama sebenar",
       email: "E-mel",
       badlogin: "Maaf, ralat log masuk. Nama pengguna atau kata laluan salah.",
+      license: "Selain daripada yang dinyata, isi wiki ini disediakan dengan lesen berikut:",
+      licenseok:
+        "Perhatian: Dengan menyunting halaman ini, anda setuju untuk isi-isi anda dilesen menggunakan lesen berikut:",
       regmissing: "Maaf, semua medan mesti diisi",
       reguexists: "Maaf, nama pengguna yang dimasukkan telah diguna. Sila pilih nama yang lain.",
       regsuccess: "Akaun pengguna telah dicipta dan kata laluan telah dikirim kepada e-mel anda.",
@@ -3970,6 +4119,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "इमेल",
       badlogin: "माफ गर्नुहोस् , प्रयोगकर्तानाम वा प्रवेशशव्द गलत भयो  ",
       badpassconfirm: "माफ गर्नुहोस् , पासवर्ड गलत छ ",
+      license: "खुलाइएको बाहेक, यस विकिका विषयवस्तुहरु निम्त प्रमाण द्वारा प्रमाणिक गरिएको छ।",
+      licenseok:
+        "नोट: यस पृष्ठ सम्पादन गरी तपाईले आफ्नो विषयवस्तु तलको प्रमाण पत्र अन्तर्गत प्रमाणिक गर्न राजी हुनु हुनेछ ।",
       regmissing: "माफ गर्नुहोला , सबै ठाउमा भर्नुपर्नेछ ।",
       reguexists: "यो नामको प्रयोगकर्ता पहिले देखि रहेको छ।",
       regsuccess: "यो प्रयोगकर्ता बनाइएको छ र प्रवेशशव्द इमेलमा पठइएको छ।",
@@ -4037,6 +4189,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail",
       badlogin: "Sorry, gebruikersnaam of wachtwoord onjuist",
       badpassconfirm: "Sorry, het wachtwoord was onjuist",
+      license: "Tenzij anders vermeld valt de inhoud van deze wiki onder de volgende licentie:",
+      licenseok:
+        "Let op: Door deze pagina aan te passen geef je de inhoud vrij onder de volgende licentie:",
       regmissing: "Vul alle velden in",
       reguexists: "Er bestaat al een gebruiker met deze loginnaam.",
       regsuccess: "De gebruiker is aangemaakt. Het wachtwoord is per e-mail verzonden.",
@@ -4127,6 +4282,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-post",
       badlogin: "Ugyldig brukernavn og/eller passord.",
       badpassconfirm: "Beklager, passordet var feil",
+      license: "Der annet ikke er angitt, er innholdet på denne wiki utgitt under følgende lisens:",
+      licenseok:
+        "Merk: Ved å endre på denne siden godtar du at ditt innhold utgis under følgende lisens:",
       regmissing: "Vennligst fyll ut alle felt.",
       reguexists: "Det finnes allerede en konto med dette brukernavnet.",
       regsuccess: "Brukerkonto har blitt laget og passord har blitt sendt via e-post.",
@@ -4289,6 +4447,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail",
       badlogin: "Nazwa użytkownika lub hasło są nieprawidłowe.",
       badpassconfirm: "Niestety, hasło jest niepoprawne.",
+      license:
+        "Wszystkie treści w tym wiki, którym nie przyporządkowano licencji, podlegają licencji:",
+      licenseok: "Uwaga: edytując tę stronę zgadzasz się na publikowanie jej treści pod licencją:",
       regmissing: "Wypełnij wszystkie pola.",
       reguexists: "Użytkownik o tej nazwie już istnieje.",
       regsuccess: "Utworzono użytkownika. Hasło zostało przesłane pocztą.",
@@ -4375,6 +4536,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail",
       badlogin: "Usuário ou ou senha inválida.",
       badpassconfirm: "Infelizmente a senha não é a correta",
+      license: "Excepto menção em contrário, o conteúdo neste wiki está sob a seguinte licença:",
+      licenseok:
+        "Nota: Ao editar esta página você aceita disponibilizar o seu conteúdo sob a seguinte licença:",
       regmissing: "Por favor, preencha todos os campos.",
       reguexists: "Este usuário já está inscrito. Por favor escolha outro nome de usuário.",
       regsuccess:
@@ -4467,6 +4631,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail",
       badlogin: "Desculpe, mas o nome de usuário ou a senha estão incorretos.",
       badpassconfirm: "Desculpe, mas a senha está errada ",
+      license:
+        "Exceto onde for informado ao contrário, o conteúdo neste wiki está sob a seguinte licença:",
+      licenseok:
+        "Observe: editando esta página você aceita disponibilizar o seu conteúdo sob a seguinte licença:",
       regmissing: "Desculpe, mas você precisa preencher todos os campos.",
       reguexists: "Desculpe, mas já existe um usuário com esse nome.",
       regsuccess: "O usuário foi criado e a senha enviada para seu e-mail.",
@@ -4558,6 +4726,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-mail",
       badlogin: "Ne pare rău, utilizatorul și/sau parola au fost greșite.",
       badpassconfirm: "Ne pare rau, parola este gresita",
+      license:
+        "Exceptând locurile unde este altfel specificat, conținutul acestui wiki este licențiat sub următoarea licență:",
+      licenseok:
+        "Notă: Prin editarea acestei pagini ești de acord să publici conțintul sub următoarea licență:",
       regmissing: "Ne pare rău, trebuie să completezi toate cîmpurile.",
       reguexists: "Ne pare rău, un utilizator cu acest nume este deja autentificat.",
       regsuccess: "Utilizatorul a fost creat. Parola a fost trimisă prin e-mail.",
@@ -4649,6 +4821,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Эл. адрес",
       badlogin: "Извините, неверное имя пользователя или пароль.",
       badpassconfirm: "Простите, пароль неверный",
+      license:
+        "Если не указано иное, содержимое этой вики предоставляется на условиях следующей лицензии:",
+      licenseok:
+        "Примечание: редактируя эту страницу, вы соглашаетесь на использование своего вклада на условиях следующей лицензии:",
       regmissing: "Извините, вам следует заполнить все поля.",
       reguexists: "Извините, пользователь с таким логином уже существует.",
       regsuccess: "Пользователь создан; пароль выслан на адрес электронной почты.",
@@ -4753,6 +4929,9 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Celé meno",
       badlogin: "Zadané používateľské meno a heslo nie je správne.",
       badpassconfirm: "Ľutujem, heslo bolo nesprávne.",
+      license: "Ak nie je uvedené inak, obsah tejto wiki je uverejnený pod nasledujúcou licenciou:",
+      licenseok:
+        "Poznámka: Zmenou tejto stránky súhlasíte s uverejnením obsahu pod nasledujúcou licenciou:",
       regmissing: "Musíte vyplniť všetky údaje.",
       reguexists: "Používateľ s rovnakým menom je už zaregistrovaný.",
       regsuccess: "Používateľský účet bol vytvorený a heslo zaslané emailom.",
@@ -4844,6 +5023,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Elektronski naslov",
       badlogin: "Uporabniško ime ali geslo je napačno.",
       badpassconfirm: "Napaka! Geslo ni pravo.",
+      license:
+        "V kolikor ni posebej določeno, je vsebina Wiki strani objavljena pod pogoji dovoljenja:",
+      licenseok: "Opomba: z urejanjem vsebine strani, se strinjate z objavo pod pogoji dovoljenja:",
       regmissing: "Izpolniti je treba vsa polja.",
       reguexists: "Uporabnik s tem imenom že obstaja.",
       regsuccess:
@@ -4933,6 +5115,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Adresa e email-it*",
       badlogin: "Na vjen keq, emri ose fjalëkalimi është gabim.",
       badpassconfirm: "Me fal, fjalekalimi ishte i gabuar",
+      license:
+        "Përveç rasteve të përcaktuara, përmbajtja në këtë wiki është e liçnsuar nën liçensën e mëposhtme:",
+      licenseok:
+        "Shënim: Duke redaktuar këtë faqe ju bini dakort të liçensoni përmbajtjen tuaj nën liçensën e mëposhtme:",
       regmissing: "Na vjen keq, duhet të plotësoni të gjitha fushat.",
       reguexists: "Na vjen keq, ekziston një përdorues tjetër me të njëjtin emër.",
       regsuccess: "Përdoruesi u regjistrua dhe fjalëkalimi u dërgua me email.",
@@ -5013,6 +5199,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Е-адреса",
       badlogin: "Нажалост, није добро корисничко име или лозинка.",
       badpassconfirm: "Нажалост, лозинка је била погрешна",
+      license:
+        "Осим где је другачије назначено, материјал на овом викију је под следећом лиценцом:",
+      licenseok:
+        "Напомена: Изменом ове стране слажете се да ће ваше измене бити под следећом лиценцом:",
       regmissing: "Извините, морате да попуните сва поља.",
       reguexists: "Извините, корисник са истим именом већ постоји.",
       regsuccess: "Корисник је направљен и лозинка је послата путем е-поште.",
@@ -5102,6 +5292,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-post",
       badlogin: "Felaktigt användarnamn eller lösenord.",
       badpassconfirm: "Ledsen, lösenordet var felaktigt",
+      license:
+        "Om inte annat angivet, innehållet i denna wiki är licensierat under följande licenser:",
+      licenseok:
+        "Notera: Genom att ändra i denna sidan så accepterar du att licensiera ditt bidrag under följande licenser:",
       regmissing: "Du måste fylla i alla fälten.",
       reguexists: "Det finns redan en användare med det användarnamnet.",
       regsuccess: "Användarkontot skapat, lösenordet har skickats via e-post.",
@@ -5226,6 +5420,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "อีเมล:",
       badlogin: "ขัดข้อง:",
       badpassconfirm: "พาสเวิร์ดไม่ถูกต้อง",
+      license:
+        "เว้นแต่จะได้แจ้งไว้เป็นอื่นใด เนื้อหาบนวิกินี้ถูกกำหนดสิทธิ์ไว้ภายใต้สัญญาอนุญาติต่อไปนี้:",
+      licenseok:
+        "โปรดทราบ: เมื่อเริ่มแก้ไขหน้านี้ ถือว่าคุณตกลงให้สิทธิ์กับเนื้อหาของคุณอยู่ภายใต้สัญญาอนุญาตินี้",
       regmissing: "ขออภัย คุณต้องกรอกให้ครบทุกช่อง",
       reguexists: "ชื่อบัญชีที่ใส่นั้นมีผู้อื่นได้ใช้แล้ว กรุณาเลือกชื่อผู้ใช้อื่น",
       regsuccess: "ผู้ใช้ถูกสร้างแล้ว และรหัสผ่านได้ถูกส่งไปทางอีเมลแล้ว",
@@ -5313,6 +5511,10 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "E-posta",
       badlogin: "Üzgünüz, Kullanıcı adı veya şifre yanlış oldu.",
       badpassconfirm: "Üzgünüz, parolanız yanlış",
+      license:
+        "Aksi belirtilmediği halde, bu wikinin içeriğinin telif hakları şu lisans ile korunmaktadır:",
+      licenseok:
+        "Not: Bu sayfayı değiştirerek yazınızın şu lisans ile yayınlanmasını kabul etmiş olacaksınız:",
       regmissing: "Üzgünüz, tüm alanları doldurmalısınız.",
       reguexists: "Üzgünüz, bu isime sahip bir kullanıcı zaten mevcut.",
       regsuccess: "Kullanıcı oluşturuldu ve şifre e-posta adresine gönderildi.",
@@ -5402,6 +5604,9 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "Повне ім'я",
       badlogin: "Вибачте, невірне ім'я чи пароль.",
       badpassconfirm: "Вибачте, але пароль невірний",
+      license: "Якщо не вказано інше, вміст цієї Вікі підпадає під дію такої ліцензії:",
+      licenseok:
+        "Примітка. Редагуючи ці сторінку, ви погоджуєтесь на розповсюдження інформації за такою ліцензією:",
       regmissing: "Необхідно заповнити всі поля.",
       reguexists: "Користувач з таким іменем вже існує.",
       regsuccess: "Користувача створено. Пароль відправлено на e-mail.",
@@ -5511,6 +5716,9 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "Thư điện tử",
       badlogin: "Xin lỗi, tên thành viên hoặc mật khẩu không đúng.",
       badpassconfirm: "Xin lỗi, mật khẩu không đúng",
+      license: "Trừ khi có ghi chú khác, nội dung trên wiki này được cấp phép theo giấy phép sau:",
+      licenseok:
+        "Lưu ý: Bằng cách sửa đổi trang này, bạn đồng ý cấp phép cho nội dung của mình theo giấy phép sau:",
       regmissing: "Xin lỗi, bạn cần điền vào tất cả các trường",
       reguexists: "Xin lỗi, thành viên có thông tin đăng nhập này đã tồn tại.",
       regsuccess: "Thành viên đã được tạo và mật khẩu đã được gửi qua thư điện tử.",
@@ -5602,6 +5810,8 @@ export const AUTH_LANGUAGE_PACKS = {
       fullname: "全名",
       badlogin: "对不起，用户名或密码错误。",
       badpassconfirm: "对不起，密码错误",
+      license: "除额外注明的地方外，本维基上的内容按下列许可协议发布：",
+      licenseok: "当您选择开始编辑本页，即寓示你同意将你贡献的内容按下列许可协议发布：",
       regmissing: "对不起，您必须填写所有的字段。",
       reguexists: "对不起，该用户名已经存在。",
       regsuccess: "新用户已建立，密码将通过电子邮件发送给您。",
@@ -5688,6 +5898,8 @@ export const AUTH_LANGUAGE_PACKS = {
       email: "電郵",
       badlogin: "很抱歉，您的使用者名稱或密碼可能有錯誤。",
       badpassconfirm: "抱歉，這密碼是錯的",
+      license: "若無特別註明，本 wiki 上的內容都是採用以下授權方式：",
+      licenseok: "注意：編輯此頁面表示您同意用以下授權方式發布您撰寫的內容：",
       regmissing: "很抱歉，所有欄位都要填寫。",
       reguexists: "很抱歉，有人已使用了這個帳號。",
       regsuccess: "使用者帳號已建立，密碼已寄發至該電郵。",

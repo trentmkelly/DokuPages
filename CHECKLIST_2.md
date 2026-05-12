@@ -199,7 +199,7 @@ are not fixed by this checklist.
 - [x] Match upstream editor toolbar buttons, picker dialogs, shortcut keys, and insertion behavior.
 - [x] Match upstream section edit buttons, action icons, and disabled-action hiding.
 - [x] Match upstream accessibility text, skip links, access keys, and ARIA behavior.
-- [ ] Match upstream validation badges, license footer behavior, and template messages.
+- [x] Match upstream validation badges, license footer behavior, and template messages.
 - [ ] Remove or replace the stale static `public/index.html` status page so future asset fallback cannot expose obsolete UI.
 - [ ] Add visual parity screenshots against a real upstream DokuWiki instance for page view, edit, revisions, diff, media manager, login, register, admin, and missing page states.
 
