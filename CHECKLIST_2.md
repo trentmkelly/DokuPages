@@ -263,7 +263,7 @@ are not fixed by this checklist.
 - [x] Match upstream cookie path behavior from `cookiedir`.
 - [x] Match upstream secure cookie and SameSite settings from `securecookie` and `samesitecookie`.
 - [x] Match DokuWiki's message rendering for security and ACL denials instead of only native JSON or simplified HTML messages.
-- [ ] Add parity tests for XSS, unsafe media, wordblock, ACL bypass, and CSRF cases from upstream DokuWiki test fixtures where available.
+- [x] Add parity tests for XSS, unsafe media, wordblock, ACL bypass, and CSRF cases from upstream DokuWiki test fixtures where available.
 
 ## Testing And Verification
 
