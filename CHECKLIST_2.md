@@ -269,7 +269,7 @@ are not fixed by this checklist.
 
 - [x] Add golden-output tests comparing upstream DokuWiki HTML with Pages HTML for bundled `wiki:syntax`, `wiki:dokuwiki`, `wiki:welcome`, and representative production pages.
 - [x] Add route parity tests for every upstream action class in `../dokuwiki/inc/Action`.
-- [ ] Add parser parity tests for every upstream parser mode in `../dokuwiki/inc/Parsing/ParserMode`.
+- [x] Add parser parity tests for every upstream parser mode in `../dokuwiki/inc/Parsing/ParserMode`.
 - [ ] Add media parity tests against upstream `lib/exe/fetch.php`, `detail.php`, and `mediamanager.php` outputs.
 - [ ] Add feed parity tests for all upstream feed types and feed configuration combinations.
 - [ ] Add search parity tests comparing query parsing, ranking, snippets, namespace filters, and ACL filtering.

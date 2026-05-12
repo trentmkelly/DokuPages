@@ -67,10 +67,11 @@ filesystem dependency checks that are not portable to Workers KV/D1.
 This port does not embed `inc/Parsing/Parser.php` or DokuWiki's PHP parser mode
 state machine. The supported subset is the native renderer behavior below,
 backed by `test/render.test.ts`, `test/syntax-fixture.test.mjs`,
-`test/wordblock.test.ts`, and the import/config tests named in the coverage
-column. `test/parser-compatibility-doc.test.mjs` guards this table so every
-upstream parser mode has an explicit status before the parser checklist can be
-treated as covered.
+`test/upstream-parser-mode-parity.test.mjs`, `test/wordblock.test.ts`, and the
+import/config tests named in the coverage column.
+`test/parser-compatibility-doc.test.mjs` guards this table so every upstream
+parser mode has an explicit status before the parser checklist can be treated
+as covered.
 
 | Upstream parser mode | Status  | Pages-native coverage or policy                                                                                                           |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |

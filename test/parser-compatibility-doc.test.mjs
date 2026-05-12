@@ -43,6 +43,7 @@ describe("parser compatibility documentation", () => {
     expect(doc).toContain("## Parser Mode Compatibility Subset");
     expect(doc).toContain("test/render.test.ts");
     expect(doc).toContain("test/syntax-fixture.test.mjs");
+    expect(doc).toContain("test/upstream-parser-mode-parity.test.mjs");
     expect(doc).toContain("test/wordblock.test.ts");
 
     for (const mode of upstreamParserModes) {
