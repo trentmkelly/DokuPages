@@ -69,10 +69,15 @@ without mutating the Cloudflare deployment, including parser/render controls
 such as TOC levels, `camelcase`, `typography`, `useheading`, `autoplural`,
 `relnofollow`, and `target.*`.
 
-Legacy `data/index` files are not migrated directly. The importer rebuilds
-search postings from canonical page source during import, which avoids carrying
-over PHP filesystem index formats and gives the Pages port deterministic D1
-search state.
+Legacy `data/index` files are not migrated directly. They are derived cache
+artifacts that can be stale, language-dependent, and tied to DokuWiki's PHP
+filesystem index layout. The importer rebuilds search postings from canonical
+page source during import, which gives the Pages port deterministic D1 search
+state. A future importer should read `data/index` only for a production wiki
+that requires byte-for-byte legacy ranking parity with an existing, trusted
+DokuWiki index; otherwise operators should expect equivalent searchable content
+with deterministic term counts and ranking that may differ from an old on-disk
+index.
 
 ## R2 Media
 
