@@ -48,6 +48,7 @@ import {
   type DiagnosticsSnapshot,
   type ImportJobStatus,
   type MigrationStatus,
+  type QuotaCheck,
   type SchemaVersionStatus,
   type StorageCheck
 } from "./http/diagnostics";
@@ -6459,6 +6460,13 @@ async function renderDiagnosticsPage(env: Env): Promise<string> {
       </thead>
       <tbody>${renderStorageHealthRows(diagnostics)}</tbody>
     </table>
+    <h2>Cloudflare quota checks</h2>
+    <table class="diagnostics">
+      <thead>
+        <tr><th>Resource</th><th>Status</th><th>Usage</th><th>Warning threshold</th><th>Message</th></tr>
+      </thead>
+      <tbody>${renderQuotaRows(diagnostics)}</tbody>
+    </table>
     <h2>Migration status</h2>
     ${renderMigrationStatus(diagnostics.migration)}
     <h2>Plugin enablement</h2>
@@ -6560,6 +6568,34 @@ function renderStorageHealthRows(diagnostics: DiagnosticsSnapshot): string {
 
 function renderStorageStatus(check: StorageCheck): string {
   return `<span class="diagnostics__status diagnostics__status--${escapeAttribute(check.status)}">${escapeHtml(check.status)}</span>`;
+}
+
+function renderQuotaRows(diagnostics: DiagnosticsSnapshot): string {
+  const rows: Array<[string, QuotaCheck]> = [
+    ["D1 logical payload", diagnostics.quotas.d1Logical],
+    ["R2 referenced media", diagnostics.quotas.r2Referenced],
+    ["Rendered cache", diagnostics.quotas.renderedCache]
+  ];
+
+  return rows
+    .map(
+      ([name, check]) => `<tr>
+        <th scope="row">${escapeHtml(name)}</th>
+        <td>${renderQuotaStatus(check)}</td>
+        <td>${formatQuotaBytes(check.usageBytes)}</td>
+        <td>${formatQuotaBytes(check.thresholdBytes)}</td>
+        <td>${escapeHtml(check.message)}</td>
+      </tr>`
+    )
+    .join("");
+}
+
+function renderQuotaStatus(check: QuotaCheck): string {
+  return `<span class="diagnostics__status diagnostics__status--${escapeAttribute(check.status)}">${escapeHtml(check.status)}</span>`;
+}
+
+function formatQuotaBytes(bytes: number | null): string {
+  return bytes === null ? "-" : escapeHtml(formatDokuWikiFileSize(bytes));
 }
 
 function renderConfigValidation(config: ConfigValidation): string {

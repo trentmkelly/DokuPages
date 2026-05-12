@@ -63,6 +63,14 @@ Optional Pages environment variables:
   set to `0` to retain all D1 audit rows. This controls the port's D1
   `audit_log` pruning. Cloudflare Logs retention is configured in Cloudflare or
   the chosen Logpush destination, not inside Worker code.
+- `QUOTA_D1_LOGICAL_WARN_BYTES`: optional warning threshold for the port's
+  D1-backed logical payload estimate, used by `/api/diagnostics`,
+  `/api/health`, and `npm run alerts:check`.
+- `QUOTA_R2_REFERENCED_WARN_BYTES`: optional warning threshold for distinct R2
+  media object bytes referenced by current media rows and immutable media
+  revision rows.
+- `QUOTA_RENDER_CACHE_WARN_BYTES`: optional warning threshold for rendered HTML
+  payload bytes tracked in D1 for KV render-cache entries.
 - `BREADCRUMBS`: number of recent visited pages to keep in the DokuWiki-style
   trace. Default: `10`; set to `0` to disable the trace.
 - `YOUAREHERE`: truthy value enables the DokuWiki-style hierarchical "You are

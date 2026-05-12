@@ -48,6 +48,34 @@ export function evaluateDiagnosticsAlerts(diagnostics, options = {}) {
     }
   }
 
+  for (const [resource, check] of Object.entries(diagnostics.quotas ?? {})) {
+    if (check?.status === "warning") {
+      alerts.push({
+        id: "quota_or_limit_pressure",
+        severity: "warning",
+        message: `${resource} quota usage reached its warning threshold.`,
+        details: {
+          resource,
+          usageBytes: check.usageBytes ?? null,
+          thresholdBytes: check.thresholdBytes ?? null,
+          usageRatio: check.usageRatio ?? null
+        }
+      });
+    }
+
+    if (check?.status === "unavailable") {
+      alerts.push({
+        id: "quota_check_unavailable",
+        severity: "warning",
+        message: `${resource} quota usage check is unavailable.`,
+        details: {
+          resource,
+          message: check.message ?? null
+        }
+      });
+    }
+  }
+
   if (diagnostics.migration?.status === "error") {
     alerts.push({
       id: "migration_failure",

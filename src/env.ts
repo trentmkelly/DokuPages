@@ -28,6 +28,9 @@ export interface Env {
   RECENT_DAYS?: string;
   DONTLOG?: string;
   LOGRETAIN?: string;
+  QUOTA_D1_LOGICAL_WARN_BYTES?: string;
+  QUOTA_R2_REFERENCED_WARN_BYTES?: string;
+  QUOTA_RENDER_CACHE_WARN_BYTES?: string;
   TOP_TOC_LEVEL?: string;
   TOC_MIN_HEADS?: string;
   MAX_TOC_LEVEL?: string;

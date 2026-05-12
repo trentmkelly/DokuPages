@@ -103,6 +103,30 @@ Do not prune D1 page or media revision rows as a cleanup task. Those rows are th
 wiki history source of truth used by old revisions, diffs, reverts, backups, and
 hash verification.
 
+## Cloudflare Quota Checks
+
+DokuWiki's PHP `do=check` action reports local filesystem writability. The Pages
+port replaces that local disk check with Cloudflare binding health plus
+operator-configured quota budgets in `/api/diagnostics`, `/api/health`, and
+`/diagnostics`.
+
+Set warning thresholds in Pages variables when the production plan has explicit
+storage budgets:
+
+```sh
+QUOTA_D1_LOGICAL_WARN_BYTES=500000000
+QUOTA_R2_REFERENCED_WARN_BYTES=5000000000
+QUOTA_RENDER_CACHE_WARN_BYTES=100000000
+```
+
+`npm run alerts:check` reports a `quota_or_limit_pressure` warning when any
+configured threshold is reached. The D1 check estimates logical payload bytes
+from page revisions, metadata, audit details, and rendered cache rows. The R2
+check sums distinct media object bytes referenced by D1. The rendered-cache
+check tracks D1-known rendered HTML payload size. Cloudflare account-level
+billing, request, and operation quotas still need account dashboard or Logpush
+monitoring because Workers cannot read account billing state at request time.
+
 ## Rollback Workflow
 
 Use the smallest rollback that removes the bad state:

@@ -89,6 +89,14 @@ Run local limit measurements with:
 npm run limits:measure
 ```
 
+Operational quota checks are exposed through `/api/diagnostics`, `/api/health`,
+and `npm run alerts:check`. Set `QUOTA_D1_LOGICAL_WARN_BYTES`,
+`QUOTA_R2_REFERENCED_WARN_BYTES`, and `QUOTA_RENDER_CACHE_WARN_BYTES` to turn
+D1 logical payload, R2 referenced media, and rendered-cache payload estimates
+into warning alerts. These replace DokuWiki's local filesystem free-space check
+with Cloudflare storage budget checks; account-wide billing and request quotas
+remain Cloudflare dashboard or Logpush concerns.
+
 The script compiles the Pages Functions bundle with Wrangler, measures local
 bundle import time as a cold-start proxy, records static asset and Worker bundle
 sizes, and times the DokuWiki import planner.

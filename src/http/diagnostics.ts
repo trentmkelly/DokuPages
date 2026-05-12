@@ -12,12 +12,23 @@ import {
 } from "../wiki/plugin-settings";
 
 export type StorageCheckStatus = "ok" | "error" | "not_configured";
+export type QuotaCheckStatus = "ok" | "warning" | "unconfigured" | "unavailable";
 
 export interface StorageCheck {
   ok: boolean;
   status: StorageCheckStatus;
   message: string;
   latencyMs?: number;
+}
+
+export interface QuotaCheck {
+  ok: boolean;
+  status: QuotaCheckStatus;
+  message: string;
+  usageBytes: number | null;
+  thresholdBytes: number | null;
+  usageRatio: number | null;
+  details?: Record<string, number>;
 }
 
 export interface DiagnosticsSnapshot {
@@ -46,6 +57,11 @@ export interface DiagnosticsSnapshot {
     kv: StorageCheck;
     r2: StorageCheck;
     durableObjects: StorageCheck;
+  };
+  quotas: {
+    d1Logical: QuotaCheck;
+    r2Referenced: QuotaCheck;
+    renderedCache: QuotaCheck;
   };
   migration: MigrationStatus;
   config: ConfigValidation;
@@ -90,6 +106,7 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     r2: await checkR2(env),
     durableObjects: checkDurableObjects(env)
   };
+  const quotas = await readQuotaStatus(env, storage.d1.ok);
   const migration = await readMigrationStatus(env, storage.d1.ok);
   const plugins = storage.d1.ok
     ? await readImportedPluginEnablement(env.DB)
@@ -129,6 +146,7 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
       durableObjects: Boolean(env.PAGE_LOCKS)
     },
     storage,
+    quotas,
     migration,
     config,
     plugins,
@@ -138,6 +156,217 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
       dokuwiki: infoRowsToRecord(dokuWikiCompatibilityInfoRows())
     }
   };
+}
+
+async function readQuotaStatus(
+  env: Env,
+  canQueryD1: boolean
+): Promise<DiagnosticsSnapshot["quotas"]> {
+  const thresholds = {
+    d1Logical: integerEnv(env.QUOTA_D1_LOGICAL_WARN_BYTES),
+    r2Referenced: integerEnv(env.QUOTA_R2_REFERENCED_WARN_BYTES),
+    renderedCache: integerEnv(env.QUOTA_RENDER_CACHE_WARN_BYTES)
+  };
+
+  if (!canQueryD1) {
+    return {
+      d1Logical: quotaUnavailable(thresholds.d1Logical),
+      r2Referenced: quotaUnavailable(thresholds.r2Referenced),
+      renderedCache: quotaUnavailable(thresholds.renderedCache)
+    };
+  }
+
+  try {
+    const row = await env.DB.prepare(
+      `select
+         (select coalesce(sum(length(content)), 0) from page_revisions) as pageRevisionBytes,
+         (select coalesce(sum(length(value_json)), 0) from metadata) as metadataBytes,
+         (select coalesce(sum(length(details_json)), 0) from audit_log) as auditLogBytes,
+         (select coalesce(sum(length(rendered_html)), 0) from rendered_cache) as renderedCacheBytes,
+         (select count(*) from pages) as pageCount,
+         (select count(*) from page_revisions) as pageRevisionCount,
+         (select count(*) from metadata) as metadataCount,
+         (select count(*) from rendered_cache) as renderedCacheEntryCount,
+         (select count(*) from search_postings) as searchPostingCount,
+         (select coalesce(sum(byte_length), 0)
+          from (
+            select object_key, max(byte_length) as byte_length
+            from (
+              select object_key, byte_length
+              from media
+              where object_key is not null and object_key <> '' and is_deleted = 0
+              union all
+              select object_key, byte_length
+              from media_revisions
+              where object_key is not null and object_key <> ''
+            )
+            group by object_key
+          )) as r2ReferencedBytes,
+         (select count(*)
+          from (
+            select object_key
+            from (
+              select object_key
+              from media
+              where object_key is not null and object_key <> '' and is_deleted = 0
+              union all
+              select object_key
+              from media_revisions
+              where object_key is not null and object_key <> ''
+            )
+            group by object_key
+          )) as r2ReferencedObjectCount`
+    )
+      .bind()
+      .first<QuotaUsageRow>();
+
+    const usage = normalizeQuotaUsage(row);
+    const d1LogicalBytes =
+      usage.pageRevisionBytes +
+      usage.metadataBytes +
+      usage.auditLogBytes +
+      usage.renderedCacheBytes;
+
+    return {
+      d1Logical: quotaCheck("D1 logical payload", d1LogicalBytes, thresholds.d1Logical, {
+        pageCount: usage.pageCount,
+        pageRevisionCount: usage.pageRevisionCount,
+        metadataCount: usage.metadataCount,
+        searchPostingCount: usage.searchPostingCount
+      }),
+      r2Referenced: quotaCheck(
+        "R2 referenced media",
+        usage.r2ReferencedBytes,
+        thresholds.r2Referenced,
+        {
+          objectCount: usage.r2ReferencedObjectCount
+        }
+      ),
+      renderedCache: quotaCheck(
+        "Rendered cache payload",
+        usage.renderedCacheBytes,
+        thresholds.renderedCache,
+        {
+          entryCount: usage.renderedCacheEntryCount
+        }
+      )
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to calculate quota usage.";
+    return {
+      d1Logical: quotaUnavailable(thresholds.d1Logical, message),
+      r2Referenced: quotaUnavailable(thresholds.r2Referenced, message),
+      renderedCache: quotaUnavailable(thresholds.renderedCache, message)
+    };
+  }
+}
+
+interface QuotaUsageRow {
+  pageRevisionBytes: number | null;
+  metadataBytes: number | null;
+  auditLogBytes: number | null;
+  renderedCacheBytes: number | null;
+  pageCount: number | null;
+  pageRevisionCount: number | null;
+  metadataCount: number | null;
+  renderedCacheEntryCount: number | null;
+  searchPostingCount: number | null;
+  r2ReferencedBytes: number | null;
+  r2ReferencedObjectCount: number | null;
+}
+
+interface NormalizedQuotaUsage {
+  pageRevisionBytes: number;
+  metadataBytes: number;
+  auditLogBytes: number;
+  renderedCacheBytes: number;
+  pageCount: number;
+  pageRevisionCount: number;
+  metadataCount: number;
+  renderedCacheEntryCount: number;
+  searchPostingCount: number;
+  r2ReferencedBytes: number;
+  r2ReferencedObjectCount: number;
+}
+
+function normalizeQuotaUsage(row: QuotaUsageRow | null): NormalizedQuotaUsage {
+  return {
+    pageRevisionBytes: numberValue(row?.pageRevisionBytes),
+    metadataBytes: numberValue(row?.metadataBytes),
+    auditLogBytes: numberValue(row?.auditLogBytes),
+    renderedCacheBytes: numberValue(row?.renderedCacheBytes),
+    pageCount: numberValue(row?.pageCount),
+    pageRevisionCount: numberValue(row?.pageRevisionCount),
+    metadataCount: numberValue(row?.metadataCount),
+    renderedCacheEntryCount: numberValue(row?.renderedCacheEntryCount),
+    searchPostingCount: numberValue(row?.searchPostingCount),
+    r2ReferencedBytes: numberValue(row?.r2ReferencedBytes),
+    r2ReferencedObjectCount: numberValue(row?.r2ReferencedObjectCount)
+  };
+}
+
+function quotaCheck(
+  label: string,
+  usageBytes: number,
+  thresholdBytes: number | null,
+  details: Record<string, number>
+): QuotaCheck {
+  if (thresholdBytes === null) {
+    return {
+      ok: true,
+      status: "unconfigured",
+      message: `${label} usage is ${usageBytes} bytes; no warning threshold is configured.`,
+      usageBytes,
+      thresholdBytes: null,
+      usageRatio: null,
+      details
+    };
+  }
+
+  const usageRatio = thresholdBytes === 0 ? 1 : usageBytes / thresholdBytes;
+  if (usageBytes >= thresholdBytes) {
+    return {
+      ok: false,
+      status: "warning",
+      message: `${label} usage is ${usageBytes} bytes, at or above the configured ${thresholdBytes} byte warning threshold.`,
+      usageBytes,
+      thresholdBytes,
+      usageRatio,
+      details
+    };
+  }
+
+  return {
+    ok: true,
+    status: "ok",
+    message: `${label} usage is ${usageBytes} bytes, below the configured ${thresholdBytes} byte warning threshold.`,
+    usageBytes,
+    thresholdBytes,
+    usageRatio,
+    details
+  };
+}
+
+function quotaUnavailable(thresholdBytes: number | null, message?: string): QuotaCheck {
+  return {
+    ok: false,
+    status: "unavailable",
+    message: message ?? "Quota usage is unavailable because D1 is not healthy.",
+    usageBytes: null,
+    thresholdBytes,
+    usageRatio: null
+  };
+}
+
+function integerEnv(value: string | undefined): number | null {
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function numberValue(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 async function checkD1(env: Env): Promise<StorageCheck> {

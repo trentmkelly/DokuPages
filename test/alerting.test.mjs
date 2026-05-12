@@ -95,6 +95,50 @@ describe("diagnostics alert evaluation", () => {
       ])
     );
   });
+
+  it("alerts on configured Cloudflare quota thresholds", () => {
+    const diagnostics = healthyDiagnostics({
+      quotas: {
+        d1Logical: {
+          ok: false,
+          status: "warning",
+          message: "D1 logical payload reached its warning threshold.",
+          usageBytes: 1200,
+          thresholdBytes: 1000,
+          usageRatio: 1.2
+        },
+        r2Referenced: {
+          ok: false,
+          status: "unavailable",
+          message: "Unable to calculate quota usage.",
+          usageBytes: null,
+          thresholdBytes: 1000,
+          usageRatio: null
+        }
+      }
+    });
+
+    expect(evaluateDiagnosticsAlerts(diagnostics)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "quota_or_limit_pressure",
+          severity: "warning",
+          details: expect.objectContaining({
+            resource: "d1Logical",
+            usageBytes: 1200,
+            thresholdBytes: 1000
+          })
+        }),
+        expect.objectContaining({
+          id: "quota_check_unavailable",
+          severity: "warning",
+          details: expect.objectContaining({
+            resource: "r2Referenced"
+          })
+        })
+      ])
+    );
+  });
 });
 
 function healthyDiagnostics(overrides = {}) {
@@ -117,6 +161,9 @@ function healthyDiagnostics(overrides = {}) {
     storage: {
       ...storage,
       ...(overrides.storage ?? {})
+    },
+    quotas: {
+      ...(overrides.quotas ?? {})
     },
     migration: {
       ...migration,

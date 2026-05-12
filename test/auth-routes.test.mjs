@@ -2780,6 +2780,20 @@ describe("auth routes", () => {
     );
     const diagnosticsPayload = await diagnostics.json();
     expect(diagnosticsPayload).toMatchObject({
+      quotas: {
+        d1Logical: expect.objectContaining({
+          status: "unconfigured",
+          usageBytes: expect.any(Number)
+        }),
+        r2Referenced: expect.objectContaining({
+          status: "unconfigured",
+          usageBytes: expect.any(Number)
+        }),
+        renderedCache: expect.objectContaining({
+          status: "unconfigured",
+          usageBytes: expect.any(Number)
+        })
+      },
       plugins: {
         sourceFiles: ["conf/plugins.php", "conf/plugins.local.php", "conf/plugins.required.php"],
         summary: {
@@ -2838,6 +2852,7 @@ describe("auth routes", () => {
       env
     );
     const diagnosticsBody = await diagnosticsHtml.text();
+    expect(diagnosticsBody).toContain("<h2>Cloudflare quota checks</h2>");
     expect(diagnosticsBody).toContain("<h2>Plugin enablement</h2>");
     expect(diagnosticsBody).toContain("<h2>Plugin configuration</h2>");
     expect(diagnosticsBody).toContain("[redacted]");

@@ -12,6 +12,7 @@ export async function healthResponse(env: Env): Promise<Response> {
     siteName: diagnostics.site.siteName,
     bindings: diagnostics.bindings,
     storage: diagnostics.storage,
+    quotas: diagnostics.quotas,
     config: {
       ok: diagnostics.config.ok,
       issueCount: diagnostics.config.issues.length
