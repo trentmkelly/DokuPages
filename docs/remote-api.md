@@ -1,15 +1,21 @@
 # Remote APIs
 
-Legacy DokuWiki XML-RPC, JSON-RPC, and OpenAPI compatibility is not required for
-the first Pages launch. The native port keeps those legacy entrypoints explicit
-so clients receive a stable `501 Not Implemented` response instead of an
-ambiguous 404.
+Legacy DokuWiki XML-RPC, JSON-RPC, and OpenAPI compatibility is intentionally
+not implemented in the Pages port. This is a permanent compatibility boundary
+unless a real legacy client requirement appears: the native JSON API under
+`/api/v1` is the supported automation surface.
+
+The legacy entrypoints stay explicit so clients receive a stable
+`501 Not Implemented` JSON response instead of an ambiguous 404. The response
+body includes `status: "not_implemented"`, `permanent: true`, and
+`replacement: "/api/v1"`.
 
 - `/lib/exe/xmlrpc.php`: `501`
 - `/lib/exe/jsonrpc.php`: `501`
 - `/lib/exe/openapi.php`: `501`
 
-The supported remote API surface is the native JSON API under `/api/v1`.
+No XML-RPC parser, JSON-RPC dispatcher, or OpenAPI generator from upstream is
+loaded by these routes.
 
 ## Authentication
 

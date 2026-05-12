@@ -1038,22 +1038,22 @@ describe("handleRequest", () => {
   });
 
   it("returns explicit not-implemented responses for legacy remote API entrypoints", async () => {
-    const xmlrpc = await handleRequest(new Request("https://example.com/lib/exe/xmlrpc.php"), env);
-    const jsonrpc = await handleRequest(
-      new Request("https://example.com/lib/exe/jsonrpc.php"),
-      env
-    );
-    const openapi = await handleRequest(
-      new Request("https://example.com/lib/exe/openapi.php"),
-      env
-    );
+    for (const [path, api] of [
+      ["/lib/exe/xmlrpc.php", "XML-RPC"],
+      ["/lib/exe/jsonrpc.php", "JSON-RPC"],
+      ["/lib/exe/openapi.php", "OpenAPI"]
+    ] as const) {
+      const response = await handleRequest(new Request(`https://example.com${path}`), env);
 
-    expect(xmlrpc.status).toBe(501);
-    expect(jsonrpc.status).toBe(501);
-    expect(openapi.status).toBe(501);
-    await expect(jsonrpc.json()).resolves.toMatchObject({
-      status: "not_implemented"
-    });
+      expect(response.status).toBe(501);
+      expect(response.headers.get("content-type")).toContain("application/json");
+      await expect(response.json()).resolves.toMatchObject({
+        api,
+        permanent: true,
+        replacement: "/api/v1",
+        status: "not_implemented"
+      });
+    }
   });
 
   it("handles unsupported legacy executable endpoints explicitly", async () => {

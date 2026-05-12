@@ -218,9 +218,9 @@ are not fixed by this checklist.
 
 ## Remote API And AJAX
 
-- [ ] Implement XML-RPC compatibility from `inc/Remote/XmlRpcServer.php` and `inc/Remote/ApiCore.php`, or keep a documented permanent `501`.
-- [ ] Implement JSON-RPC compatibility from `inc/Remote/JsonRpcServer.php`, or keep a documented permanent `501`.
-- [ ] Implement OpenAPI generation from `inc/Remote/OpenApiDoc`, or keep a documented permanent `501`.
+- [x] Implement XML-RPC compatibility from `inc/Remote/XmlRpcServer.php` and `inc/Remote/ApiCore.php`, or keep a documented permanent `501`.
+- [x] Implement JSON-RPC compatibility from `inc/Remote/JsonRpcServer.php`, or keep a documented permanent `501`.
+- [x] Implement OpenAPI generation from `inc/Remote/OpenApiDoc`, or keep a documented permanent `501`.
 - [ ] Match upstream `remote`, `remoteuser`, and `remotecors` config semantics for legacy remote APIs.
 - [ ] Compare native `/api/v1` responses with upstream remote API response objects for pages, media, revisions, search, links, and users.
 - [ ] Match all `lib/exe/ajax.php` calls from `inc/Ajax.php`, not only qsearch, suggestions, linkwiz, and index.

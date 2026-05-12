@@ -1464,7 +1464,10 @@ function isRootRelativeUrl(value: string): boolean {
 function remoteApiNotImplementedResponse(apiName: string): Response {
   return jsonResponse(
     {
+      api: apiName,
       error: `${apiName} compatibility is not supported by this Pages port yet.`,
+      permanent: true,
+      replacement: "/api/v1",
       status: "not_implemented"
     },
     { status: 501 }
