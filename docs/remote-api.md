@@ -69,6 +69,10 @@ Preflight responses support `GET`, `POST`, `DELETE`, and `OPTIONS` with
   `content`, optional `summary`, optional `baseRevisionId`, and optional
   `minor`.
 - `GET /api/v1/pages/revisions?id=<page>`: page revision list.
+- `GET /api/v1/pages/links?id=<page>`: internal page links as upstream
+  `Response\Link`-compatible objects.
+- `GET /api/v1/pages/backlinks?id=<page>`: readable backlinks as upstream
+  `Response\Link`-compatible objects.
 - `GET /api/v1/revisions?id=<revision>`: page revision content and metadata.
 - `POST /api/v1/pages/revert`: revert a page with JSON `id`, `revisionId`,
   optional `summary`, and optional `baseRevisionId`.
@@ -86,3 +90,20 @@ Preflight responses support `GET`, `POST`, `DELETE`, and `OPTIONS` with
 All page and media methods use the same DokuWiki ID normalization, ACL checks,
 wordblock checks, rate limits, changelog writes, and cache purge behavior as the
 browser UI routes.
+
+## Upstream Response Parity
+
+Native `/api/v1` responses keep their existing JSON field names and include
+`remote` subobjects where an upstream DokuWiki remote response object has a
+stable shape. The endpoint index exposes the upstream API version and the field
+sets used for comparison.
+
+| Upstream object        | Native surface                                            |
+| ---------------------- | --------------------------------------------------------- |
+| `Response\Page`        | `page.remote` on `/api/v1/pages`                          |
+| `Response\PageChange`  | `revision.remote` on page revision responses              |
+| `Response\Media`       | `media.remote` on `/api/v1/media`                         |
+| `Response\MediaChange` | `revision.remote` on media revision responses             |
+| `Response\PageHit`     | `result.remote` on `/api/v1/search`                       |
+| `Response\Link`        | `/api/v1/pages/links` and `/api/v1/pages/backlinks` items |
+| `Response\User`        | `user.remote` on `/api/v1/users/me`                       |

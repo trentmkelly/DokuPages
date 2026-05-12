@@ -132,6 +132,7 @@ import {
   deletePageDraft,
   type CurrentPage,
   type PageDraft,
+  type PageSearchResult,
   type PageRevision,
   type RecentChange
 } from "./wiki/page-service";
@@ -235,6 +236,16 @@ const EDIT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const UPLOAD_RATE_LIMIT_ATTEMPTS = 20;
 const UPLOAD_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const DISCOVERY_CACHE_KINDS = ["sitemap", "rss", "atom"] as const;
+const UPSTREAM_REMOTE_API_VERSION = 14;
+const UPSTREAM_REMOTE_RESPONSE_FIELDS = {
+  link: ["type", "page", "href"],
+  media: ["id", "revision", "size", "permission", "isimage", "hash", "author"],
+  mediaChange: ["id", "revision", "author", "ip", "summary", "type", "sizechange"],
+  page: ["id", "revision", "size", "title", "permission", "hash", "author"],
+  pageChange: ["id", "revision", "author", "ip", "summary", "type", "sizechange"],
+  pageHit: ["id", "revision", "size", "title", "permission", "score", "snippet", "hash", "author"],
+  user: ["login", "name", "mail", "groups", "isadmin", "ismanager"]
+} as const;
 const EDIT_DERIVED_ACTIONS = new Set([
   "save",
   "preview",
@@ -1825,12 +1836,18 @@ async function handleNativeApi(
       endpoints: [
         "/api/v1/pages",
         "/api/v1/pages/revisions",
+        "/api/v1/pages/links",
+        "/api/v1/pages/backlinks",
         "/api/v1/revisions",
         "/api/v1/media",
         "/api/v1/media/revisions",
         "/api/v1/search",
         "/api/v1/users/me"
-      ]
+      ],
+      upstreamRemoteApi: {
+        apiVersion: UPSTREAM_REMOTE_API_VERSION,
+        responseFields: UPSTREAM_REMOTE_RESPONSE_FIELDS
+      }
     });
   }
 
@@ -1842,6 +1859,16 @@ async function handleNativeApi(
 
   if (url.pathname === "/api/v1/pages/revisions") {
     if (request.method === "GET") return handleNativeApiPageRevisions(request, env, url, auth);
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  if (url.pathname === "/api/v1/pages/links") {
+    if (request.method === "GET") return handleNativeApiPageLinks(request, env, url, auth);
+    return nativeApiMethodNotAllowed("GET");
+  }
+
+  if (url.pathname === "/api/v1/pages/backlinks") {
+    if (request.method === "GET") return handleNativeApiPageBacklinks(request, env, url, auth);
     return nativeApiMethodNotAllowed("GET");
   }
 
@@ -1879,7 +1906,11 @@ async function handleNativeApi(
 
   if (url.pathname === "/api/v1/users/me") {
     if (request.method === "GET") {
-      return jsonResponse({ ok: true, principal: publicPrincipal(auth) });
+      return jsonResponse({
+        ok: true,
+        principal: publicPrincipal(auth),
+        user: nativeUserPayload(auth, env)
+      });
     }
     return nativeApiMethodNotAllowed("GET");
   }
@@ -1958,6 +1989,68 @@ async function handleNativeApiRevisionRead(
   if (denied) return denied;
 
   return jsonResponse({ ok: true, revision: nativePageRevisionPayload(revision) });
+}
+
+async function handleNativeApiPageLinks(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanPageId(
+    url.searchParams.get("id") ?? "",
+    getRuntimeConfig(env).pageIdCleanOptions
+  );
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const page = await getCurrentPage(env.DB, id);
+  if (!page) {
+    return jsonResponse({ error: `Page '${id}' was not found.` }, { status: 404 });
+  }
+
+  const links = extractInternalPageLinks(page.content, id, {
+    camelCaseLinks: getRuntimeConfig(env).camelCaseLinks,
+    pageIdCleanOptions: getRuntimeConfig(env).pageIdCleanOptions
+  }).map(nativeLinkPayload);
+
+  return jsonResponse({ ok: true, pageId: id, links });
+}
+
+async function handleNativeApiPageBacklinks(
+  request: Request,
+  env: Env,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanPageId(
+    url.searchParams.get("id") ?? "",
+    getRuntimeConfig(env).pageIdCleanOptions
+  );
+
+  if (!id) {
+    return jsonResponse({ error: "Missing page id." }, { status: 400 });
+  }
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const references = await filterReadablePageItems(
+    env,
+    principal,
+    await listBacklinks(env.DB, id, numericSearchParam(url, "limit", 200))
+  );
+
+  return jsonResponse({
+    ok: true,
+    pageId: id,
+    links: references.map((reference) => nativeLinkPayload(reference.id))
+  });
 }
 
 async function handleNativeApiPageWrite(
@@ -2336,7 +2429,7 @@ async function handleNativeApiSearch(
       )
     : [];
 
-  return jsonResponse({ ok: true, query, results });
+  return jsonResponse({ ok: true, query, results: results.map(nativeSearchResultPayload) });
 }
 
 function resolveNativeApiPrincipal(
@@ -2506,7 +2599,16 @@ function nativePagePayload(page: CurrentPage): Record<string, unknown> {
     revisionId: page.revisionId,
     content: page.content,
     updatedAt: page.updatedAt,
-    url: pagePath(page.id)
+    url: pagePath(page.id),
+    remote: {
+      id: page.id,
+      revision: dokuwikiTimestamp(page.updatedAt),
+      size: utf8ByteLength(page.content),
+      title: page.title || page.id,
+      permission: ACL_READ,
+      hash: "",
+      author: ""
+    }
   };
 }
 
@@ -2518,7 +2620,16 @@ function nativePageRevisionPayload(revision: PageRevision): Record<string, unkno
     summary: revision.summary,
     changeType: revision.changeType,
     sizeChange: revision.sizeChange,
-    createdAt: revision.createdAt
+    createdAt: revision.createdAt,
+    remote: {
+      id: revision.pageId,
+      revision: dokuwikiTimestamp(revision.createdAt),
+      author: "",
+      ip: "",
+      summary: revision.summary,
+      type: revision.changeType,
+      sizechange: revision.sizeChange
+    }
   };
 }
 
@@ -2533,7 +2644,16 @@ function nativeMediaPayload(media: CurrentMedia): Record<string, unknown> {
     createdAt: media.createdAt,
     updatedAt: media.updatedAt,
     url: mediaPath(media.id),
-    detailUrl: mediaDetailPath(media.id)
+    detailUrl: mediaDetailPath(media.id),
+    remote: {
+      id: media.id,
+      revision: dokuwikiTimestamp(media.updatedAt),
+      size: media.byteLength,
+      permission: ACL_READ,
+      isimage: /image\/(?:jpeg|png|gif)/i.test(media.mimeType),
+      hash: "",
+      author: ""
+    }
   };
 }
 
@@ -2547,8 +2667,71 @@ function nativeMediaRevisionPayload(revision: MediaRevision): Record<string, unk
     changeType: revision.changeType,
     summary: revision.summary,
     createdAt: revision.createdAt,
-    url: `${mediaPath(revision.mediaId)}?rev=${encodeURIComponent(revision.id)}`
+    url: `${mediaPath(revision.mediaId)}?rev=${encodeURIComponent(revision.id)}`,
+    remote: {
+      id: revision.mediaId,
+      revision: dokuwikiTimestamp(revision.createdAt),
+      author: "",
+      ip: "",
+      summary: revision.summary,
+      type: revision.changeType,
+      sizechange: 0
+    }
   };
+}
+
+function nativeSearchResultPayload(result: PageSearchResult): Record<string, unknown> {
+  return {
+    ...result,
+    remote: {
+      id: result.id,
+      revision: dokuwikiTimestamp(result.updatedAt),
+      size: 0,
+      title: result.title || result.id,
+      permission: ACL_READ,
+      score: result.score,
+      snippet: result.snippet,
+      hash: "",
+      author: ""
+    }
+  };
+}
+
+function nativeLinkPayload(pageId: string): Record<string, string> {
+  return {
+    type: "internal",
+    page: pageId,
+    href: pagePath(pageId)
+  };
+}
+
+function nativeUserPayload(principal: AuthPrincipal, env: Env): Record<string, unknown> {
+  const login = principal.username ?? "";
+  const groups = principal.type === "user" ? principal.groups : [];
+
+  return {
+    username: login,
+    displayName: principal.displayName,
+    email: principal.email,
+    groups,
+    remote: {
+      login,
+      name: principal.displayName ?? login,
+      mail: principal.email ?? "",
+      groups,
+      isadmin: isAdminPrincipal(principal, env),
+      ismanager: isManagerPrincipal(principal, env)
+    }
+  };
+}
+
+function dokuwikiTimestamp(value: string): number {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : 0;
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
 }
 
 function numericSearchParam(url: URL, name: string, fallback: number): number {

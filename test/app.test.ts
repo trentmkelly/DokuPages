@@ -1284,6 +1284,10 @@ describe("handleRequest", () => {
   });
 
   it("serves authenticated native API read methods with configured CORS", async () => {
+    if (state.row) {
+      state.row.content = "====== Welcome ======\n\nSee [[wiki:guide]].";
+    }
+    state.revisions[0].content = "====== Welcome ======\n\nSee [[wiki:guide]].";
     const headers = {
       authorization: "Bearer test-token",
       origin: "https://client.example"
@@ -1295,6 +1299,14 @@ describe("handleRequest", () => {
     );
     const pageRevisions = await handleRequest(
       new Request("https://example.com/api/v1/pages/revisions?id=wiki:welcome", { headers }),
+      env
+    );
+    const pageLinks = await handleRequest(
+      new Request("https://example.com/api/v1/pages/links?id=wiki:welcome", { headers }),
+      env
+    );
+    const pageBacklinks = await handleRequest(
+      new Request("https://example.com/api/v1/pages/backlinks?id=wiki:welcome", { headers }),
       env
     );
     const revision = await handleRequest(
@@ -1322,23 +1334,75 @@ describe("handleRequest", () => {
 
     expect(index.status).toBe(200);
     expect(index.headers.get("access-control-allow-origin")).toBe("https://client.example");
+    await expect(index.json()).resolves.toMatchObject({
+      ok: true,
+      endpoints: expect.arrayContaining(["/api/v1/pages/links", "/api/v1/pages/backlinks"]),
+      upstreamRemoteApi: {
+        apiVersion: 14,
+        responseFields: {
+          page: ["id", "revision", "size", "title", "permission", "hash", "author"],
+          link: ["type", "page", "href"],
+          user: ["login", "name", "mail", "groups", "isadmin", "ismanager"]
+        }
+      }
+    });
     await expect(page.json()).resolves.toMatchObject({
       ok: true,
       page: {
         id: "wiki:welcome",
         revisionId: "wiki:welcome@2026-05-07T00:00:00.000Z",
-        url: "/wiki/wiki/welcome"
+        url: "/wiki/wiki/welcome",
+        remote: {
+          id: "wiki:welcome",
+          revision: 1778112000,
+          title: "Welcome",
+          permission: 1
+        }
       }
     });
     await expect(pageRevisions.json()).resolves.toMatchObject({
       ok: true,
-      revisions: [expect.objectContaining({ pageId: "wiki:welcome" })]
+      revisions: [
+        expect.objectContaining({
+          pageId: "wiki:welcome",
+          remote: expect.objectContaining({
+            id: "wiki:welcome",
+            revision: 1778112000,
+            summary: "Initial import",
+            type: "create",
+            sizechange: 38
+          })
+        })
+      ]
+    });
+    await expect(pageLinks.json()).resolves.toMatchObject({
+      ok: true,
+      pageId: "wiki:welcome",
+      links: [
+        {
+          type: "internal",
+          page: "wiki:guide",
+          href: "/wiki/wiki/guide"
+        }
+      ]
+    });
+    await expect(pageBacklinks.json()).resolves.toMatchObject({
+      ok: true,
+      pageId: "wiki:welcome",
+      links: expect.any(Array)
     });
     await expect(revision.json()).resolves.toMatchObject({
       ok: true,
       revision: {
         id: "wiki:welcome@2026-05-06T00:00:00.000Z",
-        content: "====== Welcome ======\n\nOlder page."
+        content: "====== Welcome ======\n\nOlder page.",
+        remote: {
+          id: "wiki:welcome",
+          revision: 1778025600,
+          summary: "Older import",
+          type: "edit",
+          sizechange: 34
+        }
       }
     });
     await expect(media.json()).resolves.toMatchObject({
@@ -1346,22 +1410,57 @@ describe("handleRequest", () => {
       media: {
         id: "wiki:logo.svg",
         url: "/media/wiki/logo.svg",
-        detailUrl: "/media-detail/wiki/logo.svg"
+        detailUrl: "/media-detail/wiki/logo.svg",
+        remote: {
+          id: "wiki:logo.svg",
+          revision: 1778112000,
+          size: 18,
+          permission: 1,
+          isimage: false
+        }
       }
     });
     await expect(mediaRevisions.json()).resolves.toMatchObject({
       ok: true,
-      revisions: [expect.objectContaining({ mediaId: "wiki:logo.svg" })]
+      revisions: [
+        expect.objectContaining({
+          mediaId: "wiki:logo.svg",
+          remote: expect.objectContaining({
+            id: "wiki:logo.svg",
+            revision: 1778025600
+          })
+        })
+      ]
     });
     await expect(search.json()).resolves.toMatchObject({
       ok: true,
-      results: [expect.objectContaining({ id: "wiki:welcome" })]
+      results: [
+        expect.objectContaining({
+          id: "wiki:welcome",
+          remote: expect.objectContaining({
+            id: "wiki:welcome",
+            score: 5,
+            snippet: expect.any(String)
+          })
+        })
+      ]
     });
     await expect(user.json()).resolves.toMatchObject({
       ok: true,
       principal: {
         isAuthenticated: true,
         username: "api-token"
+      },
+      user: {
+        username: "api-token",
+        remote: {
+          login: "api-token",
+          name: "API token",
+          mail: "",
+          groups: ["admin", "user"],
+          isadmin: true,
+          ismanager: true
+        }
       }
     });
   });
