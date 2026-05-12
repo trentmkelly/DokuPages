@@ -2,7 +2,17 @@
 
 ## CSRF
 
-State-changing POST routes require a DokuWiki-style `sectok` value or `x-csrf-token` header that matches the `DW_CSRF_TOKEN` cookie. The cookie is HTTP-only, `SameSite=Lax`, and marked `Secure` on HTTPS. Server-rendered forms include the hidden token, and editor JavaScript forwards it for draft autosave and edit-lock refresh or release requests.
+State-changing routes follow DokuWiki's `sectok` behavior for browser clients.
+Anonymous users receive an empty `sectok` and are not CSRF-checked, matching
+upstream `checkSecurityToken()`. Logged-in native sessions receive a
+DokuWiki-compatible HMAC-MD5 `sectok` derived from the session id, username, and
+`DOKUWIKI_COOKIE_SALT`; legacy form posts and query-string action links can send
+that value as `sectok`.
+
+The previous `DW_CSRF_TOKEN` cookie plus `x-csrf-token` header remains accepted
+as a compatibility fallback for native AJAX callers, external auth principals,
+and deployments without `DOKUWIKI_COOKIE_SALT`. That fallback cookie is
+HTTP-only, `SameSite=Lax`, and marked `Secure` on HTTPS.
 
 Preview rendering is exempt because it does not write storage.
 

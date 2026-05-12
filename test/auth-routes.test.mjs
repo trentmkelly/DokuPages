@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleRequest } from "../src/app.ts";
 import { hashPassword } from "../src/auth/password.ts";
+import { hmacMd5Hex } from "../src/crypto/hmac-md5.ts";
 import { readMigrationSql } from "./support/migrations.mjs";
 
 const migrationSql = readMigrationSql();
@@ -26,10 +27,10 @@ describe("auth routes", () => {
     const response = await handleRequest(new Request("https://example.com/login"), env);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("set-cookie") ?? "").toContain("DW_CSRF_TOKEN=");
+    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_CSRF_TOKEN=");
     const html = await response.text();
     expect(html).toContain('id="dw__login"');
-    expect(html).toContain('name="sectok"');
+    expect(html).toContain('name="sectok" value=""');
   });
 
   it("renders, deduplicates, and clears stacked DokuWiki flash messages", async () => {
@@ -65,11 +66,11 @@ describe("auth routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("set-cookie") ?? "").toContain("DW_CSRF_TOKEN=");
+    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_CSRF_TOKEN=");
     const html = await response.text();
     expect(html).toContain('id="dw__login"');
     expect(html).toContain('name="returnTo" value="/wiki/wiki/welcome"');
-    expect(html).toMatch(/name="sectok" value="[^"]+"/);
+    expect(html).toContain('name="sectok" value=""');
   });
 
   it("creates, rotates, and accepts DokuWiki-compatible authentication tokens", async () => {
@@ -95,10 +96,14 @@ describe("auth routes", () => {
       );
       const profileHtml = await profile.text();
       const token = extractProfileToken(profileHtml);
+      const sectok = extractSectok(profileHtml);
+      const expectedSectok = dokuWikiSectok(cookie, "alice", "test-dokuwiki-cookie-salt");
 
       expect(profile.status).toBe(200);
+      expect(profile.headers.get("set-cookie") ?? "").not.toContain("DW_CSRF_TOKEN=");
       expect(profileHtml).toContain('id="dw__profiletoken"');
       expect(token).toContain(".");
+      expect(sectok).toBe(expectedSectok);
 
       const session = await handleRequest(
         new Request("https://example.com/api/auth/session", {
@@ -143,10 +148,12 @@ describe("auth routes", () => {
       expect(apiWrite.status).toBe(200);
 
       clock.mockReturnValue(1_770_000_001_000);
+      const rotateForm = new FormData();
       const rotated = await handleRequest(
-        new Request("https://example.com/profile?do=authtoken", {
+        new Request(`https://example.com/profile?do=authtoken&sectok=${sectok}`, {
           method: "POST",
-          headers: csrfHeaders({ cookie })
+          body: rotateForm,
+          headers: { cookie }
         }),
         env
       );
@@ -214,8 +221,10 @@ describe("auth routes", () => {
     );
 
     expect(register.status).toBe(200);
-    expect(register.headers.get("set-cookie") ?? "").toContain("DW_CSRF_TOKEN=");
-    await expect(register.text()).resolves.toContain('id="dw__register"');
+    expect(register.headers.get("set-cookie") ?? "").not.toContain("DW_CSRF_TOKEN=");
+    const registerHtml = await register.text();
+    expect(registerHtml).toContain('id="dw__register"');
+    expect(registerHtml).toContain('name="sectok" value=""');
     expect(pageRegister.status).toBe(200);
     await expect(pageRegister.text()).resolves.toContain('id="dw__register"');
     expect(reset.status).toBe(200);
@@ -3085,7 +3094,7 @@ describe("auth routes", () => {
     expect(loginResponse.headers.get("set-cookie") ?? "").not.toContain("DW_PAGES_SESSION=");
   });
 
-  it("rejects login posts without CSRF tokens", async () => {
+  it("accepts anonymous login posts without sectok like upstream DokuWiki", async () => {
     env = createEnv();
     await seedUser(env.DB);
     const login = new FormData();
@@ -3101,8 +3110,8 @@ describe("auth routes", () => {
       env
     );
 
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toMatchObject({ error: "Invalid CSRF token." });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("set-cookie") ?? "").toContain("DW_PAGES_SESSION=");
   });
 
   function createEnv(overrides = {}) {
@@ -3143,6 +3152,18 @@ function extractProfileToken(html) {
   const match = html.match(/<code[^>]*>([^<]+)<\/code>/);
   if (!match) throw new Error("Profile token was not rendered.");
   return match[1];
+}
+
+function extractSectok(html) {
+  const match = html.match(/name="sectok" value="([^"]*)"/);
+  if (!match) throw new Error("sectok was not rendered.");
+  return match[1];
+}
+
+function dokuWikiSectok(setCookie, username, salt) {
+  const sessionId = String(setCookie).match(/DW_PAGES_SESSION=([^.;]+)/)?.[1];
+  if (!sessionId) throw new Error("Session cookie did not contain a session id.");
+  return hmacMd5Hex(`${sessionId}${username}`, salt);
 }
 
 async function seedUser(d1, options) {

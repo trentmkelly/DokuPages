@@ -19,6 +19,7 @@ import { hashPassword } from "./auth/password";
 import { getOrCreateUserAuthToken, regenerateUserAuthToken } from "./auth/authtoken";
 import { getTurnstileConfig, verifyTurnstileForm } from "./auth/turnstile";
 import { emitAuthEvent, type AuthEventName } from "./auth/events";
+import { hmacMd5Hex } from "./crypto/hmac-md5";
 import {
   digestEmail,
   emailConfig,
@@ -407,13 +408,13 @@ async function dispatchRequest(
   }
 
   if (url.pathname.startsWith("/media-detail/")) {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const detail = await renderMediaDetailPage(request, env, url, principal, csrf.token);
     return detail instanceof Response ? detail : htmlResponseWithCsrf(request, detail, csrf);
   }
 
   if (url.pathname === "/media-manager") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const manager = await renderMediaManagerPage(request, env, url, principal, csrf.token);
     return manager instanceof Response ? manager : htmlResponseWithCsrf(request, manager, csrf);
   }
@@ -431,7 +432,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/login" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     return htmlResponseWithCsrf(
       request,
       renderLoginPage(env, url, undefined, undefined, csrf.token, readFlashMessages(request)),
@@ -440,12 +441,12 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/register" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     return htmlResponseWithCsrf(request, renderRegisterPage(env, url, csrf.token), csrf);
   }
 
   if (url.pathname === "/logout" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     return htmlResponseWithCsrf(request, renderLogoutPage(env, url, undefined, csrf.token), csrf);
   }
 
@@ -455,7 +456,7 @@ async function dispatchRequest(
       url.pathname === "/password") &&
     request.method === "GET"
   ) {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = url.searchParams.get("token")
       ? renderPasswordResetConfirmPage(env, url, csrf.token)
       : renderPasswordResetRequestPage(env, url, csrf.token);
@@ -467,7 +468,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/profile" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderProfilePage(request, env, url, principal, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
@@ -521,7 +522,7 @@ async function dispatchRequest(
   }
 
   if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = renderAdminDashboardPage(request, env, principal, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
@@ -541,7 +542,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/admin/styling" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderStylingAdminPage(request, env, principal, url, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
@@ -561,25 +562,25 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/admin/acl" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderAclAdminPage(request, env, principal, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
   if (url.pathname === "/admin/users" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderUserAdminPage(request, env, principal, url, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
   if (url.pathname === "/admin/media-cleanup" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderMediaCleanupPage(request, env, principal, url, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
 
   if (url.pathname === "/admin/revert" && request.method === "GET") {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderRevertManagerPage(request, env, principal, url, csrf.token);
     return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
   }
@@ -813,7 +814,7 @@ async function dispatchRequest(
         page ? ACL_EDIT : ACL_CREATE
       );
       if (denied) return denied;
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       const response = htmlResponse(
         renderConflictPage(env, id, {
           current: page,
@@ -824,7 +825,7 @@ async function dispatchRequest(
         }),
         { status: 409 }
       );
-      response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
+      appendCsrfCookie(response, request, csrf);
       return response;
     }
 
@@ -892,7 +893,7 @@ async function dispatchRequest(
     }
 
     if (url.searchParams.get("do") === "login") {
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       return htmlResponseWithCsrf(
         request,
         renderLoginPage(env, url, null, pagePath(id), csrf.token, readFlashMessages(request)),
@@ -901,12 +902,12 @@ async function dispatchRequest(
     }
 
     if (url.searchParams.get("do") === "register") {
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       return htmlResponseWithCsrf(request, renderRegisterPage(env, url, csrf.token), csrf);
     }
 
     if (url.searchParams.get("do") === "logout") {
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       return htmlResponseWithCsrf(
         request,
         renderLogoutPage(env, url, pagePath(id), csrf.token),
@@ -919,7 +920,7 @@ async function dispatchRequest(
       url.searchParams.get("do") === "password" ||
       url.searchParams.get("do") === "password_reset"
     ) {
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       return htmlResponseWithCsrf(
         request,
         renderPasswordResetRequestPage(env, url, csrf.token),
@@ -935,7 +936,7 @@ async function dispatchRequest(
     }
 
     if (url.searchParams.get("do") === "subscribe") {
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       const page = await renderSubscriptionPage(request, env, principal, id, csrf.token);
       return page instanceof Response ? page : htmlResponseWithCsrf(request, page, csrf);
     }
@@ -962,7 +963,7 @@ async function dispatchRequest(
     if (url.searchParams.get("do") === "revert") {
       const denied = await requireAclPermission(request, env, principal, id, ACL_EDIT);
       if (denied) return denied;
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       return htmlResponseWithCsrf(request, await renderRevertPage(env, id, url, csrf.token), csrf);
     }
 
@@ -1050,7 +1051,7 @@ async function dispatchRequest(
       if (!draft) {
         return notFoundResponse(`Draft for '${id}' was not found.`);
       }
-      const csrf = csrfContext(request);
+      const csrf = csrfContext(request, env, principal);
       const sidebarPageId = await findNearestSidebarPageId(
         env,
         id,
@@ -1565,7 +1566,7 @@ async function handleWikiPostAction(
     case "recover":
       return handleRecoverDraft(request, env, principal, id);
     case "show":
-      return handleShowPageAction(request, id);
+      return handleShowPageAction(request, env, principal, id);
     case "cancel":
       return handleDeleteDraft(request, env, principal, id, pagePath(id));
     case "redirect":
@@ -3114,7 +3115,7 @@ async function handleAjaxDraftDelete(
   principal: AuthPrincipal
 ): Promise<Response> {
   const id = cleanPageId(params.get("id") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
-  if (id && ajaxSecurityTokenValid(request, params, principal)) {
+  if (id && ajaxSecurityTokenValid(request, params, env, principal)) {
     await deletePageDraft(env.DB, id);
   }
   return ajaxHtmlResponse("");
@@ -3197,7 +3198,7 @@ async function handleAjaxMediaDetails(
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
   if (denied) return ajaxAclDeniedResponse(id);
 
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, principal);
   return ajaxHtmlResponse(await renderMediaDetailContent(env, principal, csrf.token, id, media));
 }
 
@@ -3247,7 +3248,7 @@ async function handleAjaxMediaUpload(
     return ajaxMediaUploadError("", namespace);
   }
 
-  if (!ajaxSecurityTokenValid(request, params, principal)) {
+  if (!ajaxSecurityTokenValid(request, params, env, principal)) {
     return ajaxMediaUploadError(AJAX_SECURITY_TOKEN_ERROR, namespace);
   }
 
@@ -3390,15 +3391,10 @@ const AJAX_SECURITY_TOKEN_ERROR = "Security Token did not match. Possible CSRF a
 function ajaxSecurityTokenValid(
   request: Request,
   params: URLSearchParams,
+  env: Env,
   principal: AuthPrincipal
 ): boolean {
-  if (principal.type !== "user") return true;
-
-  const cookie = readCookie(request, CSRF_COOKIE_NAME);
-  const token = String(
-    request.headers.get("x-csrf-token") ?? params.get("sectok") ?? params.get("csrfToken") ?? ""
-  );
-  return Boolean(cookie && token && constantTimeEqual(cookie, token));
+  return securityTokenValid(request, null, env, principal, params);
 }
 
 function ajaxAclDeniedResponse(subjectId: string): Response {
@@ -8874,7 +8870,7 @@ async function handleAclRuleUpsert(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -8914,7 +8910,7 @@ async function handleAclRuleBulkUpdate(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9009,7 +9005,7 @@ async function handleAclRuleDelete(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9048,7 +9044,7 @@ async function handleUserAdminUpdate(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9130,7 +9126,7 @@ async function handleStylingAdminUpdate(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await readFormDataOrEmpty(request);
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9175,7 +9171,7 @@ async function handleMediaCleanup(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await readFormDataOrEmpty(request);
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9218,7 +9214,7 @@ async function handleGlobalCachePurge(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await readFormDataOrEmpty(request);
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9354,7 +9350,7 @@ async function handleRevertManager(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isManagerPrincipal(principal, env)) {
@@ -9366,7 +9362,7 @@ async function handleRevertManager(
     .getAll("revert")
     .map((value) => cleanPageId(String(value)))
     .filter((id): id is string => Boolean(id));
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, principal);
   const url = new URL(request.url);
   url.searchParams.set("filter", filter);
 
@@ -9491,7 +9487,7 @@ async function handleSearchIndexRebuild(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!isAdminPrincipal(principal, env)) {
@@ -9921,14 +9917,14 @@ function parseAclRuleForm(
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, anonymousPrincipal());
   if (csrfFailure) return csrfFailure;
 
   const username = String(form.get("username") ?? form.get("u") ?? "").trim();
   const password = String(form.get("password") ?? form.get("p") ?? "");
   const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
   const url = new URL(request.url);
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, anonymousPrincipal());
   const turnstile = await verifyTurnstileForm(request, env, form);
 
   if (!turnstile.ok) {
@@ -9984,11 +9980,11 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
 async function handleRegister(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, anonymousPrincipal());
   if (csrfFailure) return csrfFailure;
 
   const url = new URL(request.url);
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, anonymousPrincipal());
   const submittedValues = registrationValuesFromForm(form);
   const turnstile = await verifyTurnstileForm(request, env, form);
 
@@ -10070,11 +10066,11 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
 
 async function handlePasswordResetRequest(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, anonymousPrincipal());
   if (csrfFailure) return csrfFailure;
 
   const url = new URL(request.url);
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, anonymousPrincipal());
   const identifier = String(form.get("identifier") ?? form.get("login") ?? "").trim();
   const message = localizedAuthText(env, "resendpwdconfirm");
 
@@ -10110,11 +10106,11 @@ async function handlePasswordResetRequest(request: Request, env: Env): Promise<R
 
 async function handlePasswordResetConfirm(request: Request, env: Env): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, anonymousPrincipal());
   if (csrfFailure) return csrfFailure;
 
   const url = new URL(request.url);
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, anonymousPrincipal());
   const token = String(form.get("token") ?? "").trim();
   const password = String(form.get("password") ?? "");
   const passwordConfirm = String(form.get("passwordConfirm") ?? "");
@@ -10232,7 +10228,7 @@ async function handleSubscriptionUpdate(
   }
 
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const subjectType = String(form.get("subjectType") ?? "");
@@ -10436,7 +10432,7 @@ async function handleLogout(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const returnTo = safeReturnPath(String(form.get("returnTo") ?? ""), env);
@@ -10482,7 +10478,7 @@ async function handleProfileUpdate(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (principal.type !== "user") {
@@ -10491,7 +10487,7 @@ async function handleProfileUpdate(
 
   const values = profileValuesFromForm(form, principal);
   const parsed = parseProfileForm(form);
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, principal);
   const config = getRuntimeConfig(env);
 
   if (!parsed.ok) {
@@ -10588,12 +10584,12 @@ async function handleAuthTokenAction(
   }
 
   const form = await readFormDataOrEmpty(request);
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const token = await regenerateUserAuthToken(env, principal);
   if (!token) {
-    const csrf = csrfContext(request);
+    const csrf = csrfContext(request, env, principal);
     const page = await renderProfilePage(
       request,
       env,
@@ -10808,14 +10804,14 @@ async function handleProfileDelete(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (principal.type !== "user") {
     return accountLoginRequiredResponse(request, env, "/profile");
   }
 
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, principal);
   const oldPassword = String(form.get("oldpass") ?? form.get("currentPassword") ?? "");
 
   if (isActionDisabled(env, "profile_delete")) {
@@ -12714,6 +12710,7 @@ function manifestResponse(body: Record<string, unknown>): Response {
 
 interface CsrfContext {
   token: string;
+  cookieToken: string | null;
 }
 
 type FlashMessageType = "error" | "info" | "success" | "notify";
@@ -12723,10 +12720,14 @@ interface FlashMessage {
   text: string;
 }
 
-function csrfContext(request: Request): CsrfContext {
-  return {
-    token: readCookie(request, CSRF_COOKIE_NAME) || randomCsrfToken()
-  };
+function csrfContext(request: Request, env?: Env, principal?: AuthPrincipal): CsrfContext {
+  const dokuwikiToken = dokuWikiSecurityToken(request, env, principal);
+  if (dokuwikiToken !== null) {
+    return { token: dokuwikiToken, cookieToken: null };
+  }
+
+  const token = readCookie(request, CSRF_COOKIE_NAME) || randomCsrfToken();
+  return { token, cookieToken: token };
 }
 
 function htmlResponseWithCsrf(
@@ -12736,7 +12737,7 @@ function htmlResponseWithCsrf(
   init: ResponseInit = {}
 ): Response {
   const response = htmlResponse(body, init);
-  response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
+  appendCsrfCookie(response, request, csrf);
   if (readFlashMessages(request).length > 0) {
     response.headers.append("set-cookie", clearFlashCookieHeader(request));
   }
@@ -12787,13 +12788,13 @@ function renderTurnstileWidget(env: Env, action: "login" | "register"): string {
   </div>`;
 }
 
-function validateCsrf(request: Request, form: FormData): Response | null {
-  const cookie = readCookie(request, CSRF_COOKIE_NAME);
-  const token = String(
-    request.headers.get("x-csrf-token") ?? form.get("sectok") ?? form.get("csrfToken") ?? ""
-  );
-
-  if (cookie && token && constantTimeEqual(cookie, token)) {
+function validateCsrf(
+  request: Request,
+  form: FormData,
+  env?: Env,
+  principal?: AuthPrincipal
+): Response | null {
+  if (securityTokenValid(request, form, env, principal)) {
     return null;
   }
 
@@ -12804,6 +12805,67 @@ function validateCsrf(request: Request, form: FormData): Response | null {
   return htmlResponse("<h1>Invalid CSRF token</h1><p>Invalid CSRF token.</p>", {
     status: 403
   });
+}
+
+function appendCsrfCookie(response: Response, request: Request, csrf: CsrfContext): void {
+  if (csrf.cookieToken) {
+    response.headers.append("set-cookie", csrfCookieHeader(csrf.cookieToken, request));
+  }
+}
+
+function securityTokenValid(
+  request: Request,
+  form: FormData | null,
+  env?: Env,
+  principal?: AuthPrincipal,
+  params?: URLSearchParams
+): boolean {
+  if (principal && principal.type !== "user") return true;
+
+  const token = requestSecurityToken(request, form, params);
+  const dokuwikiToken = dokuWikiSecurityToken(request, env, principal);
+  if (dokuwikiToken !== null && token && constantTimeEqual(dokuwikiToken, token)) {
+    return true;
+  }
+
+  const cookie = readCookie(request, CSRF_COOKIE_NAME);
+  return Boolean(cookie && token && constantTimeEqual(cookie, token));
+}
+
+function requestSecurityToken(
+  request: Request,
+  form: FormData | null,
+  params?: URLSearchParams
+): string {
+  const query = new URL(request.url).searchParams;
+  return String(
+    request.headers.get("x-csrf-token") ??
+      form?.get("sectok") ??
+      params?.get("sectok") ??
+      query.get("sectok") ??
+      form?.get("csrfToken") ??
+      params?.get("csrfToken") ??
+      query.get("csrfToken") ??
+      ""
+  );
+}
+
+function dokuWikiSecurityToken(
+  request: Request,
+  env?: Env,
+  principal?: AuthPrincipal
+): string | null {
+  if (!principal) return null;
+  if (principal.type !== "user") return "";
+
+  const salt = env?.DOKUWIKI_COOKIE_SALT?.trim();
+  const sessionCookieName = env ? getRuntimeConfig(env).sessionCookieName : "";
+  const sessionId = sessionCookieName
+    ? readCookie(request, sessionCookieName)?.split(".")[0]?.trim()
+    : "";
+  if (!salt || !sessionId || !principal.username) return null;
+
+  return hmacMd5Hex(`${sessionId}${principal.username}`, salt);
 }
 
 function csrfCookieHeader(token: string, request: Request): string {
@@ -12915,7 +12977,7 @@ async function handleEditPage(
     config.lockTime > 0 ? readCookie(request, cookieName) || randomPageLockToken() : "";
   const lock =
     config.lockTime > 0 ? await ensurePageEditLock(request, env, principal, id, lockToken) : null;
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, principal);
   const sidebarPageId = await findNearestSidebarPageId(env, id, config, principal);
 
   if (lock && !lock.ok) {
@@ -12943,7 +13005,7 @@ async function handleEditPage(
       pageLockCookieHeader(cookieName, lockToken, request, config.lockTime)
     );
   }
-  response.headers.append("set-cookie", csrfCookieHeader(csrf.token, request));
+  appendCsrfCookie(response, request, csrf);
 
   return response;
 }
@@ -12955,7 +13017,7 @@ async function handleSave(
   overrideId?: string
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") || overrideId || ""));
@@ -13013,7 +13075,7 @@ async function handleSave(
       return htmlResponse(
         renderConflictPage(env, id, {
           current: currentPage,
-          csrfToken: csrfContext(request).token,
+          csrfToken: csrfContext(request, env, principal).token,
           lockToken,
           submittedContent: content,
           summary
@@ -13028,7 +13090,7 @@ async function handleSave(
 
   const blocked = await findRuntimeWordblockMatch(env, `${content}\n${summary}`);
   if (blocked) {
-    return wordblockResponse(request, env, id, content, blocked);
+    return wordblockResponse(request, env, principal, id, content, blocked);
   }
 
   const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
@@ -13058,7 +13120,7 @@ async function handleSave(
     return htmlResponse(
       renderConflictPage(env, id, {
         current,
-        csrfToken: csrfContext(request).token,
+        csrfToken: csrfContext(request, env, principal).token,
         lockToken,
         submittedContent: content,
         summary
@@ -13095,7 +13157,7 @@ async function handleMediaUpload(
   }
 
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const file = form.get("file");
@@ -13224,7 +13286,7 @@ async function handleMediaDelete(
 ): Promise<Response> {
   const startedAt = Date.now();
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanMediaId(String(form.get("id") ?? ""));
@@ -13341,7 +13403,7 @@ async function handleMediaRevert(
 ): Promise<Response> {
   const startedAt = Date.now();
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanMediaId(String(form.get("id") ?? ""));
@@ -13413,7 +13475,7 @@ async function handleRevert(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") ?? ""));
@@ -13444,7 +13506,7 @@ async function handleRevert(
     `${revision.content}\n${String(form.get("summary") ?? "")}`
   );
   if (blocked) {
-    return wordblockResponse(request, env, id, revision.content, blocked);
+    return wordblockResponse(request, env, principal, id, revision.content, blocked);
   }
 
   const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
@@ -13474,7 +13536,7 @@ async function handleRevert(
     return htmlResponse(
       renderConflictPage(env, id, {
         current,
-        csrfToken: csrfContext(request).token,
+        csrfToken: csrfContext(request, env, principal).token,
         lockToken,
         submittedContent: revision.content,
         summary: String(form.get("summary") || "") || `Reverted to ${revision.createdAt}`
@@ -13505,7 +13567,7 @@ async function handleRefreshPageLock(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") ?? ""));
@@ -13545,7 +13607,7 @@ async function handleReleasePageLock(
   principal: AuthPrincipal
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") ?? ""));
@@ -13683,6 +13745,7 @@ function parseWordblockMetadata(value: string): string | null {
 function wordblockResponse(
   request: Request,
   env: Env,
+  principal: AuthPrincipal,
   id: string,
   content: string,
   blocked: WordblockMatch
@@ -13694,7 +13757,7 @@ function wordblockResponse(
     );
   }
 
-  const csrf = csrfContext(request);
+  const csrf = csrfContext(request, env, principal);
   return htmlResponseWithCsrf(
     request,
     renderWordblockPage(env, id, content, blocked, csrf.token),
@@ -13736,7 +13799,7 @@ async function handleSaveDraft(
   overrideId?: string
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") || overrideId || ""));
@@ -13838,7 +13901,7 @@ async function handleRecoverDraft(
   id: string
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   if (!getRuntimeConfig(env).useDraft) {
@@ -13863,9 +13926,14 @@ async function handleRecoverDraft(
   return handleEditPage(request, env, principal, id, page, draft);
 }
 
-async function handleShowPageAction(request: Request, id: string): Promise<Response> {
+async function handleShowPageAction(
+  request: Request,
+  env: Env,
+  principal: AuthPrincipal,
+  id: string
+): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   return redirectResponse(pagePath(id));
@@ -14451,7 +14519,7 @@ async function handleDeleteDraft(
   redirectTarget?: string
 ): Promise<Response> {
   const form = await request.formData();
-  const csrfFailure = validateCsrf(request, form);
+  const csrfFailure = validateCsrf(request, form, env, principal);
   if (csrfFailure) return csrfFailure;
 
   const id = cleanPageId(String(form.get("id") || overrideId || ""));

@@ -97,9 +97,12 @@ session tokens, and cookie values are never logged.
 
 The profile page includes a DokuWiki-compatible authentication token form. It
 matches upstream `Authtoken.php` behavior by requiring a valid `sectok` before
-regenerating the token, then redirecting back to the profile page. Tokens use
-the same JWT-shaped HS256 format as upstream DokuWiki with `iss=dokuwiki`,
-`sub=<username>`, and `iat=<issued timestamp>`.
+regenerating the token, then redirecting back to the profile page. For native
+sessions that `sectok` is the upstream-style HMAC-MD5 of session id plus
+username signed with `DOKUWIKI_COOKIE_SALT`; the native CSRF cookie remains a
+fallback for non-session identity modes. Tokens use the same JWT-shaped HS256
+format as upstream DokuWiki with `iss=dokuwiki`, `sub=<username>`, and
+`iat=<issued timestamp>`.
 
 `DOKUWIKI_COOKIE_SALT` signs auth tokens. The current token is stored in D1
 metadata for revocation, so generating a new token invalidates the previous

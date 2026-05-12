@@ -3362,7 +3362,7 @@ describe("handleRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("set-cookie")).not.toContain("DW_LOCK_");
+    expect(response.headers.get("set-cookie") ?? "").not.toContain("DW_LOCK_");
     const html = await response.text();
     expect(html).not.toContain('data-lock-url="/api/pages/lock"');
     expect(html).not.toContain("data-lock-warning-delay");
@@ -4502,7 +4502,12 @@ describe("handleRequest", () => {
     expect(state.batches).toHaveLength(0);
   });
 
-  it("rejects state-changing page and media posts without CSRF tokens", async () => {
+  it("rejects logged-in state-changing page and media posts without CSRF tokens", async () => {
+    env.EXTERNAL_AUTH_MODE = "cloudflare_access";
+    const authHeaders = {
+      accept: "application/json",
+      "cf-access-authenticated-user-email": "kiwi@example.com"
+    };
     const pageForm = new FormData();
     pageForm.set("id", "wiki:welcome");
     pageForm.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
@@ -4512,7 +4517,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/pages", {
         method: "POST",
         body: pageForm,
-        headers: { accept: "application/json" }
+        headers: authHeaders
       }),
       env
     );
@@ -4525,7 +4530,7 @@ describe("handleRequest", () => {
       new Request("https://example.com/api/media/upload", {
         method: "POST",
         body: mediaForm,
-        headers: { accept: "application/json" }
+        headers: authHeaders
       }),
       env
     );

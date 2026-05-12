@@ -141,7 +141,8 @@ Optional Pages environment variables:
   registration forms.
 - `DOKUWIKI_COOKIE_SALT`: Pages secret containing the upstream
   `auth_cookiesalt()` value, usually `data/meta/_htcookiesalt` from a migrated
-  DokuWiki install. It signs DokuWiki-compatible media resize tokens.
+  DokuWiki install. It signs DokuWiki-compatible media resize tokens and
+  logged-in `sectok` security tokens.
 - `REFCHECK`: set to `0` to disable DokuWiki-style media delete reference
   checks. Default: enabled.
 - `MEDIAREVISIONS`: set to `0` to disable media revision history, restore,
@@ -202,10 +203,11 @@ enabled. Set `RESEND_API_KEY` or `EMAIL_API_TOKEN` as a Pages secret when
 outbound email should be enabled. Set `EMAIL_TASK_TOKEN` when scheduled digest
 execution is enabled. Set `TURNSTILE_SECRET_KEY` as a Pages secret when
 Turnstile gating should be enforced. Set `DOKUWIKI_COOKIE_SALT` as a Pages
-secret before enabling tokenized resized-media URLs. Wrangler authentication,
-API bearer tokens, provider tokens, Turnstile secrets, and imported cookie salts
-stay outside the repository and should never be checked in. `npm run
-scan:secrets` guards tracked files for high-signal tokens.
+secret before enabling tokenized resized-media URLs or upstream-compatible
+logged-in `sectok` checks. Wrangler authentication, API bearer tokens, provider
+tokens, Turnstile secrets, and imported cookie salts stay outside the repository
+and should never be checked in. `npm run scan:secrets` guards tracked files for
+high-signal tokens.
 
 Admins can inspect the effective runtime configuration at `/admin/config` and
 download a JSON configuration backup from `/api/admin/config/export`. Secret

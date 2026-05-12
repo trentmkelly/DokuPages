@@ -259,7 +259,7 @@ are not fixed by this checklist.
 - [x] Match upstream email obfuscation modes from `mailguard`: visible, hex, and none.
 - [x] Match upstream external link `rel` behavior from `relnofollow`.
 - [x] Match upstream upload XSS protection toggles from `iexssprotect`.
-- [ ] Match upstream CSRF token names and behavior where legacy clients rely on `sectok`.
+- [x] Match upstream CSRF token names and behavior where legacy clients rely on `sectok`.
 - [ ] Match upstream cookie path behavior from `cookiedir`.
 - [ ] Match upstream secure cookie and SameSite settings from `securecookie` and `samesitecookie`.
 - [ ] Match DokuWiki's message rendering for security and ACL denials instead of only native JSON or simplified HTML messages.
