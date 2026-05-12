@@ -251,7 +251,7 @@ are not fixed by this checklist.
 - [x] Match DokuWiki log retention and `dontlog` behavior with D1/Cloudflare logs.
 - [x] Add scheduled backup automation equivalent to an operator-run production backup policy.
 - [x] Add operational checks for Cloudflare quotas that replace local disk free-space checks.
-- [ ] Add a production rehearsal using final source import, remote D1/R2/KV resources, and rollback verification.
+- [x] Add a production rehearsal using final source import, remote D1/R2/KV resources, and rollback verification.
 
 ## Security And Anti-Abuse
 

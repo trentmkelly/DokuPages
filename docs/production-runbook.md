@@ -30,6 +30,33 @@ Before starting the final sync, confirm:
 
 Do not run the final import or DNS cutover until these inputs are explicit.
 
+## Production Rehearsal
+
+Before a real cutover, run the final source import against the intended remote
+D1/R2/KV/Pages target and prove rollback from a fresh pre-import backup:
+
+```sh
+npm run rehearsal:production -- --yes \
+  --source ../dokuwiki \
+  --database dokuwiki_pages_dev \
+  --bucket dokuwiki-pages-dev-media \
+  --base-url https://dokutest.pages.dev
+```
+
+The rehearsal generates final import SQL, media, and hash manifests from the
+source tree; applies pending remote D1 migrations; exports and verifies the
+remote D1/R2 backup; applies the D1 import; uploads R2 media; verifies imported
+D1/R2 hashes; checks deployed diagnostics for D1, R2, KV, and Durable Object
+health; runs smoke and alert checks; and restores the backup into local D1/R2
+targets as rollback proof. The JSON report is written to
+`.wrangler/production-rehearsal/production-rehearsal-report.json`.
+
+To inspect the exact command sequence without changing data:
+
+```sh
+npm run rehearsal:production -- --dry-run
+```
+
 ## Pre-Freeze Backup
 
 Create a named backup of the target Cloudflare resources:

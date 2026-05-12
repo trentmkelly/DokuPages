@@ -14,6 +14,9 @@ DokuWiki port on `https://dokutest.pages.dev`.
 - Source DokuWiki cutover: no production traffic cutover was requested, so
   source read-only mode, DNS switching, and old deployment archiving are no-op
   launch steps for this target.
+- Repeatable rehearsal command: `npm run rehearsal:production -- --yes`. This
+  regenerates final source import artifacts, uses remote D1/R2/KV/Pages
+  resources, and restores the pre-import backup into local rollback targets.
 
 ## Final Sync Evidence
 
