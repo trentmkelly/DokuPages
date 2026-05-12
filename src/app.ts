@@ -2087,7 +2087,7 @@ async function handleNativeApiPageWrite(
 
   await recordEditAttempt(request, env, principal);
 
-  const blocked = findWordblockMatch(`${content}\n${summary}`);
+  const blocked = await findRuntimeWordblockMatch(env, `${content}\n${summary}`);
   if (blocked) {
     return jsonResponse(
       { error: WORD_BLOCK_MESSAGE, blockedPattern: blocked.pattern },
@@ -12861,7 +12861,7 @@ async function handleSave(
     content = joinWikiSlices(section.prefix, content, section.suffix);
   }
 
-  const blocked = findWordblockMatch(`${content}\n${summary}`);
+  const blocked = await findRuntimeWordblockMatch(env, `${content}\n${summary}`);
   if (blocked) {
     return wordblockResponse(request, env, id, content, blocked);
   }
@@ -13255,7 +13255,10 @@ async function handleRevert(
     return notFoundResponse(`Revision '${revisionId}' was not found.`);
   }
 
-  const blocked = findWordblockMatch(`${revision.content}\n${String(form.get("summary") ?? "")}`);
+  const blocked = await findRuntimeWordblockMatch(
+    env,
+    `${revision.content}\n${String(form.get("summary") ?? "")}`
+  );
   if (blocked) {
     return wordblockResponse(request, env, id, revision.content, blocked);
   }
@@ -13441,6 +13444,37 @@ function lockedResponse(
   }
 
   return htmlResponse(renderLockedPage(env, id, lock), { status: 423 });
+}
+
+async function findRuntimeWordblockMatch(env: Env, text: string): Promise<WordblockMatch | null> {
+  const patterns = await wordblockPatternsForRuntime(env);
+  return findWordblockMatch(text, patterns);
+}
+
+async function wordblockPatternsForRuntime(env: Env): Promise<string[] | undefined> {
+  const result = await env.DB.prepare(
+    `select value_json
+     from metadata
+     where subject_type = ?
+       and subject_id = ?
+     order by key asc`
+  )
+    .bind("config", "wordblock")
+    .all<{ value_json: string }>();
+  const patterns = result.results
+    .map((row) => parseWordblockMetadata(row.value_json))
+    .filter((pattern): pattern is string => Boolean(pattern));
+
+  return patterns.length > 0 ? patterns : undefined;
+}
+
+function parseWordblockMetadata(value: string): string | null {
+  try {
+    const parsed = JSON.parse(value) as { pattern?: unknown };
+    return typeof parsed.pattern === "string" && parsed.pattern.trim() ? parsed.pattern : null;
+  } catch {
+    return null;
+  }
 }
 
 function wordblockResponse(

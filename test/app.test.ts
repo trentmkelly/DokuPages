@@ -4442,6 +4442,38 @@ describe("handleRequest", () => {
     expect(purgedKeys).toHaveLength(0);
   });
 
+  it("blocks page edits with imported wordblock patterns", async () => {
+    state.metadata.push({
+      subject_type: "config",
+      subject_id: "wordblock",
+      key: "wordblock:1",
+      value_json: JSON.stringify({ id: "wordblock:1", pattern: "custom forbidden" }),
+      updated_at: "2026-05-07T00:00:00.000Z"
+    });
+    const form = new FormData();
+    form.set("id", "wiki:welcome");
+    form.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    form.set("content", "====== Updated ======\n\nA custom forbidden term.");
+    form.set("summary", "Updated page");
+
+    const response = await handleRequest(
+      new Request("https://example.com/api/pages", {
+        method: "POST",
+        body: form,
+        headers: csrfHeaders({ accept: "application/json" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: WORD_BLOCK_MESSAGE,
+      blockedText: "custom forbidden"
+    });
+    expect(state.row?.content).toBe("====== Welcome ======\n\nImported page.");
+    expect(state.batches).toHaveLength(0);
+  });
+
   it("purges rendered page cache through the page action", async () => {
     const response = await handleRequest(
       new Request("https://example.com/wiki/wiki/welcome?do=purge"),

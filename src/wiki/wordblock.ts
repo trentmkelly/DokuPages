@@ -36,11 +36,19 @@ const DEFAULT_WORD_BLOCKS = [
   String.raw`(just|simply) (my|a) profile (site|webpage|page)`
 ];
 
-export function findWordblockMatch(text: string): WordblockMatch | null {
+export function findWordblockMatch(
+  text: string,
+  patterns: readonly string[] = DEFAULT_WORD_BLOCKS
+): WordblockMatch | null {
   const prepared = prepareWordblockText(text);
 
-  for (const pattern of DEFAULT_WORD_BLOCKS) {
-    const expression = new RegExp(pattern, "is");
+  for (const pattern of patterns) {
+    let expression: RegExp;
+    try {
+      expression = new RegExp(pattern, "is");
+    } catch {
+      continue;
+    }
     const match = prepared.match(expression);
 
     if (match) {

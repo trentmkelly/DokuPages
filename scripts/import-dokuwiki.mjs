@@ -137,7 +137,10 @@ export async function buildImportPlan(sourceRoot) {
     path.join(confRoot, "acronyms.conf"),
     path.join(confRoot, "acronyms.local.conf")
   ]);
-  const wordblockPatterns = await discoverWordblockPatterns(path.join(confRoot, "wordblock.conf"));
+  const wordblockPatterns = await discoverWordblockPatterns([
+    path.join(confRoot, "wordblock.conf"),
+    path.join(confRoot, "wordblock.local.conf")
+  ]);
   const customLanguageFiles = await discoverCustomLanguageFiles(path.join(confRoot, "lang"));
   const customTemplateFiles = await discoverCustomTemplateFiles(path.join(root, "lib", "tpl"));
 
@@ -2025,18 +2028,31 @@ function phpArrayToJs(entries) {
   return Object.fromEntries(entries.map(([key, value]) => [String(key), value]));
 }
 
-export async function discoverWordblockPatterns(file) {
-  const text = await readTextIfExists(file);
-  if (!text) return [];
+export async function discoverWordblockPatterns(files) {
+  const patterns = [];
 
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    .map((pattern, index) => ({
-      id: `wordblock:${index + 1}`,
-      pattern
-    }));
+  for (const file of Array.isArray(files) ? files : [files]) {
+    const text = await readTextIfExists(file);
+    if (!text) continue;
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      if (line.startsWith("!")) {
+        const blocked = line.slice(1).trim();
+        const existing = patterns.indexOf(blocked);
+        if (existing !== -1) patterns.splice(existing, 1);
+      } else {
+        patterns.push(line);
+      }
+    }
+  }
+
+  return patterns.map((pattern, index) => ({
+    id: `wordblock:${index + 1}`,
+    pattern
+  }));
 }
 
 async function walkFiles(root) {

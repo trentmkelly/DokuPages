@@ -154,6 +154,7 @@ describe("DokuWiki import planner", () => {
     );
     await writeFile(path.join(root, "conf/acronyms.local.conf"), "API Custom API\n");
     await writeFile(path.join(root, "conf/wordblock.conf"), "# spam terms\nzoosex\n wow gold \n");
+    await writeFile(path.join(root, "conf/wordblock.local.conf"), "!zoosex\ncustom phrase\n");
     await writeFile(
       path.join(root, "conf/lang/en/lang.php"),
       "<?php\n$lang['btn_save'] = 'Save it';\n"
@@ -422,8 +423,8 @@ describe("DokuWiki import planner", () => {
       { acronym: "HTML", title: "HyperText Markup Language", source: "acronyms.conf" }
     ]);
     expect(plan.wordblockPatterns).toEqual([
-      { id: "wordblock:1", pattern: "zoosex" },
-      { id: "wordblock:2", pattern: "wow gold" }
+      { id: "wordblock:1", pattern: "wow gold" },
+      { id: "wordblock:2", pattern: "custom phrase" }
     ]);
     expect(plan.customLanguageFiles).toEqual([
       expect.objectContaining({
