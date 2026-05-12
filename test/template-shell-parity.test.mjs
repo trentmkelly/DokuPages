@@ -86,6 +86,105 @@ describe("DokuWiki template shell parity", () => {
       ]);
     }
   );
+
+  it("uses DokuWiki nearest-page propagation for default-template sidebars", async () => {
+    const env = createEnv();
+    await seedPage(env.DB, {
+      id: "wiki:team:topic",
+      title: "Topic",
+      content: "====== Topic ======\n\nPage content."
+    });
+    await seedPage(env.DB, {
+      id: "sidebar",
+      title: "Root Sidebar",
+      content: "====== Root Sidebar ======\n\nRoot sidebar content."
+    });
+    await seedPage(env.DB, {
+      id: "wiki:sidebar",
+      title: "Wiki Sidebar",
+      content: "====== Wiki Sidebar ======\n\nWiki sidebar content."
+    });
+    await seedPage(env.DB, {
+      id: "wiki:team:sidebar",
+      title: "Team Sidebar",
+      content: "====== Team Sidebar ======\n\nTeam sidebar content."
+    });
+
+    const show = await handleRequest(new Request("https://example.com/wiki/wiki/team/topic"), env);
+    const showHtml = await show.text();
+    const edit = await handleRequest(
+      new Request("https://example.com/wiki/wiki/team/topic?do=edit"),
+      env
+    );
+    const editHtml = await edit.text();
+
+    expect(show.status).toBe(200);
+    expect(showHtml).toContain('id="dokuwiki__aside"');
+    expect(showHtml).toContain("Team sidebar content.");
+    expect(showHtml).not.toContain("Wiki sidebar content.");
+    expect(showHtml).not.toContain("Root sidebar content.");
+    expect(showHtml).toContain(
+      'class="site dokuwiki mode_show tpl_dokuwiki showSidebar hasSidebar"'
+    );
+
+    expect(edit.status).toBe(200);
+    expect(editHtml).toContain('class="site dokuwiki mode_edit tpl_dokuwiki hasSidebar"');
+    expect(editHtml).not.toContain('id="dokuwiki__aside"');
+    expect(editHtml).not.toContain("Team sidebar content.");
+  });
+
+  it("continues sidebar lookup past ACL-hidden candidates for the current principal", async () => {
+    const env = createEnv({ EXTERNAL_AUTH_MODE: "cloudflare_access" });
+    await seedPage(env.DB, {
+      id: "wiki:team:topic",
+      title: "Topic",
+      content: "====== Topic ======\n\nPage content."
+    });
+    await seedPage(env.DB, {
+      id: "sidebar",
+      title: "Root Sidebar",
+      content: "====== Root Sidebar ======\n\nRoot sidebar content."
+    });
+    await seedPage(env.DB, {
+      id: "wiki:team:sidebar",
+      title: "Team Sidebar",
+      content: "====== Team Sidebar ======\n\nTeam private sidebar content."
+    });
+    await seedAclRule(env.DB, {
+      scope: "wiki:team:sidebar",
+      principalType: "all",
+      principal: "@ALL",
+      permission: 0
+    });
+    await seedAclRule(env.DB, {
+      scope: "wiki:team:sidebar",
+      principalType: "group",
+      principal: "@user",
+      permission: 1
+    });
+    await seedUser(env.DB);
+
+    const anonymous = await handleRequest(
+      new Request("https://example.com/wiki/wiki/team/topic"),
+      env
+    );
+    const anonymousHtml = await anonymous.text();
+    const authenticated = await handleRequest(
+      new Request("https://example.com/wiki/wiki/team/topic", {
+        headers: { "cf-access-authenticated-user-email": "alice@example.com" }
+      }),
+      env
+    );
+    const authenticatedHtml = await authenticated.text();
+
+    expect(anonymous.status).toBe(200);
+    expect(anonymousHtml).toContain("Root sidebar content.");
+    expect(anonymousHtml).not.toContain("Team private sidebar content.");
+
+    expect(authenticated.status).toBe(200);
+    expect(authenticatedHtml).toContain("Team private sidebar content.");
+    expect(authenticatedHtml).not.toContain("Root sidebar content.");
+  });
 });
 
 async function readUpstreamTemplateSource() {
@@ -93,7 +192,7 @@ async function readUpstreamTemplateSource() {
   return files.join("\n");
 }
 
-function createEnv() {
+function createEnv(overrides = {}) {
   db = new DatabaseSync(":memory:");
   db.exec(migrationSql);
 
@@ -101,7 +200,8 @@ function createEnv() {
     DB: new SqliteD1(db),
     RENDER_CACHE: new MemoryKv(),
     SITE_NAME: "Test Wiki",
-    DOKUWIKI_COOKIE_SALT: "template-shell-test-salt"
+    DOKUWIKI_COOKIE_SALT: "template-shell-test-salt",
+    ...overrides
   };
 }
 
@@ -200,6 +300,85 @@ async function seedTemplateShellData(d1) {
       now,
       now
     )
+    .run();
+}
+
+async function seedPage(d1, { id, title, content, createdAt = "2026-05-07T00:00:00.000Z" }) {
+  const namespace = id.includes(":") ? id.slice(0, id.lastIndexOf(":")) : "";
+  const revisionId = `${id}@${createdAt}`;
+
+  await d1
+    .prepare(
+      `insert into pages (
+         id, namespace, title, current_revision_id, is_deleted, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, namespace, title, revisionId, 0, createdAt, createdAt)
+    .run();
+  await d1
+    .prepare(
+      `insert into page_revisions (
+         id, page_id, content, content_hash, author_id, author_name, summary,
+         change_type, size_change, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      revisionId,
+      id,
+      content,
+      `hash:${id}`,
+      null,
+      null,
+      "Seed page",
+      "create",
+      content.length,
+      createdAt
+    )
+    .run();
+}
+
+async function seedAclRule(d1, { scope, principalType, principal, permission }) {
+  await d1
+    .prepare(
+      `insert into acl_rules (id, scope, principal_type, principal, permission, created_at)
+       values (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      `acl:${scope}:${principalType}:${principal}`,
+      scope,
+      principalType,
+      principal,
+      permission,
+      "2026-05-07T00:00:00.000Z"
+    )
+    .run();
+}
+
+async function seedUser(d1) {
+  await d1
+    .prepare(
+      `insert into users (
+         id, username, display_name, email, password_hash, is_disabled, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      "user:alice",
+      "alice",
+      "Alice",
+      "alice@example.com",
+      null,
+      0,
+      "2026-05-07T00:00:00.000Z",
+      "2026-05-07T00:00:00.000Z"
+    )
+    .run();
+  await d1
+    .prepare("insert into groups (id, name, created_at) values (?, ?, ?)")
+    .bind("group:user", "user", "2026-05-07T00:00:00.000Z")
+    .run();
+  await d1
+    .prepare("insert into user_groups (user_id, group_id, created_at) values (?, ?, ?)")
+    .bind("user:alice", "group:user", "2026-05-07T00:00:00.000Z")
     .run();
 }
 

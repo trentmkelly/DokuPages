@@ -836,13 +836,13 @@ async function dispatchRequest(
     if (url.searchParams.get("do") === "revisions") {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
-      return htmlResponse(await renderRevisionsPage(env, id, url));
+      return htmlResponse(await renderRevisionsPage(env, id, url, principal));
     }
 
     if (url.searchParams.get("do") === "diff") {
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
-      return htmlResponse(await renderDiffPage(env, id, url));
+      return htmlResponse(await renderDiffPage(env, id, url, principal));
     }
 
     if (url.searchParams.get("do") === "recent") {
@@ -1019,7 +1019,17 @@ async function dispatchRequest(
         return notFoundResponse(`Draft for '${id}' was not found.`);
       }
       const csrf = csrfContext(request);
-      return htmlResponseWithCsrf(request, renderDraftPage(id, page, draft, env, csrf.token), csrf);
+      const sidebarPageId = await findNearestSidebarPageId(
+        env,
+        id,
+        getRuntimeConfig(env),
+        principal
+      );
+      return htmlResponseWithCsrf(
+        request,
+        renderDraftPage(id, page, draft, env, csrf.token, sidebarPageId),
+        csrf
+      );
     }
 
     if (url.searchParams.get("do") === "source") {
@@ -1040,7 +1050,7 @@ async function dispatchRequest(
       const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
       if (denied) return denied;
       const oldRevisions = await listPageRevisions(env.DB, id, 1, 0);
-      return htmlResponse(renderMissingPage(env, id, oldRevisions.length > 0, principal), {
+      return htmlResponse(await renderMissingPage(env, id, oldRevisions.length > 0, principal), {
         status: getRuntimeConfig(env).send404 ? 404 : 200
       });
     }
@@ -4232,7 +4242,13 @@ async function renderPageHtml(
   const config = getRuntimeConfig(env);
   const sectionEdit = !isActionDisabled(env, "edit");
   const renderConfig = await runtimeSafeRenderConfig(env, config);
-  const sidebar = await renderSidebarForPage(env, id, config, renderConfig);
+  const sidebar = await renderSidebarForPage(
+    env,
+    id,
+    config,
+    renderConfig,
+    options.principal ?? anonymousPrincipal()
+  );
   const cacheableRenderControls = sectionEdit && usesDefaultRenderControls(renderConfig);
   const revisionNotice = revisionDate
     ? `<p><strong>This is an old revision of the document!</strong></p><hr>`
@@ -4602,11 +4618,12 @@ async function renderSidebarForPage(
   env: Env,
   pageId: string,
   config: RuntimeConfig,
-  renderConfig: RenderRuntimeConfig
+  renderConfig: RenderRuntimeConfig,
+  principal: AuthPrincipal
 ): Promise<{ pageId: string; html: string } | null> {
   if (!config.sidebarPage) return null;
 
-  const sidebar = await findNearestSidebarPage(env, pageId, config.sidebarPage, config);
+  const sidebar = await findNearestSidebarPage(env, pageId, config.sidebarPage, config, principal);
   if (!sidebar) return null;
 
   const entityReplacements = await entityReplacementsForRender(env);
@@ -4649,19 +4666,44 @@ async function renderSidebarForPage(
   return { pageId: sidebar.id, html: rendered.html };
 }
 
+async function findNearestSidebarPageId(
+  env: Env,
+  pageId: string,
+  config: RuntimeConfig,
+  principal: AuthPrincipal
+): Promise<string | undefined> {
+  if (!config.sidebarPage) return undefined;
+
+  const sidebar = await findNearestSidebarPage(env, pageId, config.sidebarPage, config, principal);
+  return sidebar?.id;
+}
+
 async function findNearestSidebarPage(
   env: Env,
   currentPageId: string,
   sidebarPageId: string,
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  principal: AuthPrincipal
 ): Promise<CurrentPage | null> {
+  let aclRules: Awaited<ReturnType<typeof listAclRules>> | null = null;
+
   for (const candidate of sidebarPageCandidates(
     currentPageId,
     sidebarPageId,
     config.pageIdCleanOptions
   )) {
     const page = await getCurrentPage(env.DB, candidate);
-    if (page) return page;
+    if (!page) continue;
+
+    aclRules ??= await listAclRules(env);
+    if (
+      hasAclPermission(
+        resolveConfiguredAclPermission(env, aclRules, candidate, principal),
+        ACL_READ
+      )
+    ) {
+      return page;
+    }
   }
 
   return null;
@@ -4672,15 +4714,17 @@ function sidebarPageCandidates(
   configuredSidebarId: string,
   pageIdCleanOptions: PageIdCleanOptions
 ): string[] {
-  const sidebarId = cleanPageId(configuredSidebarId, pageIdCleanOptions);
+  const sidebarId = configuredSidebarId.trim();
   if (!sidebarId) return [];
-  if (sidebarId.includes(":")) return [sidebarId];
 
   const namespaceParts = cleanPageId(currentPageId, pageIdCleanOptions).split(":").slice(0, -1);
   const candidates: string[] = [];
 
   for (let length = namespaceParts.length; length >= 0; length -= 1) {
-    candidates.push([...namespaceParts.slice(0, length), sidebarId].filter(Boolean).join(":"));
+    const namespace = namespaceParts.slice(0, length).join(":");
+    const rawCandidate = namespace ? `${namespace}:${sidebarId}` : `:${sidebarId}`;
+    const candidate = cleanPageId(rawCandidate, pageIdCleanOptions);
+    if (candidate) candidates.push(candidate);
   }
 
   return [...new Set(candidates)];
@@ -4985,12 +5029,21 @@ function staticAssetVersion(env: Env): string {
   return commitSha ? `${appVersion}-${commitSha.slice(0, 12)}` : appVersion;
 }
 
-function renderMissingPage(
+async function renderMissingPage(
   env: Env,
   id: string,
   onceExisted: boolean,
   principal?: AuthPrincipal
-): string {
+): Promise<string> {
+  const config = getRuntimeConfig(env);
+  const renderConfig = await runtimeSafeRenderConfig(env, config);
+  const sidebar = await renderSidebarForPage(
+    env,
+    id,
+    config,
+    renderConfig,
+    principal ?? anonymousPrincipal()
+  );
   const body = onceExisted
     ? `<h1 id="this-page-does-not-exist-anymore">This page does not exist anymore</h1>
     <p>You've followed a link to a page that no longer exists. You can check the list of <strong>Old revisions</strong> to see when and why it was deleted, access old revisions or restore it.</p>
@@ -5007,7 +5060,12 @@ function renderMissingPage(
       <a href="/search?q=${encodeURIComponent(id)}">Search for this page title</a>
     </p>`;
 
-  return htmlShell(env, id, `${renderBreadcrumbs(id)}${body}`, { pageId: id, principal });
+  return htmlShell(env, id, `${renderBreadcrumbs(id)}${body}`, {
+    pageId: id,
+    principal,
+    sidebarHtml: sidebar?.html,
+    sidebarPageId: sidebar?.pageId
+  });
 }
 
 function renderNoRevisionPage(
@@ -5172,10 +5230,16 @@ function renderToc(toc: TocItem[], minimumHeadings = 2): string {
   </nav>`;
 }
 
-async function renderRevisionsPage(env: Env, id: string, url: URL): Promise<string> {
+async function renderRevisionsPage(
+  env: Env,
+  id: string,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<string> {
   const pagination = paginationFromUrl(url, { defaultLimit: 50, maxLimit: 100 });
   const revisions = await listPageRevisions(env.DB, id, pagination.limit, pagination.offset);
   const config = getRuntimeConfig(env);
+  const sidebarPageId = await findNearestSidebarPageId(env, id, config, principal);
   const items = revisions
     .map((revision) => {
       const editor = revision.author
@@ -5202,16 +5266,22 @@ async function renderRevisionsPage(env: Env, id: string, url: URL): Promise<stri
       <ul>${items}</ul>
     </form>
     ${renderPaginationControls(url, pagination, revisions.length)}`,
-    { pageId: id, mode: "revisions" }
+    { pageId: id, mode: "revisions", sidebarPageId }
   );
 }
 
-async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
+async function renderDiffPage(
+  env: Env,
+  id: string,
+  url: URL,
+  principal: AuthPrincipal
+): Promise<string> {
   const pair = await resolvePageDiffPair(env, id, url);
   if (!pair) {
     return htmlShell(env, "Diff not found", "<p>Diff source not found.</p>");
   }
 
+  const sidebarPageId = await findNearestSidebarPageId(env, id, getRuntimeConfig(env), principal);
   const diffType = pageDiffType(url);
   const rows =
     diffType === "inline"
@@ -5243,7 +5313,7 @@ async function renderDiffPage(env: Env, id: string, url: URL): Promise<string> {
       </thead>
       <tbody>${rows}</tbody>
     </table>`,
-    { pageId: id, mode: "diff" }
+    { pageId: id, mode: "diff", sidebarPageId }
   );
 }
 
@@ -11297,14 +11367,16 @@ function htmlShell(env: Env, title: string, body: string, options: HtmlShellOpti
   const faviconPath = versionedAssetPath("/images/favicon.ico", env);
   const appleTouchIconPath = versionedAssetPath("/images/apple-touch-icon.png", env);
   const logoPath = versionedAssetPath("/dokuwiki-logo.png", env);
+  const showSidebar = Boolean(options.sidebarHtml && options.sidebarPageId);
+  const hasSidebar = Boolean(options.sidebarPageId);
   const sidebar =
-    options.sidebarHtml && options.sidebarPageId
+    showSidebar && options.sidebarPageId
       ? `<nav id="dokuwiki__aside" aria-label="Sidebar"><div class="pad aside include group">
           <h3 class="toggle">Sidebar</h3>
           <div class="content"><div class="group">${options.sidebarHtml}</div></div>
         </div></nav>`
       : "";
-  const siteClasses = `site dokuwiki mode_${shellModeClass(options.mode)} tpl_dokuwiki${sidebar ? " showSidebar hasSidebar" : ""}`;
+  const siteClasses = `site dokuwiki mode_${shellModeClass(options.mode)} tpl_dokuwiki${showSidebar ? " showSidebar" : ""}${hasSidebar ? " hasSidebar" : ""}`;
   const searchLabel = localizedAuthText(env, "btn_search");
   const recentLabel = localizedAuthText(env, "btn_recent");
   const mediaLabel = localizedAuthText(env, "btn_media");
@@ -11764,6 +11836,7 @@ async function handleEditPage(
   const lock =
     config.lockTime > 0 ? await ensurePageEditLock(request, env, principal, id, lockToken) : null;
   const csrf = csrfContext(request);
+  const sidebarPageId = await findNearestSidebarPageId(env, id, config, principal);
 
   if (lock && !lock.ok) {
     return lockedResponse(request, env, id, lock.lock);
@@ -11780,7 +11853,8 @@ async function handleEditPage(
       lockToken,
       csrf.token,
       section,
-      notice
+      notice,
+      sidebarPageId
     )
   );
   if (config.lockTime > 0) {
@@ -13423,7 +13497,8 @@ function renderEditPage(
   lockToken = "",
   csrfToken = "",
   section: SectionEditSlice | null = null,
-  notice = ""
+  notice = "",
+  sidebarPageId?: string
 ): string {
   const title = section?.title ?? page?.title ?? id;
   const content = section?.content ?? draft?.content ?? page?.content ?? templateContent ?? "";
@@ -13501,7 +13576,7 @@ function renderEditPage(
     </form>
     </div>
   `,
-    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author, mode: "edit" }
+    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author, mode: "edit", sidebarPageId }
   );
 }
 
@@ -13582,7 +13657,8 @@ function renderDraftPage(
   page: CurrentPage | null,
   draft: PageDraft,
   env: Env,
-  csrfToken: string
+  csrfToken: string,
+  sidebarPageId?: string
 ): string {
   const diffRows = renderLineDiff(page?.content ?? "", draft.content);
 
@@ -13615,7 +13691,13 @@ function renderDraftPage(
         <button type="submit" name="do[show]" value="1" tabindex="3" formaction="${pagePath(id)}?do=show">Cancel</button>
       </div>
     </form>`,
-    { pageId: id, updatedAt: page?.updatedAt, updatedBy: page?.author, mode: "draft" }
+    {
+      pageId: id,
+      updatedAt: page?.updatedAt,
+      updatedBy: page?.author,
+      mode: "draft",
+      sidebarPageId
+    }
   );
 }
 

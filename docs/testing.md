@@ -44,7 +44,9 @@ icon-only page tools.
 
 Template shell parity tests compare the Pages shell landmarks and `mode_$ACT`
 classes with upstream `lib/tpl/dokuwiki/main.php`, `tpl_header.php`, and
-`tpl_footer.php` across representative page modes.
+`tpl_footer.php` across representative page modes. They also cover default
+template sidebar propagation, `showSidebar`/`hasSidebar` class behavior, and
+ACL-filtered sidebar fallback for anonymous and authenticated principals.
 
 Responsive CSS tests cover the mobile navigation breakpoints, narrow-viewport
 header controls, long-word wrapping, diagnostic/media detail overflow behavior,

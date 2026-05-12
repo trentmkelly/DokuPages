@@ -24,7 +24,9 @@ Optional Pages environment variables:
 - `TAGLINE`: optional DokuWiki default-template tagline shown below the title.
   Default: blank.
 - `SIDEBAR`: DokuWiki-compatible sidebar page ID. Default: `sidebar`; set an
-  empty value to disable sidebar lookup.
+  empty value to disable sidebar lookup. The default template lookup searches
+  from the current page namespace up to the root namespace and only renders a
+  sidebar page readable by the current principal.
 - `LICENSE`: DokuWiki-compatible content license ID from the bundled default
   license map, such as `cc-by-nc-sa` or `cc-by`. Default: `cc-by-nc-sa`; use
   `none`, `0`, or `false` to hide content-license text.
