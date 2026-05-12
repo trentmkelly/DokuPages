@@ -436,7 +436,7 @@ describe("renderWikiText", () => {
     });
 
     expect(rendered.html).toContain(
-      '<a href="https://www.dokuwiki.org/newsletter" class="interwiki iw_doku">doku&gt;newsletter</a>'
+      '<a href="https://www.dokuwiki.org/newsletter" class="interwiki iw_doku">newsletter</a>'
     );
     expect(rendered.html).toContain(
       '<a href="https://www.dokuwiki.org/faq:sidebar" class="interwiki iw_doku">FAQ</a>'

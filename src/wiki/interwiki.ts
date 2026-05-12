@@ -92,7 +92,7 @@ function encodeInterwikiName(name: string): string {
 }
 
 function encodeInterwikiUrlPart(name: string): string {
-  return encodeURIComponent(name).replaceAll("%3A", ":");
+  return encodeURIComponent(name).replaceAll("%3A", ":").replaceAll("%23", "#");
 }
 
 function parseUrlParts(value: string): URL | null {

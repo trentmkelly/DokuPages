@@ -899,11 +899,14 @@ function renderInline(source: string, context: RenderContext): string {
       const entry = protectedHtml[Number(index)];
       return entry?.linkLabelHtml ?? entry?.html ?? "";
     });
-  let rendered = source.replace(/%%([\s\S]*?)%%/g, (_match, literal: string) => {
+  const protectNowiki = (_match: string, literal: string): string => {
     const token = `\uE000${nowiki.length}\uE001`;
     nowiki.push(escapeHtml(literal));
     return token;
-  });
+  };
+  let rendered = source
+    .replace(/<nowiki>([\s\S]*?)<\/nowiki>/gi, protectNowiki)
+    .replace(/%%([\s\S]*?)%%/g, protectNowiki);
 
   rendered = rendered.replace(/\(\(([\s\S]+?)\)\)/g, (_match, note: string) => {
     const token = `\uE002${footnotes.length}\uE003`;
@@ -1460,9 +1463,9 @@ function renderLinks(
   return source.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, rawTarget, rawLabel) => {
     const target = decodeHtmlEntities(rawTarget.trim());
     const explicitLabel = rawLabel?.trim();
-    const label = decodeHtmlEntities(explicitLabel || target);
 
     if (isEmailAddress(target)) {
+      const label = explicitLabel ? decodeHtmlEntities(explicitLabel) : undefined;
       return protectHtml(renderEmailLink(target, context, explicitLabel ? label : undefined));
     }
 
@@ -1488,6 +1491,13 @@ function renderLinks(
         : windowsShare
           ? windowsShare
           : (internalLink?.href ?? "#");
+    const label = decodeHtmlEntities(
+      explicitLabel ||
+        defaultLinkLabel(target, {
+          interwiki: Boolean(interwiki),
+          internal
+        })
+    );
     const classNames = linkClassNames({
       external,
       interwikiShortcut: interwiki ? interwikiShortcut(target) : null,
@@ -1511,6 +1521,26 @@ function renderLinks(
       `<a href="${escapeAttribute(href)}"${classAttribute}${titleAttribute}${targetAttributeText}${rel}>${renderLinkLabel(label)}</a>`
     );
   });
+}
+
+function defaultLinkLabel(
+  target: string,
+  options: { interwiki: boolean; internal: boolean }
+): string {
+  if (options.interwiki) {
+    const marker = target.indexOf(">");
+    const label = marker === -1 ? target : target.slice(marker + 1);
+    return label || target;
+  }
+
+  if (options.internal) {
+    const [rawPageId = "", rawFragment = ""] = target.split("#", 2);
+    const labelSource = rawPageId || rawFragment || target;
+    const parts = labelSource.split(":").filter(Boolean);
+    return parts.at(-1) ?? labelSource;
+  }
+
+  return target;
 }
 
 function linkTargetKind(

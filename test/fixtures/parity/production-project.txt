@@ -1,0 +1,20 @@
+====== Launch Status ======
+
+Project status pages usually mix tables, links, dates, and short summary lists.
+
+===== Milestones =====
+
+^ Date ^ Owner ^ Status ^
+| 2026-05-01 | [[users:alice|Alice]] | imported starter content |
+| 2026-05-08 | [[users:bob|Bob]] | verified media routes |
+| 2026-05-12 | [[ops:runbook|Operations]] | smoke tests green |
+
+===== Open Items =====
+
+  * Validate [[wiki:welcome|welcome page]] links.
+  * Compare [[doku>faq:sidebar|sidebar guidance]] with local namespace pages.
+  * Confirm missing targets like [[projects:launch:archive]] stay visibly marked.
+
+----
+
+Last reviewed by <release@example.test>.

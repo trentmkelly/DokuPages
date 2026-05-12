@@ -1,0 +1,24 @@
+====== Operations Runbook ======
+
+This page mirrors the kind of dense operator notes found in migrated production wikis.
+
+===== Contacts =====
+
+^ Role ^ Primary ^ Backup ^
+| Incident lead | <ops@example.test> | [[teams:platform]] |
+| Release owner | [[users:alice|Alice]] | [[users:bob|Bob]] |
+
+===== Checklist =====
+
+  - Review [[projects:launch:status|launch status]].
+  - Confirm the latest [[wiki:syntax|syntax reference]] renders.
+  - Attach {{wiki:dokuwiki-128.png?80|DokuWiki logo}} to the release note.
+
+===== Notes =====
+
+> Keep a rollback note next to each deployment.
+> Link to the exact revision after the change window closes.
+
+<code bash>
+npm run smoke -- --base-url https://example.test
+</code>
