@@ -96,6 +96,9 @@ describe("runtime config", () => {
       externalAuthMode: "off",
       externalAuthEmailHeader: "cf-access-authenticated-user-email",
       externalAuthUsernameHeader: null,
+      legacyRemoteEnabled: false,
+      legacyRemoteUser: "!!not set!!",
+      legacyRemoteCors: null,
       appVersion: "0.1.0"
     });
     expect(validateRuntimeConfig({} as Env)).toEqual({
@@ -172,7 +175,10 @@ describe("runtime config", () => {
       TARGET_WINDOWS: "_windows",
       EXTERNAL_AUTH_MODE: "cloudflare_access",
       EXTERNAL_AUTH_EMAIL_HEADER: "X-Auth-Email",
-      EXTERNAL_AUTH_USERNAME_HEADER: "X-Auth-User"
+      EXTERNAL_AUTH_USERNAME_HEADER: "X-Auth-User",
+      REMOTE: "1",
+      REMOTEUSER: "@admin,root",
+      REMOTECORS: "https://legacy.example"
     } as Env;
 
     expect(getRuntimeConfig(env).siteName).toBe("Configured Wiki");
@@ -246,6 +252,9 @@ describe("runtime config", () => {
     expect(getRuntimeConfig(env).externalAuthMode).toBe("cloudflare_access");
     expect(getRuntimeConfig(env).externalAuthEmailHeader).toBe("x-auth-email");
     expect(getRuntimeConfig(env).externalAuthUsernameHeader).toBe("x-auth-user");
+    expect(getRuntimeConfig(env).legacyRemoteEnabled).toBe(true);
+    expect(getRuntimeConfig(env).legacyRemoteUser).toBe("@admin,root");
+    expect(getRuntimeConfig(env).legacyRemoteCors).toBe("https://legacy.example");
     expect(validateRuntimeConfig(env)).toMatchObject({
       ok: true,
       issues: [
@@ -306,6 +315,21 @@ describe("runtime config", () => {
           key: "API_CORS_ORIGINS",
           value: "https://client.example",
           effectiveValue: "https://client.example"
+        }),
+        expect.objectContaining({
+          key: "REMOTE",
+          effectiveValue: "false",
+          dokuwikiKey: "remote"
+        }),
+        expect.objectContaining({
+          key: "REMOTEUSER",
+          effectiveValue: "!!not set!!",
+          dokuwikiKey: "remoteuser"
+        }),
+        expect.objectContaining({
+          key: "REMOTECORS",
+          effectiveValue: null,
+          dokuwikiKey: "remotecors"
         }),
         expect.objectContaining({
           key: "MAINTENANCE_MODE",

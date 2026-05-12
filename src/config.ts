@@ -27,6 +27,7 @@ const DEFAULT_SUPERUSER = "@admin";
 const DEFAULT_MANAGER = "@manager";
 const DEFAULT_CACHE_TIME = 60 * 60 * 24;
 const DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER = "cf-access-authenticated-user-email";
+const DEFAULT_REMOTEUSER = "!!not set!!";
 const DEFAULT_TRUSTED_PROXIES = [
   "::1",
   "fe80::/10",
@@ -110,6 +111,9 @@ export interface RuntimeConfig {
   externalAuthMode: "off" | "cloudflare_access";
   externalAuthEmailHeader: string;
   externalAuthUsernameHeader: string | null;
+  legacyRemoteEnabled: boolean;
+  legacyRemoteUser: string;
+  legacyRemoteCors: string | null;
   appVersion: string;
 }
 
@@ -236,6 +240,9 @@ export function getRuntimeConfig(env: Env): RuntimeConfig {
     externalAuthEmailHeader:
       normalizedHeaderName(env.EXTERNAL_AUTH_EMAIL_HEADER) ?? DEFAULT_EXTERNAL_AUTH_EMAIL_HEADER,
     externalAuthUsernameHeader: normalizedHeaderName(env.EXTERNAL_AUTH_USERNAME_HEADER),
+    legacyRemoteEnabled: truthy(env.REMOTE),
+    legacyRemoteUser: env.REMOTEUSER === undefined ? DEFAULT_REMOTEUSER : env.REMOTEUSER.trim(),
+    legacyRemoteCors: nonEmpty(env.REMOTECORS) ?? null,
     appVersion: nonEmpty(env.APP_VERSION) ?? APP_VERSION
   };
 }
@@ -409,6 +416,9 @@ export function getRuntimeConfigEntries(env: Env): RuntimeConfigEntry[] {
       config.externalAuthUsernameHeader,
       null
     ),
+    configEntry("REMOTE", env.REMOTE, String(config.legacyRemoteEnabled), "false"),
+    configEntry("REMOTEUSER", env.REMOTEUSER, config.legacyRemoteUser, DEFAULT_REMOTEUSER),
+    configEntry("REMOTECORS", env.REMOTECORS, config.legacyRemoteCors, null),
     configEntry("APP_VERSION", env.APP_VERSION, config.appVersion, APP_VERSION),
     configEntry(
       "API_CORS_ORIGINS",

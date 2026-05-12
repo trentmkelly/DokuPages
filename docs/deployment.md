@@ -86,6 +86,14 @@ Optional Pages environment variables:
   it, so CSS/JS cache entries are refreshed on each deployment.
 - `API_CORS_ORIGINS`: comma-separated exact origins allowed to call the native
   `/api/v1` JSON API cross-origin. Default: no cross-origin API access.
+- `REMOTE`: DokuWiki-compatible legacy remote toggle. It is parsed and exported
+  for parity, but it does not enable XML-RPC, JSON-RPC, or OpenAPI routes; those
+  stay permanent `501` responses.
+- `REMOTEUSER`: DokuWiki-compatible legacy remote member list. It is surfaced in
+  config export and legacy `501` responses for operator visibility.
+- `REMOTECORS`: DokuWiki-compatible CORS value for legacy remote routes. When
+  `API_CORS_ORIGINS` is unset, it also acts as the native `/api/v1` CORS
+  fallback.
 - `EMAIL_PROVIDER`: set to `resend` to enable outbound mail.
 - `EMAIL_PROVIDER_ENDPOINT`: optional Resend-compatible endpoint override.
 - `EMAIL_FROM`: fixed sender address for outbound mail. `MAILFROM` is the

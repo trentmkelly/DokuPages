@@ -19,10 +19,10 @@ describe("DokuWiki config coverage map", () => {
     expect(DOKUWIKI_CONFIG_COVERAGE).toHaveLength(115);
     expect(DOKUWIKI_CONFIG_COVERAGE.every((entry) => Boolean(entry.status))).toBe(true);
     expect(configCoverageCounts()).toEqual({
-      implemented: 71,
+      implemented: 74,
       imported_metadata_only: 6,
       intentionally_unsupported: 31,
-      not_yet_evaluated: 7
+      not_yet_evaluated: 4
     });
   });
 
@@ -33,6 +33,9 @@ describe("DokuWiki config coverage map", () => {
     expect(coverageStatusForDokuWikiConfigKey("updatecheck")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("trustedproxies")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("realip")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("remote")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("remoteuser")).toBe("implemented");
+    expect(coverageStatusForDokuWikiConfigKey("remotecors")).toBe("implemented");
     expect(coverageStatusForDokuWikiConfigKey("savedir")).toBe("intentionally_unsupported");
     expect(coverageStatusForDokuWikiConfigKey("securecookie")).toBe("not_yet_evaluated");
   });

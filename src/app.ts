@@ -359,15 +359,15 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/lib/exe/xmlrpc.php") {
-    return remoteApiNotImplementedResponse("XML-RPC");
+    return remoteApiNotImplementedResponse("XML-RPC", env);
   }
 
   if (url.pathname === "/lib/exe/jsonrpc.php") {
-    return remoteApiNotImplementedResponse("JSON-RPC");
+    return remoteApiNotImplementedResponse("JSON-RPC", env);
   }
 
   if (url.pathname === "/lib/exe/openapi.php") {
-    return remoteApiNotImplementedResponse("OpenAPI");
+    return remoteApiNotImplementedResponse("OpenAPI", env);
   }
 
   if (url.pathname === "/lib/exe/indexer.php" || url.pathname === "/lib/exe/taskrunner.php") {
@@ -1461,17 +1461,29 @@ function isRootRelativeUrl(value: string): boolean {
   return value.startsWith("/") && !value.startsWith("//");
 }
 
-function remoteApiNotImplementedResponse(apiName: string): Response {
-  return jsonResponse(
+function remoteApiNotImplementedResponse(apiName: string, env: Env): Response {
+  const config = getRuntimeConfig(env);
+  const response = jsonResponse(
     {
       api: apiName,
       error: `${apiName} compatibility is not supported by this Pages port yet.`,
+      legacyConfig: {
+        remote: config.legacyRemoteEnabled,
+        remoteuser: config.legacyRemoteUser,
+        remotecors: config.legacyRemoteCors
+      },
       permanent: true,
       replacement: "/api/v1",
       status: "not_implemented"
     },
     { status: 501 }
   );
+
+  if (config.legacyRemoteEnabled && config.legacyRemoteCors) {
+    response.headers.set("access-control-allow-origin", config.legacyRemoteCors);
+  }
+
+  return response;
 }
 
 function legacyActionNotAvailableResponse(env: Env, actionName: string, pageId: string): Response {
@@ -2408,18 +2420,28 @@ function nativeApiMethodNotAllowed(allow: string): Response {
 
 function nativeApiPreflightResponse(request: Request, env: Env): Response {
   const origin = request.headers.get("origin");
+  const allowedOrigin = origin ? allowedNativeApiCorsOrigin(env, origin) : null;
 
-  if (origin && !allowedNativeApiCorsOrigin(env, origin)) {
+  if (origin && !allowedOrigin) {
     return jsonResponse({ error: "CORS origin is not allowed." }, { status: 403 });
+  }
+
+  const headers = securityHeaders({
+    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-headers": "authorization, content-type",
+    "access-control-max-age": "86400"
+  });
+
+  if (allowedOrigin) {
+    headers.set("access-control-allow-origin", allowedOrigin);
+    if (allowedOrigin !== "*") {
+      headers.set("access-control-allow-credentials", "true");
+    }
   }
 
   return new Response(null, {
     status: 204,
-    headers: securityHeaders({
-      "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-      "access-control-allow-headers": "authorization, content-type",
-      "access-control-max-age": "86400"
-    })
+    headers
   });
 }
 
@@ -2441,7 +2463,7 @@ function withNativeApiCors(request: Request, env: Env, response: Response): Resp
 }
 
 function allowedNativeApiCorsOrigin(env: Env, origin: string): string | null {
-  const origins = (env.API_CORS_ORIGINS ?? "")
+  const origins = (env.API_CORS_ORIGINS ?? getRuntimeConfig(env).legacyRemoteCors ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);

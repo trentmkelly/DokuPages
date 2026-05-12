@@ -53,6 +53,11 @@ Cross-origin API access is denied unless the request origin is listed in
 `API_CORS_ORIGINS`. Use a comma-separated list of exact origins, or `*` only for
 public bearer-token-only integrations.
 
+For DokuWiki config parity, `REMOTECORS` is accepted as a fallback when
+`API_CORS_ORIGINS` is unset. `REMOTE` and `REMOTEUSER` are parsed, exported, and
+reported by the permanent legacy `501` responses, but they do not enable the
+old XML-RPC, JSON-RPC, or OpenAPI stacks.
+
 Preflight responses support `GET`, `POST`, `DELETE`, and `OPTIONS` with
 `authorization` and `content-type` request headers.
 

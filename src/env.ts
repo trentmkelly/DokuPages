@@ -73,6 +73,9 @@ export interface Env {
   EXTERNAL_AUTH_MODE?: string;
   EXTERNAL_AUTH_EMAIL_HEADER?: string;
   EXTERNAL_AUTH_USERNAME_HEADER?: string;
+  REMOTE?: string;
+  REMOTEUSER?: string;
+  REMOTECORS?: string;
   APP_VERSION?: string;
   API_BEARER_TOKEN?: string;
   API_CORS_ORIGINS?: string;

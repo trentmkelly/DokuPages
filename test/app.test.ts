@@ -157,6 +157,9 @@ describe("handleRequest", () => {
     env.CANONICAL_URLS = undefined;
     env.API_BEARER_TOKEN = "test-token";
     env.API_CORS_ORIGINS = "https://client.example";
+    env.REMOTE = undefined;
+    env.REMOTEUSER = undefined;
+    env.REMOTECORS = undefined;
     env.DOKUWIKI_COOKIE_SALT = TEST_DOKUWIKI_COOKIE_SALT;
     env.MAINTENANCE_MODE = undefined;
     env.USEACL = undefined;
@@ -1049,11 +1052,33 @@ describe("handleRequest", () => {
       expect(response.headers.get("content-type")).toContain("application/json");
       await expect(response.json()).resolves.toMatchObject({
         api,
+        legacyConfig: {
+          remote: false,
+          remoteuser: "!!not set!!",
+          remotecors: null
+        },
         permanent: true,
         replacement: "/api/v1",
         status: "not_implemented"
       });
     }
+
+    env.REMOTE = "1";
+    env.REMOTEUSER = "@admin";
+    env.REMOTECORS = "https://legacy.example";
+    const configured = await handleRequest(
+      new Request("https://example.com/lib/exe/jsonrpc.php"),
+      env
+    );
+
+    expect(configured.headers.get("access-control-allow-origin")).toBe("https://legacy.example");
+    await expect(configured.json()).resolves.toMatchObject({
+      legacyConfig: {
+        remote: true,
+        remoteuser: "@admin",
+        remotecors: "https://legacy.example"
+      }
+    });
   });
 
   it("handles unsupported legacy executable endpoints explicitly", async () => {
@@ -1339,6 +1364,35 @@ describe("handleRequest", () => {
         username: "api-token"
       }
     });
+  });
+
+  it("uses REMOTECORS as a DokuWiki-compatible native API CORS fallback", async () => {
+    env.API_CORS_ORIGINS = undefined;
+    env.REMOTECORS = "https://legacy.example";
+    const preflight = await handleRequest(
+      new Request("https://example.com/api/v1/pages", {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://legacy.example",
+          "access-control-request-method": "GET"
+        }
+      }),
+      env
+    );
+    const index = await handleRequest(
+      new Request("https://example.com/api/v1", {
+        headers: {
+          authorization: "Bearer test-token",
+          origin: "https://legacy.example"
+        }
+      }),
+      env
+    );
+
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("https://legacy.example");
+    expect(preflight.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(index.headers.get("access-control-allow-origin")).toBe("https://legacy.example");
   });
 
   it("supports native API page and media writes through bearer auth", async () => {
