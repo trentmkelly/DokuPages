@@ -412,7 +412,37 @@ on conflict(id) do update set
     );
   }
 
-  for (const entry of [...plan.pageMetadata, ...plan.mediaMetadata]) {
+  for (const entry of plan.pageMetadata) {
+    statements.push(
+      metadataStatement(
+        entry.subjectType,
+        entry.subjectId,
+        "dokuwiki",
+        entry.value,
+        entry.modifiedAt
+      )
+    );
+
+    for (const importedMetadata of importedPageMetadataStatements(entry)) {
+      statements.push(
+        metadataStatement(
+          entry.subjectType,
+          entry.subjectId,
+          importedMetadata.key,
+          importedMetadata.value,
+          entry.modifiedAt
+        )
+      );
+    }
+  }
+
+  for (const backlink of importedBacklinkMetadataStatements(plan.pageMetadata)) {
+    statements.push(
+      metadataStatement("page", backlink.subjectId, "backlinks", backlink.value, plan.generatedAt)
+    );
+  }
+
+  for (const entry of plan.mediaMetadata) {
     statements.push(
       metadataStatement(
         entry.subjectType,
@@ -592,6 +622,76 @@ function metadataStatement(subjectType, subjectId, key, value, updatedAt) {
 values (${sql(subjectType)}, ${sql(subjectId)}, ${sql(key)}, ${sql(JSON.stringify(value))}, ${sql(
     updatedAt
   )});`;
+}
+
+function importedPageMetadataStatements(entry) {
+  const current = metadataObject(entry.value?.current);
+  const persistent = metadataObject(entry.value?.persistent);
+  const statements = [];
+
+  const title = metadataString(current.title);
+  if (title) statements.push({ key: "title", value: title });
+
+  const description = metadataObject(current.description);
+  if (Object.keys(description).length > 0) {
+    statements.push({ key: "description", value: description });
+  }
+
+  const relation = metadataObject(current.relation);
+  if (Object.keys(relation).length > 0) {
+    statements.push({ key: "relation", value: relation });
+  }
+
+  const date = {
+    ...metadataObject(persistent.date),
+    ...metadataObject(current.date)
+  };
+  if (Object.keys(date).length > 0) {
+    statements.push({ key: "date", value: date });
+  }
+
+  const contributor = {
+    ...metadataObject(current.contributor),
+    ...metadataObject(persistent.contributor)
+  };
+  if (Object.keys(contributor).length > 0) {
+    statements.push({ key: "contributor", value: contributor });
+  }
+
+  return statements;
+}
+
+function importedBacklinkMetadataStatements(pageMetadata) {
+  const backlinks = new Map();
+
+  for (const entry of pageMetadata) {
+    const relation = metadataObject(metadataObject(entry.value?.current).relation);
+    const references = metadataObject(relation.references);
+
+    for (const target of Object.keys(references)) {
+      const targetId = target.trim();
+      if (!targetId) continue;
+
+      const referrers = backlinks.get(targetId) ?? new Set();
+      referrers.add(entry.subjectId);
+      backlinks.set(targetId, referrers);
+    }
+  }
+
+  return [...backlinks.entries()]
+    .map(([subjectId, referrers]) => ({
+      subjectId,
+      value: [...referrers].sort((a, b) => a.localeCompare(b))
+    }))
+    .sort((a, b) => a.subjectId.localeCompare(b.subjectId));
+}
+
+function metadataObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function metadataString(value) {
+  return typeof value === "string" ? value : "";
 }
 
 function changelogEntriesByRevision(entries) {

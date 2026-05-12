@@ -49,6 +49,13 @@ subscriptions; namespace `.mlist` files become namespace subscriptions.
 DokuWiki `every` delivery maps to immediate delivery, while digest/list styles
 map to daily digest delivery.
 
+DokuWiki page `.meta` files are also expanded from their raw `current` and
+`persistent` payloads into the runtime metadata keys used by the Pages port:
+title, description, relation references, date values, and contributors. The
+importer derives `backlinks` metadata from imported relation references so
+backlink, wanted-page, and orphan-page reports can use upstream parser metadata
+immediately after migration.
+
 Imported DokuWiki config metadata preserves whether a value came from
 `conf/dokuwiki.php`, `conf/local.php`, or `conf/local.protected.php`. The
 runtime only applies local/protected values for settings that are safe to use

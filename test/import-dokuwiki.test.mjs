@@ -12,6 +12,35 @@ import {
 } from "../scripts/import-dokuwiki.mjs";
 
 const gzipAsync = promisify(gzip);
+const WELCOME_PAGE_META = [
+  "a:2:{",
+  's:7:"current";a:4:{',
+  's:5:"title";s:7:"Welcome";',
+  's:11:"description";a:2:{',
+  's:8:"abstract";s:16:"Welcome abstract";',
+  's:15:"tableofcontents";a:1:{',
+  "i:0;a:4:{",
+  's:3:"hid";s:7:"welcome";',
+  's:5:"title";s:7:"Welcome";',
+  's:4:"type";s:2:"ul";',
+  's:5:"level";i:1;',
+  "}",
+  "}",
+  "}",
+  's:8:"relation";a:1:{',
+  's:10:"references";a:2:{',
+  's:10:"wiki:guide";b:1;',
+  's:12:"wiki:missing";b:0;',
+  "}",
+  "}",
+  's:4:"date";a:1:{s:8:"modified";i:1767225601;}',
+  "}",
+  's:10:"persistent";a:2:{',
+  's:4:"date";a:1:{s:7:"created";i:1767225600;}',
+  's:11:"contributor";a:1:{s:10:"user:alice";s:13:"Alice Example";}',
+  "}",
+  "}"
+].join("");
 
 describe("DokuWiki import planner", () => {
   it("discovers pages, media, ACLs, and users from a flat-file DokuWiki tree", async () => {
@@ -50,10 +79,7 @@ describe("DokuWiki import planner", () => {
       path.join(root, "data/meta/_media.changes"),
       "1767225601\t203.0.113.8\tE\twiki:logo.svg\tbob\tUpdated logo\t\t3\n"
     );
-    await writeFile(
-      path.join(root, "data/meta/wiki/welcome.meta"),
-      'a:2:{s:7:"current";a:2:{s:5:"title";s:7:"Welcome";s:8:"relation";a:1:{s:10:"references";a:1:{s:10:"wiki:guide";b:1;}}}s:10:"persistent";a:1:{s:4:"date";a:1:{s:7:"created";i:1767225600;}}}'
-    );
+    await writeFile(path.join(root, "data/meta/wiki/welcome.meta"), WELCOME_PAGE_META);
     await writeFile(
       path.join(root, "data/media_meta/wiki/logo.svg.meta"),
       'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
@@ -183,9 +209,17 @@ describe("DokuWiki import planner", () => {
       value: {
         current: {
           title: "Welcome",
-          relation: { references: { "wiki:guide": true } }
+          description: {
+            abstract: "Welcome abstract",
+            tableofcontents: [{ hid: "welcome", title: "Welcome", type: "ul", level: 1 }]
+          },
+          relation: { references: { "wiki:guide": true, "wiki:missing": false } },
+          date: { modified: 1767225601 }
         },
-        persistent: { date: { created: 1767225600 } }
+        persistent: {
+          date: { created: 1767225600 },
+          contributor: { "user:alice": "Alice Example" }
+        }
       }
     });
     expect(plan.media[0]).toMatchObject({
@@ -571,10 +605,7 @@ describe("DokuWiki import planner", () => {
         "1767225605\t203.0.113.11\tD\twiki:gone.png\tbob\tDeleted old image\t\t-9"
       ].join("\n")
     );
-    await writeFile(
-      path.join(root, "data/meta/wiki/welcome.meta"),
-      'a:1:{s:7:"current";a:1:{s:5:"title";s:7:"Welcome";}}'
-    );
+    await writeFile(path.join(root, "data/meta/wiki/welcome.meta"), WELCOME_PAGE_META);
     await writeFile(
       path.join(root, "data/media_meta/wiki/logo.svg.meta"),
       'a:1:{s:4:"Exif";a:1:{s:5:"Title";s:4:"Logo";}}'
@@ -655,6 +686,14 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'wordblock'");
     expect(sql).toContain("'wordblock:1'");
     expect(sql).toContain("insert or replace into changelog");
+    expect(sql).toContain('\'description\', \'{"abstract":"Welcome abstract"');
+    expect(sql).toContain(
+      '\'relation\', \'{"references":{"wiki:guide":true,"wiki:missing":false}}\''
+    );
+    expect(sql).toContain("'date', '{\"created\":1767225600,\"modified\":1767225601}'");
+    expect(sql).toContain("'contributor', '{\"user:alice\":\"Alice Example\"}'");
+    expect(sql).toContain("values ('page', 'wiki:guide', 'backlinks', '[\"wiki:welcome\"]'");
+    expect(sql).toContain("values ('page', 'wiki:missing', 'backlinks', '[\"wiki:welcome\"]'");
     expect(sql).toContain("'delete'");
     expect(sql).toContain("'Deleted page'");
     expect(sql).toContain("insert into acl_rules");
