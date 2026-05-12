@@ -223,7 +223,7 @@ are not fixed by this checklist.
 - [x] Implement OpenAPI generation from `inc/Remote/OpenApiDoc`, or keep a documented permanent `501`.
 - [x] Match upstream `remote`, `remoteuser`, and `remotecors` config semantics for legacy remote APIs.
 - [x] Compare native `/api/v1` responses with upstream remote API response objects for pages, media, revisions, search, links, and users.
-- [ ] Match all `lib/exe/ajax.php` calls from `inc/Ajax.php`, not only qsearch, suggestions, linkwiz, and index.
+- [x] Match all `lib/exe/ajax.php` calls from `inc/Ajax.php`, not only qsearch, suggestions, linkwiz, and index.
 - [ ] Match AJAX error formats, content types, auth failures, and CSRF handling.
 
 ## Data Import And Persistence

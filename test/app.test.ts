@@ -1021,6 +1021,52 @@ describe("handleRequest", () => {
       new Request("https://example.com/lib/exe/ajax.php?call=index&idx=wiki"),
       env
     );
+    const lockForm = new FormData();
+    lockForm.set("call", "lock");
+    lockForm.set("id", "wiki:welcome");
+    lockForm.set("baseRevisionId", "wiki:welcome@2026-05-07T00:00:00.000Z");
+    lockForm.set("wikitext", "====== AJAX Draft ======\n\nSaved through lock.");
+    const lock = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: lockForm
+      }),
+      env
+    );
+    const mediaNamespaces = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=medians&ns=wiki"),
+      env
+    );
+    const mediaList = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=medialist&ns=wiki"),
+      env
+    );
+    const mediaDetails = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=mediadetails&image=wiki:logo.svg"),
+      env
+    );
+    const mediaDiff = await handleRequest(
+      new Request(
+        "https://example.com/lib/exe/ajax.php?call=mediadiff&image=wiki:logo.svg&rev=media-rev-1"
+      ),
+      env
+    );
+    const uploadForm = new FormData();
+    uploadForm.set("call", "mediaupload");
+    uploadForm.set("ns", "wiki");
+    uploadForm.set("mediaid", "ajax.png");
+    uploadForm.set("summary", "AJAX upload");
+    uploadForm.set(
+      "qqfile",
+      new File([uint8ArrayToArrayBuffer(TEST_PIXEL_PNG)], "ajax.png", { type: "image/png" })
+    );
+    const mediaUpload = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: uploadForm
+      }),
+      env
+    );
     const unknown = await handleRequest(
       new Request("https://example.com/lib/exe/ajax.php?call=missing"),
       env
@@ -1037,6 +1083,42 @@ describe("handleRequest", () => {
     expect(linkwizNamespaceHtml).toContain("jump to parent namespace");
     expect(linkwizNamespaceHtml).toContain('class="even type_f"');
     await expect(index.text()).resolves.toContain('<ul class="idx">');
+    expect(lock.headers.get("content-type")).toContain("application/json");
+    await expect(lock.json()).resolves.toMatchObject({
+      errors: [],
+      lock: "1",
+      draft: expect.stringContaining("Draft autosaved on")
+    });
+    expect(state.drafts).toHaveLength(1);
+    const draftDeleteForm = new FormData();
+    draftDeleteForm.set("call", "draftdel");
+    draftDeleteForm.set("id", "wiki:welcome");
+    draftDeleteForm.set("sectok", TEST_CSRF_TOKEN);
+    const draftDelete = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: draftDeleteForm,
+        headers: csrfHeaders()
+      }),
+      env
+    );
+    expect(draftDelete.status).toBe(200);
+    expect(state.drafts).toHaveLength(0);
+    await expect(mediaNamespaces.text()).resolves.toContain("media-tree");
+    const mediaListHtml = await mediaList.text();
+    expect(mediaListHtml).toContain("mediamanager__page");
+    expect(mediaListHtml).toContain("logo.svg");
+    const mediaDetailsHtml = await mediaDetails.text();
+    expect(mediaDetailsHtml).toContain('id="dokuwiki__detail"');
+    expect(mediaDetailsHtml).toContain("logo.svg");
+    await expect(mediaDiff.text()).resolves.toContain('id="mediamanager__diff"');
+    expect(mediaUpload.headers.get("content-type")).toContain("application/json");
+    await expect(mediaUpload.json()).resolves.toMatchObject({
+      success: true,
+      id: "wiki:ajax.png",
+      ns: "wiki"
+    });
+    expect(state.media.some((media) => media.id === "wiki:ajax.png")).toBe(true);
     expect(unknown.status).toBe(400);
   });
 
@@ -1266,6 +1348,13 @@ describe("handleRequest", () => {
       ["/lib/exe/ajax.php?call=suggestions&q=welcome", 200, "application/x-suggestions+json"],
       ["/lib/exe/ajax.php?call=linkwiz&q=welcome", 200, "text/html"],
       ["/lib/exe/ajax.php?call=index&idx=wiki", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=lock&id=wiki:welcome", 200, "application/json"],
+      ["/lib/exe/ajax.php?call=draftdel&id=wiki:welcome", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=medians&ns=wiki", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=medialist&ns=wiki", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=mediadetails&image=wiki:logo.svg", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=mediadiff&image=wiki:logo.svg&rev=media-rev-1", 200, "text/html"],
+      ["/lib/exe/ajax.php?call=mediaupload&ns=wiki", 400, "application/json"],
       ["/lib/exe/indexer.php", 200, "image/gif"],
       ["/lib/exe/xmlrpc.php", 501, "application/json"],
       ["/lib/exe/jsonrpc.php", 501, "application/json"],

@@ -56,6 +56,13 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 | `/lib/exe/ajax.php?call=suggestions`                | Serves DokuWiki-compatible suggestion JSON.                                                             |
 | `/lib/exe/ajax.php?call=linkwiz`                    | Serves native link wizard markup.                                                                       |
 | `/lib/exe/ajax.php?call=index`                      | Serves namespace index markup.                                                                          |
+| `/lib/exe/ajax.php?call=lock`                       | Refreshes the native edit lock and saves a DokuWiki-style draft payload.                                |
+| `/lib/exe/ajax.php?call=draftdel`                   | Deletes the native draft for the requested page.                                                        |
+| `/lib/exe/ajax.php?call=medians`                    | Serves the media-manager namespace tree fragment.                                                       |
+| `/lib/exe/ajax.php?call=medialist`                  | Serves the media-manager file list fragment.                                                            |
+| `/lib/exe/ajax.php?call=mediadetails`               | Serves the media detail fragment for the right column.                                                  |
+| `/lib/exe/ajax.php?call=mediadiff`                  | Serves the media diff fragment.                                                                         |
+| `/lib/exe/ajax.php?call=mediaupload`                | Handles DokuWiki-compatible AJAX media uploads and JSON upload responses.                               |
 | `/lib/exe/opensearch.php`, `/opensearch.xml`        | Serves OpenSearch XML.                                                                                  |
 | `/lib/exe/manifest.php`, `/manifest.webmanifest`    | Serves web manifest JSON.                                                                               |
 | `/lib/exe/css.php`                                  | Redirects to `/dokuwiki.css`.                                                                           |

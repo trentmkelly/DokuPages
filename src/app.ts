@@ -2853,7 +2853,7 @@ async function handleAjax(
   url: URL,
   principal: AuthPrincipal
 ): Promise<Response> {
-  const params = await readAjaxParams(request, url);
+  const params = await readAjaxParams(request.clone() as Request, url);
   const call = params.get("call")?.toLowerCase() ?? "";
   const startedAt = Date.now();
 
@@ -2942,6 +2942,34 @@ async function handleAjax(
     return ajaxHtmlResponse(renderLinkWizardEntries(entries));
   }
 
+  if (call === "lock") {
+    return handleAjaxLock(request, env, params, principal);
+  }
+
+  if (call === "draftdel") {
+    return handleAjaxDraftDelete(env, params);
+  }
+
+  if (call === "medians") {
+    return handleAjaxMediaNamespaces(env, params, principal);
+  }
+
+  if (call === "medialist") {
+    return handleAjaxMediaList(env, url, params, principal);
+  }
+
+  if (call === "mediadetails") {
+    return handleAjaxMediaDetails(request, env, params, principal);
+  }
+
+  if (call === "mediadiff") {
+    return handleAjaxMediaDiff(request, env, url, params, principal);
+  }
+
+  if (call === "mediaupload") {
+    return handleAjaxMediaUpload(request, env, params, principal, startedAt);
+  }
+
   if (call === "index") {
     const namespace = cleanPageId(params.get("idx") ?? params.get("ns") ?? "");
     const rules = await listAclRules(env);
@@ -2968,13 +2996,359 @@ async function readAjaxParams(request: Request, url: URL): Promise<URLSearchPara
   const params = new URLSearchParams(url.search);
 
   if (request.method === "POST") {
-    const form = await request.formData();
-    for (const [key, value] of form.entries()) {
-      if (typeof value === "string") params.set(key, value);
+    try {
+      const form = await request.formData();
+      for (const [key, value] of form.entries()) {
+        if (typeof value === "string") params.set(key, value);
+      }
+    } catch {
+      // XHR media uploads post raw file bytes while carrying ajax params in the query string.
     }
   }
 
   return params;
+}
+
+async function handleAjaxLock(
+  request: Request,
+  env: Env,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanPageId(params.get("id") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
+  if (!id) return ajaxJsonResponse({ errors: [], lock: "0", draft: "" });
+
+  const response: { errors: string[]; lock: "0" | "1"; draft: string } = {
+    errors: [],
+    lock: "0",
+    draft: ""
+  };
+  const page = await getCurrentPage(env.DB, id);
+  const rules = await listAclRules(env);
+  const permission = resolveConfiguredAclPermission(env, rules, id, principal);
+  const requiredPermission = page ? ACL_EDIT : ACL_CREATE;
+
+  if (!hasAclPermission(permission, requiredPermission)) {
+    response.errors.push("Permission to write this page has been denied.");
+    return ajaxJsonResponse(response);
+  }
+
+  const config = getRuntimeConfig(env);
+  const lockToken =
+    params.get("lockToken") ||
+    readCookie(request, pageLockCookieName(id)) ||
+    (config.lockTime > 0 ? randomPageLockToken() : "");
+
+  if (lockToken) {
+    const lock = await ensurePageEditLock(request, env, principal, id, lockToken);
+    if (lock.ok) {
+      response.lock = "1";
+    } else {
+      response.errors.push("This page is currently locked for editing by another user.");
+    }
+  } else {
+    response.lock = "1";
+  }
+
+  const hasDraftPayload = ["content", "wikitext", "TEXT", "prefix", "suffix"].some((key) =>
+    params.has(key)
+  );
+  if (config.useDraft && hasDraftPayload) {
+    let content = normalizeWikiTextInput(
+      String(params.get("content") ?? params.get("wikitext") ?? params.get("TEXT") ?? "")
+    );
+    const prefix = String(params.get("prefix") ?? "");
+    const suffix = String(params.get("suffix") ?? "");
+    if (prefix || suffix) {
+      content = joinWikiSlices(prefix, content, suffix);
+    }
+
+    const author = principalAuthor(principal);
+    const draft = await savePageDraft(
+      env.DB,
+      id,
+      content,
+      params.get("baseRevisionId") ?? params.get("date") ?? page?.revisionId ?? null,
+      author.authorId
+    );
+    response.draft = draftMessage(draft, env);
+  }
+
+  const ajaxResponse = ajaxJsonResponse(response);
+  if (lockToken && config.lockTime > 0 && response.lock === "1") {
+    ajaxResponse.headers.append(
+      "set-cookie",
+      pageLockCookieHeader(pageLockCookieName(id), lockToken, request, config.lockTime)
+    );
+  }
+  return ajaxResponse;
+}
+
+async function handleAjaxDraftDelete(env: Env, params: URLSearchParams): Promise<Response> {
+  const id = cleanPageId(params.get("id") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
+  if (id) {
+    await deletePageDraft(env.DB, id);
+  }
+  return ajaxHtmlResponse("");
+}
+
+async function handleAjaxMediaNamespaces(
+  env: Env,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const namespace = cleanMediaId(params.get("ns") ?? "");
+  const rules = await listAclRules(env);
+  const namespaces = (await listMediaNamespaces(env.DB)).filter((item) =>
+    canListNamespace(env, rules, principal, item)
+  );
+  return ajaxHtmlResponse(renderMediaNamespaceTree(namespaces, namespace));
+}
+
+async function handleAjaxMediaList(
+  env: Env,
+  url: URL,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const namespace = cleanMediaId(params.get("ns") ?? "");
+  const rules = await listAclRules(env);
+  const subject = namespace ? `${namespace}:*` : "*";
+  const permission = resolveConfiguredAclPermission(env, rules, subject, principal);
+  if (!hasAclPermission(permission, ACL_READ)) {
+    return ajaxHtmlResponse('<p class="media-manager__empty">No media found.</p>');
+  }
+
+  const query = (params.get("q") ?? params.get("query") ?? "").trim();
+  const sortMode = ajaxBooleanParam(params.get("recent")) ? "date" : "name";
+  const sortOrder = sortMode === "date" ? "desc" : "asc";
+  const media = query
+    ? await searchMedia(env.DB, namespace, query, 200, 0, { sort: sortMode, order: sortOrder })
+    : await listNamespaceMedia(env.DB, namespace, 200, 0, { sort: sortMode, order: sortOrder });
+  const viewUrl = new URL(url.href);
+  viewUrl.searchParams.set("view", params.get("view") === "rows" ? "rows" : "thumbs");
+  viewUrl.searchParams.set("sort", sortMode);
+  viewUrl.searchParams.set("order", sortOrder);
+  const viewMode = mediaManagerViewMode(viewUrl);
+  const namespaceTitle = namespace || "root";
+  const items =
+    media.length === 0
+      ? '<p class="media-manager__empty">No media found.</p>'
+      : renderMediaManagerItems(env, media, viewMode);
+
+  return ajaxHtmlResponse(`<div id="media__content">
+    <div id="mediamanager__page">
+      <section id="media__files" class="media-manager__files filelist">
+        <div class="media-manager__toolbar panelHeader">
+          <div class="media-manager__crumb">Files in <strong>${escapeHtml(namespaceTitle)}</strong></div>
+          <div class="media-manager__view" aria-label="Media view">
+            ${renderMediaManagerToolbarLink(viewUrl, "Thumbnails", { view: "thumbs" }, viewMode === "thumbs")}
+            ${renderMediaManagerToolbarLink(viewUrl, "Rows", { view: "rows" }, viewMode === "rows")}
+            ${renderMediaManagerToolbarLink(viewUrl, "Name", { sort: "name", order: "asc" }, sortMode === "name")}
+            ${renderMediaManagerToolbarLink(viewUrl, "Date", { sort: "date", order: "desc" }, sortMode === "date")}
+          </div>
+        </div>
+        <div class="panelContent">${items}</div>
+      </section>
+    </div>
+  </div>`);
+}
+
+async function handleAjaxMediaDetails(
+  request: Request,
+  env: Env,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanMediaId(params.get("image") ?? params.get("id") ?? params.get("media") ?? "");
+  if (!id) return ajaxHtmlResponse("");
+
+  const media = await getCurrentMedia(env.DB, id);
+  if (!media) return ajaxHtmlResponse("<p>Media not found.</p>");
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  const csrf = csrfContext(request);
+  return ajaxHtmlResponse(await renderMediaDetailContent(env, principal, csrf.token, id, media));
+}
+
+async function handleAjaxMediaDiff(
+  request: Request,
+  env: Env,
+  url: URL,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): Promise<Response> {
+  const id = cleanMediaId(params.get("image") ?? params.get("id") ?? params.get("media") ?? "");
+  if (!id) return ajaxHtmlResponse("");
+
+  const media = await getCurrentMedia(env.DB, id);
+  if (!media) return ajaxHtmlResponse("<p>Media diff source not found.</p>");
+
+  const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
+  if (denied) return denied;
+
+  if (!getRuntimeConfig(env).mediaRevisions) {
+    return ajaxHtmlResponse("<p>Media revisions are disabled.</p>");
+  }
+
+  const diffUrl = new URL(mediaDetailPath(id), url);
+  diffUrl.searchParams.set("mediado", "diff");
+  for (const [key, value] of params.entries()) {
+    diffUrl.searchParams.set(key, value);
+  }
+  const content = await renderMediaDiffContent(env, id, media, diffUrl);
+  return ajaxHtmlResponse(content ?? "<p>Media diff source not found.</p>");
+}
+
+async function handleAjaxMediaUpload(
+  request: Request,
+  env: Env,
+  params: URLSearchParams,
+  principal: AuthPrincipal,
+  startedAt: number
+): Promise<Response> {
+  const namespace = cleanMediaId(params.get("ns") ?? "");
+  if (!env.MEDIA_BUCKET) {
+    return ajaxJsonResponse({ error: "Media bucket is not configured.", ns: namespace }, 503);
+  }
+
+  const upload = await readAjaxMediaUpload(request, params);
+  if (!upload) {
+    return ajaxJsonResponse({ error: "Missing upload file.", ns: namespace }, 400);
+  }
+
+  const requestedId = cleanMediaId(upload.mediaId);
+  const id =
+    namespace && requestedId && !requestedId.startsWith(`${namespace}:`)
+      ? cleanMediaId(`${namespace}:${requestedId}`)
+      : requestedId;
+  if (!id) {
+    return ajaxJsonResponse({ error: "Missing media id.", ns: namespace }, 400);
+  }
+
+  const config = getRuntimeConfig(env);
+  const overwrite = ajaxBooleanParam(params.get("ow") ?? params.get("overwrite"));
+  const existing = overwrite && !config.mediaRevisions ? await getCurrentMedia(env.DB, id) : null;
+  const rules = await listAclRules(env);
+  const permission = resolveConfiguredAclPermission(env, rules, id, principal);
+  if (!hasAclPermission(permission, existing ? ACL_DELETE : ACL_UPLOAD)) {
+    return ajaxJsonResponse({ error: "Permission denied.", ns: namespace }, 403);
+  }
+
+  const rateLimitHeaders = new Headers(request.headers);
+  rateLimitHeaders.set("accept", "application/json");
+  const rateLimited = await uploadRateLimitResponse(
+    new Request(request.url, { headers: rateLimitHeaders }),
+    env,
+    principal
+  );
+  if (rateLimited) return rateLimited;
+
+  await recordUploadAttempt(request, env, principal);
+
+  const mimePolicy = await getMimeTypeConfig(env.DB, extensionFromMediaId(id));
+  const validation = validateMediaUpload({
+    id,
+    body: upload.body,
+    mimeType: upload.mimeType,
+    mimePolicy,
+    ieXssProtect: config.ieXssProtect
+  });
+  if (!validation.ok) {
+    return ajaxJsonResponse({ error: validation.error, ns: namespace }, 400);
+  }
+
+  const author = principalAuthor(principal);
+  const result = await saveMediaUpload(env.DB, env.MEDIA_BUCKET, {
+    id,
+    body: upload.body,
+    mimeType: upload.mimeType,
+    summary: params.get("summary") ?? "",
+    overwrite,
+    mediaRevisions: config.mediaRevisions,
+    authorId: author.authorId,
+    authorName: author.authorName,
+    ip: requestClientIp(request, env)
+  });
+  if (!result.ok) {
+    return ajaxJsonResponse({ error: `Media '${id}' already exists.`, ns: namespace }, 409);
+  }
+
+  await purgeDependentRenderCache(env, "media", id);
+  await sendMediaChangeNotifications(request, env, result.revision, author);
+
+  logMetric("media_metric", {
+    operation: "ajax_upload",
+    namespace: mediaNamespace(id) || null,
+    changeType: result.changeType,
+    byteLength: result.media.byteLength,
+    durationMs: elapsedSince(startedAt)
+  });
+
+  const detailNamespace = mediaNamespace(id);
+  return ajaxJsonResponse({
+    success: true,
+    link: `/media-manager?ns=${encodeURIComponent(detailNamespace)}&image=${encodeURIComponent(id)}`,
+    id,
+    ns: namespace
+  });
+}
+
+interface AjaxMediaUpload {
+  body: ArrayBuffer;
+  mediaId: string;
+  mimeType: string | null;
+}
+
+async function readAjaxMediaUpload(
+  request: Request,
+  params: URLSearchParams
+): Promise<AjaxMediaUpload | null> {
+  let form: FormData | null = null;
+  if (request.method === "POST") {
+    try {
+      form = await request.formData();
+    } catch {
+      form = null;
+    }
+  }
+
+  const formFile = form?.get("qqfile") ?? form?.get("file") ?? null;
+  if (isUploadFile(formFile)) {
+    const mediaId = String(form?.get("mediaid") ?? form?.get("id") ?? formFile.name);
+    return {
+      body: await formFile.arrayBuffer(),
+      mediaId,
+      mimeType: formFile.type || null
+    };
+  }
+
+  const xhrName = params.get("qqfile");
+  if (request.method === "POST" && xhrName) {
+    const body = await request.arrayBuffer();
+    if (body.byteLength === 0) return null;
+    return {
+      body,
+      mediaId: String(form?.get("mediaid") ?? params.get("mediaid") ?? xhrName),
+      mimeType: request.headers.get("content-type")
+    };
+  }
+
+  return null;
+}
+
+function ajaxBooleanParam(value: string | null): boolean {
+  if (!value) return false;
+  return !["0", "false", "off", "no"].includes(value.toLowerCase());
+}
+
+function ajaxJsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: securityHeaders({ "content-type": "application/json" })
+  });
 }
 
 interface LinkWizardEntry {
@@ -3642,6 +4016,23 @@ async function renderMediaDetailPage(
     return renderMediaDiffPage(env, id, media, url, principal);
   }
 
+  return htmlShell(
+    env,
+    `Media detail for ${id}`,
+    await renderMediaDetailContent(env, principal, csrfToken, id, media),
+    { principal, mode: "detail" }
+  );
+}
+
+async function renderMediaDetailContent(
+  env: Env,
+  principal: AuthPrincipal,
+  csrfToken: string,
+  id: string,
+  media: CurrentMedia
+): Promise<string> {
+  const config = getRuntimeConfig(env);
+  const mediaRevisions = config.mediaRevisions;
   const [references, revisions, jpegMetadata, dokuMediaMetadata] = await Promise.all([
     filterReadablePageItems(env, principal, await listMediaUsageReferences(env.DB, id)),
     mediaRevisions ? listMediaRevisions(env.DB, id, 50) : Promise.resolve([]),
@@ -3667,10 +4058,7 @@ async function renderMediaDetailPage(
       </form>`
     : "";
 
-  return htmlShell(
-    env,
-    `Media detail for ${id}`,
-    `<div id="dokuwiki__detail">
+  return `<div id="dokuwiki__detail">
       <div class="pageId"><span>${escapeHtml(id)}</span></div>
       <div class="page group">
         ${renderMediaDetailTabs(id, mediaRevisions)}
@@ -3690,9 +4078,7 @@ async function renderMediaDetailPage(
           <button type="submit">Delete media</button>
         </form>
       </div>
-    </div>`,
-    { principal, mode: "detail" }
-  );
+    </div>`;
 }
 
 function renderMediaDetailTabs(id: string, mediaRevisions: boolean): string {
@@ -3821,18 +4207,27 @@ async function renderMediaDiffPage(
   url: URL,
   principal: AuthPrincipal
 ): Promise<string> {
-  const pair = await resolveMediaDiffPair(env, id, current, url);
-  if (!pair) {
+  const content = await renderMediaDiffContent(env, id, current, url);
+  if (!content) {
     return htmlShell(env, "Media diff not found", "<p>Media diff source not found.</p>", {
       principal
     });
   }
+
+  return htmlShell(env, `Media diff for ${id}`, content, { principal, mode: "media" });
+}
+
+async function renderMediaDiffContent(
+  env: Env,
+  id: string,
+  current: CurrentMedia,
+  url: URL
+): Promise<string | null> {
+  const pair = await resolveMediaDiffPair(env, id, current, url);
+  if (!pair) return null;
   const config = getRuntimeConfig(env);
 
-  return htmlShell(
-    env,
-    `Media diff for ${id}`,
-    `<h1>Media diff</h1>
+  return `<h1>Media diff</h1>
     ${renderMediaDiffOptions(id, pair, mediaDiffType(url))}
     <div id="mediamanager__diff">
       <table class="media_diff">
@@ -3853,9 +4248,7 @@ async function renderMediaDiffPage(
           </tr>
         </tbody>
       </table>
-    </div>`,
-    { principal, mode: "media" }
-  );
+    </div>`;
 }
 
 async function resolveMediaDiffPair(
