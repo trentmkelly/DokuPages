@@ -247,7 +247,7 @@ are not fixed by this checklist.
 - [x] Implement metadata cache parity where DokuWiki stores and reuses parser metadata.
 - [x] Implement stale cache fallback only if it can match DokuWiki's cache behavior safely.
 - [x] Implement the upstream task runner queue behavior from `inc/TaskRunner.php` and `lib/exe/taskrunner.php`, or document all replaced scheduled jobs.
-- [ ] Implement indexer locking and background indexing semantics from upstream `inc/indexer.php`.
+- [x] Implement indexer locking and background indexing semantics from upstream `inc/indexer.php`.
 - [ ] Match DokuWiki log retention and `dontlog` behavior with D1/Cloudflare logs.
 - [ ] Add scheduled backup automation equivalent to an operator-run production backup policy.
 - [ ] Add operational checks for Cloudflare quotas that replace local disk free-space checks.

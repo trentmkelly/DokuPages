@@ -94,13 +94,18 @@ export interface RebuildSearchIndexResult {
   pageCount: number;
   termCount: number;
   postingCount: number;
+  locked?: boolean;
 }
 
 export interface PageSearchIndexTaskResult {
   id: string;
-  status: "indexed" | "missing";
+  status: "indexed" | "missing" | "locked";
   termCount: number;
   postingCount: number;
+}
+
+export interface SearchIndexLockOptions {
+  waitMs?: number;
 }
 
 export interface PageMetadataCacheResult {
@@ -246,6 +251,9 @@ interface PageDraftRow {
 }
 
 const MAX_METADATA_REFERENCE_ROWS = 1000;
+const INDEXER_LOCK_WAIT_MS = 5_000;
+const INDEXER_LOCK_RETRY_MS = 50;
+const INDEXER_LOCK_TTL_MS = 5 * 60 * 1000;
 
 export async function getCurrentPage(db: D1Database, id: string): Promise<CurrentPage | null> {
   const row = await db
@@ -1317,90 +1325,202 @@ export async function rebuildSearchIndex(
   db: D1Database,
   now = new Date(),
   limit = 5_000,
-  language = "en"
+  language = "en",
+  lockOptions: SearchIndexLockOptions = {}
 ): Promise<RebuildSearchIndexResult> {
-  const pages = await listCurrentPageSources(db, limit);
-  const updatedAt = now.toISOString();
-  const termDocumentCounts = new Map<string, number>();
-  const postings: Array<{ term: string; pageId: string; frequency: number }> = [];
+  return withSearchIndexLock<RebuildSearchIndexResult>(
+    db,
+    async () => {
+      const pages = await listCurrentPageSources(db, limit);
+      const updatedAt = now.toISOString();
+      const termDocumentCounts = new Map<string, number>();
+      const postings: Array<{ term: string; pageId: string; frequency: number }> = [];
 
-  for (const page of pages) {
-    const title = page.title ?? pageTitleFromId(page.id);
-    const terms = buildSearchTermFrequencies(page.content, title, language, page.id);
+      for (const page of pages) {
+        const title = page.title ?? pageTitleFromId(page.id);
+        const terms = buildSearchTermFrequencies(page.content, title, language, page.id);
 
-    for (const [term, frequency] of terms) {
-      postings.push({ term, pageId: page.id, frequency });
-      termDocumentCounts.set(term, (termDocumentCounts.get(term) ?? 0) + 1);
-    }
-  }
+        for (const [term, frequency] of terms) {
+          postings.push({ term, pageId: page.id, frequency });
+          termDocumentCounts.set(term, (termDocumentCounts.get(term) ?? 0) + 1);
+        }
+      }
 
-  const statements: D1PreparedStatement[] = [
-    db.prepare("delete from search_postings"),
-    db.prepare("delete from search_terms")
-  ];
+      const statements: D1PreparedStatement[] = [
+        db.prepare("delete from search_postings"),
+        db.prepare("delete from search_terms")
+      ];
 
-  for (const [term, documentCount] of termDocumentCounts) {
-    statements.push(
-      db
-        .prepare(
-          `insert into search_terms (term, term_length, document_count)
-           values (?, ?, ?)`
-        )
-        .bind(term, searchIndexWordLength(term), documentCount)
-    );
-  }
+      for (const [term, documentCount] of termDocumentCounts) {
+        statements.push(
+          db
+            .prepare(
+              `insert into search_terms (term, term_length, document_count)
+               values (?, ?, ?)`
+            )
+            .bind(term, searchIndexWordLength(term), documentCount)
+        );
+      }
 
-  for (const posting of postings) {
-    statements.push(
-      db
-        .prepare(
-          `insert into search_postings (term, page_id, frequency, updated_at)
-           values (?, ?, ?, ?)`
-        )
-        .bind(posting.term, posting.pageId, posting.frequency, updatedAt)
-    );
-  }
+      for (const posting of postings) {
+        statements.push(
+          db
+            .prepare(
+              `insert into search_postings (term, page_id, frequency, updated_at)
+               values (?, ?, ?, ?)`
+            )
+            .bind(posting.term, posting.pageId, posting.frequency, updatedAt)
+        );
+      }
 
-  await db.batch(statements);
+      await db.batch(statements);
 
-  return {
-    pageCount: pages.length,
-    termCount: termDocumentCounts.size,
-    postingCount: postings.length
-  };
+      return {
+        pageCount: pages.length,
+        termCount: termDocumentCounts.size,
+        postingCount: postings.length
+      };
+    },
+    () => ({
+      pageCount: 0,
+      termCount: 0,
+      postingCount: 0,
+      locked: true
+    }),
+    lockOptions
+  );
 }
 
 export async function rebuildPageSearchIndex(
   db: D1Database,
   id: string,
   now = new Date(),
-  language = "en"
+  language = "en",
+  lockOptions: SearchIndexLockOptions = {}
 ): Promise<PageSearchIndexTaskResult> {
-  const page = await getCurrentPage(db, id);
-  const previousTerms = await listIndexedTerms(db, id);
-  const updatedAt = now.toISOString();
+  return withSearchIndexLock<PageSearchIndexTaskResult>(
+    db,
+    async () => {
+      const page = await getCurrentPage(db, id);
+      const previousTerms = await listIndexedTerms(db, id);
+      const updatedAt = now.toISOString();
 
-  if (!page) {
-    await db.batch(buildSearchIndexStatements(db, id, new Map(), previousTerms, updatedAt));
+      if (!page) {
+        await db.batch(buildSearchIndexStatements(db, id, new Map(), previousTerms, updatedAt));
 
-    return {
+        return {
+          id,
+          status: "missing",
+          termCount: 0,
+          postingCount: 0
+        };
+      }
+
+      const title = page.title ?? pageTitleFromId(page.id);
+      const terms = buildSearchTermFrequencies(page.content, title, language, page.id);
+      await db.batch(buildSearchIndexStatements(db, id, terms, previousTerms, updatedAt));
+
+      return {
+        id,
+        status: "indexed",
+        termCount: terms.size,
+        postingCount: terms.size
+      };
+    },
+    () => ({
       id,
-      status: "missing",
+      status: "locked" as const,
       termCount: 0,
       postingCount: 0
-    };
+    }),
+    lockOptions
+  );
+}
+
+async function withSearchIndexLock<T>(
+  db: D1Database,
+  task: () => Promise<T>,
+  onLocked: () => T,
+  options: SearchIndexLockOptions
+): Promise<T> {
+  const lock = await acquireSearchIndexLock(db, options);
+  if (!lock) return onLocked();
+
+  try {
+    return await task();
+  } finally {
+    await releaseSearchIndexLock(db, lock);
   }
+}
 
-  const title = page.title ?? pageTitleFromId(page.id);
-  const terms = buildSearchTermFrequencies(page.content, title, language, page.id);
-  await db.batch(buildSearchIndexStatements(db, id, terms, previousTerms, updatedAt));
+interface SearchIndexLock {
+  valueJson: string;
+}
 
-  return {
-    id,
-    status: "indexed",
-    termCount: terms.size,
-    postingCount: terms.size
-  };
+async function acquireSearchIndexLock(
+  db: D1Database,
+  options: SearchIndexLockOptions
+): Promise<SearchIndexLock | null> {
+  const waitMs = Math.max(0, options.waitMs ?? INDEXER_LOCK_WAIT_MS);
+  const startedAt = Date.now();
+  const holder = crypto.randomUUID();
+
+  while (true) {
+    const nowMs = Date.now();
+    const acquiredAt = new Date(nowMs).toISOString();
+    const expiresAt = new Date(nowMs + INDEXER_LOCK_TTL_MS).toISOString();
+    const valueJson = JSON.stringify({ holder, acquiredAt, expiresAt });
+
+    await db
+      .prepare(
+        `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+         values ('config', 'locks', 'indexer', ?, ?)
+         on conflict(subject_type, subject_id, key) do update set
+           value_json = excluded.value_json,
+           updated_at = excluded.updated_at
+         where metadata.updated_at <= ?`
+      )
+      .bind(valueJson, expiresAt, acquiredAt)
+      .run();
+
+    const row = await db
+      .prepare(
+        `select value_json
+         from metadata
+         where subject_type = 'config'
+           and subject_id = 'locks'
+           and key = 'indexer'`
+      )
+      .bind()
+      .first<{ value_json: string }>();
+
+    if (row?.value_json === valueJson) {
+      return { valueJson };
+    }
+
+    if (Date.now() - startedAt >= waitMs) {
+      return null;
+    }
+
+    await sleep(INDEXER_LOCK_RETRY_MS);
+  }
+}
+
+async function releaseSearchIndexLock(db: D1Database, lock: SearchIndexLock): Promise<void> {
+  await db
+    .prepare(
+      `delete from metadata
+       where subject_type = 'config'
+         and subject_id = 'locks'
+         and key = 'indexer'
+         and value_json = ?`
+    )
+    .bind(lock.valueJson)
+    .run();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function ensurePageMetadataCache(

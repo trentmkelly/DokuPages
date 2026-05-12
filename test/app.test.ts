@@ -5002,6 +5002,17 @@ function createD1Stub(state: D1StubState): D1Database {
             );
           }
 
+          if (sql.includes("subject_type = 'config'") && sql.includes("subject_id = 'locks'")) {
+            return (
+              state.metadata.find(
+                (record) =>
+                  record.subject_type === "config" &&
+                  record.subject_id === "locks" &&
+                  record.key === "indexer"
+              ) ?? null
+            );
+          }
+
           if (sql.includes("from metadata") && !sql.includes("from media")) {
             const [subjectId, key] = values;
             return (
@@ -5371,6 +5382,51 @@ function createD1Stub(state: D1StubState): D1Database {
           return { results: [] };
         },
         run: async () => {
+          if (
+            sql.includes("insert into metadata") &&
+            sql.includes("'config'") &&
+            sql.includes("'locks'") &&
+            sql.includes("'indexer'")
+          ) {
+            const [valueJson, expiresAt, acquiredAt] = values;
+            const existing = state.metadata.find(
+              (record) =>
+                record.subject_type === "config" &&
+                record.subject_id === "locks" &&
+                record.key === "indexer"
+            );
+
+            if (!existing) {
+              state.metadata.push({
+                subject_type: "config",
+                subject_id: "locks",
+                key: "indexer",
+                value_json: valueJson,
+                updated_at: expiresAt
+              });
+            } else if (String(existing.updated_at) <= String(acquiredAt)) {
+              existing.value_json = valueJson;
+              existing.updated_at = expiresAt;
+            }
+          }
+
+          if (
+            sql.includes("delete from metadata") &&
+            sql.includes("subject_id = 'locks'") &&
+            sql.includes("key = 'indexer'")
+          ) {
+            const [valueJson] = values;
+            state.metadata = state.metadata.filter(
+              (record) =>
+                !(
+                  record.subject_type === "config" &&
+                  record.subject_id === "locks" &&
+                  record.key === "indexer" &&
+                  record.value_json === valueJson
+                )
+            );
+          }
+
           if (sql.includes("insert into drafts")) {
             const [id, pageId, userId, content, baseRevisionId, updatedAt] = values;
             const existing = state.drafts.find((draft) => draft.id === id);

@@ -2778,9 +2778,11 @@ async function handleIndexerTask(request: Request, env: Env, url: URL): Promise<
   if (url.searchParams.has("debug")) {
     return indexerDebugResponse([
       "runIndexer(): started",
-      result.status === "missing"
-        ? `Indexer: ${result.id} does not exist, removed from index`
-        : "Indexer: finished"
+      result.status === "locked"
+        ? "Indexer: locked"
+        : result.status === "missing"
+          ? `Indexer: ${result.id} does not exist, removed from index`
+          : "Indexer: finished"
     ]);
   }
 
@@ -9438,7 +9440,9 @@ async function handleSearchIndexRebuild(
     return jsonResponse(result);
   }
 
-  return redirectResponse("/admin?searchRebuild=ok");
+  return redirectResponse(
+    result.locked ? "/admin?searchRebuild=locked" : "/admin?searchRebuild=ok"
+  );
 }
 
 async function appendAdminAuditLog(

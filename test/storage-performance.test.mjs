@@ -14,6 +14,7 @@ import {
   listNamespacePages,
   listPageRevisions,
   listRecentChanges,
+  rebuildPageSearchIndex,
   searchPages
 } from "../src/wiki/page-service.ts";
 import { readMigrationSql } from "./support/migrations.mjs";
@@ -296,6 +297,52 @@ describe("storage performance guardrails", () => {
     expect(d1.counts).toMatchObject({ all: 1, batch: 1 });
     expect(d1.counts.batchStatements).toEqual([7]);
     expect(db.prepare("select count(*) as count from search_terms").get().count).toBe(0);
+  });
+
+  it("serializes explicit search index rebuilds with a DokuWiki-style lock lease", async () => {
+    ({ db, d1 } = createDatabase());
+    seedCurrentPage(db, "wiki:indexed", "wiki", 1, "alpha beta gamma");
+    db.prepare(
+      `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+       values ('config', 'locks', 'indexer', ?, ?)`
+    ).run(JSON.stringify({ holder: "other" }), "9999-01-01T00:00:00.000Z");
+
+    const locked = await rebuildPageSearchIndex(d1, "wiki:indexed", new Date(timestamp(2)), "en", {
+      waitMs: 0
+    });
+
+    expect(locked).toMatchObject({
+      id: "wiki:indexed",
+      status: "locked",
+      termCount: 0,
+      postingCount: 0
+    });
+    expect(db.prepare("select count(*) as count from search_postings").get().count).toBe(0);
+
+    db.prepare(
+      `update metadata
+       set updated_at = ?
+       where subject_type = 'config' and subject_id = 'locks' and key = 'indexer'`
+    ).run("2000-01-01T00:00:00.000Z");
+
+    const indexed = await rebuildPageSearchIndex(d1, "wiki:indexed", new Date(timestamp(3)), "en", {
+      waitMs: 0
+    });
+
+    expect(indexed).toMatchObject({
+      id: "wiki:indexed",
+      status: "indexed"
+    });
+    expect(db.prepare("select count(*) as count from search_postings").get().count).toBeGreaterThan(
+      0
+    );
+    expect(
+      db
+        .prepare(
+          "select count(*) as count from metadata where subject_type = 'config' and subject_id = 'locks' and key = 'indexer'"
+        )
+        .get().count
+    ).toBe(0);
   });
 });
 

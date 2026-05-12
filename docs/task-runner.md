@@ -37,3 +37,23 @@ Operational scheduled work that replaces task-runner behavior:
   `npm run cache:warm -- --base-url <url>`.
 - Use the admin search-index rebuild or `/lib/exe/taskrunner.php?id=<page>` for
   explicit reindexing instead of relying on browser-triggered PHP tasks.
+
+## Search Indexer Locking
+
+Upstream `inc/Search/Indexer.php` protects the flat-file index with
+`data/locks/_indexer.lock`, waits up to five seconds, and treats locks older
+than five minutes as stale. The Pages port applies the same single-writer rule
+to explicit index rebuilds with a D1 metadata lease at
+`metadata('config', 'locks', 'indexer')`.
+
+The lease uses a five-minute expiry and a five-second acquisition window. If the
+lease is held, `/lib/exe/taskrunner.php?id=<page>` reports `Indexer: locked` in
+debug mode and returns a JSON `status: "locked"` to JSON clients; the GIF
+compatibility response remains a normal 1x1 GIF like upstream. The admin full
+search-index rebuild returns a `locked` result instead of deleting and rewriting
+the index while another explicit indexer is active.
+
+Page saves still update their page's D1 search postings in the same atomic D1
+batch as the page revision and changelog. That differs from DokuWiki's
+browser-triggered background indexer, but it keeps saved content immediately
+searchable without depending on a follow-up browser request.

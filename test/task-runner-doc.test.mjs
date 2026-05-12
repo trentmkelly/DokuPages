@@ -18,7 +18,9 @@ describe("task runner replacement documentation", () => {
       "/lib/exe/taskrunner.php",
       "/lib/exe/indexer.php",
       "/api/tasks/email-digests",
-      "npm run cache:warm"
+      "npm run cache:warm",
+      "metadata('config', 'locks', 'indexer')",
+      "Indexer: locked"
     ]) {
       expect(doc).toContain(expected);
     }
