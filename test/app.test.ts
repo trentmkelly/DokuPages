@@ -183,6 +183,7 @@ describe("handleRequest", () => {
     env.RSS_TYPE = undefined;
     env.RSS_LINKTO = undefined;
     env.RSS_CONTENT = undefined;
+    env.RSS_MEDIA = undefined;
     env.RSS_UPDATE = undefined;
     env.RSS_SHOW_SUMMARY = undefined;
     env.RSS_SHOW_DELETED = undefined;
@@ -4165,6 +4166,148 @@ describe("handleRequest", () => {
     expect(robotsText).not.toContain("Allow: /");
   });
 
+  it("covers upstream feed formats and rss configuration combinations", async () => {
+    seedFeedParityChanges();
+    env.RSS_UPDATE = "0";
+
+    const feedTypes = [
+      {
+        type: "rss",
+        path: "/feed.php?type=rss",
+        contentType: "text/xml",
+        marker: '<rss version="0.91">'
+      },
+      {
+        type: "rss1",
+        path: "/feed.php?type=rss1",
+        contentType: "text/xml",
+        marker: "<rdf:RDF"
+      },
+      {
+        type: "rss2",
+        path: "/feed.php?type=rss2",
+        contentType: "text/xml",
+        marker: '<rss version="2.0">'
+      },
+      {
+        type: "atom",
+        path: "/feed.php?type=atom",
+        contentType: "application/xml",
+        marker: '<feed version="0.3"'
+      },
+      {
+        type: "atom1",
+        path: "/feed.php?type=atom1",
+        contentType: "application/atom+xml",
+        marker: 'xmlns="http://www.w3.org/2005/Atom"'
+      }
+    ];
+
+    for (const feedType of feedTypes) {
+      const response = await handleRequest(new Request(`https://example.com${feedType.path}`), env);
+      expect(response.status, feedType.type).toBe(200);
+      expect(response.headers.get("content-type"), feedType.type).toContain(feedType.contentType);
+      await expect(response.text(), feedType.type).resolves.toContain(feedType.marker);
+    }
+
+    const linkTargets = [
+      ["diff", "/wiki/wiki/welcome?rev=wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z&do=diff"],
+      ["page", "/wiki/wiki/welcome?rev=wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z"],
+      ["rev", "/wiki/wiki/welcome?rev=wiki%3Awelcome%402026-05-07T00%3A00%3A00.000Z&do=revisions"],
+      ["current", "/wiki/wiki/welcome"]
+    ] as const;
+
+    for (const [mode, expectedPath] of linkTargets) {
+      env.RSS_LINKTO = mode;
+      const xml = decodeXmlEntities(
+        await (
+          await handleRequest(
+            new Request(`https://example.com/feed.php?type=rss2&linkmode=${mode}`),
+            env
+          )
+        ).text()
+      );
+      expect(xml, mode).toContain(`https://example.com${expectedPath}`);
+    }
+
+    const contentModes = [
+      ["abstract", "Welcome"],
+      ["diff", "--- old"],
+      ["htmldiff", "<table>"],
+      ["html", "<p>Imported page.</p>"]
+    ] as const;
+
+    for (const [mode, expectedDescription] of contentModes) {
+      env.RSS_CONTENT = mode;
+      const xml = decodeXmlEntities(
+        await (
+          await handleRequest(
+            new Request(`https://example.com/feed.php?type=rss2&contentmode=${mode}`),
+            env
+          )
+        ).text()
+      );
+      expect(xml, mode).toContain(expectedDescription);
+    }
+
+    for (const mode of ["pages", "media", "both"] as const) {
+      env.RSS_MEDIA = mode;
+      const xml = await (
+        await handleRequest(
+          new Request(`https://example.com/feed.php?type=rss2&mediamode=${mode}`),
+          env
+        )
+      ).text();
+      expect(xml.includes("wiki/welcome"), mode).toBe(mode === "pages" || mode === "both");
+      expect(xml.includes("logo.svg"), mode).toBe(mode === "media" || mode === "both");
+    }
+
+    env.RSS_MEDIA = "both";
+    env.RSS_SHOW_SUMMARY = "0";
+    const withoutSummary = await (
+      await handleRequest(new Request("https://example.com/feed.php?type=rss2&summary=0"), env)
+    ).text();
+    env.RSS_SHOW_SUMMARY = "1";
+    const withSummary = await (
+      await handleRequest(new Request("https://example.com/feed.php?type=rss2&summary=1"), env)
+    ).text();
+    expect(withoutSummary).toContain("<title>welcome</title>");
+    expect(withoutSummary).not.toContain("<title>welcome - Initial import</title>");
+    expect(withSummary).toContain("<title>welcome - Initial import</title>");
+
+    env.RSS_SHOW_DELETED = "0";
+    const withoutDeleted = await (
+      await handleRequest(new Request("https://example.com/feed.php?type=rss2&deleted=0"), env)
+    ).text();
+    env.RSS_SHOW_DELETED = "1";
+    const withDeleted = await (
+      await handleRequest(new Request("https://example.com/feed.php?type=rss2&deleted=1"), env)
+    ).text();
+    expect(withoutDeleted).not.toContain("removed - Removed page");
+    expect(withDeleted).toContain("removed - Removed page");
+
+    env.RSS_TYPE = "atom1";
+    const configuredType = await handleRequest(
+      new Request("https://example.com/feed.php?configured=atom1"),
+      env
+    );
+    expect(configuredType.headers.get("content-type")).toContain("application/atom+xml");
+    await expect(configuredType.text()).resolves.toContain('xmlns="http://www.w3.org/2005/Atom"');
+
+    env.RSS_UPDATE = "120";
+    const cachedFeed = await handleRequest(
+      new Request("https://example.com/feed.php?type=rss2&cachettl=120"),
+      env
+    );
+    env.RSS_UPDATE = "0";
+    const uncachedFeed = await handleRequest(
+      new Request("https://example.com/feed.php?type=rss2&cachettl=0"),
+      env
+    );
+    expect(cachedFeed.headers.get("cache-control")).toBe("public, max-age=120");
+    expect(uncachedFeed.headers.get("cache-control")).toBe("no-cache");
+  });
+
   it("matches upstream OpenSearch and manifest document shapes", async () => {
     env.TAGLINE = "Notes from the edge";
     env.BASE_DIR = "/docs";
@@ -5385,6 +5528,51 @@ function saveActionForm(): FormData {
 
 function emptyActionForm(): FormData {
   return new FormData();
+}
+
+function seedFeedParityChanges(): void {
+  state.changelog.push(
+    {
+      id: "media:wiki:logo.svg@2026-05-08T00:00:00.000Z",
+      subject_type: "media",
+      subject_id: "wiki:logo.svg",
+      revision_id: "media-rev-current",
+      user_name: "kiwi",
+      change_type: "edit",
+      summary: "Uploaded replacement logo",
+      size_change: 18,
+      created_at: "2026-05-08T00:00:00.000Z"
+    },
+    {
+      id: "page:wiki:removed@2026-05-08T01:00:00.000Z",
+      subject_type: "page",
+      subject_id: "wiki:removed",
+      revision_id: "wiki:removed@2026-05-08T01:00:00.000Z",
+      user_name: "kiwi",
+      change_type: "delete",
+      summary: "Removed page",
+      size_change: -24,
+      created_at: "2026-05-08T01:00:00.000Z"
+    }
+  );
+  state.revisions.push({
+    id: "wiki:removed@2026-05-08T01:00:00.000Z",
+    page_id: "wiki:removed",
+    content: "====== Removed ======\n\nDeleted content.",
+    summary: "Removed page",
+    change_type: "delete",
+    size_change: -24,
+    created_at: "2026-05-08T01:00:00.000Z"
+  });
+}
+
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 function createDurableObjectStateStub(): DurableObjectState {
