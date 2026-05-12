@@ -239,7 +239,7 @@ are not fixed by this checklist.
 - [x] Import disabled plugin state and plugin configuration into user-visible compatibility reports.
 - [x] Support bzip2 attic import without depending on an external `bzip2` process, or document the operator prerequisite.
 - [x] Preserve DokuWiki filesystem mtime semantics wherever route behavior still depends on modified times.
-- [ ] Verify import fidelity on a non-starter real wiki with pages, old revisions, media revisions, deleted pages, users, ACLs, subscriptions, plugin settings, and custom config.
+- [x] Verify import fidelity on a non-starter real wiki with pages, old revisions, media revisions, deleted pages, users, ACLs, subscriptions, plugin settings, and custom config.
 
 ## Cache, Tasks, And Operations
 

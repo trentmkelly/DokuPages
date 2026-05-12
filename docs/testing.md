@@ -100,6 +100,12 @@ and edit-save requests.
 Performance measurement helper tests cover the file-tree summarizer used by
 `npm run limits:measure` for bundle and static asset size baselines.
 
+Import fidelity tests build a non-starter DokuWiki source tree with current
+pages, attic page revisions, media attic revisions, deleted-page changelog rows,
+authplain users, ACLs, subscriptions, plugin enablement/configuration, media
+metadata, and local config. The generated import SQL is executed against the
+real migrations in SQLite before assertions verify the resulting D1 rows.
+
 Search performance tests cover indexed page search query plans, raw posting
 search result clamps, term deduplication, and one-read D1 behavior across large
 fixture corpora.

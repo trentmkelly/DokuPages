@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
 import { describe, expect, it } from "vitest";
@@ -10,8 +11,10 @@ import {
   writeMediaManifest,
   writePageImportSql
 } from "../scripts/import-dokuwiki.mjs";
+import { readMigrationSql } from "./support/migrations.mjs";
 
 const gzipAsync = promisify(gzip);
+const migrationSql = readMigrationSql();
 const WELCOME_PAGE_META = [
   "a:2:{",
   's:7:"current";a:4:{',
@@ -592,6 +595,175 @@ describe("DokuWiki import planner", () => {
     expect(currentRevisionStatement).toContain("'Current edit'");
   });
 
+  it("verifies import fidelity for a non-starter wiki fixture", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-fidelity-"));
+    const pagePath = path.join(root, "data/pages/projects/alpha.txt");
+    const pageRevisionPath = path.join(root, "data/attic/projects/alpha.1767225600.txt.gz");
+    const mediaPath = path.join(root, "data/media/projects/logo.jpg");
+    const mediaRevisionPath = path.join(root, "data/media_attic/projects/logo.1767225601.jpg");
+
+    await mkdir(path.dirname(pagePath), { recursive: true });
+    await mkdir(path.dirname(pageRevisionPath), { recursive: true });
+    await mkdir(path.dirname(mediaPath), { recursive: true });
+    await mkdir(path.dirname(mediaRevisionPath), { recursive: true });
+    await mkdir(path.join(root, "data/meta/projects"), { recursive: true });
+    await mkdir(path.join(root, "data/media_meta/projects"), { recursive: true });
+    await mkdir(path.join(root, "conf"), { recursive: true });
+
+    await writeFile(pagePath, "====== Alpha ======\nCurrent body with {{projects:logo.jpg}}\n");
+    await writeFile(pageRevisionPath, await gzipAsync("====== Alpha ======\nOld body\n"));
+    await writeFile(mediaPath, "current jpeg bytes");
+    await writeFile(mediaRevisionPath, "old jpeg bytes");
+    await writeFile(
+      path.join(root, "data/meta/_dokuwiki.changes"),
+      [
+        "1767225600\t203.0.113.10\tC\tprojects:alpha\talice\tCreated alpha\t\t23",
+        "1767225602\t203.0.113.11\tD\tprojects:retired\tbob\tDeleted retired\t\t-9",
+        "1767225603\t203.0.113.12\tE\tprojects:alpha\talice\tCurrent alpha edit\t\t31"
+      ].join("\n")
+    );
+    await writeFile(
+      path.join(root, "data/meta/_media.changes"),
+      [
+        "1767225601\t203.0.113.13\tC\tprojects:logo.jpg\talice\tUploaded logo\t\t13",
+        "1767225604\t203.0.113.14\tE\tprojects:logo.jpg\tbob\tUpdated logo\t\t5"
+      ].join("\n")
+    );
+    await writeFile(path.join(root, "data/meta/projects/alpha.meta"), WELCOME_PAGE_META);
+    await writeFile(
+      path.join(root, "data/media_meta/projects/logo.jpg.meta"),
+      DOKU_MEDIA_JPEG_META
+    );
+    await writeFile(path.join(root, "data/meta/projects/alpha.mlist"), "alice every 1767225605\n");
+    await writeFile(path.join(root, "data/meta/projects/.mlist"), "bob digest 1767225606\n");
+    await writeFile(
+      path.join(root, "conf/users.auth.php"),
+      [
+        "alice:$2y$hash:Alice Example:alice@example.test:user,admin",
+        "bob:hash:Bob Example:bob@example.test:user"
+      ].join("\n")
+    );
+    await writeFile(path.join(root, "conf/acl.auth.php"), "* @ALL 1\nprojects:* @user 8\n");
+    await writeFile(
+      path.join(root, "conf/local.php"),
+      "$conf['title'] = 'Fidelity Wiki';\n$conf['lang'] = 'en';\n$conf['plugin']['testing']['mode'] = 'local';\n"
+    );
+    await writeFile(
+      path.join(root, "conf/local.protected.php"),
+      "$conf['plugin']['testing']['locked'] = true;\n"
+    );
+    await writeFile(path.join(root, "conf/plugins.php"), "$plugins['testing'] = 0;\n");
+    await writeFile(path.join(root, "conf/plugins.local.php"), "$plugins['testing'] = 1;\n");
+    await writeFile(path.join(root, "conf/plugins.required.php"), "$plugins['acl'] = 1;\n");
+
+    await utimes(
+      pagePath,
+      new Date("2026-01-01T00:00:03.000Z"),
+      new Date("2026-01-01T00:00:03.000Z")
+    );
+    await utimes(
+      mediaPath,
+      new Date("2026-01-01T00:00:04.000Z"),
+      new Date("2026-01-01T00:00:04.000Z")
+    );
+
+    const plan = await buildImportPlan(root);
+
+    expect(plan.counts).toMatchObject({
+      pages: 1,
+      pageRevisions: 1,
+      pageChangelogEntries: 3,
+      media: 1,
+      mediaRevisions: 1,
+      mediaChangelogEntries: 2,
+      subscriptions: 2,
+      aclRules: 2,
+      users: 2,
+      configSettings: 2,
+      pluginConfigSettings: 2,
+      pluginSettings: 2
+    });
+
+    const sqlOutput = path.join(root, "import.sql");
+    await writePageImportSql(plan, sqlOutput);
+    const db = new DatabaseSync(":memory:");
+
+    try {
+      db.exec(migrationSql);
+      db.exec(await readFile(sqlOutput, "utf8"));
+
+      expect(countRows(db, "pages", "is_deleted = 0")).toBe(1);
+      expect(countRows(db, "pages", "is_deleted = 1")).toBe(1);
+      expect(countRows(db, "page_revisions")).toBe(3);
+      expect(countRows(db, "media")).toBe(1);
+      expect(countRows(db, "media_revisions")).toBe(2);
+      expect(countRows(db, "users")).toBe(2);
+      expect(countRows(db, "acl_rules")).toBe(2);
+      expect(countRows(db, "subscriptions")).toBe(2);
+
+      expect(
+        db.prepare("select is_deleted from pages where id = 'projects:retired'").get()
+      ).toMatchObject({ is_deleted: 1 });
+      expect(
+        db
+          .prepare(
+            "select author_name, summary, change_type from page_revisions where id = 'projects:alpha@2026-01-01T00:00:03.000Z'"
+          )
+          .get()
+      ).toMatchObject({
+        author_name: "alice",
+        summary: "Current alpha edit",
+        change_type: "edit"
+      });
+      expect(
+        db
+          .prepare(
+            "select summary, change_type from media_revisions where id = 'projects:logo.jpg@2026-01-01T00:00:04.000Z'"
+          )
+          .get()
+      ).toMatchObject({ summary: "Updated logo", change_type: "edit" });
+      expect(
+        db.prepare("select name from groups where name in ('admin', 'user') order by name").all()
+      ).toEqual([{ name: "admin" }, { name: "user" }]);
+
+      const titleSetting = JSON.parse(
+        db
+          .prepare(
+            "select value_json from metadata where subject_type = 'config' and subject_id = 'dokuwiki' and key = 'conf:title'"
+          )
+          .get().value_json
+      );
+      expect(titleSetting).toMatchObject({
+        value: "Fidelity Wiki",
+        source: "local.php",
+        layer: "local"
+      });
+      const pluginMode = JSON.parse(
+        db
+          .prepare(
+            "select value_json from plugin_settings where plugin = 'testing' and key = 'mode'"
+          )
+          .get().value_json
+      );
+      expect(pluginMode).toMatchObject({ value: "local", source: "local.php" });
+      const pluginLocked = JSON.parse(
+        db
+          .prepare(
+            "select value_json from plugin_settings where plugin = 'testing' and key = 'locked'"
+          )
+          .get().value_json
+      );
+      expect(pluginLocked).toMatchObject({ value: true, locked: true });
+      expect(
+        db
+          .prepare("select value_json from metadata where subject_type = 'media' and key = 'jpeg'")
+          .get()
+      ).toBeTruthy();
+    } finally {
+      db.close();
+    }
+  });
+
   it("decodes DokuWiki URL and SafeFN filename modes during import", async () => {
     const urlRoot = await mkdtemp(path.join(tmpdir(), "dokuwiki-import-url-fn-"));
     await mkdir(path.join(urlRoot, "data/pages/wiki"), { recursive: true });
@@ -798,3 +970,8 @@ describe("DokuWiki import planner", () => {
     expect(sql).toContain("'wiki:welcome'");
   });
 });
+
+function countRows(db, table, where = "") {
+  const suffix = where ? ` where ${where}` : "";
+  return db.prepare(`select count(*) as count from ${table}${suffix}`).get().count;
+}

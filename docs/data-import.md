@@ -146,3 +146,8 @@ npm run smoke -- --base-url https://dokutest.pages.dev
 ```
 
 For media-specific checks, fetch representative media paths from rendered pages and compare status, content type, byte length, and body hash against the manifest.
+
+The automated importer suite also includes a non-starter wiki fixture that
+executes generated SQL against the real migrations and verifies pages, old page
+revisions, media revisions, deleted pages, users, ACLs, subscriptions, imported
+plugin settings, media metadata, and local configuration rows.
