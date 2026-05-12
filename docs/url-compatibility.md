@@ -86,3 +86,10 @@ This audit maps legacy DokuWiki entrypoints to the Pages-native route surface.
 
 Unsupported legacy executables are handled deliberately so old clients receive a
 stable response instead of an ambiguous 404.
+
+`/lib/exe/ajax.php` follows DokuWiki's legacy AJAX response shape: a missing
+`call` returns `404` with the default `text/html` type, unknown calls return a
+`200` HTML response with `AJAX call '<name>' unknown!`, most AJAX fragments use
+the default `text/html; charset=utf-8` content type, suggestions use
+`application/x-suggestions+json`, and media uploads use `application/json` with
+upload failures in the JSON `error` field.

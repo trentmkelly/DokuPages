@@ -2854,6 +2854,8 @@ async function handleAjax(
   principal: AuthPrincipal
 ): Promise<Response> {
   const params = await readAjaxParams(request.clone() as Request, url);
+  if (!params.has("call")) return ajaxHtmlResponse("", { status: 404 });
+
   const call = params.get("call")?.toLowerCase() ?? "";
   const startedAt = Date.now();
 
@@ -2947,7 +2949,7 @@ async function handleAjax(
   }
 
   if (call === "draftdel") {
-    return handleAjaxDraftDelete(env, params);
+    return handleAjaxDraftDelete(request, env, params, principal);
   }
 
   if (call === "medians") {
@@ -2986,10 +2988,7 @@ async function handleAjax(
     );
   }
 
-  return new Response(`AJAX call '${escapeHtml(call)}' unknown.\n`, {
-    status: 400,
-    headers: securityHeaders({ "content-type": "text/plain; charset=utf-8" })
-  });
+  return ajaxHtmlResponse(`AJAX call '${escapeHtml(call)}' unknown!\n`);
 }
 
 async function readAjaxParams(request: Request, url: URL): Promise<URLSearchParams> {
@@ -3016,7 +3015,7 @@ async function handleAjaxLock(
   principal: AuthPrincipal
 ): Promise<Response> {
   const id = cleanPageId(params.get("id") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
-  if (!id) return ajaxJsonResponse({ errors: [], lock: "0", draft: "" });
+  if (!id) return ajaxTextJsonResponse({ errors: [], lock: "0", draft: "" });
 
   const response: { errors: string[]; lock: "0" | "1"; draft: string } = {
     errors: [],
@@ -3030,7 +3029,7 @@ async function handleAjaxLock(
 
   if (!hasAclPermission(permission, requiredPermission)) {
     response.errors.push("Permission to write this page has been denied.");
-    return ajaxJsonResponse(response);
+    return ajaxTextJsonResponse(response);
   }
 
   const config = getRuntimeConfig(env);
@@ -3074,7 +3073,7 @@ async function handleAjaxLock(
     response.draft = draftMessage(draft, env);
   }
 
-  const ajaxResponse = ajaxJsonResponse(response);
+  const ajaxResponse = ajaxTextJsonResponse(response);
   if (lockToken && config.lockTime > 0 && response.lock === "1") {
     ajaxResponse.headers.append(
       "set-cookie",
@@ -3084,9 +3083,14 @@ async function handleAjaxLock(
   return ajaxResponse;
 }
 
-async function handleAjaxDraftDelete(env: Env, params: URLSearchParams): Promise<Response> {
+async function handleAjaxDraftDelete(
+  request: Request,
+  env: Env,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): Promise<Response> {
   const id = cleanPageId(params.get("id") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
-  if (id) {
+  if (id && ajaxSecurityTokenValid(request, params, principal)) {
     await deletePageDraft(env.DB, id);
   }
   return ajaxHtmlResponse("");
@@ -3167,7 +3171,7 @@ async function handleAjaxMediaDetails(
   if (!media) return ajaxHtmlResponse("<p>Media not found.</p>");
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
-  if (denied) return denied;
+  if (denied) return ajaxAclDeniedResponse(id);
 
   const csrf = csrfContext(request);
   return ajaxHtmlResponse(await renderMediaDetailContent(env, principal, csrf.token, id, media));
@@ -3187,7 +3191,7 @@ async function handleAjaxMediaDiff(
   if (!media) return ajaxHtmlResponse("<p>Media diff source not found.</p>");
 
   const denied = await requireAclPermission(request, env, principal, id, ACL_READ);
-  if (denied) return denied;
+  if (denied) return ajaxAclDeniedResponse(id);
 
   if (!getRuntimeConfig(env).mediaRevisions) {
     return ajaxHtmlResponse("<p>Media revisions are disabled.</p>");
@@ -3216,7 +3220,11 @@ async function handleAjaxMediaUpload(
 
   const upload = await readAjaxMediaUpload(request, params);
   if (!upload) {
-    return ajaxJsonResponse({ error: "Missing upload file.", ns: namespace }, 400);
+    return ajaxMediaUploadError("", namespace);
+  }
+
+  if (!ajaxSecurityTokenValid(request, params, principal)) {
+    return ajaxMediaUploadError(AJAX_SECURITY_TOKEN_ERROR, namespace);
   }
 
   const requestedId = cleanMediaId(upload.mediaId);
@@ -3225,7 +3233,7 @@ async function handleAjaxMediaUpload(
       ? cleanMediaId(`${namespace}:${requestedId}`)
       : requestedId;
   if (!id) {
-    return ajaxJsonResponse({ error: "Missing media id.", ns: namespace }, 400);
+    return ajaxMediaUploadError("", namespace);
   }
 
   const config = getRuntimeConfig(env);
@@ -3234,7 +3242,7 @@ async function handleAjaxMediaUpload(
   const rules = await listAclRules(env);
   const permission = resolveConfiguredAclPermission(env, rules, id, principal);
   if (!hasAclPermission(permission, existing ? ACL_DELETE : ACL_UPLOAD)) {
-    return ajaxJsonResponse({ error: "Permission denied.", ns: namespace }, 403);
+    return ajaxMediaUploadError("You don't have permissions to upload files.", namespace);
   }
 
   const rateLimitHeaders = new Headers(request.headers);
@@ -3257,7 +3265,7 @@ async function handleAjaxMediaUpload(
     ieXssProtect: config.ieXssProtect
   });
   if (!validation.ok) {
-    return ajaxJsonResponse({ error: validation.error, ns: namespace }, 400);
+    return ajaxMediaUploadError(validation.error, namespace);
   }
 
   const author = principalAuthor(principal);
@@ -3273,7 +3281,7 @@ async function handleAjaxMediaUpload(
     ip: requestClientIp(request, env)
   });
   if (!result.ok) {
-    return ajaxJsonResponse({ error: `Media '${id}' already exists.`, ns: namespace }, 409);
+    return ajaxMediaUploadError("File already exists. Nothing done.", namespace);
   }
 
   await purgeDependentRenderCache(env, "media", id);
@@ -3344,11 +3352,44 @@ function ajaxBooleanParam(value: string | null): boolean {
   return !["0", "false", "off", "no"].includes(value.toLowerCase());
 }
 
+const AJAX_SECURITY_TOKEN_ERROR = "Security Token did not match. Possible CSRF attack.";
+
+function ajaxSecurityTokenValid(
+  request: Request,
+  params: URLSearchParams,
+  principal: AuthPrincipal
+): boolean {
+  if (principal.type !== "user") return true;
+
+  const cookie = readCookie(request, CSRF_COOKIE_NAME);
+  const token = String(
+    request.headers.get("x-csrf-token") ?? params.get("sectok") ?? params.get("csrfToken") ?? ""
+  );
+  return Boolean(cookie && token && constantTimeEqual(cookie, token));
+}
+
+function ajaxAclDeniedResponse(subjectId: string): Response {
+  return ajaxHtmlResponse(
+    `<div class="error">Permission denied for '${escapeHtml(subjectId)}'.</div>`
+  );
+}
+
+function ajaxTextJsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: securityHeaders({ "content-type": "text/html; charset=utf-8" })
+  });
+}
+
 function ajaxJsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: securityHeaders({ "content-type": "application/json" })
   });
+}
+
+function ajaxMediaUploadError(error: string, namespace: string): Response {
+  return ajaxJsonResponse({ error, ns: namespace });
 }
 
 interface LinkWizardEntry {
@@ -3524,8 +3565,9 @@ function pageName(id: string): string {
   return id.includes(":") ? id.slice(id.lastIndexOf(":") + 1) : id;
 }
 
-function ajaxHtmlResponse(body: string): Response {
+function ajaxHtmlResponse(body: string, init: ResponseInit = {}): Response {
   return new Response(body, {
+    ...init,
     headers: securityHeaders({ "content-type": "text/html; charset=utf-8" })
   });
 }

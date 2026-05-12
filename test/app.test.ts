@@ -18,6 +18,8 @@ interface D1StubState {
   cacheDependencies: Record<string, unknown>[];
   drafts: Record<string, unknown>[];
   aclRules: Record<string, unknown>[];
+  users: Record<string, unknown>[];
+  userGroups: Record<string, unknown>[];
   deleted: boolean;
   batches: unknown[][];
 }
@@ -33,6 +35,8 @@ const state: D1StubState = {
   cacheDependencies: [],
   drafts: [],
   aclRules: seedAclRules(),
+  users: seedUsers(),
+  userGroups: seedUserGroups(),
   deleted: false,
   batches: []
 };
@@ -140,6 +144,8 @@ describe("handleRequest", () => {
     state.cacheDependencies = [];
     state.drafts = [];
     state.aclRules = seedAclRules();
+    state.users = seedUsers();
+    state.userGroups = seedUserGroups();
     state.deleted = false;
     state.batches = [];
     clearCustomAuthLanguageOverrideCache(env.DB);
@@ -195,6 +201,9 @@ describe("handleRequest", () => {
     env.TARGET_EXTERN = undefined;
     env.TARGET_MEDIA = undefined;
     env.TARGET_WINDOWS = undefined;
+    env.EXTERNAL_AUTH_MODE = undefined;
+    env.EXTERNAL_AUTH_EMAIL_HEADER = undefined;
+    env.EXTERNAL_AUTH_USERNAME_HEADER = undefined;
   });
 
   it("returns health information for the API health route", async () => {
@@ -1067,6 +1076,10 @@ describe("handleRequest", () => {
       }),
       env
     );
+    const missingCall = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php"),
+      env
+    );
     const unknown = await handleRequest(
       new Request("https://example.com/lib/exe/ajax.php?call=missing"),
       env
@@ -1083,7 +1096,7 @@ describe("handleRequest", () => {
     expect(linkwizNamespaceHtml).toContain("jump to parent namespace");
     expect(linkwizNamespaceHtml).toContain('class="even type_f"');
     await expect(index.text()).resolves.toContain('<ul class="idx">');
-    expect(lock.headers.get("content-type")).toContain("application/json");
+    expect(lock.headers.get("content-type")).toContain("text/html");
     await expect(lock.json()).resolves.toMatchObject({
       errors: [],
       lock: "1",
@@ -1119,7 +1132,111 @@ describe("handleRequest", () => {
       ns: "wiki"
     });
     expect(state.media.some((media) => media.id === "wiki:ajax.png")).toBe(true);
-    expect(unknown.status).toBe(400);
+    expect(missingCall.status).toBe(404);
+    await expect(missingCall.text()).resolves.toBe("");
+    expect(unknown.status).toBe(200);
+    await expect(unknown.text()).resolves.toBe("AJAX call 'missing' unknown!\n");
+  });
+
+  it("matches upstream AJAX auth failures and logged-in sectok checks", async () => {
+    env.EXTERNAL_AUTH_MODE = "cloudflare_access";
+    const authHeaders = {
+      "cf-access-authenticated-user-email": "kiwi@example.com"
+    };
+    state.drafts = [
+      {
+        id: "draft:wiki:welcome:anonymous",
+        page_id: "wiki:welcome",
+        user_id: null,
+        content: "Draft text",
+        base_revision_id: "wiki:welcome@2026-05-07T00:00:00.000Z",
+        updated_at: "2026-05-07T00:00:00.000Z"
+      }
+    ];
+
+    const badDraftDelete = new FormData();
+    badDraftDelete.set("call", "draftdel");
+    badDraftDelete.set("id", "wiki:welcome");
+    const rejectedDraftDelete = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: badDraftDelete,
+        headers: authHeaders
+      }),
+      env
+    );
+
+    expect(rejectedDraftDelete.status).toBe(200);
+    await expect(rejectedDraftDelete.text()).resolves.toBe("");
+    expect(state.drafts).toHaveLength(1);
+
+    const goodDraftDelete = new FormData();
+    goodDraftDelete.set("call", "draftdel");
+    goodDraftDelete.set("id", "wiki:welcome");
+    goodDraftDelete.set("sectok", TEST_CSRF_TOKEN);
+    const acceptedDraftDelete = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: goodDraftDelete,
+        headers: csrfHeaders(authHeaders)
+      }),
+      env
+    );
+
+    expect(acceptedDraftDelete.status).toBe(200);
+    expect(state.drafts).toHaveLength(0);
+
+    const badUpload = new FormData();
+    badUpload.set("call", "mediaupload");
+    badUpload.set("ns", "wiki");
+    badUpload.set("mediaid", "blocked.png");
+    badUpload.set(
+      "qqfile",
+      new File([uint8ArrayToArrayBuffer(TEST_PIXEL_PNG)], "blocked.png", { type: "image/png" })
+    );
+    const rejectedUpload = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: badUpload,
+        headers: authHeaders
+      }),
+      env
+    );
+
+    expect(rejectedUpload.status).toBe(200);
+    expect(rejectedUpload.headers.get("content-type")).toBe("application/json");
+    await expect(rejectedUpload.json()).resolves.toEqual({
+      error: "Security Token did not match. Possible CSRF attack.",
+      ns: "wiki"
+    });
+    expect(state.media.some((media) => media.id === "wiki:blocked.png")).toBe(false);
+
+    state.aclRules = [aclRule("*", "all", "@ALL", 0), aclRule("wiki:welcome", "all", "@ALL", 1)];
+    const deniedLock = new FormData();
+    deniedLock.set("call", "lock");
+    deniedLock.set("id", "wiki:welcome");
+    const lock = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php", {
+        method: "POST",
+        body: deniedLock
+      }),
+      env
+    );
+
+    expect(lock.status).toBe(200);
+    expect(lock.headers.get("content-type")).toContain("text/html");
+    await expect(lock.json()).resolves.toEqual({
+      errors: ["Permission to write this page has been denied."],
+      lock: "0",
+      draft: ""
+    });
+
+    const details = await handleRequest(
+      new Request("https://example.com/lib/exe/ajax.php?call=mediadetails&image=wiki:logo.svg"),
+      env
+    );
+    expect(details.status).toBe(200);
+    await expect(details.text()).resolves.toContain("Permission denied for 'wiki:logo.svg'.");
   });
 
   it("returns explicit not-implemented responses for legacy remote API entrypoints", async () => {
@@ -1345,16 +1462,17 @@ describe("handleRequest", () => {
       ["/doku.php?do=admin&page=safefnrecode", 501, "text/html"],
       ["/media-detail/wiki/logo.svg?mediado=diff&rev=media-rev-1", 200, "text/html"],
       ["/lib/exe/ajax.php?call=qsearch&q=welcome", 200, "text/html"],
+      ["/lib/exe/ajax.php", 404, "text/html"],
       ["/lib/exe/ajax.php?call=suggestions&q=welcome", 200, "application/x-suggestions+json"],
       ["/lib/exe/ajax.php?call=linkwiz&q=welcome", 200, "text/html"],
       ["/lib/exe/ajax.php?call=index&idx=wiki", 200, "text/html"],
-      ["/lib/exe/ajax.php?call=lock&id=wiki:welcome", 200, "application/json"],
+      ["/lib/exe/ajax.php?call=lock&id=wiki:welcome", 200, "text/html"],
       ["/lib/exe/ajax.php?call=draftdel&id=wiki:welcome", 200, "text/html"],
       ["/lib/exe/ajax.php?call=medians&ns=wiki", 200, "text/html"],
       ["/lib/exe/ajax.php?call=medialist&ns=wiki", 200, "text/html"],
       ["/lib/exe/ajax.php?call=mediadetails&image=wiki:logo.svg", 200, "text/html"],
       ["/lib/exe/ajax.php?call=mediadiff&image=wiki:logo.svg&rev=media-rev-1", 200, "text/html"],
-      ["/lib/exe/ajax.php?call=mediaupload&ns=wiki", 400, "application/json"],
+      ["/lib/exe/ajax.php?call=mediaupload&ns=wiki", 200, "application/json"],
       ["/lib/exe/indexer.php", 200, "image/gif"],
       ["/lib/exe/xmlrpc.php", 501, "application/json"],
       ["/lib/exe/jsonrpc.php", 501, "application/json"],
@@ -4772,6 +4890,18 @@ function createD1Stub(state: D1StubState): D1Database {
             );
           }
 
+          if (sql.includes("from users")) {
+            const [email, username] = values.map((value) => String(value).toLowerCase());
+            return (
+              state.users.find(
+                (user) =>
+                  user.is_disabled === 0 &&
+                  (String(user.email ?? "").toLowerCase() === email ||
+                    String(user.username ?? "").toLowerCase() === username)
+              ) ?? null
+            );
+          }
+
           if (sql.includes("from media")) {
             return state.media.find((media) => media.id === id && media.is_deleted === 0) ?? null;
           }
@@ -4812,6 +4942,14 @@ function createD1Stub(state: D1StubState): D1Database {
               results: sql.includes("where scope = ?")
                 ? state.aclRules.filter((rule) => rule.scope === idOrLimit)
                 : [...state.aclRules]
+            };
+          }
+
+          if (sql.includes("from groups g") && sql.includes("join user_groups")) {
+            return {
+              results: state.userGroups
+                .filter((group) => group.user_id === idOrLimit)
+                .map((group) => ({ name: group.name }))
             };
           }
 
@@ -5578,6 +5716,25 @@ function seedMediaRevisions(): Record<string, unknown>[] {
 
 function seedAclRules(): Record<string, unknown>[] {
   return [aclRule("*", "all", "@ALL", 16)];
+}
+
+function seedUsers(): Record<string, unknown>[] {
+  return [
+    {
+      id: "user-kiwi",
+      username: "kiwi",
+      display_name: "Kiwi",
+      email: "kiwi@example.com",
+      password_hash: null,
+      is_disabled: 0,
+      created_at: "2026-05-07T00:00:00.000Z",
+      updated_at: "2026-05-07T00:00:00.000Z"
+    }
+  ];
+}
+
+function seedUserGroups(): Record<string, unknown>[] {
+  return [{ user_id: "user-kiwi", name: "user" }];
 }
 
 function base64Bytes(value: string): Uint8Array {
