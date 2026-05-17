@@ -79,6 +79,18 @@ export async function regenerateUserAuthToken(
   return saveNewUserAuthToken(env, principal.username);
 }
 
+export async function deleteStoredUserAuthToken(env: Env, username: string): Promise<void> {
+  await env.DB
+    .prepare(
+      `delete from metadata
+       where subject_type = 'plugin'
+         and subject_id = ?
+         and key = ?`
+    )
+    .bind(authTokenSubject(username), AUTH_TOKEN_KEY)
+    .run();
+}
+
 function authTokenFromRequest(request: Request): string | null {
   const dokuwikiHeader = request.headers.get("x-dokuwiki-token")?.trim();
   if (dokuwikiHeader) return dokuwikiHeader;

@@ -2172,6 +2172,16 @@ describe("auth routes", () => {
     deleteForm.set("run", "delete");
     deleteForm.set("delete", "user-charlie");
     deleteForm.set("returnTo", "/admin/users?usergroups=guest");
+    await env.DB.prepare(
+      `insert into metadata (subject_type, subject_id, key, value_json, updated_at)
+       values ('plugin', ?, 'auth_token', ?, ?)`
+    )
+      .bind(
+        "auth-token:charlie",
+        JSON.stringify({ token: "stale-token", issuedAt: 1_770_000_000 }),
+        "2026-02-01T00:00:00.000Z"
+      )
+      .run();
 
     const deleted = await handleRequest(
       new Request("https://example.com/api/admin/users", {
@@ -2186,6 +2196,17 @@ describe("auth routes", () => {
     expect(deleted.headers.get("location")).toBe("/admin/users?usergroups=guest&deleted=1");
     await expect(
       env.DB.prepare("select id from users where id = ?").bind("user-charlie").first()
+    ).resolves.toBeNull();
+    await expect(
+      env.DB.prepare(
+        `select subject_id
+         from metadata
+         where subject_type = 'plugin'
+           and subject_id = ?
+           and key = 'auth_token'`
+      )
+        .bind("auth-token:charlie")
+        .first()
     ).resolves.toBeNull();
     await expect(
       env.DB.prepare("select action, target_type, target_id from audit_log where action = ?")
