@@ -3181,10 +3181,19 @@ describe("auth routes", () => {
       }
     }
 
-    const diagnostics = await handleRequest(
+    const diagnosticsAnonymous = await handleRequest(
       new Request("https://example.com/api/diagnostics"),
       env
     );
+    expect(diagnosticsAnonymous.status).toBe(403);
+
+    const diagnostics = await handleRequest(
+      new Request("https://example.com/api/diagnostics", {
+        headers: { cookie }
+      }),
+      env
+    );
+    expect(diagnostics.status).toBe(200);
     const diagnosticsPayload = await diagnostics.json();
     expect(diagnosticsPayload).toMatchObject({
       quotas: {
@@ -3254,10 +3263,19 @@ describe("auth routes", () => {
       }
     });
     expect(JSON.stringify(diagnosticsPayload)).not.toContain("super-secret-bind-password");
-    const diagnosticsHtml = await handleRequest(
+    const diagnosticsHtmlAnonymous = await handleRequest(
       new Request("https://example.com/diagnostics"),
       env
     );
+    expect(diagnosticsHtmlAnonymous.status).toBe(403);
+
+    const diagnosticsHtml = await handleRequest(
+      new Request("https://example.com/diagnostics", {
+        headers: { cookie }
+      }),
+      env
+    );
+    expect(diagnosticsHtml.status).toBe(200);
     const diagnosticsBody = await diagnosticsHtml.text();
     expect(diagnosticsBody).toContain("<h2>Cloudflare quota checks</h2>");
     expect(diagnosticsBody).toContain("<h2>Plugin enablement</h2>");
