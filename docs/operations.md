@@ -42,7 +42,10 @@ npm run backup:verify -- --backup .wrangler/backups/pre-launch
 - installs dependencies with `npm ci`
 - runs `npm run backup:export` against the configured D1 database and R2 bucket
 - runs `npm run backup:verify` and writes `backup-verification.json`
-- uploads the verified backup directory as a GitHub Actions artifact
+
+The workflow does **not** upload full backup contents as a GitHub Actions
+artifact. Operators should retrieve backups only through operator-controlled
+storage and access paths.
 
 Configure these repository secrets before enabling the schedule:
 
@@ -54,13 +57,6 @@ Optional repository variables:
 
 - `BACKUP_DATABASE`, defaulting to `dokuwiki_pages_dev`
 - `BACKUP_BUCKET`, defaulting to `dokuwiki-pages-dev-media`
-- `BACKUP_ARTIFACT_RETENTION_DAYS`, defaulting to `14`
-
-Backup artifacts contain wiki page bodies, auth metadata, media metadata, and
-media files. Keep workflow access limited to operators who are allowed to read a
-full production backup. For longer retention, download or mirror the artifact to
-operator-owned durable storage and rehearse restores against a non-production
-target.
 
 ## Restore Workflow
 
