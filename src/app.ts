@@ -426,6 +426,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/api/diagnostics") {
+    if (!isAdminPrincipal(principal, env)) return adminDeniedResponse(request, env);
     return jsonResponse(await collectDiagnostics(env));
   }
 
@@ -530,6 +531,7 @@ async function dispatchRequest(
   }
 
   if (url.pathname === "/admin/diagnostics" || url.pathname === "/diagnostics") {
+    if (!isAdminPrincipal(principal, env)) return adminDeniedResponse(request, env);
     return htmlResponse(await renderDiagnosticsPage(env));
   }
 
