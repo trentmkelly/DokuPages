@@ -3,7 +3,7 @@ import { collectDiagnostics } from "./diagnostics";
 import { jsonResponse } from "./responses";
 
 export async function healthResponse(env: Env): Promise<Response> {
-  const diagnostics = await collectDiagnostics(env);
+  const diagnostics = await collectDiagnostics(env, { includeQuotas: false });
 
   return jsonResponse({
     ok: diagnostics.ok,
