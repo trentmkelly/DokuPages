@@ -3080,6 +3080,10 @@ async function handleAjaxLock(
     params.has(key)
   );
   if (config.useDraft && hasDraftPayload) {
+    if (!ajaxSecurityTokenValid(request, params, env, principal)) {
+      response.errors.push(AJAX_SECURITY_TOKEN_ERROR);
+      return ajaxTextJsonResponse(response);
+    }
     let content = normalizeWikiTextInput(
       String(params.get("content") ?? params.get("wikitext") ?? params.get("TEXT") ?? "")
     );
@@ -3123,9 +3127,21 @@ async function handleAjaxDraftDelete(
   principal: AuthPrincipal
 ): Promise<Response> {
   const id = cleanPageId(params.get("id") ?? "", getRuntimeConfig(env).pageIdCleanOptions);
-  if (id && ajaxSecurityTokenValid(request, params, env, principal)) {
-    await deletePageDraft(env.DB, id);
+  if (!id) return ajaxHtmlResponse("");
+
+  if (!ajaxSecurityTokenValid(request, params, env, principal)) {
+    return ajaxHtmlResponse("");
   }
+
+  const page = await getCurrentPage(env.DB, id);
+  const rules = await listAclRules(env);
+  const permission = resolveConfiguredAclPermission(env, rules, id, principal);
+  const requiredPermission = page ? ACL_EDIT : ACL_CREATE;
+  if (!hasAclPermission(permission, requiredPermission)) {
+    return ajaxHtmlResponse("");
+  }
+
+  await deletePageDraft(env.DB, id);
   return ajaxHtmlResponse("");
 }
 
