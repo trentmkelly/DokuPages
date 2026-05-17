@@ -97,7 +97,10 @@ export interface ImportJobStatus {
   finishedAt: string | null;
 }
 
-export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot> {
+export async function collectDiagnostics(
+  env: Env,
+  options: { includeQuotas?: boolean } = {}
+): Promise<DiagnosticsSnapshot> {
   const runtimeConfig = getRuntimeConfig(env);
   const config = validateRuntimeConfig(env);
   const storage = {
@@ -106,7 +109,7 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
     r2: await checkR2(env),
     durableObjects: checkDurableObjects(env)
   };
-  const quotas = await readQuotaStatus(env, storage.d1.ok);
+  const quotas = options.includeQuotas === false ? quotaUnavailableSnapshot(env) : await readQuotaStatus(env, storage.d1.ok);
   const migration = await readMigrationStatus(env, storage.d1.ok);
   const plugins = storage.d1.ok
     ? await readImportedPluginEnablement(env.DB)
@@ -155,6 +158,20 @@ export async function collectDiagnostics(env: Env): Promise<DiagnosticsSnapshot>
       php: infoRowsToRecord(phpCompatibilityInfoRows()),
       dokuwiki: infoRowsToRecord(dokuWikiCompatibilityInfoRows())
     }
+  };
+}
+
+function quotaUnavailableSnapshot(env: Env): DiagnosticsSnapshot["quotas"] {
+  const thresholds = {
+    d1Logical: integerEnv(env.QUOTA_D1_LOGICAL_WARN_BYTES),
+    r2Referenced: integerEnv(env.QUOTA_R2_REFERENCED_WARN_BYTES),
+    renderedCache: integerEnv(env.QUOTA_RENDER_CACHE_WARN_BYTES)
+  };
+
+  return {
+    d1Logical: quotaUnavailable(thresholds.d1Logical, "Quota diagnostics are restricted for this endpoint."),
+    r2Referenced: quotaUnavailable(thresholds.r2Referenced, "Quota diagnostics are restricted for this endpoint."),
+    renderedCache: quotaUnavailable(thresholds.renderedCache, "Quota diagnostics are restricted for this endpoint.")
   };
 }
 
