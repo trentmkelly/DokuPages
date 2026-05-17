@@ -17,7 +17,11 @@ import {
   type CookieHeaderOptions
 } from "./auth/session";
 import { hashPassword } from "./auth/password";
-import { getOrCreateUserAuthToken, regenerateUserAuthToken } from "./auth/authtoken";
+import {
+  deleteStoredUserAuthToken,
+  getOrCreateUserAuthToken,
+  regenerateUserAuthToken
+} from "./auth/authtoken";
 import { getTurnstileConfig, verifyTurnstileForm } from "./auth/turnstile";
 import { emitAuthEvent, type AuthEventName } from "./auth/events";
 import { hmacMd5Hex } from "./crypto/hmac-md5";
@@ -9692,7 +9696,7 @@ async function deleteManagedUsers(env: Env, userIds: string[]): Promise<ManagedU
   for (const userId of userIds) {
     const user = await getManagedUser(env.DB, userId);
     if (!user) continue;
-    await deleteProfileUserRows(env, user.id);
+    await deleteProfileUserRows(env, user.id, user.username);
     deleted.push(user);
   }
 
@@ -10886,7 +10890,7 @@ async function handleProfileDelete(
     }
   }
 
-  await deleteProfileUserRows(env, principal.id);
+  await deleteProfileUserRows(env, principal.id, principal.username);
 
   logAuthEvent(request, env, "profile_delete", {
     userId: principal.id,
@@ -10965,7 +10969,9 @@ function formFlag(form: FormData, name: string): boolean {
   return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
-async function deleteProfileUserRows(env: Env, userId: string): Promise<void> {
+async function deleteProfileUserRows(env: Env, userId: string, username: string): Promise<void> {
+  await deleteStoredUserAuthToken(env, username);
+
   await env.DB.batch([
     env.DB.prepare(
       `delete from email_digest_deliveries
