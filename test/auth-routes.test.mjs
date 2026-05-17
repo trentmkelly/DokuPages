@@ -1357,7 +1357,7 @@ describe("auth routes", () => {
     expect(blankSameSiteCookie).not.toContain("Secure");
   });
 
-  it("resolves synced external users from Cloudflare Access headers", async () => {
+  it("does not trust Cloudflare Access identity headers without verified assertions", async () => {
     env = createEnv({
       EXTERNAL_AUTH_MODE: "cloudflare_access",
       EXTERNAL_AUTH_EMAIL_HEADER: "CF-Access-Authenticated-User-Email"
@@ -1383,12 +1383,8 @@ describe("auth routes", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       principal: {
-        type: "user",
-        isAuthenticated: true,
-        username: "kiwi",
-        displayName: "Kiwi Example",
-        groups: ["ldap", "user"],
-        aclSubjects: ["@ALL", "@ldap", "@user", "kiwi"]
+        type: "anonymous",
+        isAuthenticated: false
       }
     });
   });
